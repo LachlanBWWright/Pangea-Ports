@@ -1,6 +1,0 @@
-[submodule "extern/Pomme"]
-	path = extern/Pomme
-	url = https://github.com/jorio/Pomme
-[submodule "extern/SDL"]
-	path = extern/SDL
-	url = https://github.com/libsdl-org/SDL
