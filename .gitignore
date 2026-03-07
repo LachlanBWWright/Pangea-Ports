@@ -3,6 +3,8 @@
 **/.cache/
 **/.emsdk/
 **/.pytest_cache/
+**/__pycache__/
+**/*.pyc
 **/build/
 **/build-*/
 **/cmake-build-*/

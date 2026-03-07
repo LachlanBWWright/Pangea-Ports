@@ -14,6 +14,7 @@ DOC_ASSET_SUFFIXES = {'.html', '.htm', '.css', '.js', '.png', '.webp', '.jpg', '
 PORTS = [
     {
         'name': 'BillyFrontier-Android',
+        'display_name': 'Billy Frontier',
         'path': 'games/BillyFrontier-Android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--emscripten', '--dependencies', '--configure', '--build'],
@@ -24,17 +25,28 @@ PORTS = [
             'build/billyfrontier.data',
         ],
         'wasm_entrypoint': 'billyfrontier.html',
+        'wasm_stage_subdir': 'game',
+        'wasm_stage_rename': {
+            'billyfrontier.html': 'billyfrontier.html',
+            'billyfrontier.js': 'billyfrontier.js',
+            'billyfrontier.wasm': 'billyfrontier.wasm',
+            'billyfrontier.data': 'billyfrontier.data',
+        },
+        'site_launch_path': 'game/billyfrontier.html',
+        'site_level_example': 'game/billyfrontier.html?level=1',
+        'site_override_example': "Module.FS.writeFile('Data/Terrain/custom_level.ter', bytes); Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'])",
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
-            'status': 'unsupported',
-            'web': None,
-            'native': None,
-            'notes': 'This port does not currently expose a documented direct level skip entry point.',
+            'status': 'supported',
+            'web': '?level=N',
+            'native': '--level N',
+            'notes': 'Supports direct area launch plus terrain override via ?terrainFile=... and BF_LoadTerrainData().',
         },
     },
     {
         'name': 'Bugdom-android',
+        'display_name': 'Bugdom',
         'path': 'games/Bugdom-android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build_wasm.py', '--dependencies', '--configure', '--build', '--package'],
@@ -45,6 +57,16 @@ PORTS = [
             'dist-wasm/Bugdom.data',
         ],
         'wasm_entrypoint': 'Bugdom.html',
+        'wasm_stage_subdir': '',
+        'wasm_stage_rename': {
+            'Bugdom.html': 'game.html',
+            'Bugdom.js': 'Bugdom.js',
+            'Bugdom.wasm': 'Bugdom.wasm',
+            'Bugdom.data': 'Bugdom.data',
+        },
+        'site_launch_path': 'game.html',
+        'site_level_example': 'game.html?level=3',
+        'site_override_example': '?terrainFile=:Terrain:Custom.ter or Module.ccall(\'BugdomSetTerrainOverride\', null, [\'string\'], [\':Terrain:Custom.ter\'])',
         'android_apk': False,
         'browser_test': 'bugdom-wasm',
         'skip_to_level': {
@@ -56,6 +78,7 @@ PORTS = [
     },
     {
         'name': 'Bugdom2-Android',
+        'display_name': 'Bugdom 2',
         'path': 'games/Bugdom2-Android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--emscripten', '--dependencies', '--configure', '--build', '--package'],
@@ -66,6 +89,10 @@ PORTS = [
             'build/Bugdom2.data',
         ],
         'wasm_entrypoint': 'Bugdom2.html',
+        'wasm_stage_subdir': '',
+        'site_launch_path': 'Bugdom2.html',
+        'site_level_example': 'Bugdom2.html?level=3',
+        'site_override_example': "Module.FS.writeFile('Data/Terrain/Level1_Garden.ter', bytes)",
         'android_apk': True,
         'android_package': 'io.jor.bugdom2',
         'browser_test': 'bugdom2-playwright',
@@ -78,6 +105,7 @@ PORTS = [
     },
     {
         'name': 'CroMagRally-Android',
+        'display_name': 'Cro-Mag Rally',
         'path': 'games/CroMagRally-Android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py'],
@@ -88,6 +116,10 @@ PORTS = [
             'build-wasm/CroMagRally.data',
         ],
         'wasm_entrypoint': 'CroMagRally.html',
+        'wasm_stage_subdir': 'game',
+        'site_launch_path': 'game/CroMagRally.html',
+        'site_level_example': 'game/CroMagRally.html?track=2&car=1',
+        'site_override_example': '?levelOverride=:Terrain:MyLevel.ter',
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -99,6 +131,7 @@ PORTS = [
     },
     {
         'name': 'MightyMike-Android',
+        'display_name': 'Mighty Mike',
         'path': 'games/MightyMike-Android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm', '--dependencies', '--configure', '--build', '--package'],
@@ -107,6 +140,10 @@ PORTS = [
             'build-wasm/MightyMike.wasm',
         ],
         'wasm_entrypoint': 'index.html',
+        'wasm_stage_subdir': '',
+        'site_launch_path': '',
+        'site_level_example': '?level=1:1',
+        'site_override_example': '?mapOverride=:Maps:custom.map-1',
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -118,6 +155,7 @@ PORTS = [
     },
     {
         'name': 'Nanosaur-android',
+        'display_name': 'Nanosaur',
         'path': 'games/Nanosaur-android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm'],
@@ -128,6 +166,16 @@ PORTS = [
             'build-wasm/Nanosaur.data',
         ],
         'wasm_entrypoint': 'Nanosaur.html',
+        'wasm_stage_subdir': 'game',
+        'wasm_stage_rename': {
+            'Nanosaur.html': 'index.html',
+            'Nanosaur.js': 'Nanosaur.js',
+            'Nanosaur.wasm': 'Nanosaur.wasm',
+            'Nanosaur.data': 'Nanosaur.data',
+        },
+        'site_launch_path': 'game/index.html',
+        'site_level_example': 'game/index.html?level=0&skipMenu=1',
+        'site_override_example': '?terrainFile=:Terrain:custom.ter',
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -139,6 +187,7 @@ PORTS = [
     },
     {
         'name': 'Nanosaur2-Android',
+        'display_name': 'Nanosaur 2',
         'path': 'games/Nanosaur2-Android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm'],
@@ -149,6 +198,10 @@ PORTS = [
             'build-wasm/Nanosaur2.data',
         ],
         'wasm_entrypoint': 'Nanosaur2.html',
+        'wasm_stage_subdir': '',
+        'site_launch_path': 'Nanosaur2.html',
+        'site_level_example': 'Nanosaur2.html?level=0',
+        'site_override_example': '?terrainOverride=:Terrain:custom.ter',
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -160,6 +213,7 @@ PORTS = [
     },
     {
         'name': 'OttoMatic-Android',
+        'display_name': 'Otto Matic',
         'path': 'games/OttoMatic-Android',
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm'],
@@ -170,6 +224,10 @@ PORTS = [
             'build/OttoMatic.data',
         ],
         'wasm_entrypoint': 'OttoMatic.html',
+        'wasm_stage_subdir': '',
+        'site_launch_path': 'OttoMatic.html',
+        'site_level_example': 'OttoMatic.html?level=1',
+        'site_override_example': '?terrain=/Data/Terrain/custom.ter',
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -205,15 +263,22 @@ def _run_command(command: list[str], cwd: Path) -> None:
 
 def _copy_if_exists(source: Path, dest_dir: Path) -> None:
     if source.exists():
+        dest_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, dest_dir / source.name)
 
 
 def _stage_wasm(port: dict, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     game_root = ROOT / port['path']
+    stage_subdir = port.get('wasm_stage_subdir', '')
+    wasm_dest = dest / stage_subdir if stage_subdir else dest
+    rename_map = port.get('wasm_stage_rename', {})
     for relative_path in port['wasm_outputs']:
         source = game_root / relative_path
-        _copy_if_exists(source, dest)
+        if source.exists():
+            wasm_dest.mkdir(parents=True, exist_ok=True)
+            target_name = rename_map.get(source.name, source.name)
+            shutil.copy2(source, wasm_dest / target_name)
 
     docs_dir = game_root / 'docs'
     if docs_dir.exists():

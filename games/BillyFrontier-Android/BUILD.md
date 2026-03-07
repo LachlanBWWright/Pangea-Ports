@@ -102,3 +102,12 @@ If you want to build the game **manually** instead, the rest of this document de
     Then open `http://localhost:8080/billyfrontier.html` in your browser.
 
     **Note**: A plain `file://` URL won't work — the browser needs HTTP headers to load the `.wasm` and `.data` files.
+
+### Level editor / direct-launch hooks
+
+- `?level=N` — jump directly into area `N`, skipping the title/menu flow
+- `?terrainFile=:Terrain:custom_level.ter` — override the terrain file used for the next level load
+- `--level N` — native desktop equivalent of the query-string level jump
+- `--terrain-file :Terrain:custom_level.ter` — native desktop equivalent terrain override
+
+The legacy hash-based format (`#level=N&terrain=...`) is still accepted in WebAssembly builds for backward compatibility.

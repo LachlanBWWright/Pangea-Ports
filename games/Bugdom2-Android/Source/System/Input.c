@@ -10,8 +10,15 @@
 
 #define MOUSE_SMOOTHING 1
 
-#define kJoystickDeadZoneFrac			(.33f)
-#define kJoystickDeadZoneFrac_UI		(.66f)
+#if defined(__ANDROID__)
+	// Android virtual thumbsticks and compact physical controllers feel much
+	// better with a slightly smaller dead zone so short drags register sooner.
+	#define kJoystickDeadZoneFrac			(.22f)
+	#define kJoystickDeadZoneFrac_UI		(.45f)
+#else
+	#define kJoystickDeadZoneFrac			(.33f)
+	#define kJoystickDeadZoneFrac_UI		(.66f)
+#endif
 
 #if MOUSE_SMOOTHING
 static const int kMouseSmoothingAccumulatorWindowNanoseconds = 10 * 1e6;  // 10 milliseconds

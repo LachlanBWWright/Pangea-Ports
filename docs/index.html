@@ -9,142 +9,377 @@
       color-scheme: dark;
       --bg: #09111f;
       --panel: #13203a;
+      --panel-2: #0e1b33;
       --accent: #8cd0ff;
+      --accent-2: #ffd280;
       --text: #edf5ff;
       --muted: #c2d4e7;
       --border: #27456f;
+      --border-2: #355a8f;
+      --shadow: rgba(0, 0, 0, 0.35);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #0a1426, #0f1a31 50%, #0a1426);
+      background: radial-gradient(circle at top, #122446 0%, #0b1528 45%, #09111f 100%);
       color: var(--text);
     }
     main {
-      max-width: 1100px;
+      max-width: 1180px;
       margin: 0 auto;
       padding: 2rem 1rem 4rem;
     }
     header {
-      margin-bottom: 2rem;
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
     }
     h1 {
-      margin: 0 0 .5rem;
-      font-size: clamp(2rem, 4vw, 3rem);
+      margin: 0;
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
     }
-    p { color: var(--muted); line-height: 1.5; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: rgba(19, 32, 58, 0.88);
+    p { color: var(--muted); line-height: 1.6; margin: 0; }
+    .hero {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 2fr 1fr;
+      align-items: start;
+      margin-bottom: 1.5rem;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(19, 32, 58, 0.95), rgba(12, 25, 48, 0.92));
       border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px var(--shadow);
+    }
+    .card.pad { padding: 1.1rem 1.2rem; }
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      padding: 0;
+      list-style: none;
+      margin: .75rem 0 0;
+    }
+    .pill-list li {
+      padding: .4rem .7rem;
+      border: 1px solid var(--border-2);
+      border-radius: 999px;
+      color: var(--text);
+      background: rgba(255,255,255,.05);
+      font-size: .9rem;
+    }
+    .meta-grid {
+      display: grid;
+      gap: .75rem;
+    }
+    .meta-grid strong { display: block; margin-bottom: .2rem; }
+    .warning {
+      margin-top: 1rem;
+      padding: .85rem 1rem;
       border-radius: 12px;
-      overflow: hidden;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      font-size: .95rem;
     }
-    th, td {
-      padding: .9rem;
+    .tab-shell {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .tab-list {
+      padding: .75rem;
+      display: grid;
+      gap: .45rem;
+      align-self: start;
+      position: sticky;
+      top: 1rem;
+    }
+    .tab-button {
+      width: 100%;
       text-align: left;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid transparent;
+      border-radius: 12px;
+      padding: .8rem .9rem;
+      cursor: pointer;
+      font: inherit;
+      transition: background .18s ease, border-color .18s ease, transform .18s ease;
     }
-    th {
-      background: rgba(39, 69, 111, 0.45);
+    .tab-button:hover {
+      background: rgba(255,255,255,.05);
+      border-color: var(--border);
+      transform: translateY(-1px);
     }
-    tr:last-child td { border-bottom: 0; }
-    a {
-      color: var(--accent);
+    .tab-button[aria-selected="true"] {
+      background: rgba(140, 208, 255, 0.12);
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(140, 208, 255, 0.2);
+    }
+    .tab-button small {
+      display: block;
+      color: var(--muted);
+      margin-top: .2rem;
+      font-size: .82rem;
+    }
+    .tab-panel {
+      display: none;
+      padding: 1.2rem;
+    }
+    .tab-panel.active { display: block; }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: start;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .panel-header h2 { margin: 0 0 .35rem; font-size: 1.8rem; }
+    .panel-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: .72rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-2);
       text-decoration: none;
-      font-weight: 600;
+      color: var(--text);
+      font-weight: 700;
+      background: rgba(255,255,255,.04);
+      min-width: 9rem;
     }
-    a:hover { text-decoration: underline; }
-    code {
+    .btn.primary {
+      background: linear-gradient(180deg, rgba(140, 208, 255, .18), rgba(140, 208, 255, .08));
+      border-color: var(--accent);
+    }
+    .btn.secondary { border-color: var(--accent-2); }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .detail-card {
+      padding: 1rem;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+    }
+    .detail-card h3 {
+      margin: 0 0 .55rem;
+      color: var(--accent);
+      font-size: .92rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    code, pre {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: .92em;
+    }
+    code {
       background: rgba(255,255,255,.08);
       padding: .15rem .35rem;
       border-radius: 6px;
+      word-break: break-word;
     }
-    .note {
-      margin-top: 1.25rem;
-      padding: 1rem;
+    pre {
+      margin: .5rem 0 0;
+      white-space: pre-wrap;
+      background: rgba(4, 12, 26, 0.8);
       border: 1px solid var(--border);
       border-radius: 12px;
-      background: rgba(19, 32, 58, 0.7);
+      padding: .8rem .9rem;
+      color: #d9ecff;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .35rem .7rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: .88rem;
+      margin-top: .35rem;
+    }
+    .status.supported { border-color: #3f8c66; color: #bbf4d5; }
+    .status.partial { border-color: #9a8041; color: #ffe4a0; }
+    .status.limited { border-color: #7a5970; color: #f3c8ea; }
+    footer {
+      margin-top: 1.5rem;
+      color: #93acc7;
+      text-align: center;
+      font-size: .84rem;
+    }
+    footer a { color: var(--accent); }
+    @media (max-width: 900px) {
+      .hero, .tab-shell, .detail-grid { grid-template-columns: 1fr; }
+      .tab-list { position: static; }
     }
   </style>
 </head>
 <body>
   <main>
     <header>
-      <h1>Pangea Ports</h1>
-      <p>A single Pages landing site for the imported Android/WASM Pangea ports. Use the direct play links for browser testing, and use the level-entry examples where the underlying game already supports menu-skipping or direct level boot.</p>
+      <div>
+        <h1>Pangea Ports</h1>
+        <p>This GitHub Pages site hosts the monorepo WebAssembly builds for all imported Pangea ports. Use the selector below to switch games, jump directly into testable levels, and see the current override hooks used by the level-editor workflow.</p>
+      </div>
     </header>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Game</th>
-          <th>Play</th>
-          <th>Direct-level example</th>
-          <th>Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Billy Frontier</td>
-          <td><a href="./BillyFrontier-Android/billyfrontier.html">Launch</a></td>
-          <td>—</td>
-          <td>No standardized skip-to-level entrypoint is currently documented in this port.</td>
-        </tr>
-        <tr>
-          <td>Bugdom</td>
-          <td><a href="./Bugdom-android/Bugdom.html">Launch</a></td>
-          <td><a href="./Bugdom-android/Bugdom.html?level=3"><code>?level=3</code></a></td>
-          <td>Supports terrain override and dev helpers for editor testing.</td>
-        </tr>
-        <tr>
-          <td>Bugdom 2</td>
-          <td><a href="./Bugdom2-Android/Bugdom2.html">Launch</a></td>
-          <td><a href="./Bugdom2-Android/Bugdom2.html?level=3"><code>?level=3</code></a></td>
-          <td>Most complete browser/editor integration in the imported set.</td>
-        </tr>
-        <tr>
-          <td>Cro-Mag Rally</td>
-          <td><a href="./CroMagRally-Android/CroMagRally.html">Launch</a></td>
-          <td><a href="./CroMagRally-Android/CroMagRally.html?track=2&amp;car=1"><code>?track=2&amp;car=1</code></a></td>
-          <td>Uses track/car selection instead of a single-player level skip.</td>
-        </tr>
-        <tr>
-          <td>Mighty Mike</td>
-          <td><a href="./MightyMike-Android/">Launch</a></td>
-          <td><a href="./MightyMike-Android/?level=1:1"><code>?level=1:1</code></a></td>
-          <td>Level selection uses scene/area identifiers.</td>
-        </tr>
-        <tr>
-          <td>Nanosaur</td>
-          <td><a href="./Nanosaur-android/Nanosaur.html">Launch</a></td>
-          <td><a href="./Nanosaur-android/Nanosaur.html?level=0&amp;skipMenu=1"><code>?level=0&amp;skipMenu=1</code></a></td>
-          <td>Best current direct-boot example for level-editor workflows.</td>
-        </tr>
-        <tr>
-          <td>Nanosaur 2</td>
-          <td><a href="./Nanosaur2-Android/Nanosaur2.html">Launch</a></td>
-          <td><a href="./Nanosaur2-Android/Nanosaur2.html?level=0"><code>?level=0</code></a></td>
-          <td>Supports direct level selection and terrain override flows.</td>
-        </tr>
-        <tr>
-          <td>Otto Matic</td>
-          <td><a href="./OttoMatic-Android/OttoMatic.html">Launch</a></td>
-          <td><a href="./OttoMatic-Android/OttoMatic.html?level=1"><code>?level=1</code></a></td>
-          <td>Includes terrain override hooks for editor-driven testing.</td>
-        </tr>
-      </tbody>
-    </table>
+    <section class="hero">
+      <div class="card pad">
+        <strong>Deployed WebAssembly hub</strong>
+        <p style="margin-top:.45rem">The Pages build now stages each imported game using the directory structure its existing web shell expects, so launch links and in-browser tooling remain consistent after monorepo deployment.</p>
+        <ul class="pill-list">
+          <li>8 vendored games</li>
+          <li>Direct level boot hooks</li>
+          <li>Level data override support</li>
+          <li>GitHub Pages deployment</li>
+        </ul>
+      </div>
+      <div class="card pad meta-grid">
+        <div>
+          <strong>Current Android APK support</strong>
+          <p>Bugdom 2 is still the only imported game with a checked-in Gradle Android app.</p>
+        </div>
+        <div>
+          <strong>Level-editor focus</strong>
+          <p>Each tab documents the currently supported startup and override hooks instead of hiding game-specific differences.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="note">
-      <strong>Android status:</strong> only <code>Bugdom2-Android</code> currently ships a checked-in Gradle Android app project, so it is the only imported game that produces an APK from this monorepo today.
+    <section class="tab-shell">
+      <div class="card tab-list" role="tablist" aria-label="Pangea game selector">
+        <button class="tab-button" role="tab" aria-selected="true" aria-controls="panel-billy" id="tab-billy" data-panel="panel-billy">Billy Frontier<small>Area jump + terrain override</small></button>
+        <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-bugdom" id="tab-bugdom" data-panel="panel-bugdom">Bugdom<small>Level jump + terrain override</small></button>
+        <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-bugdom2" id="tab-bugdom2" data-panel="panel-bugdom2">Bugdom 2<small>Most complete editor workflow</small></button>
+        <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-cromag" id="tab-cromag" data-panel="panel-cromag">Cro-Mag Rally<small>Track/car launch + terrain override</small></button>
+        <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-mighty" id="tab-mighty" data-panel="panel-mighty">Mighty Mike<small>Scene/area launch + map override</small></button>
+        <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-nanosaur" id="tab-nanosaur" data-panel="panel-nanosaur">Nanosaur<small>Direct gameplay boot reference</small></button>
+        <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-nanosaur2" id="tab-nanosaur2" data-panel="panel-nanosaur2">Nanosaur 2<small>Level jump + terrain override</small></button>
+        <button class="tab-button" role="tab" aria-selected="false" aria-controls="panel-otto" id="tab-otto" data-panel="panel-otto">Otto Matic<small>Level jump + terrain override</small></button>
+      </div>
+
+      <div class="card">
+        <section class="tab-panel active" id="panel-billy" role="tabpanel" aria-labelledby="tab-billy">
+          <div class="panel-header"><div><h2>Billy Frontier</h2><p>Direct-launch logic now accepts the same query-string style used elsewhere in the monorepo, while preserving legacy hash support.</p><div class="status supported">Supported: <code>?level=N</code> and <code>?terrainFile=...</code></div></div><div class="panel-actions"><a class="btn primary" href="./BillyFrontier-Android/game/billyfrontier.html">Launch game</a><a class="btn secondary" href="./BillyFrontier-Android/index.html">Docs</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct level boot</h3><p>Jump directly into a specific duel, shootout, stampede, or target-practice area.</p><pre>./BillyFrontier-Android/game/billyfrontier.html?level=1</pre><p>Native equivalent: <code>--level 1</code></p></div>
+            <div class="detail-card"><h3>Level data override</h3><p>Upload a custom terrain file into MEMFS or point the build at an existing colon-style terrain path.</p><pre>Module.FS.writeFile('Data/Terrain/custom_level.ter', bytes)
+Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'])</pre></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-bugdom" role="tabpanel" aria-labelledby="tab-bugdom">
+          <div class="panel-header"><div><h2>Bugdom</h2><p>The Pages build now preserves Bugdom’s expected <code>game.html</code> entrypoint so its existing docs page works unchanged after deployment.</p><div class="status supported">Supported: <code>?level=N</code></div></div><div class="panel-actions"><a class="btn primary" href="./Bugdom-android/game.html">Launch game</a><a class="btn secondary" href="./Bugdom-android/index.html">Docs</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct level boot</h3><pre>./Bugdom-android/game.html?level=3</pre></div>
+            <div class="detail-card"><h3>Level data override</h3><pre>?terrainFile=:Terrain:Custom.ter
+?noFenceCollision=1
+?dev</pre></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-bugdom2" role="tabpanel" aria-labelledby="tab-bugdom2">
+          <div class="panel-header"><div><h2>Bugdom 2</h2><p>The current reference implementation for GitHub Pages, browser jump-to-level workflows, and the checked-in Android app.</p><div class="status supported">Supported: <code>?level=N</code> and JS cheat API</div></div><div class="panel-actions"><a class="btn primary" href="./Bugdom2-Android/index.html">Open page</a><a class="btn secondary" href="./Bugdom2-Android/Bugdom2.html?level=3">Jump to level 3</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct level boot</h3><pre>./Bugdom2-Android/Bugdom2.html?level=3</pre><p>Native equivalent: <code>--level 3</code></p></div>
+            <div class="detail-card"><h3>Level data override</h3><pre>Module.FS.writeFile('Data/Terrain/Level1_Garden.ter', bytes)</pre><p>Write override data before the target level loads.</p></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-cromag" role="tabpanel" aria-labelledby="tab-cromag">
+          <div class="panel-header"><div><h2>Cro-Mag Rally</h2><p>Cro-Mag uses a racing-specific startup contract: pick a track and car, then optionally swap in custom terrain data.</p><div class="status partial">Partial: track/car boot instead of single-level boot</div></div><div class="panel-actions"><a class="btn primary" href="./CroMagRally-Android/game/CroMagRally.html">Launch game</a><a class="btn secondary" href="./CroMagRally-Android/index.html">Docs</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct launch</h3><pre>./CroMagRally-Android/game/CroMagRally.html?track=2&car=1</pre></div>
+            <div class="detail-card"><h3>Level data override</h3><pre>?levelOverride=:Terrain:MyLevel.ter</pre></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-mighty" role="tabpanel" aria-labelledby="tab-mighty">
+          <div class="panel-header"><div><h2>Mighty Mike</h2><p>The Mighty Mike shell already exposes scene/area startup plus map override controls directly in its developer panel.</p><div class="status supported">Supported: <code>?level=SCENE:AREA</code></div></div><div class="panel-actions"><a class="btn primary" href="./MightyMike-Android/">Open page</a><a class="btn secondary" href="./MightyMike-Android/?level=1:1">Jump to 1:1</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct level boot</h3><pre>./MightyMike-Android/?level=1:1</pre></div>
+            <div class="detail-card"><h3>Level data override</h3><pre>?mapOverride=:Maps:custom.map-1</pre></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-nanosaur" role="tabpanel" aria-labelledby="tab-nanosaur">
+          <div class="panel-header"><div><h2>Nanosaur</h2><p>Nanosaur remains the clearest direct-gameplay boot flow for rapid editor iteration: boot level 0 and force menu skipping.</p><div class="status supported">Supported: <code>?level=N&skipMenu=1</code></div></div><div class="panel-actions"><a class="btn primary" href="./Nanosaur-android/game/index.html">Launch game</a><a class="btn secondary" href="./Nanosaur-android/index.html">Docs</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct level boot</h3><pre>./Nanosaur-android/game/index.html?level=0&skipMenu=1</pre></div>
+            <div class="detail-card"><h3>Level data override</h3><pre>?terrainFile=:Terrain:custom.ter</pre></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-nanosaur2" role="tabpanel" aria-labelledby="tab-nanosaur2">
+          <div class="panel-header"><div><h2>Nanosaur 2</h2><p>Direct boot is already supported through the shipped shell, with additional terrain override support for custom test data.</p><div class="status supported">Supported: <code>?level=N</code></div></div><div class="panel-actions"><a class="btn primary" href="./Nanosaur2-Android/Nanosaur2.html">Launch game</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct level boot</h3><pre>./Nanosaur2-Android/Nanosaur2.html?level=0</pre></div>
+            <div class="detail-card"><h3>Level data override</h3><pre>?terrainOverride=:Terrain:custom.ter</pre></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-otto" role="tabpanel" aria-labelledby="tab-otto">
+          <div class="panel-header"><div><h2>Otto Matic</h2><p>Otto’s shell is geared toward editor-driven testing with direct level boot plus terrain replacement hooks.</p><div class="status supported">Supported: <code>?level=N</code></div></div><div class="panel-actions"><a class="btn primary" href="./OttoMatic-Android/OttoMatic.html">Launch game</a></div></div>
+          <div class="detail-grid">
+            <div class="detail-card"><h3>Direct level boot</h3><pre>./OttoMatic-Android/OttoMatic.html?level=1</pre></div>
+            <div class="detail-card"><h3>Level data override</h3><pre>?terrain=/Data/Terrain/custom.ter</pre></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <div class="warning">
+      <strong>Android note:</strong> Bugdom 2 is currently the only imported game with a checked-in Android app module, so it is still the only monorepo game that produces APK artifacts today.
     </div>
+
+    <footer>
+      Pangea Ports monorepo Pages hub · Built from GitHub Actions · <a href="https://github.com/LachlanBWWright/Pangea-Ports">Repository</a>
+    </footer>
   </main>
+  <script>
+    const tabs = Array.from(document.querySelectorAll('.tab-button'));
+    const panels = Array.from(document.querySelectorAll('.tab-panel'));
+
+    function activateTab(tab) {
+      tabs.forEach((candidate) => {
+        const selected = candidate === tab;
+        candidate.setAttribute('aria-selected', selected ? 'true' : 'false');
+        candidate.tabIndex = selected ? 0 : -1;
+      });
+
+      panels.forEach((panel) => {
+        panel.classList.toggle('active', panel.id === tab.dataset.panel);
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activateTab(tab));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
+          return;
+        }
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1;
+        const nextIndex = (index + delta + tabs.length) % tabs.length;
+        tabs[nextIndex].focus();
+        activateTab(tabs[nextIndex]);
+      });
+    });
+  </script>
 </body>
 </html>

@@ -73,6 +73,68 @@ tryAgain:
 	return dataPath;
 }
 
+static void ParseCommandLineArgs(int argc, char** argv)
+{
+	for (int i = 1; i < argc; i++)
+	{
+		if (SDL_strcmp(argv[i], "--level") == 0 && i + 1 < argc)
+		{
+			i++;
+			gDirectLaunchLevel = SDL_atoi(argv[i]);
+		}
+		else if ((SDL_strcmp(argv[i], "--terrain-file") == 0 || SDL_strcmp(argv[i], "--terrain") == 0) && i + 1 < argc)
+		{
+			i++;
+			SDL_strlcpy(gDirectTerrainPath, argv[i], sizeof(gDirectTerrainPath));
+		}
+	}
+}
+
+#ifdef __EMSCRIPTEN__
+static void ParseEmscriptenURLParams(void)
+{
+	char paramsBuf[512] = {0};
+	int paramsLen = EM_ASM_INT({
+		const search = window.location.search.replace(/^\?/, '');
+		const hash = window.location.hash.replace(/^#/, '');
+		const payload = search || hash;
+		const buf = $0;
+		const len = Math.min(payload.length, $1 - 1);
+		for (let i = 0; i < len; i++)
+		{
+			Module.HEAPU8[buf + i] = payload.charCodeAt(i);
+		}
+		Module.HEAPU8[buf + len] = 0;
+		return len;
+	}, paramsBuf, (int) sizeof(paramsBuf));
+
+	if (paramsLen <= 0)
+		return;
+
+	char* saveptr = nullptr;
+	char* pair = SDL_strtok_r(paramsBuf, "&", &saveptr);
+	while (pair)
+	{
+		char* eq = SDL_strchr(pair, '=');
+		if (eq)
+		{
+			*eq = '\0';
+			const char* key = pair;
+			const char* val = eq + 1;
+			if (SDL_strcmp(key, "level") == 0)
+			{
+				gDirectLaunchLevel = SDL_atoi(val);
+			}
+			else if (SDL_strcmp(key, "terrainFile") == 0 || SDL_strcmp(key, "terrain") == 0)
+			{
+				SDL_strlcpy(gDirectTerrainPath, val, sizeof(gDirectTerrainPath));
+			}
+		}
+		pair = SDL_strtok_r(nullptr, "&", &saveptr);
+	}
+}
+#endif
+
 static void Boot(int argc, char** argv)
 {
 	SDL_SetAppMetadata(GAME_FULL_NAME, GAME_VERSION, GAME_IDENTIFIER);
@@ -88,6 +150,8 @@ static void Boot(int argc, char** argv)
 	// Start our "machine"
 	Pomme::Init();
 
+	ParseCommandLineArgs(argc, argv);
+
 	// Find path to game data folder
 	const char* executablePath = argc > 0 ? argv[0] : NULL;
 	fs::path dataPath = FindGameData(executablePath);
@@ -96,46 +160,10 @@ static void Boot(int argc, char** argv)
 	LoadPrefs();
 
 #ifdef __EMSCRIPTEN__
-	// Parse URL hash parameters for level editor integration.
-	// Supported params: #level=N  and  #terrain=/path/to/file.ter
-	// Example: billyfrontier.html#level=1&terrain=/Data/Terrain/custom.ter
-	char hashBuf[512] = {0};
-	int hashLen = EM_ASM_INT({
-		var h = window.location.hash.replace(/^#/, '');
-		var buf = $0;
-		var len = Math.min(h.length, $1 - 1);
-		for (var i = 0; i < len; i++) {
-			Module.HEAPU8[buf + i] = h.charCodeAt(i);
-		}
-		Module.HEAPU8[buf + len] = 0;
-		return len;
-	}, hashBuf, (int)sizeof(hashBuf));
-
-	if (hashLen > 0)
-	{
-		// Tokenise key=value pairs separated by '&'
-		char *saveptr = nullptr;
-		char *pair = SDL_strtok_r(hashBuf, "&", &saveptr);
-		while (pair)
-		{
-			char *eq = SDL_strchr(pair, '=');
-			if (eq)
-			{
-				*eq = '\0';
-				const char *key = pair;
-				const char *val = eq + 1;
-				if (SDL_strcmp(key, "level") == 0)
-				{
-					gDirectLaunchLevel = SDL_atoi(val);
-				}
-				else if (SDL_strcmp(key, "terrain") == 0)
-				{
-					SDL_strlcpy(gDirectTerrainPath, val, sizeof(gDirectTerrainPath));
-				}
-			}
-			pair = SDL_strtok_r(nullptr, "&", &saveptr);
-		}
-	}
+	// Parse URL query parameters for level editor integration.
+	// Supported params: ?level=N and ?terrainFile=:Terrain:custom_level.ter
+	// Legacy #level=...&terrain=... hashes are still accepted for compatibility.
+	ParseEmscriptenURLParams();
 #endif
 
 retryVideo:

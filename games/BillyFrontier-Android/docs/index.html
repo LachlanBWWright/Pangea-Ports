@@ -150,9 +150,9 @@
       <h2>Level Editor Integration</h2>
       <p>
         The game supports direct level launch for use with external level editors.
-        Append a URL hash to skip the title screen and jump straight to a level:
+        Append a URL query string to skip the title screen and jump straight to a level:
       </p>
-      <p><code>billyfrontier.html#level=1</code></p>
+      <p><code>billyfrontier.html?level=1</code></p>
       <p>Supported area numbers (see controls on the game page):</p>
       <ul>
         <li>0 – Town Duel 1 &nbsp; 1 – Town Shootout &nbsp; 2 – Town Duel 2</li>
@@ -160,8 +160,9 @@
         <li>6 – Swamp Duel 1 &nbsp; 7 – Swamp Shootout &nbsp; 8 – Swamp Duel 2</li>
         <li>9 – Swamp Stampede &nbsp; 10 – Swamp Duel 3 &nbsp; 11 – Target Practice 2</li>
       </ul>
-      <p>You can also supply a custom terrain file override via hash parameter:</p>
-      <p><code>billyfrontier.html#level=1&amp;terrain=/Data/Terrain/custom.ter</code></p>
+      <p>You can also supply a custom terrain file override via query parameter:</p>
+      <p><code>billyfrontier.html?level=1&amp;terrainFile=:Terrain:custom_level.ter</code></p>
+      <p>For backward compatibility, the older <code>#level=...</code> / <code>#terrain=...</code> hash form still works.</p>
       <p>Or use the on-screen file picker to upload a custom <code>.ter</code> file at runtime.</p>
     </section>
 
@@ -172,7 +173,8 @@
         <li><code>Module.ccall('BF_SetDirectLaunchLevel', null, ['number'], [area])</code> – skip to area</li>
         <li><code>Module.ccall('BF_SetFenceCollision', null, ['number'], [1])</code> – enable fence collisions</li>
         <li><code>Module.ccall('BF_SetFenceCollision', null, ['number'], [0])</code> – disable fence collisions</li>
-        <li><code>Module.FS.writeFile('Data/Terrain/custom.ter', data)</code> then <code>Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom.ter'])</code> – upload and activate a custom terrain file</li>
+        <li><code>Module.ccall('BF_LoadTerrainData', null, ['array', 'number'], [bytes, bytes.length])</code> – upload and activate a custom terrain file in one call</li>
+        <li><code>Module.FS.writeFile('Data/Terrain/custom_level.ter', data)</code> then <code>Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'])</code> – manually upload and activate a custom terrain file</li>
       </ul>
     </section>
 
