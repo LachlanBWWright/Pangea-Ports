@@ -87,7 +87,7 @@ jobs:
           cd games/Bugdom-android
           python3 build_wasm.py --dependencies --configure --build --package
           pip3 install playwright
-          python3 -m playwright install chromium
+          python3 -m playwright install --with-deps chromium
           python3 -m http.server 8888 --directory dist-wasm &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID"' EXIT
