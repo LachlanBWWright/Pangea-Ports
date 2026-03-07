@@ -4,6 +4,8 @@ from pathlib import Path
 
 import scripts.ports as ports
 
+VALID_SKIP_STATUSES = ports.VALID_SKIP_STATUSES
+
 
 class MonorepoMetadataTests(unittest.TestCase):
     def test_all_ports_have_consistent_hook_metadata(self):
@@ -11,7 +13,7 @@ class MonorepoMetadataTests(unittest.TestCase):
             with self.subTest(port=port["name"]):
                 self.assertTrue(port["display_name"])
                 self.assertIn("status", port["skip_to_level"])
-                self.assertIn(port["skip_to_level"]["status"], {"supported", "partial", "unsupported"})
+                self.assertIn(port["skip_to_level"]["status"], VALID_SKIP_STATUSES)
                 self.assertTrue(port["site_override_example"])
 
                 if port["skip_to_level"]["status"] != "unsupported":
@@ -37,7 +39,7 @@ class MonorepoMetadataTests(unittest.TestCase):
                     ports._stage_wasm(port, dest)
 
                     docs_index = dest / "index.html"
-                    if port["name"] in {"Bugdom2-Android", "BillyFrontier-Android", "Bugdom-android", "CroMagRally-Android", "MightyMike-Android", "Nanosaur-android"}:
+                    if port.get("has_docs_landing"):
                         self.assertTrue(docs_index.exists(), f"{port['name']} should stage its docs landing page")
 
                     launch_path = port.get("site_launch_path")

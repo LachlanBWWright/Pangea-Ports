@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC_ASSET_SUFFIXES = {'.html', '.htm', '.css', '.js', '.png', '.webp', '.jpg', '.jpeg', '.svg', '.ico', '.gif', '.txt'}
+VALID_SKIP_STATUSES = {'supported', 'partial', 'unsupported'}
 
 PORTS = [
     {
@@ -36,6 +37,7 @@ PORTS = [
         'site_launch_path': 'game/billyfrontier.html',
         'site_level_example': 'game/billyfrontier.html?level=1',
         'site_override_example': "Module.FS.writeFile('Data/Terrain/custom_level.ter', bytes); Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'])",
+        'has_docs_landing': True,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -69,6 +71,7 @@ PORTS = [
         'site_launch_path': 'game.html',
         'site_level_example': 'game.html?level=3',
         'site_override_example': '?terrainFile=:Terrain:Custom.ter or Module.ccall(\'BugdomSetTerrainOverride\', null, [\'string\'], [\':Terrain:Custom.ter\'])',
+        'has_docs_landing': True,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -96,6 +99,7 @@ PORTS = [
         'site_launch_path': 'Bugdom2.html',
         'site_level_example': 'Bugdom2.html?level=3',
         'site_override_example': "Module.FS.writeFile('Data/Terrain/Level1_Garden.ter', bytes)",
+        'has_docs_landing': True,
         'android_apk': True,
         'android_package': 'io.jor.bugdom2',
         'browser_test': 'bugdom2-playwright',
@@ -124,6 +128,7 @@ PORTS = [
         'site_launch_path': 'game/CroMagRally.html',
         'site_level_example': 'game/CroMagRally.html?track=2&car=1',
         'site_override_example': '?levelOverride=:Terrain:MyLevel.ter',
+        'has_docs_landing': True,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -149,6 +154,7 @@ PORTS = [
         'site_launch_path': '',
         'site_level_example': '?level=1:1',
         'site_override_example': '?mapOverride=:Maps:custom.map-1',
+        'has_docs_landing': True,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -182,6 +188,7 @@ PORTS = [
         'site_launch_path': 'game/index.html',
         'site_level_example': 'game/index.html?level=0&skipMenu=1',
         'site_override_example': '?terrainFile=:Terrain:custom.ter',
+        'has_docs_landing': True,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -209,6 +216,7 @@ PORTS = [
         'site_launch_path': 'Nanosaur2.html',
         'site_level_example': 'Nanosaur2.html?level=0',
         'site_override_example': '?terrainOverride=:Terrain:custom.ter',
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -236,6 +244,7 @@ PORTS = [
         'site_launch_path': 'OttoMatic.html',
         'site_level_example': 'OttoMatic.html?level=1',
         'site_override_example': '?terrain=/Data/Terrain/custom.ter',
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
