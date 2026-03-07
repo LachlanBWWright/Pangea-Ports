@@ -26,6 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCREENSHOTS_DIR = ROOT / "docs" / "screenshots"
 PORT = 19876  # unlikely to clash
+PAGE_LOAD_TIMEOUT_MS = 15_000
 
 # --------------------------------------------------------------------- #
 #  Per-game test expectations                                            #
@@ -88,7 +89,7 @@ GAME_DOCS = [
 # --------------------------------------------------------------------- #
 
 class _SilentHandler(SimpleHTTPRequestHandler):
-    def log_message(self, *args):  # suppress access logs
+    def log_message(self, *log_args):  # suppress access logs
         pass
 
 
@@ -142,7 +143,7 @@ class SkipToLevelPlaywrightTests(unittest.TestCase):
             page.on("pageerror", lambda e: errors.append(str(e)))
 
             url = f"{self._base_url}/{game['path']}"
-            page.goto(url, wait_until="domcontentloaded", timeout=15_000)
+            page.goto(url, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
 
             # 1. Page loaded — title must be non-empty
             title = page.title()
