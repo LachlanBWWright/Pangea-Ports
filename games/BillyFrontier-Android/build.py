@@ -452,11 +452,27 @@ class EmscriptenProject(Project):
         return f"{game_name}-{game_ver}-wasm.zip"
 
     def prepare_dependencies(self):
-        # Emscripten builds SDL3 from source; ensure the SDL submodule is present
+        # Emscripten builds SDL3 from source.
+        # Support two layouts: extern/SDL (git-submodule clone) or the tarball
+        # extracted as extern/SDL3-{ver} then symlinked/renamed to extern/SDL.
         sdl_src = f"{libs_dir}/SDL"
         if not os.path.exists(f"{sdl_src}/CMakeLists.txt"):
-            die(f"SDL source not found at {sdl_src}.\n"
-                "Run: git submodule update --init --recursive")
+            # Try downloading the SDL3 tarball as a fallback (same mechanism as
+            # Bugdom2 / CroMagRally, so the CI cache is shared).
+            sdl_tar_dst = f"{libs_dir}/SDL3-{sdl_ver}"
+            if not os.path.exists(f"{sdl_tar_dst}/CMakeLists.txt"):
+                sdl_zip_path = get_package(
+                    f"https://libsdl.org/release/SDL3-{sdl_ver}.tar.gz"
+                )
+                shutil.unpack_archive(sdl_zip_path, libs_dir)
+            # Rename/move to the expected 'SDL' directory
+            if os.path.exists(sdl_tar_dst):
+                shutil.move(sdl_tar_dst, sdl_src)
+        if not os.path.exists(f"{sdl_src}/CMakeLists.txt"):
+            die(
+                f"SDL source not found at {sdl_src}.\n"
+                "Run: git submodule update --init --recursive"
+            )
 
     def configure(self):
         fatlog(f"Configuring {self.dir_name} (Emscripten)")

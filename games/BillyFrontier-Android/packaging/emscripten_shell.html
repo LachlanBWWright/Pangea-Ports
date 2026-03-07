@@ -254,6 +254,44 @@
         console.log('[BillyFrontier] Runtime initialized');
         var el = document.getElementById('status-text');
         if (el) el.textContent = 'Starting game\u2026';
+
+        // ── Standard PangeaGame API ─────────────────────────────────────────
+        // Consistent interface for level-editor integration across all Pangea
+        // Ports WASM builds. Must be set inside onRuntimeInitialized so Module
+        // exports are available.
+        window.PangeaGame = {
+          // skipToLevel: reload with ?level=N so gDirectLaunchLevel is set at
+          // startup. BF_SetDirectLaunchLevel can also be called at runtime.
+          skipToLevel: function(n) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('level', n);
+            window.location.href = url.toString();
+          },
+          setLevel: function(n) {
+            // Runtime variant: jump without page reload (resets current game state)
+            return Module.ccall('BF_SetDirectLaunchLevel', null, ['number'], [n]);
+          },
+          getCurrentLevel: function() {
+            // Billy Frontier doesn't expose a get-current-level export; returns
+            // the level that was requested via URL, or -1 if not set.
+            var params = new URLSearchParams(window.location.search);
+            var l = params.get('level');
+            return l !== null ? parseInt(l, 10) : -1;
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('BF_SetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
+          },
+          getFenceCollisions: function() {
+            return Module.ccall('BF_GetFenceCollision', 'number', [], []) !== 0;
+          },
+          setTerrainOverride: function(path) {
+            return Module.ccall('BF_SetTerrainFile', null, ['string'], [path]);
+          },
+          loadTerrainData: function(data, length) {
+            return Module.ccall('BF_LoadTerrainData', null, ['array', 'number'], [data, length]);
+          },
+        };
+        console.log('[BillyFrontier] PangeaGame API ready.');
       },
 
       preRun: [function() {
