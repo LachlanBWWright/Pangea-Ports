@@ -67,6 +67,15 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("terrainFile", billy_docs)
         self.assertIn("BF_LoadTerrainData", billy_docs)
 
+    def test_shared_pomme_dependency_is_present_for_all_games(self):
+        shared_pomme = ports.ROOT / "extern" / "Pomme" / "CMakeLists.txt"
+        self.assertTrue(shared_pomme.exists())
+
+        for port in ports.PORTS:
+            with self.subTest(port=port["name"]):
+                game_pomme = ports.ROOT / port["path"] / "extern" / "Pomme"
+                self.assertTrue(game_pomme.exists(), f"{port['name']} should expose extern/Pomme")
+
     def test_bugdom2_android_manifest_wires_standard_icons(self):
         manifest = (ports.ROOT / "games" / "Bugdom2-Android" / "android" / "app" / "src" / "main" / "AndroidManifest.xml").read_text(encoding="utf-8")
         self.assertIn('android:icon="@mipmap/ic_launcher"', manifest)
@@ -76,6 +85,17 @@ class MonorepoMetadataTests(unittest.TestCase):
         for density in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
             with self.subTest(density=density):
                 self.assertTrue((res_root / f"mipmap-{density}" / "ic_launcher_round.png").exists())
+
+    def test_bugdom2_android_build_bootstraps_sdl(self):
+        build_gradle = (ports.ROOT / "games" / "Bugdom2-Android" / "android" / "app" / "build.gradle").read_text(encoding="utf-8")
+        self.assertIn("prepareSdlSource", build_gradle)
+        self.assertIn('def sdlVersion = "3.2.8"', build_gradle)
+        self.assertIn('def sdlArchiveName = "SDL3-${sdlVersion}.tar.gz"', build_gradle)
+        self.assertIn('"-DSDL_SHARED=OFF"', build_gradle)
+
+        wrapper_root = ports.ROOT / "games" / "Bugdom2-Android" / "android"
+        self.assertTrue((wrapper_root / "gradlew").exists())
+        self.assertTrue((wrapper_root / "gradle" / "wrapper" / "gradle-wrapper.jar").exists())
 
 
 if __name__ == "__main__":

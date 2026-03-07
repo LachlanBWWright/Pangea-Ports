@@ -1,4 +1,63 @@
+import java.net.URL
+import java.security.MessageDigest
+import org.gradle.api.file.RelativePath
+
 apply plugin: 'com.android.application'
+
+def sdlVersion = "3.2.8"
+def sdlArchiveName = "SDL3-${sdlVersion}.tar.gz"
+def sdlArchiveUrl = "https://libsdl.org/release/${sdlArchiveName}"
+def sdlArchiveSha256 = "13388fabb361de768ecdf2b65e52bb27d1054cae6ccb6942ba926e378e00db03"
+def sdlArchiveFile = layout.buildDirectory.file("downloads/${sdlArchiveName}")
+def sdlSourceDir = file("../../extern/SDL")
+
+def sha256(File file) {
+    def digest = MessageDigest.getInstance("SHA-256")
+    file.withInputStream { stream ->
+        byte[] buffer = new byte[8192]
+        int read
+        while ((read = stream.read(buffer)) != -1) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().collect { String.format("%02x", it) }.join()
+}
+
+tasks.register('prepareSdlSource') {
+    outputs.dir(sdlSourceDir)
+    doLast {
+        if (new File(sdlSourceDir, "CMakeLists.txt").exists()) {
+            return
+        }
+
+        def archive = sdlArchiveFile.get().asFile
+        archive.parentFile.mkdirs()
+
+        if (!archive.exists()) {
+            new URL(sdlArchiveUrl).withInputStream { input ->
+                archive.withOutputStream { output -> output << input }
+            }
+        }
+
+        def actualSha256 = sha256(archive)
+        if (actualSha256 != sdlArchiveSha256) {
+            throw new GradleException("SDL archive hash mismatch: expected ${sdlArchiveSha256}, got ${actualSha256}")
+        }
+
+        delete(sdlSourceDir)
+        copy {
+            from tarTree(resources.gzip(archive))
+            into sdlSourceDir
+            eachFile { details ->
+                def segments = details.relativePath.segments
+                if (segments.length > 1) {
+                    details.relativePath = new RelativePath(details.file.isDirectory(), (String[]) segments[1..-1])
+                }
+            }
+            includeEmptyDirs = false
+        }
+    }
+}
 
 android {
     namespace 'io.jor.bugdom2'
@@ -17,7 +76,8 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DSDL_STATIC=ON",
-                          "-DBUILD_SDL_FROM_SOURCE=ON"
+                          "-DSDL_SHARED=OFF",
+                           "-DBUILD_SDL_FROM_SOURCE=ON"
             }
         }
     }
@@ -44,4 +104,12 @@ android {
 }
 
 dependencies {
+}
+
+tasks.matching { task ->
+    task.name == "preBuild" ||
+    task.name.startsWith("configureCMake") ||
+    task.name.startsWith("buildCMake")
+}.configureEach {
+    dependsOn(tasks.named("prepareSdlSource"))
 }

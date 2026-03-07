@@ -1,8 +1,8 @@
 // GLES3Compat.c
 // GLES3/WebGL2 compatibility layer – replaces legacy OpenGL 1.x calls.
-// Compiled only for Emscripten/WebAssembly builds.
+// Compiled for Emscripten/WebAssembly and Android GLES builds.
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 // Include the native GLES3 headers BEFORE gles3compat.h so that our
 // GLES3_* wrapper functions can call the real GL entry points without

@@ -21,14 +21,16 @@ Repository-level workflows live in [`.github/workflows`](./.github/workflows) an
 
 ### PR validation (`pull_request` to `dev` or `main`)
 
+- Linux native build smoke tests for all eight games
 - Static monorepo validation of:
   - `scripts/ports.py` hook/staging metadata
   - GitHub Pages staging layout expectations
   - the root TabView landing page and Billy Frontier hook docs
   - Bugdom 2 Android icon wiring
-- Existing browser smoke test reused where it already exists:
+- Existing browser smoke tests reused where they already exist:
+  - `Bugdom-android/test_wasm_browser.py`
   - `Bugdom2-Android/tests/playwright/docs.spec.js`
-- Bugdom 2 Android Gradle configuration smoke (`gradle help`)
+- Android emulator launch smoke for `Bugdom2-Android`
 
 ### Build / publish workflow
 
@@ -37,7 +39,7 @@ Repository-level workflows live in [`.github/workflows`](./.github/workflows) an
 - GitHub Pages artifact assembled as a multi-game site
 - Optional GitHub release publishing on tag push or manual dispatch
 
-> This monorepo vendors the game source trees directly, but it does **not** currently vendor the shared `extern/Pomme` dependency tree that the original upstream build scripts expect for full native/WASM builds. As a result, repository-level CI currently validates the Pages/docs/hook surface and the checked-in Android project configuration rather than pretending all imported games are fully reproducible from this monorepo checkout alone.
+> This monorepo now includes a shared upstream `Pomme` dependency checkout at [`extern/Pomme`](./extern/Pomme), with each imported game exposing it through its existing `extern/Pomme` path. This keeps the vendored game trees stable while making the original upstream native/WASM build flows reproducible from the monorepo again.
 
 ## Standardized editor/testing terminology
 

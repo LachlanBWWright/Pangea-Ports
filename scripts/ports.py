@@ -39,7 +39,7 @@ PORTS = [
         'site_override_example': "Module.FS.writeFile('Data/Terrain/custom_level.ter', bytes); Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'])",
         'has_docs_landing': True,
         'android_apk': False,
-        'browser_test': None,
+        'browser_test': 'bugdom-wasm',
         'skip_to_level': {
             'status': 'supported',
             'web': '?level=N',
@@ -261,7 +261,7 @@ PORTS_BY_NAME = {port['name']: port for port in PORTS}
 
 def _matrix_for(kind: str) -> dict:
     if kind == 'native':
-        ports = [port for port in PORTS if port.get('native_smoke')]
+        ports = PORTS
     elif kind == 'wasm':
         ports = PORTS
     elif kind == 'browser':

@@ -1,12 +1,12 @@
 //
 // gles3compat.h
 // GLES3/WebGL2 compatibility layer for legacy OpenGL 1.x calls.
-// Included only for Emscripten builds.
+// Included for Emscripten and Android GLES builds.
 //
 
 #pragma once
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include <GLES3/gl3.h>
 #include <stdlib.h>   // malloc/free for texture conversion

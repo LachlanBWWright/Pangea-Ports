@@ -3,7 +3,7 @@
 #include "Pomme.h"
 #include <SDL3/SDL.h>
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #include "gles3compat.h"
 #else
 #include <SDL3/SDL_opengl.h>
