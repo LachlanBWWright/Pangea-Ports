@@ -97,6 +97,14 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertTrue((wrapper_root / "gradlew").exists())
         self.assertTrue((wrapper_root / "gradle" / "wrapper" / "gradle-wrapper.jar").exists())
 
+    def test_build_release_workflow_publishes_downloadable_pages_bundle(self):
+        workflow = (ports.ROOT / ".github" / "workflows" / "build-and-release.yml").read_text(encoding="utf-8")
+        self.assertIn("Archive assembled Pages site", workflow)
+        self.assertIn("pangea-pages-site.zip", workflow)
+        self.assertIn("name: pangea-pages-site", workflow)
+        self.assertIn("- assemble-pages", workflow)
+        self.assertIn("(github.event_name == 'workflow_dispatch' && inputs.publish_release)", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

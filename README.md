@@ -36,8 +36,8 @@ Repository-level workflows live in [`.github/workflows`](./.github/workflows) an
 
 - WebAssembly builds for all eight games
 - WASM artifacts uploaded per game
-- GitHub Pages artifact assembled as a multi-game site
-- Optional GitHub release publishing on tag push or manual dispatch
+- GitHub Pages artifact assembled as a multi-game site and uploaded as a downloadable zip
+- Optional GitHub release publishing on tag push or manual dispatch, including the site zip plus available APKs
 
 > This monorepo now includes a shared upstream `Pomme` dependency checkout at [`extern/Pomme`](./extern/Pomme), with each imported game exposing it through its existing `extern/Pomme` path. This keeps the vendored game trees stable while making the original upstream native/WASM build flows reproducible from the monorepo again.
 
