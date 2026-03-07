@@ -412,6 +412,30 @@
         }
 
         if (card) card.addEventListener('click', startGame);
+
+        // ── Standard PangeaGame API ────────────────────────────────────────
+        // Exposes a consistent interface shared across all Pangea Ports WASM
+        // builds. Set on window so level-editor integrations can call it from
+        // the browser console or an injected script after the game is ready.
+        window.PangeaGame = {
+          // skipToLevel: reload the page at the requested level. Bugdom uses a
+          // URL parameter parsed at startup; there is no runtime WASM call.
+          skipToLevel: function(n) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('level', n);
+            window.location.href = url.toString();
+          },
+          getCurrentLevel: function() {
+            return Module.ccall('BugdomGetCurrentLevel', 'number');
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('BugdomSetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
+          },
+          setTerrainOverride: function(path) {
+            return Module.ccall('BugdomSetTerrainOverride', null, ['string'], [path]);
+          },
+        };
+        console.log('[Bugdom] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
       },
 
       setStatus: function (text) {
@@ -618,25 +642,6 @@
       if (st) st.textContent = '⚠️ Game crashed — ' + (what || 'unknown error');
     };
   </script>
-
-
-    // ── Standard PangeaGame API ────────────────────────────────────────────
-    // Exposes a consistent interface shared across all Pangea Ports WASM builds.
-    window.PangeaGame = {
-      skipToLevel: function(n) {
-        return Module.ccall('BugdomSetStartLevel', null, ['number'], [n]);
-      },
-      getCurrentLevel: function() {
-        return Module.ccall('BugdomGetCurrentLevel', 'number');
-      },
-      setFenceCollisions: function(enabled) {
-        return Module.ccall('BugdomSetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
-      },
-      setTerrainOverride: function(path) {
-        return Module.ccall('BugdomSetTerrainOverride', null, ['string'], [path]);
-      },
-    };
-    console.log('[Bugdom] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
 
   {{{ SCRIPT }}}
 </body>

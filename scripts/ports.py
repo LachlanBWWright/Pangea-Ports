@@ -9,7 +9,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DOC_ASSET_SUFFIXES = {'.html', '.htm', '.css', '.js', '.png', '.webp', '.jpg', '.jpeg', '.svg', '.ico', '.gif', '.txt'}
+DOC_ASSET_SUFFIXES = {'.css', '.png', '.webp', '.jpg', '.jpeg', '.svg', '.ico', '.gif'}
+# Note: .html and .js files from docs/ are NOT staged — the built WASM HTML/JS artifacts
+# are the game entrypoints. Per-game landing pages are excluded to keep the WASM output
+# as just the game itself. The single hub page lives at docs/index.html (root of site).
 VALID_SKIP_STATUSES = {'supported', 'partial', 'unsupported'}
 
 PORTS = [
@@ -37,7 +40,7 @@ PORTS = [
         'site_launch_path': 'game/billyfrontier.html',
         'site_level_example': 'game/billyfrontier.html?level=1',
         'site_override_example': "Module.FS.writeFile('Data/Terrain/custom_level.ter', bytes); Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'])",
-        'has_docs_landing': True,
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': 'bugdom-wasm',
         'skip_to_level': {
@@ -71,7 +74,7 @@ PORTS = [
         'site_launch_path': 'game.html',
         'site_level_example': 'game.html?level=3',
         'site_override_example': '?terrainFile=:Terrain:Custom.ter or Module.ccall(\'BugdomSetTerrainOverride\', null, [\'string\'], [\':Terrain:Custom.ter\'])',
-        'has_docs_landing': True,
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -99,7 +102,7 @@ PORTS = [
         'site_launch_path': 'Bugdom2.html',
         'site_level_example': 'Bugdom2.html?level=3',
         'site_override_example': "Module.FS.writeFile('Data/Terrain/Level1_Garden.ter', bytes)",
-        'has_docs_landing': True,
+        'has_docs_landing': False,
         'android_apk': True,
         'android_package': 'io.jor.bugdom2',
         'browser_test': 'bugdom2-playwright',
@@ -128,7 +131,7 @@ PORTS = [
         'site_launch_path': 'game/CroMagRally.html',
         'site_level_example': 'game/CroMagRally.html?track=2&car=1',
         'site_override_example': '?levelOverride=:Terrain:MyLevel.ter',
-        'has_docs_landing': True,
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -188,7 +191,7 @@ PORTS = [
         'site_launch_path': 'game/index.html',
         'site_level_example': 'game/index.html?level=0&skipMenu=1',
         'site_override_example': '?terrainFile=:Terrain:custom.ter',
-        'has_docs_landing': True,
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -216,7 +219,7 @@ PORTS = [
         'site_launch_path': 'Nanosaur2.html',
         'site_level_example': 'Nanosaur2.html?level=0',
         'site_override_example': '?terrainOverride=:Terrain:custom.ter',
-        'has_docs_landing': True,
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -244,7 +247,7 @@ PORTS = [
         'site_launch_path': 'OttoMatic.html',
         'site_level_example': 'OttoMatic.html?level=1',
         'site_override_example': '?terrain=/Data/Terrain/custom.ter',
-        'has_docs_landing': True,
+        'has_docs_landing': False,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -297,12 +300,16 @@ def _stage_wasm(port: dict, dest: Path) -> None:
             target_name = rename_map.get(source.name, source.name)
             shutil.copy2(source, wasm_dest / target_name)
 
+    # Copy non-HTML/JS doc assets (logos, images) but NOT per-game landing pages.
+    # The built WASM HTML is the game entrypoint; per-game index.html pages are excluded.
     docs_dir = game_root / 'docs'
     if docs_dir.exists():
         for path in docs_dir.iterdir():
             if path.is_file() and path.suffix.lower() in DOC_ASSET_SUFFIXES:
                 shutil.copy2(path, dest / path.name)
 
+    # MightyMike uses docs/index.html as the game shell itself (not a landing page).
+    # It has no {{{ SCRIPT }}} template; it loads MightyMike.js via a <script> tag.
     if port['name'] == 'MightyMike-Android' and not (dest / 'index.html').exists():
         docs_index = docs_dir / 'index.html'
         if docs_index.exists():

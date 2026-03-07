@@ -140,11 +140,6 @@ jobs:
         run: |
           mkdir -p site
           cp docs/index.html site/index.html
-          # Copy screenshots directory into Pages site so links work
-          if [ -d docs/screenshots ]; then
-            mkdir -p site/screenshots
-            cp docs/screenshots/*.png site/screenshots/ 2>/dev/null || true
-          fi
           touch site/.nojekyll
           find site-artifacts -mindepth 1 -maxdepth 1 -type d -name '*-site' | while read -r dir; do
             game_dir=$(basename "$dir" | sed 's/-site$//')
