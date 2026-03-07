@@ -55,6 +55,26 @@ jobs:
       - name: Validate monorepo hook metadata and Pages staging
         run: python3 -m unittest -v tests.test_monorepo_metadata
 
+  skip-to-level-docs-smoke:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright and Chromium
+        run: |
+          pip3 install playwright
+          python3 -m playwright install --with-deps chromium
+      - name: Run skip-to-level Playwright docs tests
+        run: python3 -m unittest -v tests.test_skip_to_level_playwright
+      - name: Upload skip-to-level screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skip-to-level-screenshots
+          path: docs/screenshots/
+          if-no-files-found: warn
+          compression-level: 1
+
   browser-smoke:
     needs: prepare-matrices
     runs-on: ubuntu-22.04
