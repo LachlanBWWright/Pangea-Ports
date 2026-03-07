@@ -1,0 +1,24 @@
+[submodule "games/BillyFrontier-Android/extern/Pomme"]
+	path = games/BillyFrontier-Android/extern/Pomme
+	url = https://github.com/jorio/Pomme
+[submodule "games/Bugdom2-Android/extern/Pomme"]
+	path = games/Bugdom2-Android/extern/Pomme
+	url = https://github.com/jorio/Pomme
+[submodule "games/CroMagRally-Android/extern/Pomme"]
+	path = games/CroMagRally-Android/extern/Pomme
+	url = https://github.com/jorio/Pomme
+[submodule "games/MightyMike-Android/extern/Pomme"]
+	path = games/MightyMike-Android/extern/Pomme
+	url = https://github.com/jorio/Pomme
+[submodule "games/Nanosaur2-Android/extern/Pomme"]
+	path = games/Nanosaur2-Android/extern/Pomme
+	url = https://github.com/jorio/Pomme
+[submodule "games/OttoMatic-Android/extern/Pomme"]
+	path = games/OttoMatic-Android/extern/Pomme
+	url = https://github.com/jorio/Pomme
+[submodule "games/Bugdom-android/extern/Pomme"]
+	path = games/Bugdom-android/extern/Pomme
+	url = https://github.com/jorio/Pomme
+[submodule "games/Nanosaur-android/extern/Pomme"]
+	path = games/Nanosaur-android/extern/Pomme
+	url = https://github.com/jorio/Pomme
