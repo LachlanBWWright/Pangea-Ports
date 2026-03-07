@@ -1,6 +1,7 @@
 # Pangea Ports Follow-up Progress
 
 Started: 2026-03-07T11:14:59Z
+Follow-up timestamp: 2026-03-07T11:39:28Z
 
 ## Checklist
 
@@ -11,6 +12,9 @@ Started: 2026-03-07T11:14:59Z
 - [x] Standardize Billy Frontier onto query-string / CLI direct-launch conventions
 - [x] Improve current Android app polish for Bugdom 2, including round launcher resources and touch-oriented input tuning
 - [x] Run targeted validation and capture fresh screenshots
+- [x] Investigate the current failing PR validation run via GitHub Actions logs
+- [x] Fix the immediate CI issues (broken Python helper, impossible browser smoke, incorrect Android wrapper assumption) and replace failing smoke jobs with truthful monorepo validations
+- [x] Capture additional screenshots showing skip-to-level hooks being triggered from the hosted/docs UI
 - [ ] Run final automated review and security checks
 
 ## Notes
@@ -19,4 +23,7 @@ Started: 2026-03-07T11:14:59Z
 - `scripts/ports.py` now stages WASM files using per-game layout metadata so GitHub Pages matches each game's existing shell/docs expectations.
 - Billy Frontier already had low-level WASM launch and terrain hooks; this follow-up standardizes them onto `?level=` / `?terrainFile=` and `--level` / `--terrain-file`.
 - Bugdom 2 already had launcher icons checked in, so this pass focused on explicit round-icon resources plus Android-specific deadzone tuning for better virtual-stick responsiveness.
+- The latest PR workflow failure was not just one bug: it combined a `scripts/ports.py` f-string syntax error, a Bugdom browser smoke that attempted a full source build without vendored `extern/Pomme` sources, and an Android job that assumed a missing Gradle wrapper.
+- CI is now being shifted to validate the supported monorepo surface (Pages staging, hook metadata, root docs, Bugdom 2 docs Playwright, and Android Gradle configuration) instead of claiming full native/APK reproducibility from a checkout that lacks the vendored upstream dependency tree.
 - Fresh UI screenshot for PR use: https://github.com/user-attachments/assets/c6430c5a-4049-42ce-a870-71658b20ba9b
+- Hook-trigger screenshot for PR use: https://github.com/user-attachments/assets/ce0d424d-c00d-4570-aafc-031131f3859f

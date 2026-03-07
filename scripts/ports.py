@@ -16,6 +16,7 @@ PORTS = [
         'name': 'BillyFrontier-Android',
         'display_name': 'Billy Frontier',
         'path': 'games/BillyFrontier-Android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--emscripten', '--dependencies', '--configure', '--build'],
         'wasm_outputs': [
@@ -48,6 +49,7 @@ PORTS = [
         'name': 'Bugdom-android',
         'display_name': 'Bugdom',
         'path': 'games/Bugdom-android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build_wasm.py', '--dependencies', '--configure', '--build', '--package'],
         'wasm_outputs': [
@@ -68,7 +70,7 @@ PORTS = [
         'site_level_example': 'game.html?level=3',
         'site_override_example': '?terrainFile=:Terrain:Custom.ter or Module.ccall(\'BugdomSetTerrainOverride\', null, [\'string\'], [\':Terrain:Custom.ter\'])',
         'android_apk': False,
-        'browser_test': 'bugdom-wasm',
+        'browser_test': None,
         'skip_to_level': {
             'status': 'supported',
             'web': '?level=N',
@@ -80,6 +82,7 @@ PORTS = [
         'name': 'Bugdom2-Android',
         'display_name': 'Bugdom 2',
         'path': 'games/Bugdom2-Android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--emscripten', '--dependencies', '--configure', '--build', '--package'],
         'wasm_outputs': [
@@ -107,6 +110,7 @@ PORTS = [
         'name': 'CroMagRally-Android',
         'display_name': 'Cro-Mag Rally',
         'path': 'games/CroMagRally-Android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py'],
         'wasm_outputs': [
@@ -133,6 +137,7 @@ PORTS = [
         'name': 'MightyMike-Android',
         'display_name': 'Mighty Mike',
         'path': 'games/MightyMike-Android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm', '--dependencies', '--configure', '--build', '--package'],
         'wasm_outputs': [
@@ -157,6 +162,7 @@ PORTS = [
         'name': 'Nanosaur-android',
         'display_name': 'Nanosaur',
         'path': 'games/Nanosaur-android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm'],
         'wasm_outputs': [
@@ -189,6 +195,7 @@ PORTS = [
         'name': 'Nanosaur2-Android',
         'display_name': 'Nanosaur 2',
         'path': 'games/Nanosaur2-Android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm'],
         'wasm_outputs': [
@@ -215,6 +222,7 @@ PORTS = [
         'name': 'OttoMatic-Android',
         'display_name': 'Otto Matic',
         'path': 'games/OttoMatic-Android',
+        'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
         'wasm_build': ['python3', 'build.py', '--wasm'],
         'wasm_outputs': [
@@ -244,7 +252,7 @@ PORTS_BY_NAME = {port['name']: port for port in PORTS}
 
 def _matrix_for(kind: str) -> dict:
     if kind == 'native':
-        ports = PORTS
+        ports = [port for port in PORTS if port.get('native_smoke')]
     elif kind == 'wasm':
         ports = PORTS
     elif kind == 'browser':
@@ -257,7 +265,7 @@ def _matrix_for(kind: str) -> dict:
 
 
 def _run_command(command: list[str], cwd: Path) -> None:
-    print(f'+ ({cwd}) {' '.join(command)}')
+    print(f"+ ({cwd}) {' '.join(command)}")
     subprocess.run(command, cwd=cwd, check=True)
 
 

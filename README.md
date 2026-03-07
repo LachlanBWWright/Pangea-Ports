@@ -21,21 +21,23 @@ Repository-level workflows live in [`.github/workflows`](./.github/workflows) an
 
 ### PR validation (`pull_request` to `dev` or `main`)
 
-- Linux native build smoke tests for all eight games
-- Existing browser smoke tests reused where they already exist:
-  - `Bugdom-android/test_wasm_browser.py`
+- Static monorepo validation of:
+  - `scripts/ports.py` hook/staging metadata
+  - GitHub Pages staging layout expectations
+  - the root TabView landing page and Billy Frontier hook docs
+  - Bugdom 2 Android icon wiring
+- Existing browser smoke test reused where it already exists:
   - `Bugdom2-Android/tests/playwright/docs.spec.js`
-- Android emulator launch smoke for `Bugdom2-Android` using the checked-in Gradle project
+- Bugdom 2 Android Gradle configuration smoke (`gradle help`)
 
 ### Build / publish workflow
 
 - WebAssembly builds for all eight games
 - WASM artifacts uploaded per game
 - GitHub Pages artifact assembled as a multi-game site
-- Android APK artifacts for `Bugdom2-Android`
 - Optional GitHub release publishing on tag push or manual dispatch
 
-> Only `Bugdom2-Android` currently contains a checked-in Android Gradle app template. The other imported games are preserved as-is from their source repositories and can already build natively and/or as WebAssembly, but they do **not** yet produce APKs from this monorepo without additional Android project setup.
+> This monorepo vendors the game source trees directly, but it does **not** currently vendor the shared `extern/Pomme` dependency tree that the original upstream build scripts expect for full native/WASM builds. As a result, repository-level CI currently validates the Pages/docs/hook surface and the checked-in Android project configuration rather than pretending all imported games are fully reproducible from this monorepo checkout alone.
 
 ## Standardized editor/testing terminology
 
@@ -49,7 +51,7 @@ Current level-skip status:
 
 | Game | Current web entrypoint | Native entrypoint | Status |
 | --- | --- | --- | --- |
-| BillyFrontier-Android | _not currently documented_ | _not currently documented_ | Unsupported |
+| BillyFrontier-Android | `?level=N` | `--level N` | Supported |
 | Bugdom-android | `?level=N` | — | Supported |
 | Bugdom2-Android | `?level=N` | `--level N` | Supported |
 | CroMagRally-Android | `?track=N&car=N` | `--track N --car N` | Partial |
