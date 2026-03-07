@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Otto Matic – WebAssembly</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <meta name="description" content="Play Otto Matic in your browser — Pangea Software's classic 3D action platformer, rebuilt for WebAssembly. No installation required.">
+  <meta property="og:title" content="Otto Matic – Play in Browser">
+  <meta property="og:description" content="Pangea Software's classic 3D action platformer — now playable in your browser via WebAssembly.">
+  <meta property="og:image" content="screenshot.webp">
+  <meta property="og:type" content="website">
+  <style>
+    :root {
+      --accent: #4fc3f7;
+      --bg:     #07070f;
+      --panel:  #10102a;
+      --border: #1e1e3a;
+      --text:   #d8d8e8;
+      --dim:    #6a6a8a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #07071a, #10102a);
+      border-bottom: 2px solid var(--accent);
+      padding: 24px;
+      text-align: center;
+    }
+    header img { max-width: 220px; width: 100%; margin-bottom: 12px; display: block; margin-inline: auto; }
+    header h1 {
+      font-size: 2.5em;
+      color: var(--accent);
+      text-shadow: 0 2px 8px rgba(79,195,247,0.4);
+      margin-bottom: 6px;
+      letter-spacing: 2px;
+    }
+    header p { color: var(--dim); font-size: 0.9em; }
+    .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+    .launch-btn {
+      display: block;
+      background: linear-gradient(135deg, var(--accent), #1a7ab0);
+      color: #07070f;
+      text-align: center;
+      padding: 16px 32px;
+      border-radius: 6px;
+      font-size: 1.2em;
+      font-weight: bold;
+      text-decoration: none;
+      margin: 0 auto 24px;
+      max-width: 320px;
+      box-shadow: 0 4px 16px rgba(79,195,247,0.3);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .launch-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79,195,247,0.5); }
+    .screenshot-frame {
+      background: #000;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .screenshot-frame img { width: 100%; display: block; }
+    .level-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+      margin: 12px 0 24px;
+    }
+    .level-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 10px 12px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.85em;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .level-card:hover { border-color: var(--accent); background: #1a1a3a; }
+    .level-num { color: var(--accent); font-weight: bold; display: block; margin-bottom: 2px; }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .info-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+    .info-card h3 { color: var(--accent); margin-bottom: 8px; font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.05em; }
+    .info-card p, .info-card li { font-size: 0.85em; color: var(--dim); line-height: 1.6; }
+    .info-card ul { padding-left: 16px; }
+    .url-params {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .url-params h3 { color: var(--accent); margin-bottom: 10px; font-size: 0.95em; text-transform: uppercase; }
+    .url-params p { font-size: 0.85em; color: var(--dim); margin-bottom: 8px; line-height: 1.6; }
+    code {
+      background: #0a0a1a;
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.85em;
+    }
+    pre {
+      background: #0a0a1a;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      font-size: 0.82em;
+      color: #a0b8d0;
+      margin-top: 8px;
+    }
+    .section-label {
+      font-size: 0.78em;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+      margin-bottom: 8px;
+    }
+    footer {
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.75em;
+      padding: 24px;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="logo.png" alt="Otto Matic logo">
+  <h1>🤖 Otto Matic</h1>
+  <p>WebAssembly Port — Play in your browser, no installation required</p>
+</header>
+
+<div class="container">
+  <a class="launch-btn" href="OttoMatic.html">▶ Play Otto Matic</a>
+
+  <div class="screenshot-frame">
+    <img src="screenshot.webp" alt="Otto Matic gameplay screenshot">
+  </div>
+
+  <p class="section-label">Skip to level — click to jump directly into gameplay</p>
+  <div class="level-grid" id="level-grid"></div>
+
+  <div class="info-grid">
+    <div class="info-card">
+      <h3>🎮 Controls</h3>
+      <ul>
+        <li>Arrow keys / WASD — move</li>
+        <li>Space — jump</li>
+        <li>Ctrl / Left-click — shoot</li>
+        <li>Z — change weapon</li>
+        <li>Escape — pause</li>
+        <li>Click canvas to capture mouse</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h3>🛠 Level Editor Integration</h3>
+      <p>This WebAssembly build supports direct level boot via URL parameters
+         and a full terrain override API for custom level testing workflows.</p>
+    </div>
+    <div class="info-card">
+      <h3>📱 Android</h3>
+      <p>Native Android builds are available in the
+         <a href="https://github.com/LachlanBWWright/OttoMatic-Android" style="color:var(--accent)">repository</a>.
+         The WebAssembly build is recommended for quick testing and level preview.</p>
+    </div>
+  </div>
+
+  <div class="url-params">
+    <h3>🔗 Skip-to-Level URL Parameters</h3>
+    <p>Append these query parameters to skip title screens and menus for rapid level testing:</p>
+    <p><code>?level=N</code> — Boot directly into level N (0–9), skipping all title screens and menus.</p>
+    <p><code>?terrain=/Data/Terrain/custom.ter</code> — Load a custom terrain file for the level.</p>
+    <pre>OttoMatic.html?level=1
+OttoMatic.html?level=3
+OttoMatic.html?level=0&amp;terrain=/Data/Terrain/MyLevel.ter</pre>
+  </div>
+
+  <div class="url-params">
+    <h3>🧪 JavaScript API (browser console)</h3>
+    <p>Once the game is loaded, use the <code>PangeaGame</code> object or direct Module calls from the browser console:</p>
+    <pre>// Standard API (available after game loads)
+PangeaGame.skipToLevel(3);              // skip to level 3 (0–9)
+PangeaGame.getCurrentLevel();           // returns current level number
+
+// Game-specific terrain override
+PangeaGame.setTerrainPath('/Data/Terrain/custom.ter');
+
+// Direct C function equivalents
+OttoMatic_SkipToLevel(3);
+OttoMatic_GetCurrentLevel();
+OttoMatic_SetTerrainPath('/Data/Terrain/custom.ter');</pre>
+  </div>
+
+  <div class="info-card" style="margin-bottom:24px">
+    <h3>ℹ️ About</h3>
+    <p>Otto Matic is © 2002 Pangea Software, Inc.
+       Open-source port by <a href="https://github.com/jorio/OttoMatic" style="color:var(--accent)">Iliyas Jorio</a>.
+       This WebAssembly port was built for the Pangea Ports project.</p>
+    <p style="margin-top:8px"><strong>Requirements:</strong> A modern browser with WebAssembly and WebGL support (Chrome, Firefox, Safari, Edge).</p>
+  </div>
+</div>
+
+<footer>
+  <p>Otto Matic © 2002 Pangea Software, Inc. ·
+     Open-source port by <a href="https://github.com/jorio/OttoMatic">Iliyas Jorio</a> ·
+     <a href="https://github.com/LachlanBWWright/Pangea-Ports">Pangea Ports on GitHub</a>
+  </p>
+</footer>
+
+<script>
+  var levels = [
+    { n: 0, name: 'Planet Meat' },
+    { n: 1, name: 'Planet Meat 2' },
+    { n: 2, name: 'Planet Sulpha' },
+    { n: 3, name: 'Planet Sulpha 2' },
+    { n: 4, name: 'Planet Sheol' },
+    { n: 5, name: 'Planet Sheol 2' },
+    { n: 6, name: 'Planet Jungle' },
+    { n: 7, name: 'Planet Ice' },
+    { n: 8, name: 'Planet Zoo' },
+    { n: 9, name: 'Planet Brain' },
+  ];
+  var grid = document.getElementById('level-grid');
+  levels.forEach(function(lv) {
+    var a = document.createElement('a');
+    a.className = 'level-card';
+    a.href = 'OttoMatic.html?level=' + lv.n;
+    a.innerHTML = '<span class="level-num">Level ' + lv.n + '</span>' + lv.name;
+    grid.appendChild(a);
+  });
+</script>
+
+</body>
+</html>

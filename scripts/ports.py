@@ -216,7 +216,7 @@ PORTS = [
         'site_launch_path': 'Nanosaur2.html',
         'site_level_example': 'Nanosaur2.html?level=0',
         'site_override_example': '?terrainOverride=:Terrain:custom.ter',
-        'has_docs_landing': False,
+        'has_docs_landing': True,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {
@@ -244,7 +244,7 @@ PORTS = [
         'site_launch_path': 'OttoMatic.html',
         'site_level_example': 'OttoMatic.html?level=1',
         'site_override_example': '?terrain=/Data/Terrain/custom.ter',
-        'has_docs_landing': False,
+        'has_docs_landing': True,
         'android_apk': False,
         'browser_test': None,
         'skip_to_level': {

@@ -68,15 +68,65 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("BF_LoadTerrainData", billy_docs)
 
     def test_shared_pomme_dependency_is_present_for_all_games(self):
-        shared_pomme = ports.ROOT / "extern" / "Pomme" / "CMakeLists.txt"
-        self.assertTrue(shared_pomme.exists())
+        # Each game vendors Pomme as a per-game submodule under extern/Pomme.
+        # The directory exists as an (optionally uninitialised) submodule reference.
+        gitmodules = (ports.ROOT / ".gitmodules").read_text(encoding="utf-8")
 
         for port in ports.PORTS:
             with self.subTest(port=port["name"]):
                 game_pomme = ports.ROOT / port["path"] / "extern" / "Pomme"
-                self.assertTrue(game_pomme.exists(), f"{port['name']} should expose extern/Pomme")
+                self.assertTrue(
+                    game_pomme.exists(),
+                    f"{port['name']} should have extern/Pomme submodule directory",
+                )
+                self.assertIn(
+                    port["path"] + "/extern/Pomme",
+                    gitmodules,
+                    f"{port['name']} should be registered in .gitmodules",
+                )
 
-    def test_bugdom2_android_manifest_wires_standard_icons(self):
+    def test_all_ports_with_docs_landing_have_index_html(self):
+        for port in ports.PORTS:
+            with self.subTest(port=port["name"]):
+                if port.get("has_docs_landing"):
+                    docs_index = ports.ROOT / port["path"] / "docs" / "index.html"
+                    self.assertTrue(
+                        docs_index.exists(),
+                        f"{port['name']} has has_docs_landing=True but is missing docs/index.html",
+                    )
+
+    def test_all_shells_expose_pangea_game_api(self):
+        games_with_shells = [
+            "Bugdom-android",
+            "Nanosaur2-Android",
+            "OttoMatic-Android",
+        ]
+        for game_name in games_with_shells:
+            with self.subTest(game=game_name):
+                shell = ports.ROOT / "games" / game_name / "docs" / "shell.html"
+                self.assertTrue(shell.exists(), f"{game_name} should have docs/shell.html")
+                shell_text = shell.read_text(encoding="utf-8")
+                self.assertIn(
+                    "PangeaGame",
+                    shell_text,
+                    f"{game_name}/docs/shell.html should expose the standard PangeaGame API",
+                )
+                self.assertIn(
+                    "skipToLevel",
+                    shell_text,
+                    f"{game_name}/docs/shell.html should expose skipToLevel",
+                )
+
+    def test_nanosaur2_and_ottomatic_have_landing_pages(self):
+        for game_name in ("Nanosaur2-Android", "OttoMatic-Android"):
+            with self.subTest(game=game_name):
+                index = ports.ROOT / "games" / game_name / "docs" / "index.html"
+                self.assertTrue(index.exists(), f"{game_name} should have a docs/index.html landing page")
+                content = index.read_text(encoding="utf-8")
+                self.assertIn("?level=", content, f"{game_name} landing page should document skip-to-level URL param")
+                self.assertIn("PangeaGame", content, f"{game_name} landing page should document PangeaGame API")
+
+
         manifest = (ports.ROOT / "games" / "Bugdom2-Android" / "android" / "app" / "src" / "main" / "AndroidManifest.xml").read_text(encoding="utf-8")
         self.assertIn('android:icon="@mipmap/ic_launcher"', manifest)
         self.assertIn('android:roundIcon="@mipmap/ic_launcher_round"', manifest)

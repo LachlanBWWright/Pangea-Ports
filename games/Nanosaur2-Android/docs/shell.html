@@ -376,6 +376,26 @@
     }
   </script>
 
+
+    // ── Standard PangeaGame API ────────────────────────────────────────────
+    // Exposes a consistent interface shared across all Pangea Ports WASM builds.
+    window.PangeaGame = {
+      skipToLevel: function(n) {
+        return Module.ccall('Nanosaur2_SkipToLevel', null, ['number'], [n]);
+      },
+      getCurrentLevel: function() {
+        return Module.ccall('Nanosaur2_GetCurrentLevel', 'number');
+      },
+      setFenceCollisions: function(enabled) {
+        return Module.ccall('Nanosaur2_SetFenceCollisionsEnabled', null, ['number'], [enabled ? 1 : 0]);
+      },
+    };
+    // Convenience aliases
+    window.Nanosaur2_SkipToLevel                  = function(n) { return PangeaGame.skipToLevel(n); };
+    window.Nanosaur2_GetCurrentLevel              = function()  { return PangeaGame.getCurrentLevel(); };
+    window.Nanosaur2_SetFenceCollisionsEnabled    = function(e) { return PangeaGame.setFenceCollisions(e); };
+    console.log('[Nanosaur2] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
+
   {{{ SCRIPT }}}
 </body>
 </html>

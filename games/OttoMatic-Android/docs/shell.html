@@ -631,6 +631,42 @@
     }
   </script>
 
+
+    // ── Standard PangeaGame API ────────────────────────────────────────────
+    // Exposes a consistent interface shared across all Pangea Ports WASM builds.
+    window.PangeaGame = {
+      skipToLevel: function(n) {
+        return Module.ccall('OttoMatic_SkipToLevel', null, ['number'], [n]);
+      },
+      getCurrentLevel: function() {
+        return Module.ccall('OttoMatic_GetCurrentLevel', 'number');
+      },
+      setTerrainPath: function(path) {
+        return Module.ccall('OttoMatic_SetTerrainPath', null, ['string'], [path]);
+      },
+      setFenceCollisions: function(enabled) {
+        return Module.ccall('OttoMatic_SetFenceCollisions', null, ['number'], [enabled ? 1 : 0]);
+      },
+      setSpeedMultiplier: function(mult) {
+        return Module.ccall('OttoMatic_SetSpeedMultiplier', null, ['number'], [mult]);
+      },
+      getPlayerHealth: function() {
+        return Module.ccall('OttoMatic_GetPlayerHealth', 'number');
+      },
+      getPlayerLives: function() {
+        return Module.ccall('OttoMatic_GetPlayerLives', 'number');
+      },
+    };
+    // Convenience aliases (legacy API names remain available)
+    window.OttoMatic_SkipToLevel        = function(n)    { return PangeaGame.skipToLevel(n); };
+    window.OttoMatic_GetCurrentLevel    = function()     { return PangeaGame.getCurrentLevel(); };
+    window.OttoMatic_SetTerrainPath     = function(p)    { return PangeaGame.setTerrainPath(p); };
+    window.OttoMatic_SetFenceCollisions = function(e)    { return PangeaGame.setFenceCollisions(e); };
+    window.OttoMatic_SetSpeedMultiplier = function(mult) { return PangeaGame.setSpeedMultiplier(mult); };
+    window.OttoMatic_GetPlayerHealth    = function()     { return PangeaGame.getPlayerHealth(); };
+    window.OttoMatic_GetPlayerLives     = function()     { return PangeaGame.getPlayerLives(); };
+    console.log('[OttoMatic] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
+
   {{{ SCRIPT }}}
 </body>
 </html>

@@ -619,6 +619,25 @@
     };
   </script>
 
+
+    // ── Standard PangeaGame API ────────────────────────────────────────────
+    // Exposes a consistent interface shared across all Pangea Ports WASM builds.
+    window.PangeaGame = {
+      skipToLevel: function(n) {
+        return Module.ccall('BugdomSetStartLevel', null, ['number'], [n]);
+      },
+      getCurrentLevel: function() {
+        return Module.ccall('BugdomGetCurrentLevel', 'number');
+      },
+      setFenceCollisions: function(enabled) {
+        return Module.ccall('BugdomSetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
+      },
+      setTerrainOverride: function(path) {
+        return Module.ccall('BugdomSetTerrainOverride', null, ['string'], [path]);
+      },
+    };
+    console.log('[Bugdom] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
+
   {{{ SCRIPT }}}
 </body>
 </html>
