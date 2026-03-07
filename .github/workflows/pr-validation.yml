@@ -1,0 +1,155 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-matrices:
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.native.outputs.matrix }}
+      browser: ${{ steps.browser.outputs.matrix }}
+      android_apk: ${{ steps.android_apk.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: native
+        run: echo "matrix=$(python3 scripts/ports.py matrix native)" >> "$GITHUB_OUTPUT"
+      - id: browser
+        run: echo "matrix=$(python3 scripts/ports.py matrix browser)" >> "$GITHUB_OUTPUT"
+      - id: android_apk
+        run: echo "matrix=$(python3 scripts/ports.py matrix android-apk)" >> "$GITHUB_OUTPUT"
+
+  native-build-smoke:
+    needs: prepare-matrices
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.native) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            libasound2-dev libpulse-dev libaudio-dev libjack-dev libsndio-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev \
+            libibus-1.0-dev libudev-dev fcitx-libs-dev libpipewire-0.3-dev \
+            libwayland-dev libdecor-0-dev liburing-dev cmake ninja-build python3 zip unzip
+      - name: Native build smoke
+        run: python3 scripts/ports.py run --game "${{ matrix.name }}" --task native-build
+
+  static-pages-and-hook-smoke:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate monorepo hook metadata and Pages staging
+        run: python3 -m unittest -v tests.test_monorepo_metadata
+
+  browser-smoke:
+    needs: prepare-matrices
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.browser) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Emscripten SDK
+        uses: actions/cache@v4
+        with:
+          path: .emsdk
+          key: emsdk-${{ runner.os }}-${{ runner.arch }}-v1
+          restore-keys: emsdk-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install Emscripten SDK
+        run: |
+          if [ ! -f .emsdk/emsdk ]; then
+            git clone --depth=1 https://github.com/emscripten-core/emsdk.git .emsdk
+            .emsdk/emsdk install latest
+          fi
+          .emsdk/emsdk activate latest
+          source .emsdk/emsdk_env.sh
+          echo "$EMSDK" >> "$GITHUB_PATH"
+          echo "$EMSDK/upstream/emscripten" >> "$GITHUB_PATH"
+          echo "$EMSDK/upstream/bin" >> "$GITHUB_PATH"
+          for d in "$EMSDK/node/"*/bin; do [ -d "$d" ] && echo "$d" >> "$GITHUB_PATH"; done
+      - name: Install browser test dependencies
+        if: matrix.browser_test == 'bugdom2-playwright'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: games/Bugdom2-Android/package-lock.json
+      - name: Run Bugdom WASM smoke test
+        if: matrix.browser_test == 'bugdom-wasm'
+        run: |
+          cd games/Bugdom-android
+          python3 build_wasm.py --dependencies --configure --build --package
+          pip3 install playwright
+          python3 -m playwright install --with-deps chromium
+          python3 -m http.server 8888 --directory dist-wasm &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          sleep 3
+          python3 test_wasm_browser.py --url http://localhost:8888/Bugdom.html
+      - name: Run Bugdom 2 landing-page Playwright test
+        if: matrix.browser_test == 'bugdom2-playwright'
+        run: |
+          cd games/Bugdom2-Android
+          npm ci
+          npx playwright install --with-deps chromium
+          npm test -- --reporter=list
+
+  android-emulator-smoke:
+    needs: prepare-matrices
+    if: needs.prepare-matrices.outputs.android_apk != '{"include":[]}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.android_apk) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build debug APK
+        run: |
+          cd games/Bugdom2-Android/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - name: Emulator smoke launch
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            adb install -r games/Bugdom2-Android/android/app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell monkey -p io.jor.bugdom2 -c android.intent.category.LAUNCHER 1
+            sleep 20
+            adb logcat -d > bugdom2-logcat.txt
+            if grep -q "FATAL EXCEPTION" bugdom2-logcat.txt; then
+              cat bugdom2-logcat.txt
+              exit 1
+            fi
+      - name: Upload emulator log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bugdom2-emulator-log
+          path: bugdom2-logcat.txt
+          if-no-files-found: ignore

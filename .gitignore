@@ -1,0 +1,16 @@
+# Monorepo-local build artifacts
+**/.DS_Store
+**/.cache/
+**/.emsdk/
+**/.pytest_cache/
+**/__pycache__/
+**/*.pyc
+**/build/
+**/build-*/
+**/cmake-build-*/
+**/dist/
+**/dist-*/
+**/node_modules/
+**/playwright-report/
+**/test-results/
+site/
