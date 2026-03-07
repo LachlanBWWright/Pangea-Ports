@@ -95,7 +95,7 @@ static void ParseEmscriptenURLParams(void)
 {
 	char paramsBuf[512] = {0};
 	int paramsLen = EM_ASM_INT({
-		const search = window.location.search.replace(/^\?/, '');
+		const search = window.location.search.replace(/^\\?/, '');
 		const hash = window.location.hash.replace(/^#/, '');
 		const payload = search || hash;
 		const buf = $0;
