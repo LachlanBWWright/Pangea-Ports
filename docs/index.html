@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pangea Ports</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #09111f;
+      --panel: #13203a;
+      --accent: #8cd0ff;
+      --text: #edf5ff;
+      --muted: #c2d4e7;
+      --border: #27456f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #0a1426, #0f1a31 50%, #0a1426);
+      color: var(--text);
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1rem 4rem;
+    }
+    header {
+      margin-bottom: 2rem;
+    }
+    h1 {
+      margin: 0 0 .5rem;
+      font-size: clamp(2rem, 4vw, 3rem);
+    }
+    p { color: var(--muted); line-height: 1.5; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(19, 32, 58, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: .9rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      background: rgba(39, 69, 111, 0.45);
+    }
+    tr:last-child td { border-bottom: 0; }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    a:hover { text-decoration: underline; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .92em;
+      background: rgba(255,255,255,.08);
+      padding: .15rem .35rem;
+      border-radius: 6px;
+    }
+    .note {
+      margin-top: 1.25rem;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(19, 32, 58, 0.7);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Pangea Ports</h1>
+      <p>A single Pages landing site for the imported Android/WASM Pangea ports. Use the direct play links for browser testing, and use the level-entry examples where the underlying game already supports menu-skipping or direct level boot.</p>
+    </header>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Game</th>
+          <th>Play</th>
+          <th>Direct-level example</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Billy Frontier</td>
+          <td><a href="./BillyFrontier-Android/billyfrontier.html">Launch</a></td>
+          <td>—</td>
+          <td>No standardized skip-to-level entrypoint is currently documented in this port.</td>
+        </tr>
+        <tr>
+          <td>Bugdom</td>
+          <td><a href="./Bugdom-android/Bugdom.html">Launch</a></td>
+          <td><a href="./Bugdom-android/Bugdom.html?level=3"><code>?level=3</code></a></td>
+          <td>Supports terrain override and dev helpers for editor testing.</td>
+        </tr>
+        <tr>
+          <td>Bugdom 2</td>
+          <td><a href="./Bugdom2-Android/Bugdom2.html">Launch</a></td>
+          <td><a href="./Bugdom2-Android/Bugdom2.html?level=3"><code>?level=3</code></a></td>
+          <td>Most complete browser/editor integration in the imported set.</td>
+        </tr>
+        <tr>
+          <td>Cro-Mag Rally</td>
+          <td><a href="./CroMagRally-Android/CroMagRally.html">Launch</a></td>
+          <td><a href="./CroMagRally-Android/CroMagRally.html?track=2&amp;car=1"><code>?track=2&amp;car=1</code></a></td>
+          <td>Uses track/car selection instead of a single-player level skip.</td>
+        </tr>
+        <tr>
+          <td>Mighty Mike</td>
+          <td><a href="./MightyMike-Android/">Launch</a></td>
+          <td><a href="./MightyMike-Android/?level=1:1"><code>?level=1:1</code></a></td>
+          <td>Level selection uses scene/area identifiers.</td>
+        </tr>
+        <tr>
+          <td>Nanosaur</td>
+          <td><a href="./Nanosaur-android/Nanosaur.html">Launch</a></td>
+          <td><a href="./Nanosaur-android/Nanosaur.html?level=0&amp;skipMenu=1"><code>?level=0&amp;skipMenu=1</code></a></td>
+          <td>Best current direct-boot example for level-editor workflows.</td>
+        </tr>
+        <tr>
+          <td>Nanosaur 2</td>
+          <td><a href="./Nanosaur2-Android/Nanosaur2.html">Launch</a></td>
+          <td><a href="./Nanosaur2-Android/Nanosaur2.html?level=0"><code>?level=0</code></a></td>
+          <td>Supports direct level selection and terrain override flows.</td>
+        </tr>
+        <tr>
+          <td>Otto Matic</td>
+          <td><a href="./OttoMatic-Android/OttoMatic.html">Launch</a></td>
+          <td><a href="./OttoMatic-Android/OttoMatic.html?level=1"><code>?level=1</code></a></td>
+          <td>Includes terrain override hooks for editor-driven testing.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>Android status:</strong> only <code>Bugdom2-Android</code> currently ships a checked-in Gradle Android app project, so it is the only imported game that produces an APK from this monorepo today.
+    </div>
+  </main>
+</body>
+</html>

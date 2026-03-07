@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bugdom 2 — WebAssembly</title>
+  <style>
+    :root {
+      --accent: #6fbf6f;
+      --bg:     #0a0a0a;
+      --panel:  #111a11;
+      --border: #1f3a1f;
+      --text:   #d8d8d8;
+      --dim:    #6a7a6a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    #header {
+      text-align: center;
+      padding: 1.25rem 1rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    #header h1 {
+      font-size: 2rem;
+      color: var(--accent);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    #header p { color: var(--dim); font-size: 0.85rem; margin-top: 0.25rem; }
+
+    /* ── Game area ───────────────────────────────────────── */
+    #game-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+      position: relative;
+    }
+
+    /* Loading card — overlays the canvas until game starts */
+    #loading-card {
+      position: absolute;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      width: 100%;
+      max-width: 800px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+    #status-text {
+      font-size: 1.05rem;
+      color: var(--accent);
+      min-height: 1.6rem;
+    }
+    #progress-bar {
+      width: 100%;
+      max-width: 420px;
+      height: 6px;
+      margin: 0.75rem auto 0.35rem;
+      accent-color: var(--accent);
+    }
+    #progress-label { font-size: 0.78rem; color: var(--dim); }
+
+    #play-btn {
+      display: none;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #2a7a2a;
+      border: 3px solid var(--accent);
+      font-size: 2.5em;
+      color: #d0ffd0;
+      margin: 1rem auto 0.5rem auto;
+      transition: transform 0.15s, background 0.15s;
+      line-height: 74px;
+      text-align: center;
+      cursor: pointer;
+    }
+    #play-btn:hover {
+      transform: scale(1.1);
+      background: #3a9a3a;
+    }
+    #play-label {
+      display: none;
+      font-size: 1.1em;
+      color: #9fe09f;
+    }
+
+    .spinner {
+      border: 3px solid #1a2a1a;
+      border-top: 3px solid var(--accent);
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Canvas — always in the DOM with proper dimensions for SDL3 */
+    #canvas {
+      max-width: 100%;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    /* Toolbar below canvas */
+    #toolbar {
+      display: none;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* ── Generic button ──────────────────────────────────── */
+    .btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.35rem 0.8rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .btn:hover  { background: #1a2a1a; border-color: var(--accent); }
+    .btn.on     { background: #0d2a0d; border-color: var(--accent); color: var(--accent); }
+    .btn.danger { border-color: #c04040; color: #e06060; }
+    .btn.danger:hover { background: #2a0d0d; }
+
+    /* ── API / debug panel ───────────────────────────────── */
+    #api-panel {
+      width: 100%;
+      max-width: 800px;
+      margin: 0.5rem auto 1.5rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    #api-panel h2 {
+      color: var(--accent);
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    #api-panel .sub {
+      color: var(--dim);
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+    }
+
+    .api-section { margin-bottom: 1.1rem; }
+    .api-section h3 {
+      font-size: 0.88rem;
+      color: #90b090;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3rem;
+      margin-bottom: 0.6rem;
+    }
+    .api-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0.45rem 0;
+      flex-wrap: wrap;
+    }
+    .api-row label {
+      min-width: 160px;
+      font-size: 0.88rem;
+      color: #b0c8b0;
+    }
+    input[type="text"] {
+      flex: 1;
+      min-width: 200px;
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.3rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.88rem;
+    }
+    #player-state {
+      font-size: 0.82rem;
+      color: var(--dim);
+      padding: 0.3rem 0;
+    }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    #footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.78rem;
+      color: #444;
+      border-top: 1px solid #1a1a1a;
+    }
+    #footer a { color: #5a9f5a; }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <h1>🐛 Bugdom 2</h1>
+    <p>WebAssembly Build &nbsp;·&nbsp; © 2002 Pangea Software &nbsp;·&nbsp; Open-source port</p>
+  </div>
+
+  <div id="game-wrap">
+    <!-- Loading card overlays the canvas until the game starts -->
+    <div id="loading-card">
+      <div class="spinner" id="spinner"></div>
+      <div id="play-btn">▶</div>
+      <div id="status-text">Loading…</div>
+      <progress id="progress-bar" value="0" max="1"></progress>
+      <div id="progress-label"></div>
+      <div id="play-label">Click to play</div>
+    </div>
+
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="1"
+            width="960" height="720"></canvas>
+
+    <!-- Toolbar — shown once the game starts -->
+    <div id="toolbar">
+      <button class="btn" id="btn-fullscreen" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+      <button class="btn" id="btn-mute" onclick="toggleMute()">🔊 Unmute</button>
+      <button class="btn on" id="btn-fence" onclick="toggleFences()">✓ Fences</button>
+    </div>
+  </div>
+
+  <!-- Debug / cheat API panel -->
+  <div id="api-panel" style="display:none">
+    <h2>🎮 Debug &amp; Cheat Panel</h2>
+    <p class="sub">These controls call exported C functions via <code>Module.ccall()</code>. Open the browser console for details.</p>
+
+    <div class="api-section">
+      <h3>Player</h3>
+      <div id="player-state">Not available yet</div>
+      <div class="api-row">
+        <button class="btn" onclick="doFullHeal()">💚 Full Heal</button>
+        <button class="btn" onclick="doSetHealth()">Set Health</button>
+        <input type="text" id="health-val" value="1.0" style="max-width:80px">
+        <button class="btn" onclick="doSetLives()">Set Lives</button>
+        <input type="text" id="lives-val" value="9" style="max-width:80px">
+      </div>
+    </div>
+
+    <div class="api-section">
+      <h3>Level Control</h3>
+      <div class="api-row">
+        <button class="btn" onclick="doWinLevel()">🏆 Win Level</button>
+        <label>Skip to level:</label>
+        <input type="text" id="warp-level" value="0" style="max-width:60px">
+        <button class="btn" onclick="doSkipToLevel()">Go</button>
+      </div>
+    </div>
+
+    <div class="api-section">
+      <h3>Level File Override</h3>
+      <div class="api-row">
+        <label>Upload .ter file:</label>
+        <input type="file" id="ter-upload" accept=".ter" style="font-size:0.85rem">
+        <button class="btn" onclick="uploadTerrainFile()">Upload</button>
+      </div>
+      <div class="api-row" style="margin-top:0.3rem">
+        <label style="font-size:0.78rem; color:var(--dim)">
+          Write to the virtual FS before the level loads. The game will use your file instead of the bundled one.
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    Bugdom 2 &nbsp;·&nbsp; © 2002 Pangea Software, Inc. &nbsp;·&nbsp;
+    Open-source port by Iliyas Jorio &nbsp;·&nbsp;
+    <a href="https://github.com/LachlanBWWright/Bugdom2-Android">GitHub</a>
+  </div>
+
+  <script type="text/javascript">
+    var statusEl     = document.getElementById('status-text');
+    var barEl        = document.getElementById('progress-bar');
+    var labelEl      = document.getElementById('progress-label');
+    var spinnerEl    = document.getElementById('spinner');
+    var loadingCard  = document.getElementById('loading-card');
+    var playBtnEl    = document.getElementById('play-btn');
+    var playLabelEl  = document.getElementById('play-label');
+    var canvas       = document.getElementById('canvas');
+
+    var loadingDone  = false;
+    var gameStarted  = false;
+    var _fenceEnabled = true;
+    var _muted        = false;
+
+    function showPlayButton() {
+      spinnerEl.style.display   = 'none';
+      statusEl.style.display    = 'none';
+      barEl.style.display       = 'none';
+      labelEl.style.display     = 'none';
+      playBtnEl.style.display   = 'block';
+      playLabelEl.style.display = 'block';
+      loadingCard.style.cursor  = 'pointer';
+      loadingCard.onclick       = startGame;
+    }
+
+    function startGame() {
+      if (gameStarted) return;
+      gameStarted = true;
+      loadingCard.style.display = 'none';
+      document.getElementById('toolbar').style.display = 'flex';
+      document.getElementById('api-panel').style.display = 'block';
+      canvas.focus();
+      Module.callMain([]);
+    }
+
+    // ── Emscripten Module config ──────────────────────────
+    var Module = {
+      canvas: canvas,
+      noInitialRun: true,
+
+      print:    function(text) { console.log('[Bugdom2]', text); },
+      printErr: function(text) { console.error('[Bugdom2]', text); },
+
+      setStatus: function(text) {
+        if (!text) {
+          loadingDone = true;
+          if (!gameStarted) showPlayButton();
+          return;
+        }
+        statusEl.innerText = text;
+        var m = text.match(/Downloading data\.\.\. \((\d+)\/(\d+)\)/);
+        if (m) {
+          var done = parseInt(m[1]), total = parseInt(m[2]);
+          barEl.value = done / total;
+          labelEl.innerText = (done / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB';
+        }
+      },
+
+      monitorRunDependencies: function(left) {
+        if (left === 0 && !loadingDone) {
+          spinnerEl.style.display = 'none';
+        } else if (left > 0) {
+          barEl.value = Math.max(0, 1 - (left * 0.02));
+        }
+      }
+    };
+
+    window.onerror = function(msg, url, line, col, err) {
+      statusEl.innerText = 'Error: ' + msg;
+      statusEl.style.color = '#ff6060';
+      playBtnEl.style.display = 'none';
+      spinnerEl.style.display = 'none';
+    };
+
+    // ── Toolbar helpers ──────────────────────────────────
+
+    function toggleFullscreen() {
+      if (!canvas) return;
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        canvas.requestFullscreen().catch(function(e) { console.warn(e); });
+      }
+    }
+
+    function toggleMute() {
+      _muted = !_muted;
+      var btn = document.getElementById('btn-mute');
+      try {
+        var ctx = Module.SDL3 && Module.SDL3.audioContext;
+        if (!ctx && Module.SDL2) ctx = Module.SDL2.audioContext;
+        if (ctx) {
+          if (_muted) ctx.suspend(); else ctx.resume();
+        }
+      } catch (e) { /* ignore */ }
+      if (btn) btn.textContent = _muted ? '🔇 Muted' : '🔊 Unmute';
+    }
+
+    function toggleFences() {
+      _fenceEnabled = !_fenceEnabled;
+      var btn = document.getElementById('btn-fence');
+      try {
+        Module.ccall('SetFenceCollisionEnabled', null, ['number'], [_fenceEnabled ? 1 : 0]);
+      } catch (e) { console.warn('Module not ready:', e); }
+      if (btn) {
+        btn.textContent = _fenceEnabled ? '✓ Fences' : '✗ Fences';
+        btn.className   = 'btn' + (_fenceEnabled ? ' on' : ' danger');
+      }
+    }
+
+    // ── Debug panel helpers ──────────────────────────────
+
+    function doFullHeal() {
+      try { Module.ccall('FullHeal', null, [], []); }
+      catch (e) { console.warn('Module not ready:', e); }
+    }
+
+    function doSetHealth() {
+      var v = parseFloat((document.getElementById('health-val') || {}).value) || 1.0;
+      try { Module.ccall('SetPlayerHealth', null, ['number'], [v]); }
+      catch (e) { console.warn('Module not ready:', e); }
+    }
+
+    function doSetLives() {
+      var v = parseInt((document.getElementById('lives-val') || {}).value, 10) || 3;
+      try { Module.ccall('SetPlayerLives', null, ['number'], [v]); }
+      catch (e) { console.warn('Module not ready:', e); }
+    }
+
+    function doWinLevel() {
+      try { Module.ccall('WinLevel', null, [], []); }
+      catch (e) { console.warn('Module not ready:', e); }
+    }
+
+    function doSkipToLevel() {
+      var lvl = parseInt((document.getElementById('warp-level') || {}).value, 10);
+      if (isNaN(lvl)) return;
+      try { Module.ccall('SetStartLevel', null, ['number'], [lvl]); }
+      catch (e) { console.warn('Module not ready:', e); }
+    }
+
+    function uploadTerrainFile() {
+      var input = document.getElementById('ter-upload');
+      if (!input || !input.files.length) return;
+      var file = input.files[0];
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var data = new Uint8Array(e.target.result);
+        var vfsPath = '/Data/Terrain/' + file.name;
+        try {
+          Module.FS.writeFile(vfsPath, data);
+          console.log('[Bugdom2] Uploaded terrain: ' + vfsPath + ' (' + data.length + ' bytes)');
+        } catch (err) {
+          console.error('Upload failed:', err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  </script>
+
+  {{{ SCRIPT }}}
+</body>
+</html>

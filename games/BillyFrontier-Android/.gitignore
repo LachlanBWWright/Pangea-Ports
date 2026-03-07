@@ -1,0 +1,14 @@
+build*/
+cmake-build-*/
+CMakeFiles/
+cache/
+extern/SDL3*
+dist/
+
+# IDEs and OS-specific stuff
+.vs/
+.idea/
+.DS_Store
+*.user
+_codeql_detected_source_root
+docs/game
