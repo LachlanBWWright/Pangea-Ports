@@ -71,12 +71,14 @@ static Mat4 s_modelview_stack[MATRIX_STACK_DEPTH];
 static int  s_modelview_top = 0;
 static Mat4 s_projection_stack[MATRIX_STACK_DEPTH];
 static int  s_projection_top = 0;
+static Mat4 s_tex_matrix;   // GL_TEXTURE matrix (single level, no stack needed)
+static int  s_tex_matrix_dirty = 1;
 static int  s_matrix_mode = GL_MODELVIEW;
 
 static Mat4 *current_matrix(void) {
-    return s_matrix_mode == GL_PROJECTION
-        ? &s_projection_stack[s_projection_top]
-        : &s_modelview_stack[s_modelview_top];
+    if (s_matrix_mode == GL_PROJECTION) return &s_projection_stack[s_projection_top];
+    if (s_matrix_mode == GL_TEXTURE)    return &s_tex_matrix;
+    return &s_modelview_stack[s_modelview_top];
 }
 
 // ── Lighting state ────────────────────────────────────────────────────────────
@@ -167,6 +169,7 @@ static GLint u_texture0, u_texture1;
 static GLint u_sampler0, u_sampler1;
 static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
+static GLint u_tex_matrix;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
@@ -179,6 +182,7 @@ static const char *VERT_SRC =
     "uniform mat4 u_mv;\n"
     "uniform mat4 u_proj;\n"
     "uniform mat3 u_normal_mat;\n"
+    "uniform mat4 u_tex_matrix;\n"
     "uniform vec4 u_current_color;\n"
     // Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
     "uniform int  u_use_color_array;\n"
@@ -223,9 +227,9 @@ static const char *VERT_SRC =
     "    vec3 r = reflect(normalize(vec3(eye_pos)), normalize(u_normal_mat * a_normal));\n"
     "    float m = 2.0 * sqrt(r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0));\n"
     "    v_tc1 = vec2(r.x/m + 0.5, r.y/m + 0.5);\n"
-    "    v_tc0 = a_texcoord0;\n"
+    "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
     "  } else {\n"
-    "    v_tc0 = a_texcoord0;\n"
+    "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
     "    v_tc1 = a_texcoord1;\n"
     "  }\n"
     "  v_fog_depth = (u_fog != 0) ? abs(eye_pos.z) : 0.0;\n"
@@ -377,6 +381,12 @@ static void upload_uniforms(void) {
     glUniform1i(u_texenv0,  s_texenv_mode[0]);
     glUniform1i(u_texenv1,  s_texenv_mode[1]);
     glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
+
+    // Texture matrix (for UV animation via glMatrixMode(GL_TEXTURE))
+    if (s_tex_matrix_dirty) {
+        glUniformMatrix4fv(u_tex_matrix, 1, GL_FALSE, s_tex_matrix.m);
+        s_tex_matrix_dirty = 0;
+    }
 }
 
 // Set up vertex attributes from client-side arrays, upload to VBO, return
@@ -469,6 +479,8 @@ void COMPAT_GL_Init(void) {
         mat4_identity(&s_modelview_stack[i]);
         mat4_identity(&s_projection_stack[i]);
     }
+    mat4_identity(&s_tex_matrix);
+    s_tex_matrix_dirty = 1;
     memset(s_lights, 0, sizeof(s_lights));
 
     // Compile shader
@@ -522,6 +534,7 @@ void COMPAT_GL_Init(void) {
     u_texenv0     = glGetUniformLocation(s_prog, "u_texenv0");
     u_texenv1     = glGetUniformLocation(s_prog, "u_texenv1");
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
+    u_tex_matrix  = glGetUniformLocation(s_prog, "u_tex_matrix");
 
     // VBO for interleaved vertex data
     glGenBuffers(1, &s_vbo);
@@ -532,14 +545,20 @@ void COMPAT_GL_Init(void) {
 // ── Matrix operations ─────────────────────────────────────────────────────────
 void glMatrixMode(GLenum mode) { s_matrix_mode = mode; }
 
-void glLoadIdentity(void) { mat4_identity(current_matrix()); }
+// Mark the texture matrix dirty whenever it is modified
+static void mark_tex_dirty_if_needed(void) {
+    if (s_matrix_mode == GL_TEXTURE) s_tex_matrix_dirty = 1;
+}
 
-void glLoadMatrixf(const GLfloat *m) { memcpy(current_matrix()->m, m, 64); }
+void glLoadIdentity(void) { mat4_identity(current_matrix()); mark_tex_dirty_if_needed(); }
+
+void glLoadMatrixf(const GLfloat *m) { memcpy(current_matrix()->m, m, 64); mark_tex_dirty_if_needed(); }
 
 void glMultMatrixf(const GLfloat *m) {
     Mat4 a = *current_matrix();
     Mat4 b; memcpy(b.m, m, 64);
     mat4_mul(current_matrix(), &a, &b);
+    mark_tex_dirty_if_needed();
 }
 
 void glPushMatrix(void) {
@@ -548,6 +567,8 @@ void glPushMatrix(void) {
             s_projection_stack[s_projection_top+1] = s_projection_stack[s_projection_top];
             s_projection_top++;
         }
+    } else if (s_matrix_mode == GL_TEXTURE) {
+        // No stack for texture matrix — nothing to push
     } else {
         if (s_modelview_top < MATRIX_STACK_DEPTH-1) {
             s_modelview_stack[s_modelview_top+1] = s_modelview_stack[s_modelview_top];
@@ -559,6 +580,8 @@ void glPushMatrix(void) {
 void glPopMatrix(void) {
     if (s_matrix_mode == GL_PROJECTION) {
         if (s_projection_top > 0) s_projection_top--;
+    } else if (s_matrix_mode == GL_TEXTURE) {
+        // No stack for texture matrix — nothing to pop
     } else {
         if (s_modelview_top > 0) s_modelview_top--;
     }
@@ -568,12 +591,14 @@ void glTranslatef(GLfloat x, GLfloat y, GLfloat z) {
     Mat4 t; mat4_identity(&t);
     t.m[12]=x; t.m[13]=y; t.m[14]=z;
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &t);
+    mark_tex_dirty_if_needed();
 }
 
 void glScalef(GLfloat x, GLfloat y, GLfloat z) {
     Mat4 s; mat4_identity(&s);
     s.m[0]=x; s.m[5]=y; s.m[10]=z;
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &s);
+    mark_tex_dirty_if_needed();
 }
 
 void glRotatef(GLfloat angle, GLfloat ax, GLfloat ay, GLfloat az) {
@@ -587,6 +612,7 @@ void glRotatef(GLfloat angle, GLfloat ax, GLfloat ay, GLfloat az) {
     rot.m[4] = ax*ay*(1-c)-az*s;  rot.m[5] = c+ay*ay*(1-c);     rot.m[6] = az*ay*(1-c)+ax*s;
     rot.m[8] = ax*az*(1-c)+ay*s;  rot.m[9] = ay*az*(1-c)-ax*s;  rot.m[10]= c+az*az*(1-c);
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &rot);
+    mark_tex_dirty_if_needed();
 }
 
 void glOrtho(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdouble f) {

@@ -843,10 +843,11 @@ if (bufferFormat == GL_RGB || bufferFormat == GL_BGR) bpp = 3;
 else if (bufferFormat == GL_ALPHA) bpp = 1;
 else if (bufferType == GL_UNSIGNED_SHORT_1_5_5_5_REV) bpp = 2;
 int lineBytes = width * bpp;
+int strideBytes = rowBytesInInput * bpp;  // rowBytesInInput is in pixels, convert to bytes
 rowStripped = (uint8_t*) AllocPtr(height * lineBytes);
 const uint8_t* src = (const uint8_t*) pixels;
 for (int row = 0; row < height; row++)
-SDL_memcpy(rowStripped + row * lineBytes, src + row * rowBytesInInput, lineBytes);
+SDL_memcpy(rowStripped + row * lineBytes, src + row * strideBytes, lineBytes);
 srcPixels = rowStripped;
 }
 

@@ -755,6 +755,11 @@ GLuint	textureName;
 		int numPixels = width * height;
 		uint8_t *rgba = (uint8_t *) AllocPtr(numPixels * 4);
 		const uint16_t *sp = (const uint16_t *) imageMemory;
+		/* If the destination format is GL_RGB the texture is fully opaque —
+		   force alpha to 255 so the alpha-test (GL_NOTEQUAL, 0) doesn't
+		   discard every pixel.  Only respect the 1-bit source alpha when the
+		   caller explicitly requested an RGBA (transparent) format. */
+		bool hasAlpha = (destFormat == GL_RGBA);
 		for (int pi = 0; pi < numPixels; pi++)
 		{
 			uint16_t px = sp[pi];
@@ -771,7 +776,7 @@ GLuint	textureName;
 			rgba[pi*4 + 0] = (r5 << 3) | (r5 >> 2);
 			rgba[pi*4 + 1] = (g5 << 3) | (g5 >> 2);
 			rgba[pi*4 + 2] = (b5 << 3) | (b5 >> 2);
-			rgba[pi*4 + 3] = a1 ? 255 : 0;
+			rgba[pi*4 + 3] = hasAlpha ? (a1 ? 255 : 0) : 255;
 		}
 		convertedPixels = rgba;
 		imageMemory  = rgba;
