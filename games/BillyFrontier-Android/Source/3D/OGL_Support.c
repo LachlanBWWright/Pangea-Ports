@@ -262,21 +262,6 @@ static void OGL_CreateDrawContext(void)
 	bool mkc = SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);
 	GAME_ASSERT_MESSAGE(mkc, SDL_GetError());
 
-#ifdef __EMSCRIPTEN__
-	/*
-	 * LEGACY_GL_EMULATION workaround: Ensure GLImmediate is fully initialized
-	 * immediately after context creation.  Emscripten's GL emulation defers
-	 * initialization of s_texUnits, the matrix stack, and vertex buffers until
-	 * the first immediate-mode call.  Force it now so subsequent glEnable,
-	 * glMaterialfv, glColor4f, etc. calls don't crash on null state.
-	 */
-	EM_ASM({
-		if (typeof GLImmediate !== 'undefined' && GLImmediate.init) {
-			GLImmediate.init();
-		}
-	});
-#endif
-
 			/* ENABLE VSYNC */
 
 	SDL_GL_SetSwapInterval(1);

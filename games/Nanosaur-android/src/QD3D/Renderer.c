@@ -8,9 +8,11 @@
 /****************************/
 
 #include <SDL3/SDL.h>
+#ifndef __EMSCRIPTEN__
 #include <SDL3/SDL_opengl.h>
 #if !OSXPPC
 #include <SDL3/SDL_opengl_glext.h>
+#endif
 #endif
 #include "game.h"
 

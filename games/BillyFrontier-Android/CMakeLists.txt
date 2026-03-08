@@ -375,19 +375,17 @@ if(EMSCRIPTEN)
 		-sASYNCIFY=1
 		-sASYNCIFY_STACK_SIZE=65536
 
-		# Legacy OpenGL emulation: translates the game's fixed-function OpenGL pipeline
-		# (glBegin/glEnd, glLight, glFog, glMatrix, etc.) into WebGL draw calls.
-		-sLEGACY_GL_EMULATION=1
-
-		# Disable the aggressive GL emulation optimizations that can cause rendering
-		# artifacts and trigger the "unsafe opts" console warning in the browser.
-		-sGL_UNSAFE_OPTS=0
+		# Full OpenGL ES 2.0 emulation via our custom compat layer (modern_gl.c,
+		# vertex_array_compat.c, state_compat.c) instead of LEGACY_GL_EMULATION.
+		# LEGACY_GL_EMULATION crashes in Emscripten 3.x headless (TypeError reading '1').
+		-sFULL_ES2=1
 
 		# Memory configuration
 		-sINITIAL_MEMORY=134217728		# 128 MB initial heap
 		-sALLOW_MEMORY_GROWTH=1
 
-		# WebGL 2 for better compatibility
+		# WebGL 2 for better compatibility; UNSIGNED_INT index buffers are natively
+		# supported in WebGL 2 (no OES_element_index_uint extension needed).
 		-sMAX_WEBGL_VERSION=2
 		-sMIN_WEBGL_VERSION=1
 

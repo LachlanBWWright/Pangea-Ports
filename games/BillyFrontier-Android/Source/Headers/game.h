@@ -6,7 +6,13 @@
 
 #include <math.h>
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_opengl.h>
+#ifdef __EMSCRIPTEN__
+// WebGL/GLES2 path: use the custom compat layer instead of desktop OpenGL headers.
+#	include <SDL3/SDL_opengles2.h>
+#	include "gl_compat.h"
+#else
+#	include <SDL3/SDL_opengl.h>
+#endif
 
 #include "Pomme.h"
 

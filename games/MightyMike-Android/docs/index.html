@@ -63,11 +63,6 @@
       padding: 2rem 1.5rem;
       text-align: center;
     }
-    #loading-card img {
-      max-width: 280px;
-      width: 100%;
-      margin-bottom: 1.25rem;
-    }
     #status-text {
       font-size: 1.05rem;
       color: var(--accent);
@@ -216,7 +211,6 @@
 
     <!-- Loading card (overlays the canvas until the game starts) -->
     <div id="loading-card">
-      <img src="screenshot.png" alt="Mighty Mike" onerror="this.style.opacity='0'">
       <div id="status-text">Initializing…</div>
       <progress id="progress-bar" value="0" max="1"></progress>
       <div id="progress-label">Downloading game data…</div>
