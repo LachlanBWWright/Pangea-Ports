@@ -389,6 +389,34 @@
 
         // Sync fence-collision toggle UI with current game state
         refreshFenceStatus();
+
+        // ── Standard PangeaGame API ───────────────────────────────────────
+        // MightyMike uses ?level=SCENE:AREA for level skip.
+        window.PangeaGame = {
+          // skipToLevel(n) where n is a flat 0-based area index (converted to scene:area)
+          // or pass "SCENE:AREA" string directly.
+          skipToLevel: function(n) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('level', typeof n === 'string' ? n : n);
+            window.location.href = url.toString();
+          },
+          // setLevel: runtime variant — Boot_SetDirectLevel(scene, area)
+          setLevel: function(scene, area) {
+            if (area === undefined) { area = scene; scene = 0; }
+            return Module.ccall('Boot_SetDirectLevel', null, ['number','number'], [scene, area]);
+          },
+          getCurrentLevel: function() {
+            var params = new URLSearchParams(window.location.search);
+            return params.get('level') || '';
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('Cheat_SetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
+          },
+          getFenceCollisions: function() {
+            return Module.ccall('Cheat_GetFenceCollision', 'number', [], []) !== 0;
+          },
+        };
+        console.log('[MightyMike] PangeaGame API ready. Use PangeaGame.skipToLevel("SCENE:AREA") to jump to a level.');
       },
 
       preRun: [function() {
