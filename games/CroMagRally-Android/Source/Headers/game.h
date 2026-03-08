@@ -176,3 +176,10 @@ extern uint16_t					**gTileGrid;
 extern uint32_t					gAutoFadeStatusBits;
 extern uint32_t					gGlobalMaterialFlags;
 extern uint32_t					gInfobarUpdateBits;
+
+#ifdef __EMSCRIPTEN__
+// WebGL/GLES2 compatibility layer — must come LAST (after all game type definitions).
+// gl_compat.h already includes SDL_opengl.h for constants; the #ifdef block
+// only needs to add the compat layer macros.
+#include "gl_compat.h"
+#endif

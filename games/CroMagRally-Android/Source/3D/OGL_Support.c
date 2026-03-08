@@ -42,6 +42,7 @@ static void OGL_InitDrawContext(void);
 static void OGL_SetStyles(OGLSetupInputType *setupDefPtr);
 static void OGL_CreateLights(OGLLightDefType *lightDefPtr);
 static void OGL_UpdatePaneDimensions(Byte whichPane);
+void OGL_InitFunctions(void);   // defined in OGL_Functions.c
 
 
 /****************************/

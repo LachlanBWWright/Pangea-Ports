@@ -5,15 +5,7 @@
 #pragma once
 
 #include "main.h"
-#ifdef __EMSCRIPTEN__
-// WebGL/GLES2 path: use the custom compat layer instead of desktop OpenGL headers.
-// This must come before gl_compat.h so GLES2 types are available.
-#	include <SDL3/SDL_opengles2.h>
-// Our shader-based compat layer replacing LEGACY_GL_EMULATION (must be LAST GL header)
-#	include "gl_compat.h"
-#else
-#	include <SDL3/SDL_opengl.h>
-#endif
+#include <SDL3/SDL_opengl.h>
 
 #define MAX_SPLITSCREENS	MAX_LOCAL_PLAYERS
 #define MAX_VIEWPORTS		(1+MAX_SPLITSCREENS)

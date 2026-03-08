@@ -5,9 +5,9 @@
 
 #pragma once
 
-#ifndef __EMSCRIPTEN__
+// Always include the desktop GL headers for constant definitions
+// (GL_MODELVIEW, GL_PROJECTION, GL_BGRA, etc.)
 #include <SDL3/SDL_opengl.h>
-#endif
 
 #ifdef __EMSCRIPTEN__
 #include "modern_gl.h"
@@ -27,9 +27,12 @@
 #define glVertex3f(x,y,z) ModernGL_ImmediateVertex(x,y,z)
 #define glVertex3fv(v) ModernGL_ImmediateVertex((v)[0],(v)[1],(v)[2])
 
-// GL_QUADS not supported in WebGL - need to convert to triangles
-// This is handled in the immediate mode implementation
-// For GL_QUADS: vertices 0,1,2,3 become triangles 0,1,2 and 0,2,3
+// GL_QUADS not supported natively in WebGL/GLES2; handled by converting
+// quads to triangles in the immediate mode implementation.
+// The constant is not defined in SDL_opengles2.h, so define it here.
+#ifndef GL_QUADS
+#define GL_QUADS 0x0007
+#endif
 
 // Client-side vertex arrays
 // Redirected via vertex_array_compat.h: glEnableClientState, glDisableClientState,

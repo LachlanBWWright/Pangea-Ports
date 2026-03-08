@@ -6,10 +6,8 @@
 // (C) 2022-2025 Pangea Ports contributors.
 
 #include <SDL3/SDL.h>
-#ifndef __EMSCRIPTEN__
 #include <SDL3/SDL_opengl.h>
 #include <SDL3/SDL_opengl_glext.h>
-#endif
 
 #include "game.h"
 
@@ -45,7 +43,8 @@ void OGL_InitFunctions(void)
 // procptr_glActiveTextureARB must be defined because state_compat.c
 // has an extern declaration for it.  We just provide a non-null pointer
 // to the real GLES2 glActiveTexture so CompatGL_ActiveTexture works.
-typedef void (*glActiveTextureFunc_t)(unsigned int);
+// PFNGLACTIVETEXTUREARBPROC is only in SDL_opengl.h; define the typedef manually.
+typedef void (*PFNGLACTIVETEXTUREARBPROC)(GLenum texture);
 PFNGLACTIVETEXTUREARBPROC procptr_glActiveTextureARB = (PFNGLACTIVETEXTUREARBPROC) glActiveTexture;
 
 void OGL_InitFunctions(void)
