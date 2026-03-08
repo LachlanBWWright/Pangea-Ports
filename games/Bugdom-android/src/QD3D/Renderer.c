@@ -108,8 +108,12 @@ static float                gBackupVertexColors[4*65536];
 
 #ifdef __EMSCRIPTEN__
 // WebGL requires VBOs — client-side vertex arrays are not supported.
-// We use a single pair of streaming VBO/EBO that is re-uploaded each draw call.
-static GLuint               s_streamVBO = 0;
+// Each vertex attribute gets its own streaming VBO so that uploading data for
+// one attribute does not overwrite the previously-uploaded data for another.
+// (A single shared VBO would be overwritten by each glBufferData call, causing
+// all glVertexAttribPointer(offset=0) calls to read the *last* uploaded array.)
+enum { VBO_ATTRIB_POS=0, VBO_ATTRIB_NORM=1, VBO_ATTRIB_COLOR=2, VBO_ATTRIB_TC=3, VBO_ATTRIB_COUNT=4 };
+static GLuint               s_attrVBO[VBO_ATTRIB_COUNT] = {0,0,0,0};
 static GLuint               s_streamEBO = 0;
 #endif
 
@@ -123,11 +127,12 @@ static void SendGeometry(const MeshQueueEntry* entry);
 
 #ifdef __EMSCRIPTEN__
 // WebGL does not support client-side vertex arrays — all data must live in GPU buffers.
-// VertexAttribVBO uploads a flat array of floats to the streaming VBO and sets up
-// the vertex attribute pointer against it.
-static void VertexAttribVBO(GLint attribLoc, GLint components, GLsizei numVerts, const GLfloat* data)
+// VertexAttribVBO uploads a flat array of floats to the per-attribute VBO and sets up
+// the vertex attribute pointer.  Each attribute has its own VBO so uploads for different
+// attributes do not overwrite each other.
+static void VertexAttribVBO(GLint attribLoc, GLint attrIdx, GLint components, GLsizei numVerts, const GLfloat* data)
 {
-	glBindBuffer(GL_ARRAY_BUFFER, s_streamVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, s_attrVBO[attrIdx]);
 	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(numVerts * components * sizeof(GLfloat)), data, GL_STREAM_DRAW);
 	glVertexAttribPointer(attribLoc, components, GL_FLOAT, GL_FALSE, 0, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -140,10 +145,10 @@ static void DrawElementsVBO(GLenum mode, GLsizei count, const TQ3TriMeshTriangle
 	glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
-#define ATTRIB_VBO(loc, components, mesh, field) VertexAttribVBO((loc), (components), (mesh)->numPoints, (const GLfloat*)(mesh)->field)
+#define ATTRIB_VBO(loc, vboIdx, components, mesh, field) VertexAttribVBO((loc), (vboIdx), (components), (mesh)->numPoints, (const GLfloat*)(mesh)->field)
 #define DRAW_ELEMENTS_VBO(mesh) DrawElementsVBO(GL_TRIANGLES, (mesh)->numTriangles * 3, (mesh)->triangles)
 #else
-#define ATTRIB_VBO(loc, components, mesh, field) glVertexAttribPointer((loc), (components), GL_FLOAT, GL_FALSE, 0, (mesh)->field)
+#define ATTRIB_VBO(loc, vboIdx, components, mesh, field) glVertexAttribPointer((loc), (components), GL_FLOAT, GL_FALSE, 0, (mesh)->field)
 #define DRAW_ELEMENTS_VBO(mesh) glDrawElements(GL_TRIANGLES, (mesh)->numTriangles * 3, GL_UNSIGNED_INT, (mesh)->triangles)
 #endif
 
@@ -489,7 +494,7 @@ if (gGLContext)
 {
 #ifdef __EMSCRIPTEN__
 // Free streaming VBOs/EBO before destroying the GL context.
-if (s_streamVBO) { glDeleteBuffers(1, &s_streamVBO); s_streamVBO = 0; }
+if (s_attrVBO[0]) { glDeleteBuffers(VBO_ATTRIB_COUNT, s_attrVBO); for (int i=0;i<VBO_ATTRIB_COUNT;i++) s_attrVBO[i]=0; }
 if (s_streamEBO) { glDeleteBuffers(1, &s_streamEBO); s_streamEBO = 0; }
 #endif
 SDL_GL_DestroyContext(gGLContext);
@@ -620,7 +625,7 @@ gFullscreenQuad = MakeQuadMesh_UI(0, 0, GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT, 0, 0,
 
 #ifdef __EMSCRIPTEN__
 // WebGL requires all vertex data in GPU buffers — create streaming VBO/EBO.
-if (!s_streamVBO) { glGenBuffers(1, &s_streamVBO); }
+if (!s_attrVBO[0]) { glGenBuffers(VBO_ATTRIB_COUNT, s_attrVBO); }
 if (!s_streamEBO) { glGenBuffers(1, &s_streamEBO); }
 #endif
 
@@ -754,6 +759,16 @@ if (flags & kRendererTextureFlags_ClampU)
 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 if (flags & kRendererTextureFlags_ClampV)
 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+#ifdef __EMSCRIPTEN__
+// WebGL 1 does not support GL_REPEAT on non-power-of-two textures: sampling
+// such a texture returns black (0,0,0,0) instead of the correct colour.
+// Force CLAMP_TO_EDGE on every texture unit regardless of the requested flags.
+if (!(flags & kRendererTextureFlags_ClampU))
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+if (!(flags & kRendererTextureFlags_ClampV))
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#endif
 
 #ifdef __EMSCRIPTEN__
 // WebGL 1 only supports RGBA/RGB + UNSIGNED_BYTE (and a few 16-bit packed types).
@@ -1230,7 +1245,7 @@ if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 glCullFace(GL_FRONT);       // pass 1: draw backfaces
 
 // Submit vertex positions
-ATTRIB_VBO(gState.loc_a_Position, 3, mesh, points);
+ATTRIB_VBO(gState.loc_a_Position, VBO_ATTRIB_POS, 3, mesh, points);
 
 // Upload combined modelview if the per-object transform changed
 if (gState.currentTransform != entry->transform)
@@ -1289,7 +1304,7 @@ SetUniformBool(gState.loc_u_TextureEnabled,   &gState.textureEnabled,   true);
 SetUniformBool(gState.loc_u_AlphaTestEnabled, &gState.alphaTestEnabled, true);
 EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
-ATTRIB_VBO(gState.loc_a_TexCoord, 2, mesh, vertexUVs);
+ATTRIB_VBO(gState.loc_a_TexCoord, VBO_ATTRIB_TC, 2, mesh, vertexUVs);
 CHECK_GL_ERROR();
 }
 else
@@ -1346,7 +1361,7 @@ DisableAttrib(TexCoord);
 if (mesh->hasVertexNormals && wantLighting)
 {
 EnableAttrib(Normal);
-ATTRIB_VBO(gState.loc_a_Normal, 3, mesh, vertexNormals);
+ATTRIB_VBO(gState.loc_a_Normal, VBO_ATTRIB_NORM, 3, mesh, vertexNormals);
 }
 else
 {
@@ -1369,7 +1384,7 @@ if (mesh->hasVertexColors)
 {
 SetUniformBool(gState.loc_u_UseVertexColors, &gState.useVertexColors, true);
 EnableAttrib(Color);
-ATTRIB_VBO(gState.loc_a_Color, 4, mesh, vertexColors);
+ATTRIB_VBO(gState.loc_a_Color, VBO_ATTRIB_COLOR, 4, mesh, vertexColors);
 }
 else
 {
