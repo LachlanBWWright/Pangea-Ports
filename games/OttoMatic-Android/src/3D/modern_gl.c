@@ -46,7 +46,7 @@ static int gImmScratchCapacity = 0;
 
 // Vertex shader source (embedded)
 static const char* gVertexShaderSource =
-"precision highp float;\n"
+"precision highp float;\nprecision mediump int;\n"
 "attribute vec3 aPosition;\n"
 "attribute vec3 aNormal;\n"
 "attribute vec4 aColor;\n"
@@ -122,7 +122,7 @@ static const char* gVertexShaderSource =
 
 // Fragment shader source (embedded)
 static const char* gFragmentShaderSource =
-"precision mediump float;\n"
+"precision mediump float;\nprecision mediump int;\n"
 "uniform sampler2D uTexture0;\n"
 "uniform sampler2D uTexture1;\n"
 // Use int instead of bool for GLSL ES 1.0 compatibility

@@ -170,7 +170,7 @@ static GLint u_texgen;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
-    "precision mediump float;\n"
+    "precision mediump float;\nprecision mediump int;\n"
     "attribute vec3 a_position;\n"
     "attribute vec3 a_normal;\n"
     "attribute vec4 a_color;\n"
@@ -232,7 +232,7 @@ static const char *VERT_SRC =
     "}\n";
 
 static const char *FRAG_SRC =
-    "precision mediump float;\n"
+    "precision mediump float;\nprecision mediump int;\n"
     "varying vec4  v_color;\n"
     "varying vec2  v_tc0;\n"
     "varying vec2  v_tc1;\n"

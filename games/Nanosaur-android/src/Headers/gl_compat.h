@@ -97,8 +97,12 @@ extern "C" {
 
 // Pixel format constants (GL 1.x, not in GLES2)
 #define GL_BGRA                         0x80E1
+#define GL_UNSIGNED_INT_8_8_8_8         0x8035
 #define GL_UNSIGNED_INT_8_8_8_8_REV     0x8367
 #define GL_UNSIGNED_SHORT_1_5_5_5_REV   0x8366
+
+// Pixel store parameters (available in WebGL 2.0 / OpenGL ES 3.0)
+#define GL_UNPACK_ROW_LENGTH            0x0CF2
 
 // Material
 #define GL_AMBIENT_AND_DIFFUSE          0x1602
