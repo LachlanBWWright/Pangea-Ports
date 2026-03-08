@@ -106,6 +106,13 @@ static bool                 gFrameStarted = false;
 
 static float                gBackupVertexColors[4*65536];
 
+#ifdef __EMSCRIPTEN__
+// WebGL requires VBOs — client-side vertex arrays are not supported.
+// We use a single pair of streaming VBO/EBO that is re-uploaded each draw call.
+static GLuint               s_streamVBO = 0;
+static GLuint               s_streamEBO = 0;
+#endif
+
 static int DrawOrderComparator(void const* a_void, void const* b_void);
 
 static void BeginDepthPass(const MeshQueueEntry* entry);
@@ -113,6 +120,32 @@ static void BeginShadingPass(const MeshQueueEntry* entry);
 static void PrepareOpaqueShading(const MeshQueueEntry* entry);
 static void PrepareAlphaShading(const MeshQueueEntry* entry);
 static void SendGeometry(const MeshQueueEntry* entry);
+
+#ifdef __EMSCRIPTEN__
+// WebGL does not support client-side vertex arrays — all data must live in GPU buffers.
+// VertexAttribVBO uploads a flat array of floats to the streaming VBO and sets up
+// the vertex attribute pointer against it.
+static void VertexAttribVBO(GLint attribLoc, GLint components, GLsizei numVerts, const GLfloat* data)
+{
+	glBindBuffer(GL_ARRAY_BUFFER, s_streamVBO);
+	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(numVerts * components * sizeof(GLfloat)), data, GL_STREAM_DRAW);
+	glVertexAttribPointer(attribLoc, components, GL_FLOAT, GL_FALSE, 0, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+// DrawElementsVBO uploads an index array to the streaming EBO and issues the draw call.
+static void DrawElementsVBO(GLenum mode, GLsizei count, const TQ3TriMeshTriangleData* triangles)
+{
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_streamEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(GLuint)), triangles, GL_STREAM_DRAW);
+	glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+#define ATTRIB_VBO(loc, components, mesh, field) VertexAttribVBO((loc), (components), (mesh)->numPoints, (const GLfloat*)(mesh)->field)
+#define DRAW_ELEMENTS_VBO(mesh) DrawElementsVBO(GL_TRIANGLES, (mesh)->numTriangles * 3, (mesh)->triangles)
+#else
+#define ATTRIB_VBO(loc, components, mesh, field) glVertexAttribPointer((loc), (components), GL_FLOAT, GL_FALSE, 0, (mesh)->field)
+#define DRAW_ELEMENTS_VBO(mesh) glDrawElements(GL_TRIANGLES, (mesh)->numTriangles * 3, GL_UNSIGNED_INT, (mesh)->triangles)
+#endif
 
 #pragma mark -
 
@@ -579,6 +612,12 @@ if (!gFullscreenQuad)
 {
 gFullscreenQuad = MakeQuadMesh_UI(0, 0, GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT, 0, 0, 1, 1);
 }
+
+#ifdef __EMSCRIPTEN__
+// WebGL requires all vertex data in GPU buffers — create streaming VBO/EBO.
+if (!s_streamVBO) { glGenBuffers(1, &s_streamVBO); }
+if (!s_streamEBO) { glGenBuffers(1, &s_streamEBO); }
+#endif
 
 CHECK_GL_ERROR();
 }
@@ -1186,7 +1225,7 @@ if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 glCullFace(GL_FRONT);       // pass 1: draw backfaces
 
 // Submit vertex positions
-glVertexAttribPointer(gState.loc_a_Position, 3, GL_FLOAT, GL_FALSE, 0, mesh->points);
+ATTRIB_VBO(gState.loc_a_Position, 3, mesh, points);
 
 // Upload combined modelview if the per-object transform changed
 if (gState.currentTransform != entry->transform)
@@ -1206,14 +1245,14 @@ UploadMatrix3x3NormalFromMV(&gCurrentModelView);
 gState.currentTransform = entry->transform;
 }
 
-glDrawElements(GL_TRIANGLES, mesh->numTriangles * 3, GL_UNSIGNED_INT, mesh->triangles);
+DRAW_ELEMENTS_VBO(mesh);
 CHECK_GL_ERROR();
 
 // Pass 2: draw frontfaces (improves look of translucent spheres etc.)
 if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 {
 glCullFace(GL_BACK);        // pass 2: draw frontfaces
-glDrawElements(GL_TRIANGLES, mesh->numTriangles * 3, GL_UNSIGNED_INT, mesh->triangles);
+DRAW_ELEMENTS_VBO(mesh);
 CHECK_GL_ERROR();
 }
 }
@@ -1245,7 +1284,7 @@ SetUniformBool(gState.loc_u_TextureEnabled,   &gState.textureEnabled,   true);
 SetUniformBool(gState.loc_u_AlphaTestEnabled, &gState.alphaTestEnabled, true);
 EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
-glVertexAttribPointer(gState.loc_a_TexCoord, 2, GL_FLOAT, GL_FALSE, 0, mesh->vertexUVs);
+ATTRIB_VBO(gState.loc_a_TexCoord, 2, mesh, vertexUVs);
 CHECK_GL_ERROR();
 }
 else
@@ -1285,7 +1324,11 @@ SetUniformBool(gState.loc_u_TextureEnabled, &gState.textureEnabled, true);
 EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
 const float* uvs = (const float*)(statusBits & STATUS_BIT_REFLECTIONMAP ? gEnvMapUVs : mesh->vertexUVs);
+#ifdef __EMSCRIPTEN__
+VertexAttribVBO(gState.loc_a_TexCoord, 2, mesh->numPoints, uvs);
+#else
 glVertexAttribPointer(gState.loc_a_TexCoord, 2, GL_FLOAT, GL_FALSE, 0, uvs);
+#endif
 CHECK_GL_ERROR();
 }
 else
@@ -1298,7 +1341,7 @@ DisableAttrib(TexCoord);
 if (mesh->hasVertexNormals && wantLighting)
 {
 EnableAttrib(Normal);
-glVertexAttribPointer(gState.loc_a_Normal, 3, GL_FLOAT, GL_FALSE, 0, mesh->vertexNormals);
+ATTRIB_VBO(gState.loc_a_Normal, 3, mesh, vertexNormals);
 }
 else
 {
@@ -1321,7 +1364,7 @@ if (mesh->hasVertexColors)
 {
 SetUniformBool(gState.loc_u_UseVertexColors, &gState.useVertexColors, true);
 EnableAttrib(Color);
-glVertexAttribPointer(gState.loc_a_Color, 4, GL_FLOAT, GL_FALSE, 0, mesh->vertexColors);
+ATTRIB_VBO(gState.loc_a_Color, 4, mesh, vertexColors);
 }
 else
 {
@@ -1366,7 +1409,11 @@ gBackupVertexColors[j++] = mesh->vertexColors[v].g;
 gBackupVertexColors[j++] = mesh->vertexColors[v].b;
 gBackupVertexColors[j++] = mesh->vertexColors[v].a * entry->mods->autoFadeFactor;
 }
+#ifdef __EMSCRIPTEN__
+VertexAttribVBO(gState.loc_a_Color, 4, mesh->numPoints, gBackupVertexColors);
+#else
 glVertexAttribPointer(gState.loc_a_Color, 4, GL_FLOAT, GL_FALSE, 0, gBackupVertexColors);
+#endif
 }
 else
 {
