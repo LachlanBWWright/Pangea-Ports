@@ -27,4 +27,13 @@ void OGL_InitFunctions(void)
 PFNGLACTIVETEXTUREARBPROC procptr_glActiveTextureARB =
     (PFNGLACTIVETEXTUREARBPROC) glActiveTexture;
 
+// OGL_InitFunctions is called unconditionally by OGL_Support.c.
+// On Emscripten, we use it to initialise the custom GLES2 compatibility layer.
+extern void ModernGL_Init(void);
+
+void OGL_InitFunctions(void)
+{
+    ModernGL_Init();
+}
+
 #endif /* !__EMSCRIPTEN__ */

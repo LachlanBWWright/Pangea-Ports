@@ -22,6 +22,11 @@
 #include <stdlib.h>
 #include <GLES2/gl2.h>
 
+// Render statistics counters (defined in render_stats_stub.c for this game)
+extern int gDrawCallsThisFrame;
+extern int gVerticesThisFrame;
+extern int gBufferUploadsThisFrame;
+
 // #undef the macros so we can call the real GL functions for drawing.
 // Our CompatGL_* implementations set up VBOs and call the real functions
 // directly, bypassing the recursive macro redirect.

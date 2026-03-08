@@ -13,6 +13,11 @@
 #include <GLES2/gl2.h>
 #include <emscripten/html5.h>
 
+// Render statistics counters (defined in render_stats_stub.c for this game)
+extern int gDrawCallsThisFrame;
+extern int gVerticesThisFrame;
+extern int gBufferUploadsThisFrame;
+
 // IMPORTANT: #undef macros that redirect to the compat layer, so this file
 // can call the REAL GLES2 functions.  Without this, ModernGL_DrawGeometry
 // would recurse through CompatGL_DrawElements → ModernGL_DrawGeometry → ∞.

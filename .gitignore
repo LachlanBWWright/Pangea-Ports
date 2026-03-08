@@ -16,3 +16,5 @@
 site/
 docs/bugdom_gameplay.png
 games/BillyFrontier-Android/extern/SDL/
+**/extern/SDL3-*/
+**/extern/SDL3/
