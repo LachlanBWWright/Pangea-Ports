@@ -1345,7 +1345,7 @@ EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
 const float* uvs = (const float*)(statusBits & STATUS_BIT_REFLECTIONMAP ? gEnvMapUVs : mesh->vertexUVs);
 #ifdef __EMSCRIPTEN__
-VertexAttribVBO(gState.loc_a_TexCoord, 2, mesh->numPoints, uvs);
+VertexAttribVBO(gState.loc_a_TexCoord, VBO_ATTRIB_TC, 2, mesh->numPoints, uvs);
 #else
 glVertexAttribPointer(gState.loc_a_TexCoord, 2, GL_FLOAT, GL_FALSE, 0, uvs);
 #endif
@@ -1430,7 +1430,7 @@ gBackupVertexColors[j++] = mesh->vertexColors[v].b;
 gBackupVertexColors[j++] = mesh->vertexColors[v].a * entry->mods->autoFadeFactor;
 }
 #ifdef __EMSCRIPTEN__
-VertexAttribVBO(gState.loc_a_Color, 4, mesh->numPoints, gBackupVertexColors);
+VertexAttribVBO(gState.loc_a_Color, VBO_ATTRIB_COLOR, 4, mesh->numPoints, gBackupVertexColors);
 #else
 glVertexAttribPointer(gState.loc_a_Color, 4, GL_FLOAT, GL_FALSE, 0, gBackupVertexColors);
 #endif

@@ -392,7 +392,7 @@ GLuint Render_LoadTexture(
 		}
 		converted = dst;
 	}
-	else if (bufferFormat == GL_BGR && bufferType == GL_UNSIGNED_BYTE)
+	else if (bufferFormat == 0x80E0 /* GL_BGR */ && bufferType == GL_UNSIGNED_BYTE)
 	{
 		int n = width * height;
 		uint8_t* dst = (uint8_t*) SDL_malloc(n * 3);
