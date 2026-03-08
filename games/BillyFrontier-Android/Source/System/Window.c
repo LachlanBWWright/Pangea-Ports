@@ -269,6 +269,13 @@ long	start;
 
 void GetDefaultWindowSize(int display, int* width, int* height)
 {
+#ifdef __EMSCRIPTEN__
+	// Use a fixed game resolution for Emscripten/WebAssembly builds.
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless browsers before layout is computed, producing a 3×3 canvas.
+	*width  = 1280;
+	*height = 960;	// 4:3 at 1280 wide
+#else
 	const float aspectRatio = 4.0f / 3.0f;
 	const float screenCoverage = .8f;
 
@@ -285,6 +292,7 @@ void GetDefaultWindowSize(int display, int* width, int* height)
 		*width	= displayBounds.w * screenCoverage;
 		*height	= displayBounds.w * screenCoverage / aspectRatio;
 	}
+#endif
 }
 
 /********************** GET NUM DISPLAYS **********************/

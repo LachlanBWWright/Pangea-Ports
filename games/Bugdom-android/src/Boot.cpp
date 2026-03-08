@@ -231,6 +231,16 @@ retryVideo:
 #ifdef __EMSCRIPTEN__
 	// Sync with requestAnimationFrame on Emscripten for smooth rendering
 	SDL_GL_SetSwapInterval(1);
+
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless/CI browsers before the page layout is computed.  Force the
+	// window (and therefore the WebGL canvas) to the game's target resolution
+	// so headless screenshots are taken at the correct size.
+	if (gSDLWindow)
+	{
+		SDL_SetWindowSize(gSDLWindow, initialWidth, initialHeight);
+		SDL_SyncWindow(gSDLWindow);
+	}
 #endif
 
 	if (!gSDLWindow)

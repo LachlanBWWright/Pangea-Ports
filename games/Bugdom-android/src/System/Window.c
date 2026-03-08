@@ -220,6 +220,14 @@ void QD3D_OnWindowResized(int windowWidth, int windowHeight)
 
 void GetDefaultWindowSize(SDL_DisplayID display, int* width, int* height)
 {
+#ifdef __EMSCRIPTEN__
+	// Use a fixed game resolution for Emscripten/WebAssembly builds.
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless browsers or CI environments before layout is computed.
+	// Providing a known-good size avoids a 3×3 canvas in those environments.
+	*width  = 1280;
+	*height = 720;
+#else
 	const float aspectRatio = 16.0 / 9.0f;
 	const float screenCoverage = .8f;
 
@@ -235,16 +243,6 @@ void GetDefaultWindowSize(SDL_DisplayID display, int* width, int* height)
 	{
 		*width = displayBounds.w * screenCoverage;
 		*height = displayBounds.w * screenCoverage / aspectRatio;
-	}
-
-#ifdef __EMSCRIPTEN__
-	// Ensure a minimum window size for Emscripten builds.
-	// In some environments, SDL_GetDisplayUsableBounds may return very small
-	// values (e.g. headless browsers), leading to a tiny canvas.
-	if (*width < 640 || *height < 480)
-	{
-		*width = 1280;
-		*height = 720;
 	}
 #endif
 }

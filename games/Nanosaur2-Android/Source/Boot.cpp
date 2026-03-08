@@ -207,6 +207,16 @@ retryVideo:
 #ifdef __EMSCRIPTEN__
 	// Enable vsync via requestAnimationFrame on Emscripten (recommended by SDL3 README-emscripten)
 	SDL_GL_SetSwapInterval(1);
+
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless/CI browsers before the page layout is computed.  Force the
+	// window (and therefore the WebGL canvas) to the game's target resolution.
+	{
+		int emW = 640, emH = 480;
+		GetDefaultWindowSize(SDL_GetDisplayForWindow(gSDLWindow), &emW, &emH);
+		SDL_SetWindowSize(gSDLWindow, emW, emH);
+		SDL_SyncWindow(gSDLWindow);
+	}
 #endif
 
 	// Init gamepad subsystem

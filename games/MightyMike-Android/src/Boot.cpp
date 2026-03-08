@@ -184,6 +184,19 @@ static void Boot(int argc, char** argv)
 	if (!gSDLWindow)
 		throw std::runtime_error("Couldn't create SDL window.");
 
+#ifdef __EMSCRIPTEN__
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless/CI browsers before the page layout is computed.  Force the
+	// window (and therefore the WebGL canvas) to an integer-zoom size so
+	// headless screenshots are taken at the correct resolution.
+	{
+		int zoom = GetMaxIntegerZoomForPreferredDisplay();
+		if (zoom < 1) zoom = 1;
+		SDL_SetWindowSize(gSDLWindow, VISIBLE_WIDTH * zoom, VISIBLE_HEIGHT * zoom);
+		SDL_SyncWindow(gSDLWindow);
+	}
+#endif
+
 #if GLRENDER
 	GLRender_Init();
 #else

@@ -231,6 +231,14 @@ retryVideo:
 		}
 	}
 
+#ifdef __EMSCRIPTEN__
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless/CI browsers before the page layout is computed.  Force the
+	// window (and therefore the WebGL canvas) to the game's target resolution.
+	SDL_SetWindowSize(gSDLWindow, GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT);
+	SDL_SyncWindow(gSDLWindow);
+#endif
+
 	// Set up globals that the game expects
 	gCoverWindow = Pomme::Graphics::GetScreenPort();
 	gBackdropPixels = (UInt32*) GetPixBaseAddr(GetGWorldPixMap(gCoverWindow));
