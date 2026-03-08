@@ -460,7 +460,7 @@ class EmscriptenProject(Project):
         super().__init__(dir_name)
         self.gen_args += [
             "-DCMAKE_BUILD_TYPE=Release",
-            "-DBUILD_SDL_FROM_SOURCE=OFF",
+            "-DBUILD_SDL_FROM_SOURCE=ON",   # required for Emscripten (no prebuilt)
         ]
         self.build_args += ["-j", str(NPROC)]
         self.build_configs = ["Release"]

@@ -309,6 +309,26 @@
         if (card) card.style.display = 'none';
         var tb = document.getElementById('toolbar');
         if (tb) tb.style.display = 'flex';
+
+        // ── Standard PangeaGame API ──────────────────────────────────────
+        // Exposes a consistent interface shared across all Pangea Ports WASM
+        // builds. Set on window inside onRuntimeInitialized so Module is ready.
+        window.PangeaGame = {
+          skipToLevel: function(n) {
+            return Module.ccall('Nanosaur2_SkipToLevel', null, ['number'], [n]);
+          },
+          getCurrentLevel: function() {
+            return Module.ccall('Nanosaur2_GetCurrentLevel', 'number');
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('Nanosaur2_SetFenceCollisionsEnabled', null, ['number'], [enabled ? 1 : 0]);
+          },
+        };
+        // Convenience aliases
+        window.Nanosaur2_SkipToLevel                  = function(n) { return window.PangeaGame.skipToLevel(n); };
+        window.Nanosaur2_GetCurrentLevel              = function()  { return window.PangeaGame.getCurrentLevel(); };
+        window.Nanosaur2_SetFenceCollisionsEnabled    = function(e) { return window.PangeaGame.setFenceCollisions(e); };
+        console.log('[Nanosaur2] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
       },
 
       // Display fatal errors in the loading card instead of silently failing

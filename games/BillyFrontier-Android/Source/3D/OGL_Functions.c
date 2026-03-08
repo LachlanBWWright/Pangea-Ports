@@ -5,8 +5,7 @@
 
 #ifndef __EMSCRIPTEN__
 // On Emscripten/WebGL, glActiveTexture and glClientActiveTexture are available
-// as core or LEGACY_GL_EMULATION functions -- no proc-address lookup needed.
-// See ogl_functions.h for the Emscripten macro definitions.
+// as core GLES2 functions.  See ogl_functions.h for the Emscripten definitions.
 
 PFNGLACTIVETEXTUREARBPROC			procptr_glActiveTextureARB			= NULL;
 PFNGLCLIENTACTIVETEXTUREARBPROC		procptr_glClientActiveTextureARB	= NULL;
@@ -18,6 +17,23 @@ void OGL_InitFunctions(void)
 
 	GAME_ASSERT(procptr_glActiveTextureARB);
 	GAME_ASSERT(procptr_glClientActiveTextureARB);
+}
+
+#else /* __EMSCRIPTEN__ */
+
+// On Emscripten, glActiveTexture is a core GLES2 function.
+// state_compat.c references procptr_glActiveTextureARB directly (extern),
+// so we must provide a definition here, pointing to the real function.
+PFNGLACTIVETEXTUREARBPROC procptr_glActiveTextureARB =
+    (PFNGLACTIVETEXTUREARBPROC) glActiveTexture;
+
+// OGL_InitFunctions is called unconditionally by OGL_Support.c.
+// On Emscripten, we use it to initialise the custom GLES2 compatibility layer.
+extern void ModernGL_Init(void);
+
+void OGL_InitFunctions(void)
+{
+    ModernGL_Init();
 }
 
 #endif /* !__EMSCRIPTEN__ */

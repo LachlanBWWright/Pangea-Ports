@@ -772,6 +772,26 @@ Boolean					forceUpdate = false;
 				/**********************/
 
 		Render_BindTexture(gGPSObj->MeshList[0]->glTextureName);
+#ifdef __EMSCRIPTEN__
+		// WebGL 1 does not support GL_BGRA + GL_UNSIGNED_INT_8_8_8_8 in glTexSubImage2D.
+		// Convert to GL_RGBA + GL_UNSIGNED_BYTE (matching Render_LoadTexture's output format).
+		{
+			int n = GPS_MAP_TEXTURE_SIZE * GPS_MAP_TEXTURE_SIZE;
+			uint8_t* rgba = (uint8_t*) SDL_malloc(n * 4);
+			const uint8_t* src = (const uint8_t*) GetPixBaseAddr(GetGWorldPixMap(gGPSGWorld));
+			// GL_UNSIGNED_INT_8_8_8_8 on little-endian: bytes are [A][R][G][B]
+			for (int i = 0; i < n; i++) {
+				rgba[i*4+0] = src[i*4+1]; // R
+				rgba[i*4+1] = src[i*4+2]; // G
+				rgba[i*4+2] = src[i*4+3]; // B
+				rgba[i*4+3] = src[i*4+0]; // A
+			}
+			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+					GPS_MAP_TEXTURE_SIZE, GPS_MAP_TEXTURE_SIZE,
+					GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+			SDL_free(rgba);
+		}
+#else
 		glTexSubImage2D(
 				GL_TEXTURE_2D,
 				0,
@@ -786,6 +806,7 @@ Boolean					forceUpdate = false;
 				GL_UNSIGNED_INT_8_8_8_8_REV,
 #endif
 				GetPixBaseAddr(GetGWorldPixMap(gGPSGWorld)));
+#endif
 		CHECK_GL_ERROR();
 
 

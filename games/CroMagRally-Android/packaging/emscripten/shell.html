@@ -245,6 +245,29 @@
           getFenceCollision: Module.cwrap('WASM_GetFenceCollision', 'number', []),
         };
 
+        // ── Standard PangeaGame API ───────────────────────────────────────
+        // Consistent interface for level-editor integration.
+        // CroMagRally uses ?track=N (1-based) for level skip at page load.
+        window.PangeaGame = {
+          skipToLevel: function(n) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('track', n);
+            window.location.href = url.toString();
+          },
+          getCurrentLevel: function() {
+            var params = new URLSearchParams(window.location.search);
+            var t = params.get('track');
+            return t !== null ? parseInt(t, 10) : 1;
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('WASM_SetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
+          },
+          getFenceCollisions: function() {
+            return Module.ccall('WASM_GetFenceCollision', 'number', [], []) !== 0;
+          },
+        };
+        console.log('[CroMag] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a track.');
+
         // Sync fence state
         _fenceEnabled = window.GameCheat.getFenceCollision() !== 0;
         updateFenceButtons();

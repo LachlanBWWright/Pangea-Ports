@@ -71,12 +71,14 @@ static Mat4 s_modelview_stack[MATRIX_STACK_DEPTH];
 static int  s_modelview_top = 0;
 static Mat4 s_projection_stack[MATRIX_STACK_DEPTH];
 static int  s_projection_top = 0;
+static Mat4 s_tex_matrix;   // GL_TEXTURE matrix (single level, no stack needed)
+static int  s_tex_matrix_dirty = 1;
 static int  s_matrix_mode = GL_MODELVIEW;
 
 static Mat4 *current_matrix(void) {
-    return s_matrix_mode == GL_PROJECTION
-        ? &s_projection_stack[s_projection_top]
-        : &s_modelview_stack[s_modelview_top];
+    if (s_matrix_mode == GL_PROJECTION) return &s_projection_stack[s_projection_top];
+    if (s_matrix_mode == GL_TEXTURE)    return &s_tex_matrix;
+    return &s_modelview_stack[s_modelview_top];
 }
 
 // ── Lighting state ────────────────────────────────────────────────────────────
@@ -167,10 +169,11 @@ static GLint u_texture0, u_texture1;
 static GLint u_sampler0, u_sampler1;
 static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
+static GLint u_tex_matrix;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
-    "precision mediump float;\n"
+    "precision mediump float;\nprecision mediump int;\n"
     "attribute vec3 a_position;\n"
     "attribute vec3 a_normal;\n"
     "attribute vec4 a_color;\n"
@@ -179,90 +182,98 @@ static const char *VERT_SRC =
     "uniform mat4 u_mv;\n"
     "uniform mat4 u_proj;\n"
     "uniform mat3 u_normal_mat;\n"
+    "uniform mat4 u_tex_matrix;\n"
     "uniform vec4 u_current_color;\n"
-    "uniform bool u_use_color_array;\n"
-    "uniform bool u_lighting;\n"
+    // Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
+    "uniform int  u_use_color_array;\n"
+    "uniform int  u_lighting;\n"
     "uniform vec4 u_ambient;\n"
     "uniform int  u_num_lights;\n"
     "uniform vec4 u_light_pos[4];\n"
     "uniform vec4 u_light_diff[4];\n"
     "uniform vec4 u_light_amb[4];\n"
-    "uniform bool u_fog;\n"
-    "uniform bool u_texgen;\n"
+    "uniform int  u_fog;\n"
+    "uniform int  u_texgen;\n"
     "varying vec4 v_color;\n"
     "varying vec2 v_tc0;\n"
     "varying vec2 v_tc1;\n"
     "varying float v_fog_depth;\n"
+    // Helper: compute contribution from one light
+    "vec3 light_contrib(int li, vec3 n, vec4 ep) {\n"
+    "  vec3 ld = (u_light_pos[li].w == 0.0)\n"
+    "           ? normalize(vec3(u_light_pos[li]))\n"
+    "           : normalize(vec3(u_light_pos[li]) - vec3(ep));\n"
+    "  float d = max(dot(n, ld), 0.0);\n"
+    "  return u_light_amb[li].rgb + d * u_light_diff[li].rgb;\n"
+    "}\n"
     "void main() {\n"
     "  vec4 eye_pos = u_mv * vec4(a_position, 1.0);\n"
     "  gl_Position  = u_proj * eye_pos;\n"
-    "  vec4 vc = u_use_color_array ? a_color : u_current_color;\n"
-    "  if (u_lighting) {\n"
+    "  vec4 vc = (u_use_color_array != 0) ? a_color : u_current_color;\n"
+    "  if (u_lighting != 0) {\n"
     "    vec3 n = normalize(u_normal_mat * a_normal);\n"
     "    vec4 color = u_ambient;\n"
-    "    for (int i = 0; i < 4; i++) {\n"
-    "      if (i >= u_num_lights) break;\n"
-    "      vec3 ld = (u_light_pos[i].w == 0.0)\n"
-    "               ? normalize(vec3(u_light_pos[i]))\n"
-    "               : normalize(vec3(u_light_pos[i]) - vec3(eye_pos));\n"
-    "      float d = max(dot(n, ld), 0.0);\n"
-    "      color.rgb += u_light_amb[i].rgb + d * u_light_diff[i].rgb;\n"
-    "    }\n"
+    // Unrolled 4-light loop — avoids break+non-constant-bound (invalid GLSL ES 1.0)
+    "    if (u_num_lights > 0) color.rgb += light_contrib(0, n, eye_pos);\n"
+    "    if (u_num_lights > 1) color.rgb += light_contrib(1, n, eye_pos);\n"
+    "    if (u_num_lights > 2) color.rgb += light_contrib(2, n, eye_pos);\n"
+    "    if (u_num_lights > 3) color.rgb += light_contrib(3, n, eye_pos);\n"
     "    v_color = clamp(color, 0.0, 1.0) * vc;\n"
     "  } else {\n"
     "    v_color = vc;\n"
     "  }\n"
     // Sphere-map texcoords from eye-space normal
-    "  if (u_texgen) {\n"
+    "  if (u_texgen != 0) {\n"
     "    vec3 r = reflect(normalize(vec3(eye_pos)), normalize(u_normal_mat * a_normal));\n"
     "    float m = 2.0 * sqrt(r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0));\n"
     "    v_tc1 = vec2(r.x/m + 0.5, r.y/m + 0.5);\n"
-    "    v_tc0 = a_texcoord0;\n"
+    "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
     "  } else {\n"
-    "    v_tc0 = a_texcoord0;\n"
+    "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
     "    v_tc1 = a_texcoord1;\n"
     "  }\n"
-    "  v_fog_depth = u_fog ? abs(eye_pos.z) : 0.0;\n"
+    "  v_fog_depth = (u_fog != 0) ? abs(eye_pos.z) : 0.0;\n"
     "}\n";
 
 static const char *FRAG_SRC =
-    "precision mediump float;\n"
+    "precision mediump float;\nprecision mediump int;\n"
     "varying vec4  v_color;\n"
     "varying vec2  v_tc0;\n"
     "varying vec2  v_tc1;\n"
     "varying float v_fog_depth;\n"
-    "uniform bool      u_texture0;\n"
-    "uniform bool      u_texture1;\n"
+    // Use int instead of bool for the same GLSL ES 1.0 compatibility reason
+    "uniform int       u_texture0;\n"
+    "uniform int       u_texture1;\n"
     "uniform sampler2D u_sampler0;\n"
     "uniform sampler2D u_sampler1;\n"
     "uniform int       u_texenv0;\n"   // 0=MODULATE 1=ADD 2=REPLACE 3=COMBINE_ADD
     "uniform int       u_texenv1;\n"
-    "uniform bool      u_fog;\n"
+    "uniform int       u_fog;\n"
     "uniform int       u_fog_mode;\n"  // 0=LINEAR 1=EXP 2=EXP2
     "uniform float     u_fog_start;\n"
     "uniform float     u_fog_end;\n"
     "uniform float     u_fog_density;\n"
     "uniform vec4      u_fog_color;\n"
-    "uniform bool      u_alpha_test;\n"
+    "uniform int       u_alpha_test;\n"
     "uniform int       u_alpha_func;\n" // 0=NEVER 1=LESS 2=EQUAL 3=LEQUAL 4=GREATER 5=NOTEQUAL 6=GEQUAL 7=ALWAYS
     "uniform float     u_alpha_ref;\n"
     "void main() {\n"
     "  vec4 color = v_color;\n"
-    "  if (u_texture0) {\n"
+    "  if (u_texture0 != 0) {\n"
     "    vec4 tex = texture2D(u_sampler0, v_tc0);\n"
     "    if      (u_texenv0 == 0) color *= tex;\n"          // MODULATE
     "    else if (u_texenv0 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"  // ADD
     "    else if (u_texenv0 == 2) color = tex;\n"           // REPLACE
     "    else if (u_texenv0 == 3) { color.rgb = min(color.rgb+tex.rgb,1.0); }\n"  // COMBINE_ADD
     "  }\n"
-    "  if (u_texture1) {\n"
+    "  if (u_texture1 != 0) {\n"
     "    vec4 tex = texture2D(u_sampler1, v_tc1);\n"
     "    if      (u_texenv1 == 0) color *= tex;\n"
     "    else if (u_texenv1 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"
     "    else if (u_texenv1 == 2) color = tex;\n"
     "    else if (u_texenv1 == 3) { color.rgb = min(color.rgb+tex.rgb,1.0); }\n"
     "  }\n"
-    "  if (u_alpha_test) {\n"
+    "  if (u_alpha_test != 0) {\n"
     "    float a = color.a;\n"
     "    if      (u_alpha_func == 0) discard;\n"            // NEVER
     "    else if (u_alpha_func == 1 && a >= u_alpha_ref) discard;\n"  // LESS
@@ -272,7 +283,7 @@ static const char *FRAG_SRC =
     "    else if (u_alpha_func == 5 && a == u_alpha_ref) discard;\n"  // NOTEQUAL
     "    else if (u_alpha_func == 6 && a <  u_alpha_ref) discard;\n"  // GEQUAL
     "  }\n"
-    "  if (u_fog) {\n"
+    "  if (u_fog != 0) {\n"
     "    float ff;\n"
     "    if      (u_fog_mode == 0) ff = (u_fog_end - v_fog_depth) / (u_fog_end - u_fog_start);\n"
     "    else if (u_fog_mode == 1) ff = exp(-u_fog_density * v_fog_depth);\n"
@@ -370,6 +381,12 @@ static void upload_uniforms(void) {
     glUniform1i(u_texenv0,  s_texenv_mode[0]);
     glUniform1i(u_texenv1,  s_texenv_mode[1]);
     glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
+
+    // Texture matrix (for UV animation via glMatrixMode(GL_TEXTURE))
+    if (s_tex_matrix_dirty) {
+        glUniformMatrix4fv(u_tex_matrix, 1, GL_FALSE, s_tex_matrix.m);
+        s_tex_matrix_dirty = 0;
+    }
 }
 
 // Set up vertex attributes from client-side arrays, upload to VBO, return
@@ -462,6 +479,8 @@ void COMPAT_GL_Init(void) {
         mat4_identity(&s_modelview_stack[i]);
         mat4_identity(&s_projection_stack[i]);
     }
+    mat4_identity(&s_tex_matrix);
+    s_tex_matrix_dirty = 1;
     memset(s_lights, 0, sizeof(s_lights));
 
     // Compile shader
@@ -515,6 +534,7 @@ void COMPAT_GL_Init(void) {
     u_texenv0     = glGetUniformLocation(s_prog, "u_texenv0");
     u_texenv1     = glGetUniformLocation(s_prog, "u_texenv1");
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
+    u_tex_matrix  = glGetUniformLocation(s_prog, "u_tex_matrix");
 
     // VBO for interleaved vertex data
     glGenBuffers(1, &s_vbo);
@@ -525,14 +545,20 @@ void COMPAT_GL_Init(void) {
 // ── Matrix operations ─────────────────────────────────────────────────────────
 void glMatrixMode(GLenum mode) { s_matrix_mode = mode; }
 
-void glLoadIdentity(void) { mat4_identity(current_matrix()); }
+// Mark the texture matrix dirty whenever it is modified
+static void mark_tex_dirty_if_needed(void) {
+    if (s_matrix_mode == GL_TEXTURE) s_tex_matrix_dirty = 1;
+}
 
-void glLoadMatrixf(const GLfloat *m) { memcpy(current_matrix()->m, m, 64); }
+void glLoadIdentity(void) { mat4_identity(current_matrix()); mark_tex_dirty_if_needed(); }
+
+void glLoadMatrixf(const GLfloat *m) { memcpy(current_matrix()->m, m, 64); mark_tex_dirty_if_needed(); }
 
 void glMultMatrixf(const GLfloat *m) {
     Mat4 a = *current_matrix();
     Mat4 b; memcpy(b.m, m, 64);
     mat4_mul(current_matrix(), &a, &b);
+    mark_tex_dirty_if_needed();
 }
 
 void glPushMatrix(void) {
@@ -541,6 +567,8 @@ void glPushMatrix(void) {
             s_projection_stack[s_projection_top+1] = s_projection_stack[s_projection_top];
             s_projection_top++;
         }
+    } else if (s_matrix_mode == GL_TEXTURE) {
+        // No stack for texture matrix — nothing to push
     } else {
         if (s_modelview_top < MATRIX_STACK_DEPTH-1) {
             s_modelview_stack[s_modelview_top+1] = s_modelview_stack[s_modelview_top];
@@ -552,6 +580,8 @@ void glPushMatrix(void) {
 void glPopMatrix(void) {
     if (s_matrix_mode == GL_PROJECTION) {
         if (s_projection_top > 0) s_projection_top--;
+    } else if (s_matrix_mode == GL_TEXTURE) {
+        // No stack for texture matrix — nothing to pop
     } else {
         if (s_modelview_top > 0) s_modelview_top--;
     }
@@ -561,12 +591,14 @@ void glTranslatef(GLfloat x, GLfloat y, GLfloat z) {
     Mat4 t; mat4_identity(&t);
     t.m[12]=x; t.m[13]=y; t.m[14]=z;
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &t);
+    mark_tex_dirty_if_needed();
 }
 
 void glScalef(GLfloat x, GLfloat y, GLfloat z) {
     Mat4 s; mat4_identity(&s);
     s.m[0]=x; s.m[5]=y; s.m[10]=z;
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &s);
+    mark_tex_dirty_if_needed();
 }
 
 void glRotatef(GLfloat angle, GLfloat ax, GLfloat ay, GLfloat az) {
@@ -580,6 +612,7 @@ void glRotatef(GLfloat angle, GLfloat ax, GLfloat ay, GLfloat az) {
     rot.m[4] = ax*ay*(1-c)-az*s;  rot.m[5] = c+ay*ay*(1-c);     rot.m[6] = az*ay*(1-c)+ax*s;
     rot.m[8] = ax*az*(1-c)+ay*s;  rot.m[9] = ay*az*(1-c)-ax*s;  rot.m[10]= c+az*az*(1-c);
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &rot);
+    mark_tex_dirty_if_needed();
 }
 
 void glOrtho(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdouble f) {

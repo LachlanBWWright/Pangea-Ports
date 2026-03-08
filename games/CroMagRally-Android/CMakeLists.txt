@@ -377,10 +377,14 @@ if(EMSCRIPTEN)
 	set_target_properties(${GAME_TARGET} PROPERTIES SUFFIX ".html")
 
 	target_link_options(${GAME_TARGET} PRIVATE
-		# Legacy OpenGL emulation: translates fixed-function pipeline and
-		# immediate-mode (glBegin/glEnd, glMatrixMode, glFog*, etc.) to WebGL.
-		-sLEGACY_GL_EMULATION=1
-		-sGL_UNSAFE_OPTS=0
+		# Full OpenGL ES 2.0 emulation via our custom compat layer (modern_gl.c,
+		# vertex_array_compat.c, state_compat.c) instead of LEGACY_GL_EMULATION.
+		# LEGACY_GL_EMULATION has vertex-positioning bugs in Emscripten 3.x.
+		-sFULL_ES2=1
+		# WebGL 2 for better compatibility; UNSIGNED_INT index buffers are natively
+		# supported in WebGL 2 (no OES_element_index_uint extension needed).
+		-sMAX_WEBGL_VERSION=2
+		-sMIN_WEBGL_VERSION=1
 		# Asyncify: allows blocking C loops (game main loop, SDL_Delay, etc.)
 		# to yield to the browser event loop so frames can be composited.
 		-sASYNCIFY=1

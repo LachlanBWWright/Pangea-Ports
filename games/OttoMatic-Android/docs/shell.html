@@ -428,6 +428,42 @@
         console.log('[OttoMatic] Runtime initialized');
         var el = document.getElementById('status-text');
         if (el) el.textContent = 'Starting game…';
+
+        // ── Standard PangeaGame API ──────────────────────────────────────
+        // Exposes a consistent interface shared across all Pangea Ports WASM
+        // builds. Set on window inside onRuntimeInitialized so Module is ready.
+        window.PangeaGame = {
+          skipToLevel: function(n) {
+            return Module.ccall('OttoMatic_SkipToLevel', null, ['number'], [n]);
+          },
+          getCurrentLevel: function() {
+            return Module.ccall('OttoMatic_GetCurrentLevel', 'number');
+          },
+          setTerrainPath: function(path) {
+            return Module.ccall('OttoMatic_SetTerrainPath', null, ['string'], [path]);
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('OttoMatic_SetFenceCollisions', null, ['number'], [enabled ? 1 : 0]);
+          },
+          setSpeedMultiplier: function(mult) {
+            return Module.ccall('OttoMatic_SetSpeedMultiplier', null, ['number'], [mult]);
+          },
+          getPlayerHealth: function() {
+            return Module.ccall('OttoMatic_GetPlayerHealth', 'number');
+          },
+          getPlayerLives: function() {
+            return Module.ccall('OttoMatic_GetPlayerLives', 'number');
+          },
+        };
+        // Convenience aliases (legacy API names remain available)
+        window.OttoMatic_SkipToLevel        = function(n)    { return window.PangeaGame.skipToLevel(n); };
+        window.OttoMatic_GetCurrentLevel    = function()     { return window.PangeaGame.getCurrentLevel(); };
+        window.OttoMatic_SetTerrainPath     = function(p)    { return window.PangeaGame.setTerrainPath(p); };
+        window.OttoMatic_SetFenceCollisions = function(e)    { return window.PangeaGame.setFenceCollisions(e); };
+        window.OttoMatic_SetSpeedMultiplier = function(mult) { return window.PangeaGame.setSpeedMultiplier(mult); };
+        window.OttoMatic_GetPlayerHealth    = function()     { return window.PangeaGame.getPlayerHealth(); };
+        window.OttoMatic_GetPlayerLives     = function()     { return window.PangeaGame.getPlayerLives(); };
+        console.log('[OttoMatic] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
       },
 
       preRun: [function() {

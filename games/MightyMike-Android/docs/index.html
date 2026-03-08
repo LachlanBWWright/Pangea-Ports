@@ -63,11 +63,6 @@
       padding: 2rem 1.5rem;
       text-align: center;
     }
-    #loading-card img {
-      max-width: 280px;
-      width: 100%;
-      margin-bottom: 1.25rem;
-    }
     #status-text {
       font-size: 1.05rem;
       color: var(--accent);
@@ -216,7 +211,6 @@
 
     <!-- Loading card (overlays the canvas until the game starts) -->
     <div id="loading-card">
-      <img src="screenshot.png" alt="Mighty Mike" onerror="this.style.opacity='0'">
       <div id="status-text">Initializing…</div>
       <progress id="progress-bar" value="0" max="1"></progress>
       <div id="progress-label">Downloading game data…</div>
@@ -389,6 +383,34 @@
 
         // Sync fence-collision toggle UI with current game state
         refreshFenceStatus();
+
+        // ── Standard PangeaGame API ───────────────────────────────────────
+        // MightyMike uses ?level=SCENE:AREA for level skip.
+        window.PangeaGame = {
+          // skipToLevel(n) where n is a flat 0-based area index (converted to scene:area)
+          // or pass "SCENE:AREA" string directly.
+          skipToLevel: function(n) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('level', typeof n === 'string' ? n : n);
+            window.location.href = url.toString();
+          },
+          // setLevel: runtime variant — Boot_SetDirectLevel(scene, area)
+          setLevel: function(scene, area) {
+            if (area === undefined) { area = scene; scene = 0; }
+            return Module.ccall('Boot_SetDirectLevel', null, ['number','number'], [scene, area]);
+          },
+          getCurrentLevel: function() {
+            var params = new URLSearchParams(window.location.search);
+            return params.get('level') || '';
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('Cheat_SetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
+          },
+          getFenceCollisions: function() {
+            return Module.ccall('Cheat_GetFenceCollision', 'number', [], []) !== 0;
+          },
+        };
+        console.log('[MightyMike] PangeaGame API ready. Use PangeaGame.skipToLevel("SCENE:AREA") to jump to a level.');
       },
 
       preRun: [function() {

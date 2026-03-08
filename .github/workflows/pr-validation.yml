@@ -34,6 +34,8 @@ jobs:
       matrix: ${{ fromJson(needs.prepare-matrices.outputs.native) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Install Linux build dependencies
         run: |
           sudo apt update
@@ -55,6 +57,18 @@ jobs:
       - name: Validate monorepo hook metadata and Pages staging
         run: python3 -m unittest -v tests.test_monorepo_metadata
 
+  skip-to-level-docs-smoke:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright and Chromium
+        run: |
+          pip3 install playwright
+          python3 -m playwright install --with-deps chromium
+      - name: Run skip-to-level Playwright docs tests
+        run: python3 -m unittest -v tests.test_skip_to_level_playwright
+
   browser-smoke:
     needs: prepare-matrices
     runs-on: ubuntu-22.04
@@ -64,6 +78,8 @@ jobs:
       matrix: ${{ fromJson(needs.prepare-matrices.outputs.browser) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Cache Emscripten SDK
         uses: actions/cache@v4
         with:
@@ -118,6 +134,8 @@ jobs:
       matrix: ${{ fromJson(needs.prepare-matrices.outputs.android_apk) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Set up Java
         uses: actions/setup-java@v4
         with:

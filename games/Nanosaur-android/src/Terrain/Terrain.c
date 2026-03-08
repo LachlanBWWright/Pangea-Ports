@@ -984,6 +984,29 @@ static void UpdateSuperTileTexture(SuperTileMemoryType* superTilePtr)
 			/* RECREATE TEXTURE */
 
 	Render_BindTexture(superTilePtr->glTextureName);
+#ifdef __EMSCRIPTEN__
+	// WebGL 1 does not support GL_BGRA_EXT + GL_UNSIGNED_SHORT_1_5_5_5_REV in glTexSubImage2D.
+	// Convert to GL_RGBA + GL_UNSIGNED_BYTE (matching the format used by Render_LoadTexture).
+	{
+		int n = SUPERTILE_TEXMAP_SIZE * SUPERTILE_TEXMAP_SIZE;
+		uint8_t* rgba = (uint8_t*) SDL_malloc(n * 4);
+		for (int i = 0; i < n; i++)
+		{
+			uint16_t v = textureData[i];
+			uint8_t b5 = (v      ) & 0x1F;
+			uint8_t g5 = (v >>  5) & 0x1F;
+			uint8_t r5 = (v >> 10) & 0x1F;
+			rgba[i*4+0] = (r5 << 3) | (r5 >> 2);
+			rgba[i*4+1] = (g5 << 3) | (g5 >> 2);
+			rgba[i*4+2] = (b5 << 3) | (b5 >> 2);
+			rgba[i*4+3] = 255;
+		}
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+				SUPERTILE_TEXMAP_SIZE, SUPERTILE_TEXMAP_SIZE,
+				GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+		SDL_free(rgba);
+	}
+#else
 	glTexSubImage2D(
 			GL_TEXTURE_2D,
 			0,
@@ -994,6 +1017,7 @@ static void UpdateSuperTileTexture(SuperTileMemoryType* superTilePtr)
 			TILE_TEXTURE_FORMAT,
 			TILE_TEXTURE_TYPE,
 			textureData);
+#endif
 	CHECK_GL_ERROR();
 }
 

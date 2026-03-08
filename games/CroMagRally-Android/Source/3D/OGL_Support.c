@@ -13,16 +13,15 @@
 #include "game.h"
 #include "stb_image.h"
 #include "pillarbox.h"
+#ifndef __EMSCRIPTEN__
 #include <SDL3/SDL_opengl.h>
+#endif
 #include <math.h>
 #include <stdlib.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-// glColorMaterial is a fixed-function pipeline function not available in WebGL/GLES2.
-// LEGACY_GL_EMULATION does not provide it. This intentionally shadows the GL symbol
-// name to satisfy the linker when the game code calls glColorMaterial.
-void glColorMaterial(GLenum face, GLenum mode) { (void)face; (void)mode; }
+// Note: glColorMaterial is provided by our gl_compat.h layer; no stub needed here.
 #endif
 
 extern SDL_Window*		gSDLWindow;
@@ -43,6 +42,7 @@ static void OGL_InitDrawContext(void);
 static void OGL_SetStyles(OGLSetupInputType *setupDefPtr);
 static void OGL_CreateLights(OGLLightDefType *lightDefPtr);
 static void OGL_UpdatePaneDimensions(Byte whichPane);
+void OGL_InitFunctions(void);   // defined in OGL_Functions.c
 
 
 /****************************/
@@ -373,27 +373,13 @@ static void OGL_CreateDrawContext(void)
 	GAME_ASSERT_MESSAGE(didMakeCurrent, SDL_GetError());
 
 #ifdef __EMSCRIPTEN__
-	// SDL3 creates the WebGL context via emscripten_webgl_create_context(),
-	// bypassing Browser.createContext() which normally fires
-	// moduleContextCreatedCallbacks to initialize GLImmediate.
-	// Without this, all LEGACY_GL_EMULATION calls crash on null state.
-	// After SDL_GL_MakeCurrent, the WebGL context is active and
-	// GL.currentContext/GLctx are valid. We just need to tell the Browser
-	// module that WebGL is active, then fire the pending callbacks.
-	EM_ASM({
-		if (typeof Browser !== 'undefined') {
-			Browser.useWebGL = true;
-		}
-		if (typeof Module !== 'undefined') {
-			Module['ctx'] = GLctx;
-		}
-		if (typeof Browser !== 'undefined' && Browser.moduleContextCreatedCallbacks) {
-			Browser.moduleContextCreatedCallbacks.forEach(function(cb) { cb(); });
-		}
-	});
+	// Initialize the custom GLES2 fixed-function compatibility layer.
+	// ModernGL_Init() compiles the shader program and enables required
+	// WebGL extensions (OES_element_index_uint for 32-bit index buffers).
+	extern void ModernGL_Init(void);
+	ModernGL_Init();
 #endif
 
-#if 0
 			/* GET OPENGL EXTENSIONS */
 			//
 			// On Mac/Linux, we only need to do this once.
@@ -401,7 +387,6 @@ static void OGL_CreateDrawContext(void)
 			//
 
 	OGL_InitFunctions();
-#endif
 }
 
 
@@ -983,13 +968,17 @@ static void* ConvertTextureForWebGL(const void* src, int w, int h,
 	{
 		uint8_t* rgba = (uint8_t*) malloc(w * h * 4);
 		const uint16_t* s = (const uint16_t*) src;
+		/* Preserve the 1-bit source alpha only if the caller wants an RGBA
+		   (transparent) texture.  Opaque (GL_RGB) textures must have alpha=255
+		   so that glAlphaFunc(GL_NOTEQUAL, 0) does not discard every pixel. */
+		bool hasAlpha = (*ioDest == GL_RGBA || *ioDest == GL_RGB5_A1);
 		for (int i = 0; i < w * h; i++)
 		{
 			uint16_t p = s[i];
 			rgba[i*4+0] = (uint8_t)(((p >> 10) & 0x1F) * 255 / 31);
 			rgba[i*4+1] = (uint8_t)(((p >>  5) & 0x1F) * 255 / 31);
 			rgba[i*4+2] = (uint8_t)(((p >>  0) & 0x1F) * 255 / 31);
-			rgba[i*4+3] = (p >> 15) ? 255 : 0;
+			rgba[i*4+3] = hasAlpha ? ((p >> 15) ? 255 : 0) : 255;
 		}
 		*ioSrc = GL_RGBA;
 		*ioDest = GL_RGBA;
@@ -1055,6 +1044,13 @@ GLuint	textureName;
 			: GL_LINEAR;
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+
+#ifdef __EMSCRIPTEN__
+	// WebGL 1: NPOT textures with GL_REPEAT are texture-incomplete (render as black).
+	// Always clamp to edge so every texture is WebGL-complete regardless of dimensions.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#endif
 
 	if (!(gLoadTextureFlags & kLoadTextureFlags_NoGammaFix))
 	{

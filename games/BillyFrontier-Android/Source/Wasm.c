@@ -20,10 +20,6 @@ void glColorMaterial(unsigned int face, unsigned int mode) { (void)face; (void)m
 // Not emulated by Emscripten; a no-op has negligible visual impact for this game.
 void glLightModeli(unsigned int pname, int param) { (void)pname; (void)param; }
 
-// glPolygonMode: sets polygon rasterization mode (e.g. wireframe).
-// Not available in WebGL/GLES2; a no-op since this game only uses GL_FILL.
-void glPolygonMode(unsigned int face, unsigned int mode) { (void)face; (void)mode; }
-
 // -------------------------------------------------------------------------
 // CHEAT / DEBUG COMMANDS
 // -------------------------------------------------------------------------

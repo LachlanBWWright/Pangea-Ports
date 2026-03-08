@@ -309,6 +309,7 @@ if(EMSCRIPTEN)
 		-sALLOW_MEMORY_GROWTH=1
 		-sMAXIMUM_MEMORY=512MB
 		-sFULL_ES2=1
+		-sMAX_WEBGL_VERSION=2
 		-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,FS
 		-sEXPORTED_FUNCTIONS=_main,_BugdomSetFenceCollision,_BugdomGetFenceCollision,_BugdomGetCurrentLevel,_BugdomSetTerrainOverride
 		"SHELL:--preload-file ${GAME_DATADIR}@/Data"

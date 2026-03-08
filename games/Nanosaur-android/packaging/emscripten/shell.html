@@ -410,6 +410,28 @@
       var stext = document.getElementById('status-text');
       if (stext) stext.textContent = 'Starting game…';
       Module.setStatus('');
+
+      // ── Standard PangeaGame API ─────────────────────────────────────────
+      // Nanosaur uses ?level=N URL param for level-skip at startup.
+      // There is no runtime SetStartLevel export, so skipToLevel reloads.
+      window.PangeaGame = {
+        skipToLevel: function(n) {
+          var url = new URL(window.location.href);
+          url.searchParams.set('level', n);
+          url.searchParams.set('skipMenu', '1');
+          window.location.href = url.toString();
+        },
+        getCurrentLevel: function() {
+          return window._startLevel !== undefined ? window._startLevel : -1;
+        },
+        setFenceCollisions: function(enabled) {
+          return Module.ccall('SetFenceCollisionsEnabled', null, ['number'], [enabled ? 1 : 0]);
+        },
+        getFenceCollisions: function() {
+          return Module.ccall('GetFenceCollisionsEnabled', 'number', [], []) !== 0;
+        },
+      };
+      console.log('[Nanosaur] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level (reloads page).');
     }
   };
 

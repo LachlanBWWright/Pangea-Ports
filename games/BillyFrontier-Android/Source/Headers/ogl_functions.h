@@ -1,13 +1,15 @@
 #pragma once
 
-#include <SDL3/SDL_opengl.h>
-
 #ifdef __EMSCRIPTEN__
-// In WebGL/OpenGL ES, glActiveTexture and glClientActiveTexture are core or
-// emulated functions -- no ARB proc-address lookup needed at runtime.
-#define glActiveTextureARB					glActiveTexture
-#define glClientActiveTextureARB			glClientActiveTexture
-static inline void OGL_InitFunctions(void) {}
+// WebGL/Emscripten path: glActiveTexture is a core GLES2 function.
+// glClientActiveTexture is provided by our gl_compat layer.
+// ModernGL_Init() must be called once after context creation to initialize
+// the shader-based fixed-function emulation layer.
+extern void ModernGL_Init(void);
+static inline void OGL_InitFunctions(void) { ModernGL_Init(); }
+// Redirect ARB-suffixed variants through the compat layer's ActiveTexture.
+#define glActiveTextureARB CompatGL_ActiveTexture
+#define glClientActiveTextureARB CompatGL_ActiveTexture
 #else
 extern PFNGLACTIVETEXTUREARBPROC			procptr_glActiveTextureARB;
 extern PFNGLCLIENTACTIVETEXTUREARBPROC		procptr_glClientActiveTextureARB;

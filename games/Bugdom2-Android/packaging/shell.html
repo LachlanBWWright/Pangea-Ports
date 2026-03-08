@@ -348,14 +348,41 @@
         }
       },
 
-      monitorRunDependencies: function(left) {
-        if (left === 0 && !loadingDone) {
-          spinnerEl.style.display = 'none';
-        } else if (left > 0) {
-          barEl.value = Math.max(0, 1 - (left * 0.02));
-        }
-      }
-    };
+      onRuntimeInitialized: function() {
+        console.log('[Bugdom2] Runtime initialized');
+
+        // ── Standard PangeaGame API ───────────────────────────────────────
+        // Consistent interface for level-editor integration across all Pangea
+        // Ports WASM builds. Must be set inside onRuntimeInitialized so
+        // Module exports are available.
+        window.PangeaGame = {
+          // skipToLevel: reload with ?level=N so SetStartLevel is called at startup
+          skipToLevel: function(n) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('level', n);
+            window.location.href = url.toString();
+          },
+          // setLevel: runtime variant (no reload) — jump to level immediately
+          setLevel: function(n) {
+            return Module.ccall('SetStartLevel', null, ['number'], [n]);
+          },
+          getCurrentLevel: function() {
+            var params = new URLSearchParams(window.location.search);
+            var l = params.get('level');
+            return l !== null ? parseInt(l, 10) : 0;
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('SetFenceCollisionEnabled', null, ['number'], [enabled ? 1 : 0]);
+          },
+          getFenceCollisions: function() {
+            return Module.ccall('GetFenceCollisionEnabled', 'number', [], []) !== 0;
+          },
+          winLevel: function() {
+            return Module.ccall('WinLevel', null, [], []);
+          },
+        };
+        console.log('[Bugdom2] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
+      },
 
     window.onerror = function(msg, url, line, col, err) {
       statusEl.innerText = 'Error: ' + msg;

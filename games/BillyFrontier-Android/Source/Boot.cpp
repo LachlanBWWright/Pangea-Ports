@@ -95,7 +95,7 @@ static void ParseEmscriptenURLParams(void)
 {
 	char paramsBuf[512] = {0};
 	int paramsLen = EM_ASM_INT({
-		const search = window.location.search.replace(/^\?/, '');
+		const search = window.location.search.replace(/^\\?/, '');
 		const hash = window.location.hash.replace(/^#/, '');
 		const payload = search || hash;
 		const buf = $0;
@@ -213,6 +213,18 @@ retryVideo:
 			throw std::runtime_error("Couldn't create SDL window.");
 		}
 	}
+
+#ifdef __EMSCRIPTEN__
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless/CI browsers before the page layout is computed.  Force the
+	// window (and therefore the WebGL canvas) to the game's target resolution.
+	{
+		int emW = 640, emH = 480;
+		GetDefaultWindowSize(SDL_GetDisplayForWindow(gSDLWindow), &emW, &emH);
+		SDL_SetWindowSize(gSDLWindow, emW, emH);
+		SDL_SyncWindow(gSDLWindow);
+	}
+#endif
 
 	// Init gamepad subsystem
 	SDL_Init(SDL_INIT_GAMEPAD);

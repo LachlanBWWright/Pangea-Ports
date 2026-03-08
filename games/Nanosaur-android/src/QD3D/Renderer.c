@@ -8,9 +8,11 @@
 /****************************/
 
 #include <SDL3/SDL.h>
+#ifndef __EMSCRIPTEN__
 #include <SDL3/SDL_opengl.h>
 #if !OSXPPC
 #include <SDL3/SDL_opengl_glext.h>
+#endif
 #endif
 #include "game.h"
 
@@ -338,10 +340,76 @@ GLuint Render_LoadTexture(
 
 	if (flags & kRendererTextureFlags_ClampU)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-
 	if (flags & kRendererTextureFlags_ClampV)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+#ifdef __EMSCRIPTEN__
+	// WebGL 1 does not support GL_BGRA, GL_UNSIGNED_INT_8_8_8_8, GL_UNSIGNED_INT_8_8_8_8_REV
+	// or GL_UNSIGNED_SHORT_1_5_5_5_REV — we must convert to GL_RGBA + GL_UNSIGNED_BYTE.
+	// Also force CLAMP_TO_EDGE: GL_REPEAT on NPOT textures renders black in WebGL 1.
+	if (!(flags & kRendererTextureFlags_ClampU))
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	if (!(flags & kRendererTextureFlags_ClampV))
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	void* converted = NULL;
+	GLenum glFormat = GL_RGBA;
+	GLenum glType   = GL_UNSIGNED_BYTE;
+
+	if (bufferFormat == GL_BGRA && (bufferType == GL_UNSIGNED_INT_8_8_8_8_REV || bufferType == GL_UNSIGNED_INT_8_8_8_8))
+	{
+		// BGRA-8888 → RGBA-8888
+		// For _REV on little-endian: bytes in memory are [B][G][R][A].
+		// For (no REV) on little-endian: the uint32 MSB-first is BGRA, so in memory
+		//   bytes are also [A][R][G][B] but per-uint32 big-endian order; treat as BGRA.
+		// Either way: src bytes are laid out as B,G,R,A; convert to R,G,B,A.
+		int n = width * height;
+		uint8_t* dst = (uint8_t*) SDL_malloc(n * 4);
+		const uint8_t* s = (const uint8_t*) pixels;
+		if (bufferType == GL_UNSIGNED_INT_8_8_8_8_REV)
+		{
+			for (int i = 0; i < n; i++) { dst[i*4+0]=s[i*4+2]; dst[i*4+1]=s[i*4+1]; dst[i*4+2]=s[i*4+0]; dst[i*4+3]=s[i*4+3]; }
+		}
+		else  // GL_UNSIGNED_INT_8_8_8_8: big-endian packed → bytes are [A][R][G][B]
+		{
+			for (int i = 0; i < n; i++) { dst[i*4+0]=s[i*4+1]; dst[i*4+1]=s[i*4+2]; dst[i*4+2]=s[i*4+3]; dst[i*4+3]=s[i*4+0]; }
+		}
+		converted = dst;
+	}
+	else if (bufferFormat == GL_BGRA && bufferType == GL_UNSIGNED_SHORT_1_5_5_5_REV)
+	{
+		// 1555-BGRA-REV → RGBA-8888
+		int n = width * height;
+		uint8_t* dst = (uint8_t*) SDL_malloc(n * 4);
+		const uint16_t* s = (const uint16_t*) pixels;
+		bool hasAlpha = (internalFormat == GL_RGBA);
+		for (int i = 0; i < n; i++)
+		{
+			uint16_t v = s[i];
+			uint8_t b = (v & 0x001F); uint8_t g = (v >> 5) & 0x1F; uint8_t r = (v >> 10) & 0x1F; uint8_t a = (v >> 15) & 1;
+			dst[i*4+0] = (r << 3) | (r >> 2); dst[i*4+1] = (g << 3) | (g >> 2); dst[i*4+2] = (b << 3) | (b >> 2);
+			dst[i*4+3] = hasAlpha ? (a ? 255 : 0) : 255;
+		}
+		converted = dst;
+	}
+	else if (bufferFormat == 0x80E0 /* GL_BGR */ && bufferType == GL_UNSIGNED_BYTE)
+	{
+		int n = width * height;
+		uint8_t* dst = (uint8_t*) SDL_malloc(n * 3);
+		const uint8_t* s = (const uint8_t*) pixels;
+		for (int i = 0; i < n; i++) { dst[i*3+0]=s[i*3+2]; dst[i*3+1]=s[i*3+1]; dst[i*3+2]=s[i*3+0]; }
+		converted = dst;
+		glFormat = GL_RGB;
+	}
+	else
+	{
+		glFormat = bufferFormat;
+		glType   = bufferType;
+	}
+
+	glTexImage2D(GL_TEXTURE_2D, 0, glFormat, width, height, 0, glFormat, glType, converted ? converted : pixels);
+	if (converted) SDL_free(converted);
+#else
 	glTexImage2D(
 			GL_TEXTURE_2D,
 			0,						// mipmap level
@@ -352,6 +420,7 @@ GLuint Render_LoadTexture(
 			bufferFormat,			// what my format is
 			bufferType,				// size of each r,g,b
 			pixels);				// pointer to the actual texture pixels
+#endif
 	CHECK_GL_ERROR();
 
 	return textureName;
@@ -965,7 +1034,31 @@ void Render_DrawBackdrop(bool keepBackdropAspectRatio)
 		GAME_ASSERT(damageRect.bottom <= gBackdropHeightPOT);
 #endif
 
-		// Set unpack row length to 640
+		int subW = damageRect.right  - damageRect.left;
+		int subH = damageRect.bottom - damageRect.top;
+		const UInt32* srcBase = gBackdropPixels + (damageRect.top * gBackdropWidth + damageRect.left);
+
+#ifdef __EMSCRIPTEN__
+		// WebGL 1 does not support GL_UNPACK_ROW_LENGTH or GL_BGRA.
+		// Copy the dirty sub-rect (row by row) into a contiguous RGBA buffer.
+		uint8_t* tmp = (uint8_t*) SDL_malloc(subW * subH * 4);
+		for (int row = 0; row < subH; row++)
+		{
+			const uint8_t* sr = (const uint8_t*)(srcBase + row * gBackdropWidth);
+			uint8_t* dr = tmp + row * subW * 4;
+			for (int col = 0; col < subW; col++)
+			{
+				// src bytes on little-endian GL_BGRA+GL_UNSIGNED_INT_8_8_8_8: [A][R][G][B]
+				dr[col*4+0] = sr[col*4+1]; // R
+				dr[col*4+1] = sr[col*4+2]; // G
+				dr[col*4+2] = sr[col*4+3]; // B
+				dr[col*4+3] = sr[col*4+0]; // A
+			}
+		}
+		glTexSubImage2D(GL_TEXTURE_2D, 0, damageRect.left, damageRect.top, subW, subH, GL_RGBA, GL_UNSIGNED_BYTE, tmp);
+		SDL_free(tmp);
+#else
+		// Set unpack row length to backdrop width so we can upload a sub-rect
 		GLint pUnpackRowLength;
 		glGetIntegerv(GL_UNPACK_ROW_LENGTH, &pUnpackRowLength);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, gBackdropWidth);
@@ -975,19 +1068,21 @@ void Render_DrawBackdrop(bool keepBackdropAspectRatio)
 				0,
 				damageRect.left,
 				damageRect.top,
-				damageRect.right - damageRect.left,
-				damageRect.bottom - damageRect.top,
+				subW,
+				subH,
 				GL_BGRA,
 #if !(__BIG_ENDIAN__)
 				GL_UNSIGNED_INT_8_8_8_8,
 #else
 				GL_UNSIGNED_INT_8_8_8_8_REV,
 #endif
-				gBackdropPixels + (damageRect.top * gBackdropWidth + damageRect.left));
+				srcBase);
 		CHECK_GL_ERROR();
 
 		// Restore unpack row length
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, pUnpackRowLength);
+#endif
+		CHECK_GL_ERROR();
 
 		ClearPortDamage();
 	}

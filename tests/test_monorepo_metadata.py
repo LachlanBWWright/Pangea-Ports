@@ -38,9 +38,10 @@ class MonorepoMetadataTests(unittest.TestCase):
                     dest = stage_root / port["name"]
                     ports._stage_wasm(port, dest)
 
+                    # MightyMike uses docs/index.html as the game shell itself
                     docs_index = dest / "index.html"
                     if port.get("has_docs_landing"):
-                        self.assertTrue(docs_index.exists(), f"{port['name']} should stage its docs landing page")
+                        self.assertTrue(docs_index.exists(), f"{port['name']} should stage its game shell index page")
 
                     launch_path = port.get("site_launch_path")
                     if launch_path:
@@ -61,6 +62,18 @@ class MonorepoMetadataTests(unittest.TestCase):
                 if port.get("site_level_example"):
                     self.assertIn(port["site_level_example"], hub)
 
+    def test_hub_has_no_per_game_docs_links(self):
+        """The hub should NOT link to per-game docs/index.html pages; WASM is game-only."""
+        hub = (ports.ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+        # The single-site model has no secondary "Docs" buttons pointing to per-game pages
+        import re
+        docs_hrefs = re.findall(r'href="[^"]*index\.html"[^>]*>Docs<', hub)
+        self.assertEqual(
+            docs_hrefs,
+            [],
+            "Hub should not contain per-game 'Docs' links: " + str(docs_hrefs),
+        )
+
     def test_billy_frontier_docs_use_standard_query_params(self):
         billy_docs = (ports.ROOT / "games" / "BillyFrontier-Android" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn("?level=1", billy_docs)
@@ -68,13 +81,97 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("BF_LoadTerrainData", billy_docs)
 
     def test_shared_pomme_dependency_is_present_for_all_games(self):
-        shared_pomme = ports.ROOT / "extern" / "Pomme" / "CMakeLists.txt"
-        self.assertTrue(shared_pomme.exists())
+        # Each game vendors Pomme as a per-game submodule under extern/Pomme.
+        # The directory exists as an (optionally uninitialised) submodule reference.
+        gitmodules = (ports.ROOT / ".gitmodules").read_text(encoding="utf-8")
 
         for port in ports.PORTS:
             with self.subTest(port=port["name"]):
                 game_pomme = ports.ROOT / port["path"] / "extern" / "Pomme"
-                self.assertTrue(game_pomme.exists(), f"{port['name']} should expose extern/Pomme")
+                self.assertTrue(
+                    game_pomme.exists(),
+                    f"{port['name']} should have extern/Pomme submodule directory",
+                )
+                self.assertIn(
+                    port["path"] + "/extern/Pomme",
+                    gitmodules,
+                    f"{port['name']} should be registered in .gitmodules",
+                )
+
+    def test_mightymike_game_shell_is_the_docs_index(self):
+        """MightyMike uses docs/index.html as the game shell itself (not a landing page)."""
+        mighty_mike_index = ports.ROOT / "games" / "MightyMike-Android" / "docs" / "index.html"
+        self.assertTrue(mighty_mike_index.exists(), "MightyMike should have docs/index.html as game shell")
+        content = mighty_mike_index.read_text(encoding="utf-8")
+        # It must embed a canvas and Emscripten Module config
+        self.assertIn("<canvas", content, "MightyMike game shell must contain a WebGL canvas")
+        self.assertIn("var Module", content, "MightyMike game shell must configure Emscripten Module")
+        self.assertIn("MightyMike.js", content, "MightyMike game shell must reference MightyMike.js loader")
+
+    def test_all_shells_expose_pangea_game_api(self):
+        games_with_shells = [
+            "Bugdom-android",
+            "Nanosaur2-Android",
+            "OttoMatic-Android",
+        ]
+        for game_name in games_with_shells:
+            with self.subTest(game=game_name):
+                shell = ports.ROOT / "games" / game_name / "docs" / "shell.html"
+                self.assertTrue(shell.exists(), f"{game_name} should have docs/shell.html")
+                shell_text = shell.read_text(encoding="utf-8")
+                self.assertIn(
+                    "PangeaGame",
+                    shell_text,
+                    f"{game_name}/docs/shell.html should expose the standard PangeaGame API",
+                )
+                self.assertIn(
+                    "skipToLevel",
+                    shell_text,
+                    f"{game_name}/docs/shell.html should expose skipToLevel",
+                )
+
+    def test_wasm_stage_does_not_include_per_game_html_from_docs(self):
+        """
+        The WASM staging step must NOT copy per-game landing pages from docs/
+        into the staged output. Only the built game HTML/JS/WASM/data files
+        and non-HTML doc assets (images) should be present.
+        """
+        created_files: list[Path] = []
+        try:
+            with tempfile.TemporaryDirectory(prefix="pangea-stage-html-test-") as tmp:
+                stage_root = Path(tmp)
+
+                for port in ports.PORTS:
+                    # MightyMike-Android is the one exception: its docs/index.html IS the
+                    # game shell (wasm_entrypoint = 'index.html'), not a landing page.
+                    if port.get('has_docs_landing'):
+                        continue
+
+                    game_root = ports.ROOT / port["path"]
+                    docs_dir = game_root / "docs"
+                    if not docs_dir.exists():
+                        continue
+
+                    for rel_output in port["wasm_outputs"]:
+                        source = game_root / rel_output
+                        if not source.exists():
+                            source.parent.mkdir(parents=True, exist_ok=True)
+                            source.write_text(f"placeholder for {port['name']}\n", encoding="utf-8")
+                            created_files.append(source)
+
+                    dest = stage_root / port["name"]
+                    ports._stage_wasm(port, dest)
+
+                    # docs/index.html should NOT appear at the root of the staged output
+                    with self.subTest(game=port["name"]):
+                        staged_index = dest / "index.html"
+                        self.assertFalse(
+                            staged_index.exists(),
+                            f"{port['name']}: docs/index.html should NOT be staged (WASM = game only, no per-game landing pages)",
+                        )
+        finally:
+            for created in created_files:
+                created.unlink(missing_ok=True)
 
     def test_bugdom2_android_manifest_wires_standard_icons(self):
         manifest = (ports.ROOT / "games" / "Bugdom2-Android" / "android" / "app" / "src" / "main" / "AndroidManifest.xml").read_text(encoding="utf-8")

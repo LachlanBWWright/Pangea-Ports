@@ -275,7 +275,7 @@
 
       <div class="card">
         <section class="tab-panel active" id="panel-billy" role="tabpanel" aria-labelledby="tab-billy">
-          <div class="panel-header"><div><h2>Billy Frontier</h2><p>Direct-launch logic now accepts the same query-string style used elsewhere in the monorepo, while preserving legacy hash support.</p><div class="status supported">Supported: <code>?level=N</code> and <code>?terrainFile=...</code></div></div><div class="panel-actions"><a class="btn primary" href="./BillyFrontier-Android/game/billyfrontier.html">Launch game</a><a class="btn secondary" href="./BillyFrontier-Android/index.html">Docs</a></div></div>
+          <div class="panel-header"><div><h2>Billy Frontier</h2><p>Direct-launch logic now accepts the same query-string style used elsewhere in the monorepo, while preserving legacy hash support.</p><div class="status supported">Supported: <code>?level=N</code> and <code>?terrainFile=...</code></div></div><div class="panel-actions"><a class="btn primary" href="./BillyFrontier-Android/game/billyfrontier.html">Launch game</a></div></div>
           <div class="detail-grid">
             <div class="detail-card"><h3>Direct level boot</h3><p>Jump directly into a specific duel, shootout, stampede, or target-practice area.</p><pre>./BillyFrontier-Android/game/billyfrontier.html?level=1</pre><p>Native equivalent: <code>--level 1</code></p></div>
             <div class="detail-card"><h3>Level data override</h3><p>Upload a custom terrain file into MEMFS or point the build at an existing colon-style terrain path.</p><pre>Module.FS.writeFile('Data/Terrain/custom_level.ter', bytes)
@@ -284,7 +284,7 @@ Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'
         </section>
 
         <section class="tab-panel" id="panel-bugdom" role="tabpanel" aria-labelledby="tab-bugdom">
-          <div class="panel-header"><div><h2>Bugdom</h2><p>The Pages build now preserves Bugdom’s expected <code>game.html</code> entrypoint so its existing docs page works unchanged after deployment.</p><div class="status supported">Supported: <code>?level=N</code></div></div><div class="panel-actions"><a class="btn primary" href="./Bugdom-android/game.html">Launch game</a><a class="btn secondary" href="./Bugdom-android/index.html">Docs</a></div></div>
+          <div class="panel-header"><div><h2>Bugdom</h2><p>The Pages build now preserves Bugdom’s expected <code>game.html</code> entrypoint so its existing docs page works unchanged after deployment.</p><div class="status supported">Supported: <code>?level=N</code></div></div><div class="panel-actions"><a class="btn primary" href="./Bugdom-android/game.html">Launch game</a></div></div>
           <div class="detail-grid">
             <div class="detail-card"><h3>Direct level boot</h3><pre>./Bugdom-android/game.html?level=3</pre></div>
             <div class="detail-card"><h3>Level data override</h3><pre>?terrainFile=:Terrain:Custom.ter
@@ -294,7 +294,7 @@ Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'
         </section>
 
         <section class="tab-panel" id="panel-bugdom2" role="tabpanel" aria-labelledby="tab-bugdom2">
-          <div class="panel-header"><div><h2>Bugdom 2</h2><p>The current reference implementation for GitHub Pages, browser jump-to-level workflows, and the checked-in Android app.</p><div class="status supported">Supported: <code>?level=N</code> and JS cheat API</div></div><div class="panel-actions"><a class="btn primary" href="./Bugdom2-Android/index.html">Open page</a><a class="btn secondary" href="./Bugdom2-Android/Bugdom2.html?level=3">Jump to level 3</a></div></div>
+          <div class="panel-header"><div><h2>Bugdom 2</h2><p>The current reference implementation for GitHub Pages, browser jump-to-level workflows, and the checked-in Android app.</p><div class="status supported">Supported: <code>?level=N</code> and JS cheat API</div></div><div class="panel-actions"><a class="btn primary" href="./Bugdom2-Android/Bugdom2.html">Launch game</a></div></div>
           <div class="detail-grid">
             <div class="detail-card"><h3>Direct level boot</h3><pre>./Bugdom2-Android/Bugdom2.html?level=3</pre><p>Native equivalent: <code>--level 3</code></p></div>
             <div class="detail-card"><h3>Level data override</h3><pre>Module.FS.writeFile('Data/Terrain/Level1_Garden.ter', bytes)</pre><p>Write override data before the target level loads.</p></div>
@@ -302,7 +302,7 @@ Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'
         </section>
 
         <section class="tab-panel" id="panel-cromag" role="tabpanel" aria-labelledby="tab-cromag">
-          <div class="panel-header"><div><h2>Cro-Mag Rally</h2><p>Cro-Mag uses a racing-specific startup contract: pick a track and car, then optionally swap in custom terrain data.</p><div class="status partial">Partial: track/car boot instead of single-level boot</div></div><div class="panel-actions"><a class="btn primary" href="./CroMagRally-Android/game/CroMagRally.html">Launch game</a><a class="btn secondary" href="./CroMagRally-Android/index.html">Docs</a></div></div>
+          <div class="panel-header"><div><h2>Cro-Mag Rally</h2><p>Cro-Mag uses a racing-specific startup contract: pick a track and car, then optionally swap in custom terrain data.</p><div class="status partial">Partial: track/car boot instead of single-level boot</div></div><div class="panel-actions"><a class="btn primary" href="./CroMagRally-Android/game/CroMagRally.html">Launch game</a></div></div>
           <div class="detail-grid">
             <div class="detail-card"><h3>Direct launch</h3><pre>./CroMagRally-Android/game/CroMagRally.html?track=2&car=1</pre></div>
             <div class="detail-card"><h3>Level data override</h3><pre>?levelOverride=:Terrain:MyLevel.ter</pre></div>
@@ -318,7 +318,7 @@ Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'
         </section>
 
         <section class="tab-panel" id="panel-nanosaur" role="tabpanel" aria-labelledby="tab-nanosaur">
-          <div class="panel-header"><div><h2>Nanosaur</h2><p>Nanosaur remains the clearest direct-gameplay boot flow for rapid editor iteration: boot level 0 and force menu skipping.</p><div class="status supported">Supported: <code>?level=N&skipMenu=1</code></div></div><div class="panel-actions"><a class="btn primary" href="./Nanosaur-android/game/index.html">Launch game</a><a class="btn secondary" href="./Nanosaur-android/index.html">Docs</a></div></div>
+          <div class="panel-header"><div><h2>Nanosaur</h2><p>Nanosaur remains the clearest direct-gameplay boot flow for rapid editor iteration: boot level 0 and force menu skipping.</p><div class="status supported">Supported: <code>?level=N&skipMenu=1</code></div></div><div class="panel-actions"><a class="btn primary" href="./Nanosaur-android/game/index.html">Launch game</a></div></div>
           <div class="detail-grid">
             <div class="detail-card"><h3>Direct level boot</h3><pre>./Nanosaur-android/game/index.html?level=0&skipMenu=1</pre></div>
             <div class="detail-card"><h3>Level data override</h3><pre>?terrainFile=:Terrain:custom.ter</pre></div>
