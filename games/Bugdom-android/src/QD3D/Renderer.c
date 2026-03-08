@@ -487,6 +487,11 @@ void Render_DeleteContext(void)
 {
 if (gGLContext)
 {
+#ifdef __EMSCRIPTEN__
+// Free streaming VBOs/EBO before destroying the GL context.
+if (s_streamVBO) { glDeleteBuffers(1, &s_streamVBO); s_streamVBO = 0; }
+if (s_streamEBO) { glDeleteBuffers(1, &s_streamEBO); s_streamEBO = 0; }
+#endif
 SDL_GL_DestroyContext(gGLContext);
 gGLContext = NULL;
 }
