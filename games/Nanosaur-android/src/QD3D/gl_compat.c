@@ -393,8 +393,11 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
 
         // Position
         if (s_ca_vertex.ptr) {
-            const float *src = (const float *)((const char *)s_ca_vertex.ptr
-                               + i * (s_ca_vertex.stride ? s_ca_vertex.stride : 3*sizeof(float)));
+            // Default stride = size * sizeof(float); NOT hardcoded 3*sizeof(float)
+            // because 2D quads (size=2) pack tightly at 8 bytes/vertex.
+            int vStride = s_ca_vertex.stride ? s_ca_vertex.stride
+                                              : s_ca_vertex.size * (int)sizeof(float);
+            const float *src = (const float *)((const char *)s_ca_vertex.ptr + i * vStride);
             dst[0] = src[0]; dst[1] = src[1]; dst[2] = (s_ca_vertex.size >= 3) ? src[2] : 0.0f;
         } else { dst[0]=dst[1]=dst[2]=0; }
 

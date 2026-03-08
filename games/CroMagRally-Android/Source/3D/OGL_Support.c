@@ -968,13 +968,17 @@ static void* ConvertTextureForWebGL(const void* src, int w, int h,
 	{
 		uint8_t* rgba = (uint8_t*) malloc(w * h * 4);
 		const uint16_t* s = (const uint16_t*) src;
+		/* Preserve the 1-bit source alpha only if the caller wants an RGBA
+		   (transparent) texture.  Opaque (GL_RGB) textures must have alpha=255
+		   so that glAlphaFunc(GL_NOTEQUAL, 0) does not discard every pixel. */
+		bool hasAlpha = (*ioDest == GL_RGBA || *ioDest == GL_RGB5_A1);
 		for (int i = 0; i < w * h; i++)
 		{
 			uint16_t p = s[i];
 			rgba[i*4+0] = (uint8_t)(((p >> 10) & 0x1F) * 255 / 31);
 			rgba[i*4+1] = (uint8_t)(((p >>  5) & 0x1F) * 255 / 31);
 			rgba[i*4+2] = (uint8_t)(((p >>  0) & 0x1F) * 255 / 31);
-			rgba[i*4+3] = (p >> 15) ? 255 : 0;
+			rgba[i*4+3] = hasAlpha ? ((p >> 15) ? 255 : 0) : 255;
 		}
 		*ioSrc = GL_RGBA;
 		*ioDest = GL_RGBA;
@@ -1040,6 +1044,13 @@ GLuint	textureName;
 			: GL_LINEAR;
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+
+#ifdef __EMSCRIPTEN__
+	// WebGL 1: NPOT textures with GL_REPEAT are texture-incomplete (render as black).
+	// Always clamp to edge so every texture is WebGL-complete regardless of dimensions.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#endif
 
 	if (!(gLoadTextureFlags & kLoadTextureFlags_NoGammaFix))
 	{
