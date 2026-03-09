@@ -939,6 +939,7 @@ uint32_t				matFlags;
 #ifdef __EMSCRIPTEN__
 					// WebGL 1: GL_REPEAT on NPOT textures causes texture-incompleteness (samples as black).
 					// Only restore GL_REPEAT when the texture dimensions are power-of-two.
+					// matData->width/height are set at load time and never change during the material's lifetime.
 					bool npotTex = ((matData->width  & (matData->width  - 1)) != 0) ||
 					               ((matData->height & (matData->height - 1)) != 0);
 #endif
