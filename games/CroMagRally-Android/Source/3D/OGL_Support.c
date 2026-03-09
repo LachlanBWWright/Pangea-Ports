@@ -1315,10 +1315,16 @@ OGLLightDefType	*lights;
 GLenum _OGL_CheckError(const char* file, const int line)
 {
 #ifdef __EMSCRIPTEN__
-	// LEGACY_GL_EMULATION generates spurious GL_INVALID_ENUM errors.
-	// Drain the error queue and return GL_NO_ERROR to prevent false crashes.
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR) { /* drain */ }
+	// On WASM/WebGL, skip glGetError() entirely.  Each glGetError() call
+	// crosses the WASM→JS boundary and forces the GL command queue to flush,
+	// stalling the GPU pipeline.  With many calls per draw and hundreds of
+	// draws per frame, this adds hundreds of synchronous round-trips per frame.
+	//
+	// Return GL_NO_ERROR so callers' "if (OGL_CheckError()) DoFatalAlert()"
+	// patterns are satisfied.  Any real GL errors will still be visible in
+	// the browser's WebGL error log (DevTools → Console).
+	(void)file;
+	(void)line;
 	return GL_NO_ERROR;
 #else
 	GLenum error = glGetError();

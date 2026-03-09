@@ -1790,6 +1790,15 @@ OGLLightDefType	*lights;
 
 GLenum OGL_CheckError_Impl(const char* file, const int line)
 {
+#ifdef __EMSCRIPTEN__
+	// On WASM/WebGL, skip glGetError() entirely.  Each glGetError() call
+	// crosses the WASM→JS boundary and forces the GL command queue to flush,
+	// stalling the GPU pipeline.  Return GL_NO_ERROR immediately; real errors
+	// remain visible in the browser's WebGL error log (DevTools → Console).
+	(void)file;
+	(void)line;
+	return GL_NO_ERROR;
+#else
 	GLenum error = glGetError();
 	if (error != 0)
 	{
@@ -1808,6 +1817,7 @@ GLenum OGL_CheckError_Impl(const char* file, const int line)
 		DoFatalAlert("OpenGL error 0x%x (%s)\nin %s:%d", error, text, file, line);
 	}
 	return error;
+#endif
 }
 
 
