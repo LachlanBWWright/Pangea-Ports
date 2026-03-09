@@ -100,10 +100,10 @@ if(EMSCRIPTEN)
 
 	# SDL3's add_subdirectory creates targets in its binary dir.
 	# Point SDL3_DIR there so Pomme's find_package(SDL3) succeeds.
-	# Also append to CMAKE_FIND_ROOT_PATH for Android/Emscripten toolchains that
-	# set CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY (sysroot-only search).
+	# Android/Emscripten toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY;
+	# set(CACHE FORCE) does NOT update the local var, so use explicit path.
 	set(SDL3_DIR "${CMAKE_BINARY_DIR}/SDL3" CACHE PATH "" FORCE)
-	list(APPEND CMAKE_FIND_ROOT_PATH "${SDL3_DIR}")
+	list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/SDL3")
 else()
 	# If SDL3_DIR wasn't specified, discover if the user put some prebuilt SDL3
 	# package in the 'extern' directory
@@ -136,8 +136,9 @@ else()
 		# Update SDL3_DIR so subsequent find_package(SDL3) calls (e.g. in Pomme) can find it.
 		file(RELATIVE_PATH _sdl3_relpath "${CMAKE_SOURCE_DIR}" "${SDL3_DIR}")
 		set(SDL3_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}" CACHE PATH "" FORCE)
-		# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY; extend search path.
-		list(APPEND CMAKE_FIND_ROOT_PATH "${SDL3_DIR}")
+		# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY. set(CACHE FORCE)
+		# does NOT update the local variable, so use explicit binary path.
+		list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
 		unset(_sdl3_relpath)
 	endif()
 endif()

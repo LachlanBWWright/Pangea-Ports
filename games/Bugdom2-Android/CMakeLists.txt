@@ -92,10 +92,10 @@ else()
 	# subdirectories (e.g. Pomme) can locate those generated config files.
 	file(RELATIVE_PATH _sdl3_relpath "${CMAKE_SOURCE_DIR}" "${SDL3_DIR}")
 	set(SDL3_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}" CACHE PATH "" FORCE)
-	# Android (and Emscripten) toolchains set CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY,
-	# restricting find_package to the sysroot. Append SDL3_DIR to CMAKE_FIND_ROOT_PATH
+	# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY. set(CACHE FORCE)
+	# does NOT update the local variable, so we must explicitly use the binary path
 	# so that Pomme's find_package(SDL3) can locate SDL3Config.cmake.
-	list(APPEND CMAKE_FIND_ROOT_PATH "${SDL3_DIR}")
+	list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
 	unset(_sdl3_relpath)
 endif()
 
