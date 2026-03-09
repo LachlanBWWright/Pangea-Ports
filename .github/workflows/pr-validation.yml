@@ -156,16 +156,13 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            GAME_PACKAGE=$(python3 -c "import scripts.ports as p; print(p.PORTS_BY_NAME['${{ matrix.name }}']['android_package'])")
-            APK_PATH="${{ matrix.path }}/android/app/build/outputs/apk/debug/app-debug.apk"
-            LOG_FILE="${{ matrix.name }}-logcat.txt"
-            adb install -r "$APK_PATH"
+            adb install -r "${{ matrix.path }}/android/app/build/outputs/apk/debug/app-debug.apk"
             adb logcat -c
-            adb shell monkey -p "$GAME_PACKAGE" -c android.intent.category.LAUNCHER 1
+            adb shell monkey -p "$(python3 -c "import scripts.ports as p; print(p.PORTS_BY_NAME['${{ matrix.name }}']['android_package'])")" -c android.intent.category.LAUNCHER 1
             sleep 20
-            adb logcat -d > "$LOG_FILE"
-            if grep -q "FATAL EXCEPTION" "$LOG_FILE"; then
-              cat "$LOG_FILE"
+            adb logcat -d > "${{ matrix.name }}-logcat.txt"
+            if grep -q "FATAL EXCEPTION" "${{ matrix.name }}-logcat.txt"; then
+              cat "${{ matrix.name }}-logcat.txt"
               exit 1
             fi
       - name: Upload emulator log

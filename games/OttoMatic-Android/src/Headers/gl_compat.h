@@ -48,3 +48,13 @@
 // instead of a macro, to avoid conflicting with the GLES2/gl2.h declaration.
 
 #endif // __EMSCRIPTEN__
+
+#ifdef __ANDROID__
+// Android OpenGL ES 3.0 does not include these legacy OpenGL 1.x functions.
+// glPolygonMode: wireframe debug mode — no-op on Android.
+#define glPolygonMode(face, mode) ((void)0)
+// glFrustum: anaglyph stereo path — provide a stub that applies the frustum
+// projection matrix for the rare case anaglyph mode is enabled on Android.
+void OttoMatic_Android_Frustum(double l, double r, double b, double t, double n, double f);
+#define glFrustum OttoMatic_Android_Frustum
+#endif // __ANDROID__

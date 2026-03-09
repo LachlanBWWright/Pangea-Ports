@@ -119,11 +119,12 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
-if(NOT EMSCRIPTEN)
+if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)
 else()
 	# Emscripten provides WebGL, no need for a system OpenGL package
-	# Create a dummy OpenGL::GL target so the rest of the CMakeLists.txt compiles
+	# Android uses GLES3. Create a dummy OpenGL::GL target so the rest of the
+	# CMakeLists.txt compiles without change; actual GLES3 libs are linked below.
 	add_library(OpenGL::GL INTERFACE IMPORTED)
 endif()
 
@@ -149,7 +150,11 @@ elseif(APPLE)
 	set_source_files_properties(${CMAKE_SOURCE_DIR}/packaging/${GAME_TARGET}.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 endif()
 
-add_executable(${GAME_TARGET} ${GAME_SOURCES})
+if(ANDROID)
+	add_library(${GAME_TARGET} SHARED ${GAME_SOURCES})
+else()
+	add_executable(${GAME_TARGET} ${GAME_SOURCES})
+endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 
@@ -239,7 +244,11 @@ else()
 endif()
 
 # Link core dependencies
-target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+if(ANDROID)
+	target_link_libraries(${GAME_TARGET} PRIVATE Pomme GLESv3 EGL android log)
+else()
+	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+endif()
 
 # Add required frameworks for KillMacMouseAcceleration
 if(APPLE)
