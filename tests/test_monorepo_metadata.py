@@ -243,6 +243,25 @@ class MonorepoMetadataTests(unittest.TestCase):
         png_files = [f for f in shots_dir.iterdir() if f.suffix == ".png" and "skip_to_level" not in f.name]
         self.assertGreaterEqual(len(png_files), 24, f"Expected ≥24 level screenshots, found {len(png_files)}")
 
+    def test_docs_pages_hero_images_exist(self):
+        """
+        Docs pages that reference screenshot.webp or screenshot.png must have those files present.
+        These are hero images shown on the per-game landing pages and used as og:image metadata.
+        """
+        expected_screenshots = [
+            ("BillyFrontier-Android", "docs/screenshot.webp"),
+            ("Bugdom-android", "docs/screenshot.webp"),
+            ("CroMagRally-Android", "docs/screenshot.webp"),
+            ("Nanosaur-android", "docs/screenshot.png"),
+        ]
+        for game_name, rel_path in expected_screenshots:
+            with self.subTest(game=game_name):
+                asset = ports.ROOT / "games" / game_name / rel_path
+                self.assertTrue(
+                    asset.exists(),
+                    f"{game_name}: {rel_path} must exist (referenced from docs/index.html)",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

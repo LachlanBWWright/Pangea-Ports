@@ -197,6 +197,49 @@ class SkipToLevelPlaywrightTests(unittest.TestCase):
             "OttoMatic per-game landing page should not exist; use hub for navigation",
         )
 
+    def test_docs_pages_hero_images_load(self):
+        """Docs pages that have hero images (screenshot.webp/.png) must load them without errors."""
+        from playwright.sync_api import sync_playwright
+
+        PAGES_WITH_HEROES = [
+            ("BillyFrontier", "games/BillyFrontier-Android/docs/index.html", "screenshot.webp"),
+            ("Bugdom", "games/Bugdom-android/docs/index.html", "screenshot.webp"),
+            ("CroMagRally", "games/CroMagRally-Android/docs/index.html", "screenshot.webp"),
+            ("Nanosaur", "games/Nanosaur-android/docs/index.html", "screenshot.png"),
+        ]
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+
+            for name, path, screenshot_ref in PAGES_WITH_HEROES:
+                with self.subTest(game=name):
+                    page = browser.new_page()
+                    page.goto(
+                        f"{self._base_url}/{path}",
+                        wait_until="networkidle",
+                        timeout=PAGE_LOAD_TIMEOUT_MS,
+                    )
+                    page.wait_for_timeout(500)
+
+                    img_status = page.evaluate(f"""
+                        (() => {{
+                            const imgs = document.querySelectorAll('img[src="{screenshot_ref}"]');
+                            if (imgs.length === 0) return 'no-img-found';
+                            const img = imgs[0];
+                            return img.complete && img.naturalWidth > 0 ? 'loaded' : 'broken';
+                        }})()
+                    """)
+
+                    self.assertEqual(
+                        img_status,
+                        "loaded",
+                        f"{name}: hero image '{screenshot_ref}' is not loading (status: {img_status}). "
+                        f"The file must exist in games/{name.lower()}-*/docs/{screenshot_ref}",
+                    )
+                    page.close()
+
+            browser.close()
+
 
 if __name__ == "__main__":
     unittest.main()
