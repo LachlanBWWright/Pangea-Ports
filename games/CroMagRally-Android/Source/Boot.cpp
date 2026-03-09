@@ -198,9 +198,30 @@ retryVideo:
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 1 << gCurrentAntialiasingLevel);
 	}
 
+	// Determine initial window size
+	int initialWidth  = 640;
+	int initialHeight = 480;
+#ifdef __EMSCRIPTEN__
+	// Use a fixed game resolution for WebAssembly builds.
+	// SDL_GetDisplayUsableBounds() may return spuriously small values in
+	// headless browsers before the page layout is fully computed.
+	initialWidth  = 1280;
+	initialHeight = 720;
+#endif
+
 	gSDLWindow = SDL_CreateWindow(
-		GAME_FULL_NAME " " GAME_VERSION, 640, 480,
+		GAME_FULL_NAME " " GAME_VERSION, initialWidth, initialHeight,
 		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+
+#ifdef __EMSCRIPTEN__
+	// Force the WebGL canvas to the target resolution.
+	// SDL3 on Emscripten may set the canvas to 3×3 before the page layout settles.
+	if (gSDLWindow)
+	{
+		SDL_SetWindowSize(gSDLWindow, initialWidth, initialHeight);
+		SDL_SyncWindow(gSDLWindow);
+	}
+#endif
 
 	if (!gSDLWindow)
 	{
