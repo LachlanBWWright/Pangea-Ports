@@ -1145,9 +1145,16 @@ GLuint	textureName;
 
 #ifdef __EMSCRIPTEN__
 	// WebGL 1: NPOT textures with GL_REPEAT are texture-incomplete (render as black).
-	// Always clamp to edge — sprites and model textures don't tile anyway.
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	// Only force CLAMP_TO_EDGE for NPOT textures; POT textures may use GL_REPEAT.
+	{
+		bool npotW = (width  & (width  - 1)) != 0;
+		bool npotH = (height & (height - 1)) != 0;
+		if (npotW || npotH)
+		{
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+	}
 #endif
 
 #if 0
