@@ -757,12 +757,22 @@ uint32_t				matFlags;
 		if (matFlags & BG3D_MATERIALFLAG_CLAMP_U)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		else
+#ifdef __EMSCRIPTEN__
+			// WebGL 1: NPOT textures with GL_REPEAT are texture-incomplete (sample as black).
+			// Always clamp to edge so every BG3D texture is WebGL-complete.
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+#else
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+#endif
 
 		if (matFlags & BG3D_MATERIALFLAG_CLAMP_V)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		else
+#ifdef __EMSCRIPTEN__
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#else
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+#endif
 	}
 	else
 		glDisable(GL_TEXTURE_2D);									// not textured, so disable textures

@@ -864,7 +864,10 @@ else if (bufferFormat == GL_BGR && bufferType == GL_UNSIGNED_BYTE)
 }
 else if (bufferFormat == GL_BGRA && bufferType == GL_UNSIGNED_SHORT_1_5_5_5_REV)
 {
-	converted = Convert1555ToRGBA8(srcPixels, width, height, true);
+	// Terrain supertile textures are GL_RGB (fully opaque). Force alpha=255 so that
+	// the WebGL canvas (alpha:true) does not composite tile pixels as transparent,
+	// which would show the page background through the terrain.
+	converted = Convert1555ToRGBA8(srcPixels, width, height, false);
 	glFormat  = GL_RGBA;
 	glType    = GL_UNSIGNED_BYTE;
 }
