@@ -53,17 +53,20 @@ Full-page screenshots of each game's `docs/index.html` skip-to-level UI.
 
 ### Level screenshots (3 per game = 24 total)
 Each shows the docs page scrolled to show level-specific content.
+All screenshots are 1280×800 pixels (viewport), except full-page hub screenshots.
 
 | Files | Game | Content shown |
 |-------|------|-------------|
-| `billyfrontier_lv0/2/4.png` | Billy Frontier | Hero/header, Level Editor Integration, JavaScript API |
-| `bugdom_lv0/1/2.png` | Bugdom | Level Select table, Editor Integration, JavaScript API |
-| `bugdom2_lv0/1/2.png` | Bugdom 2 | Jump-to-Level grid, URL Parameters, JS Cheat API |
-| `cromagnrally_track1/3/5.png` | Cro-Mag Rally | Track selector UI, Level Editor API, Custom Level File |
-| `mightymike_lv0/1/2.png` | Mighty Mike | Level Navigation controls, Cheat Toggles, URL Reference |
-| `nanosaur_lv0/1/2.png` | Nanosaur | Overview, Level Editor Integration, URL params |
-| `nanosaur2_lv0/1/2.png` | Nanosaur 2 | Hub tab panel sections (Nanosaur 2 tab active) |
-| `ottomatic_lv0/1/2.png` | Otto Matic | Hub tab panel sections (Otto Matic tab active) |
+| `billyfrontier_lv0/2/4.png` | Billy Frontier | Hero/header w/ screenshot, Level Editor Integration, JavaScript API |
+| `bugdom_lv0/1/2.png` | Bugdom | Level Select table (levels 0–9), Editor Integration, JavaScript API |
+| `bugdom2_lv0/1/2.png` | Bugdom 2 | Jump-to-Level grid (10 cards), upper dev section, JS Cheat API |
+| `cromagnrally_track1/3/5.png` | Cro-Mag Rally | Track/car selector UI, Level Editor API URL params, Custom Level File |
+| `mightymike_lv0/1/2.png` | Mighty Mike | Game canvas area, dev panel (Level Navigation), URL reference examples |
+| `nanosaur_lv0/1/2.png` | Nanosaur | Top/overview, Level Editor Integration, URL params |
+| `nanosaur2_lv0/1/2.png` | Nanosaur 2 | Hub top (tab buttons), game panel header, detail cards |
+| `ottomatic_lv0/1/2.png` | Otto Matic | Hub top (tab buttons), game panel header, detail cards |
+
+All screenshot triplets verified to show distinct content (minimum pixel difference > 3.0).
 
 ## Visual Review Notes
 
