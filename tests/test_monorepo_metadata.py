@@ -194,6 +194,93 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertTrue((wrapper_root / "gradlew").exists())
         self.assertTrue((wrapper_root / "gradle" / "wrapper" / "gradle-wrapper.jar").exists())
 
+    def test_all_games_have_android_gradle_project(self):
+        """All 8 Pangea ports must have a checked-in Android Gradle project."""
+        for port in ports.PORTS:
+            game_name = port['name']
+            with self.subTest(game=game_name):
+                android_dir = ports.ROOT / port['path'] / 'android'
+                self.assertTrue(
+                    android_dir.exists(),
+                    f"{game_name}: android/ directory must exist",
+                )
+                gradlew = android_dir / 'gradlew'
+                self.assertTrue(
+                    gradlew.exists(),
+                    f"{game_name}: android/gradlew must exist",
+                )
+                build_gradle = android_dir / 'app' / 'build.gradle'
+                self.assertTrue(
+                    build_gradle.exists(),
+                    f"{game_name}: android/app/build.gradle must exist",
+                )
+                # Build script must use SDL from source (standardized pattern)
+                content = build_gradle.read_text(encoding='utf-8')
+                self.assertIn(
+                    'prepareSdlSource',
+                    content,
+                    f"{game_name}: build.gradle must auto-download SDL3",
+                )
+                # Must have a known package identifier
+                self.assertIn(
+                    port['android_package'],
+                    content,
+                    f"{game_name}: build.gradle must reference package '{port['android_package']}'",
+                )
+
+    def test_all_games_have_android_apk_flag(self):
+        """All 8 games must have android_apk=True in ports.py."""
+        for port in ports.PORTS:
+            with self.subTest(game=port['name']):
+                self.assertTrue(
+                    port.get('android_apk', False),
+                    f"{port['name']}: android_apk must be True — this repo is exclusively Android/WASM ports",
+                )
+
+    def test_android_apk_matrix_includes_all_games(self):
+        """android-apk matrix must include all 8 games."""
+        import json
+        matrix_json = json.loads(
+            __import__('subprocess').check_output(
+                ['python3', 'scripts/ports.py', 'matrix', 'android-apk'],
+                cwd=str(ports.ROOT),
+                text=True,
+            )
+        )
+        names = {entry['name'] for entry in matrix_json['include']}
+        expected = {port['name'] for port in ports.PORTS}
+        self.assertEqual(
+            names,
+            expected,
+            f"android-apk matrix missing: {expected - names}",
+        )
+
+    def test_pr_validation_android_smoke_uses_matrix_path(self):
+        """pr-validation.yml android-emulator-smoke must use matrix.path, not hardcoded Bugdom2."""
+        wf = (ports.ROOT / ".github" / "workflows" / "pr-validation.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            "matrix.path",
+            wf,
+            "android-emulator-smoke must use matrix.path so all games get tested",
+        )
+        # Extract just the android-emulator-smoke section to check it
+        # Find the section between 'android-emulator-smoke:' and the next top-level job or EOF
+        smoke_start = wf.find("android-emulator-smoke:")
+        self.assertGreater(smoke_start, 0, "android-emulator-smoke job not found")
+        smoke_section = wf[smoke_start:]
+        # The smoke section must use matrix.path, not a hardcoded game path
+        self.assertIn(
+            'matrix.path',
+            smoke_section,
+            "android-emulator-smoke must reference matrix.path",
+        )
+        # The cd command in the smoke build step must NOT hardcode a specific game
+        self.assertNotIn(
+            "cd games/Bugdom2-Android/android",
+            smoke_section,
+            "android-emulator-smoke must not hardcode 'cd games/Bugdom2-Android/android'",
+        )
+
     def test_separate_wasm_and_apk_workflow_files_exist(self):
         """Separate CI pipelines: build-wasm.yml (WASM + Pages) and build-android-apk.yml (APK only)."""
         workflows_dir = ports.ROOT / ".github" / "workflows"
@@ -220,10 +307,19 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertNotIn("deploy-pages", apk_wf, "build-android-apk.yml must not deploy Pages")
         self.assertNotIn("actions/deploy-pages", apk_wf, "build-android-apk.yml must not use deploy-pages action")
 
-    def test_session7_screenshots_present(self):
-        """Session-7 screenshots directory must contain skip-to-level and level shots for all 8 games."""
-        shots_dir = ports.ROOT / "docs" / "screenshots" / "session-7"
-        self.assertTrue(shots_dir.exists(), "docs/screenshots/session-7/ must exist")
+    def test_apk_workflow_uses_matrix_path(self):
+        """The APK build workflow must use matrix.path so all 8 games get built."""
+        apk_wf = (ports.ROOT / ".github" / "workflows" / "build-android-apk.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            "matrix.path",
+            apk_wf,
+            "build-android-apk.yml must use matrix.path (not hardcoded game dirs)",
+        )
+
+    def test_session8_screenshots_present(self):
+        """Session-8 screenshots directory must contain skip-to-level and level shots for all 8 games."""
+        shots_dir = ports.ROOT / "docs" / "screenshots" / "session-8"
+        self.assertTrue(shots_dir.exists(), "docs/screenshots/session-8/ must exist")
 
         expected_skip = [
             "billyfrontier_skip_to_level.png",

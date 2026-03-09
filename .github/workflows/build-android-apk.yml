@@ -48,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
+      fail-fast: false
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.android_apk) }}
     steps:
       - uses: actions/checkout@v4
@@ -60,14 +61,14 @@ jobs:
           java-version: '17'
       - name: Build APKs
         run: |
-          cd games/Bugdom2-Android/android
+          cd "${{ matrix.path }}/android"
           chmod +x gradlew
           ./gradlew assembleDebug assembleRelease
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-apk
-          path: games/Bugdom2-Android/android/app/build/outputs/apk
+          path: ${{ matrix.path }}/android/app/build/outputs/apk
           compression-level: 0
 
   publish-apk-release:
@@ -100,8 +101,6 @@ jobs:
             Automated Android APK build from `${{ github.sha }}`.
 
             Included artifacts:
-            - Bugdom 2 Android APKs (debug and release)
-
-            Note: Bugdom 2 is currently the only imported game with a checked-in Android Gradle project.
+            - Android APKs (debug and release) for all 8 Pangea ports games
           files: |
             release-artifacts/**/*.apk
