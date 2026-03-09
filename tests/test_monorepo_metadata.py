@@ -194,6 +194,55 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertTrue((wrapper_root / "gradlew").exists())
         self.assertTrue((wrapper_root / "gradle" / "wrapper" / "gradle-wrapper.jar").exists())
 
+    def test_separate_wasm_and_apk_workflow_files_exist(self):
+        """Separate CI pipelines: build-wasm.yml (WASM + Pages) and build-android-apk.yml (APK only)."""
+        workflows_dir = ports.ROOT / ".github" / "workflows"
+
+        wasm_wf = workflows_dir / "build-wasm.yml"
+        self.assertTrue(wasm_wf.exists(), "build-wasm.yml must exist as the dedicated WASM pipeline")
+
+        apk_wf = workflows_dir / "build-android-apk.yml"
+        self.assertTrue(apk_wf.exists(), "build-android-apk.yml must exist as the dedicated APK pipeline")
+
+    def test_wasm_workflow_deploys_pages_only_on_main(self):
+        """The WASM workflow must deploy Pages only on main/master, not on every tag or dispatch."""
+        wasm_wf = (ports.ROOT / ".github" / "workflows" / "build-wasm.yml").read_text(encoding="utf-8")
+
+        # Must contain a deploy-pages job that depends on build-wasm
+        self.assertIn("deploy-pages", wasm_wf, "build-wasm.yml must have a deploy-pages job")
+        # The deploy-pages job must be gated to main/master (not all tags)
+        self.assertIn("refs/heads/main", wasm_wf, "deploy-pages must check for refs/heads/main")
+        self.assertIn("refs/heads/master", wasm_wf, "deploy-pages must check for refs/heads/master")
+
+    def test_apk_workflow_does_not_trigger_pages_deploy(self):
+        """The APK workflow must not contain any Pages deployment logic."""
+        apk_wf = (ports.ROOT / ".github" / "workflows" / "build-android-apk.yml").read_text(encoding="utf-8")
+        self.assertNotIn("deploy-pages", apk_wf, "build-android-apk.yml must not deploy Pages")
+        self.assertNotIn("actions/deploy-pages", apk_wf, "build-android-apk.yml must not use deploy-pages action")
+
+    def test_session7_screenshots_present(self):
+        """Session-7 screenshots directory must contain skip-to-level and level shots for all 8 games."""
+        shots_dir = ports.ROOT / "docs" / "screenshots" / "session-7"
+        self.assertTrue(shots_dir.exists(), "docs/screenshots/session-7/ must exist")
+
+        expected_skip = [
+            "billyfrontier_skip_to_level.png",
+            "bugdom_skip_to_level.png",
+            "bugdom2_skip_to_level.png",
+            "cromagnrally_skip_to_level.png",
+            "mightymike_skip_to_level.png",
+            "nanosaur_skip_to_level.png",
+            "nanosaur2_skip_to_level.png",
+            "ottomatic_skip_to_level.png",
+        ]
+        for fname in expected_skip:
+            with self.subTest(file=fname):
+                self.assertTrue((shots_dir / fname).exists(), f"Missing skip-to-level screenshot: {fname}")
+
+        # At least 24 level screenshots must be present (3 per game × 8 games)
+        png_files = [f for f in shots_dir.iterdir() if f.suffix == ".png" and "skip_to_level" not in f.name]
+        self.assertGreaterEqual(len(png_files), 24, f"Expected ≥24 level screenshots, found {len(png_files)}")
+
 
 if __name__ == "__main__":
     unittest.main()

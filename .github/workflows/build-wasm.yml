@@ -1,17 +1,16 @@
-name: Build Ports (legacy — use build-wasm.yml and build-android-apk.yml instead)
-
-# This combined workflow is kept for backwards compatibility.
-# New separate pipelines:
-#   - build-wasm.yml     — builds all WASM targets and deploys GitHub Pages on main
-#   - build-android-apk.yml — builds Bugdom 2 Android APKs
-#
-# This file is no longer triggered automatically; use the dedicated workflows above.
+name: Build WASM & Deploy Pages
 
 on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       publish_release:
-        description: Publish the built artifacts as a GitHub release
+        description: Publish WASM artifacts as a GitHub release
         required: false
         default: false
         type: boolean
@@ -23,7 +22,7 @@ on:
       release_name:
         description: Release name for manual publishing
         required: false
-        default: Pangea Ports build
+        default: Pangea Ports WASM build
         type: string
 
 permissions:
@@ -32,29 +31,26 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ports-legacy-${{ github.ref }}
+  group: wasm-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  prepare-matrices:
+  prepare-matrix:
     runs-on: ubuntu-latest
     outputs:
       wasm: ${{ steps.wasm.outputs.matrix }}
-      android_apk: ${{ steps.android_apk.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
       - id: wasm
         run: echo "matrix=$(python3 scripts/ports.py matrix wasm)" >> "$GITHUB_OUTPUT"
-      - id: android_apk
-        run: echo "matrix=$(python3 scripts/ports.py matrix android-apk)" >> "$GITHUB_OUTPUT"
 
   build-wasm:
-    needs: prepare-matrices
+    needs: prepare-matrix
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrices.outputs.wasm) }}
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.wasm) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -98,36 +94,10 @@ jobs:
           path: ${{ runner.temp }}/site/${{ matrix.name }}
           compression-level: 0
 
-  build-android-apk:
-    needs: prepare-matrices
-    if: needs.prepare-matrices.outputs.android_apk != '{"include":[]}'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      matrix: ${{ fromJson(needs.prepare-matrices.outputs.android_apk) }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Build APKs
-        run: |
-          cd games/Bugdom2-Android/android
-          chmod +x gradlew
-          ./gradlew assembleDebug assembleRelease
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Bugdom2-Android-apk
-          path: games/Bugdom2-Android/android/app/build/outputs/apk
-          compression-level: 0
-
-  assemble-pages:
+  # Deploy to GitHub Pages only when ALL WASM builds pass on the main branch.
+  deploy-pages:
     needs: build-wasm
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
@@ -158,11 +128,9 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v4
 
-  publish-release:
-    needs:
-      - build-wasm
-      - build-android-apk
-    if: inputs.publish_release
+  publish-wasm-release:
+    needs: build-wasm
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -172,8 +140,13 @@ jobs:
       - name: Choose release metadata
         id: release_meta
         run: |
-          echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-          echo "name=${{ inputs.release_name }}" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "name=Pangea Ports ${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+            echo "name=${{ inputs.release_name }}" >> "$GITHUB_OUTPUT"
+          fi
       - name: Validate release tag
         run: test -n "${{ steps.release_meta.outputs.tag }}"
       - name: Create or update GitHub release
@@ -182,14 +155,9 @@ jobs:
           tag_name: ${{ steps.release_meta.outputs.tag }}
           name: ${{ steps.release_meta.outputs.name }}
           body: |
-            Automated multi-port build from `${{ github.sha }}`.
+            Automated WASM build from `${{ github.sha }}`.
 
             Included artifacts:
             - WebAssembly bundles for all imported games
-            - GitHub Pages multi-game site artifact
-            - Bugdom 2 Android APKs
-
-            Note: Bugdom 2 is currently the only imported game with a checked-in Android Gradle project, so it is the only game that produces APKs in this workflow today.
           files: |
             release-artifacts/**/*.zip
-            release-artifacts/**/*.apk
