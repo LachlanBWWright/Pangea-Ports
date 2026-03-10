@@ -5,7 +5,7 @@
 
 #pragma once
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include "modern_gl.h"
 
@@ -72,4 +72,4 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count);
 
 // Note: glClientActiveTextureARB is already handled in OGL_Functions.c
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

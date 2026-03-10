@@ -94,6 +94,16 @@ if(NOT EMSCRIPTEN)
 		endif()
 		message("Building SDL3 from source: " ${SDL3_DIR})
 		add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
+		# SDL3 writes SDL3Config.cmake into its binary directory during configure.
+		# Update SDL3_DIR so that subsequent find_package(SDL3) calls in
+		# subdirectories (e.g. Pomme) can locate those generated config files.
+		file(RELATIVE_PATH _sdl3_relpath "${CMAKE_SOURCE_DIR}" "${SDL3_DIR}")
+		set(SDL3_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}" CACHE PATH "" FORCE)
+		# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY. set(CACHE FORCE)
+		# does NOT update the local variable, so use the explicit binary path here
+		# so that Pomme's find_package(SDL3) can locate SDL3Config.cmake.
+		list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
+		unset(_sdl3_relpath)
 	endif()
 else()
 	# Emscripten: build SDL3 from source (required for Emscripten port)
@@ -123,7 +133,7 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
-if(NOT EMSCRIPTEN)
+if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)
 endif()
 
@@ -149,7 +159,11 @@ elseif(APPLE)
 	set_source_files_properties(${CMAKE_SOURCE_DIR}/packaging/${GAME_TARGET}.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 endif()
 
-add_executable(${GAME_TARGET} ${GAME_SOURCES})
+if(ANDROID)
+	add_library(${GAME_TARGET} SHARED ${GAME_SOURCES})
+else()
+	add_executable(${GAME_TARGET} ${GAME_SOURCES})
+endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 
@@ -243,10 +257,15 @@ else()
 endif()
 
 # Link core dependencies
-if(NOT EMSCRIPTEN)
-	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
-else()
+if(EMSCRIPTEN OR ANDROID)
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme)
+else()
+	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+endif()
+
+# Android-specific libraries
+if(ANDROID)
+	target_link_libraries(${GAME_TARGET} PRIVATE GLESv3 EGL android log)
 endif()
 
 # Add required frameworks for KillMacMouseAcceleration

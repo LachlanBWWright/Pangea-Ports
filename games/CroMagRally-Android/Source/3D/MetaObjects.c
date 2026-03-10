@@ -717,7 +717,7 @@ uint32_t				matFlags;
 //			DoFatalAlert("MO_DrawMaterial: texture is not assigned to this draw context");
 
 
-		if (matData->pixelDstFormat == GL_RGBA)						// if 32bit with alpha, then turn blending on (see below)
+		if (matData->pixelDstFormat == GL_RGBA || matData->pixelDstFormat == GL_RGB5_A1)	// if has alpha, then turn blending on
 			textureHasAlpha = true;
 
 					/* SET APPROPRIATE ALPHA MODE */
@@ -754,14 +754,31 @@ uint32_t				matFlags;
 
 					/* SET TEXTURE WRAPPING MODE */
 
+#ifdef __EMSCRIPTEN__
+		// WebGL 1: NPOT textures with GL_REPEAT are texture-incomplete (sample as black).
+		// Only force CLAMP_TO_EDGE for NPOT textures; POT textures may use GL_REPEAT.
+		bool npotTex = ((matData->width  & (matData->width  - 1)) != 0) ||
+		               ((matData->height & (matData->height - 1)) != 0);
+#endif
+
 		if (matFlags & BG3D_MATERIALFLAG_CLAMP_U)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		else
+#ifdef __EMSCRIPTEN__
+		if (npotTex)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		else
+#endif
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 
 		if (matFlags & BG3D_MATERIALFLAG_CLAMP_V)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		else
+#ifdef __EMSCRIPTEN__
+		if (npotTex)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		else
+#endif
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	}
 	else

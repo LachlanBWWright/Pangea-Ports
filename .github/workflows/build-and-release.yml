@@ -1,12 +1,13 @@
-name: Build Ports
+name: Build Ports (legacy — use build-wasm.yml and build-android-apk.yml instead)
+
+# This combined workflow is kept for backwards compatibility.
+# New separate pipelines:
+#   - build-wasm.yml     — builds all WASM targets and deploys GitHub Pages on main
+#   - build-android-apk.yml — builds Bugdom 2 Android APKs
+#
+# This file is no longer triggered automatically; use the dedicated workflows above.
 
 on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       publish_release:
@@ -31,7 +32,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ports-${{ github.ref }}
+  group: ports-legacy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -127,7 +128,6 @@ jobs:
 
   assemble-pages:
     needs: build-wasm
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
@@ -162,7 +162,7 @@ jobs:
     needs:
       - build-wasm
       - build-android-apk
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+    if: inputs.publish_release
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -172,13 +172,8 @@ jobs:
       - name: Choose release metadata
         id: release_meta
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-            echo "name=Pangea Ports ${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-            echo "name=${{ inputs.release_name }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          echo "name=${{ inputs.release_name }}" >> "$GITHUB_OUTPUT"
       - name: Validate release tag
         run: test -n "${{ steps.release_meta.outputs.tag }}"
       - name: Create or update GitHub release

@@ -1145,10 +1145,88 @@ GLuint	textureName;
 
 #ifdef __EMSCRIPTEN__
 	// WebGL 1: NPOT textures with GL_REPEAT are texture-incomplete (render as black).
-	// Always clamp to edge — sprites and model textures don't tile anyway.
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-#endif
+	// Only force CLAMP_TO_EDGE for NPOT textures; POT textures may use GL_REPEAT.
+	{
+		bool npotW = (width  & (width  - 1)) != 0;
+		bool npotH = (height & (height - 1)) != 0;
+		if (npotW || npotH)
+		{
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+	}
+
+	// WebGL 1 only supports a limited set of format/type combinations.
+	// Convert incompatible legacy Mac formats to GL_RGBA / GL_UNSIGNED_BYTE.
+	void* convertedPixels = NULL;
+	if (dataType == GL_UNSIGNED_SHORT_1_5_5_5_REV && srcFormat == GL_BGRA)
+	{
+		// 16-bit packed BGRA-1555 → 32-bit RGBA-8888
+		bool hasAlpha = (destFormat == GL_RGBA || destFormat == GL_RGB5_A1);
+		uint8_t* rgba = (uint8_t*) malloc(width * height * 4);
+		const uint16_t* s = (const uint16_t*) imageMemory;
+		for (int i = 0; i < width * height; i++)
+		{
+			uint16_t p = s[i];
+			rgba[i*4+0] = (uint8_t)(((p >> 10) & 0x1F) * 255 / 31);
+			rgba[i*4+1] = (uint8_t)(((p >>  5) & 0x1F) * 255 / 31);
+			rgba[i*4+2] = (uint8_t)(((p >>  0) & 0x1F) * 255 / 31);
+			rgba[i*4+3] = hasAlpha ? ((p >> 15) ? 255 : 0) : 255;
+		}
+		convertedPixels = rgba;
+		srcFormat = GL_RGBA;
+		destFormat = GL_RGBA;
+		dataType = GL_UNSIGNED_BYTE;
+	}
+	else if (dataType == GL_UNSIGNED_INT_8_8_8_8_REV && srcFormat == GL_BGRA)
+	{
+		// 32-bit ARGB (big-endian Mac) → 32-bit RGBA-8888
+		uint8_t* rgba = (uint8_t*) malloc(width * height * 4);
+		const uint8_t* s = (const uint8_t*) imageMemory;
+		for (int i = 0; i < width * height; i++)
+		{
+			// GL_UNSIGNED_INT_8_8_8_8_REV + GL_BGRA: stored as [A][R][G][B] in memory
+			rgba[i*4+0] = s[i*4+1];  // R
+			rgba[i*4+1] = s[i*4+2];  // G
+			rgba[i*4+2] = s[i*4+3];  // B
+			rgba[i*4+3] = s[i*4+0];  // A
+		}
+		convertedPixels = rgba;
+		srcFormat = GL_RGBA;
+		destFormat = GL_RGBA;
+		dataType = GL_UNSIGNED_BYTE;
+	}
+	else if (dataType == GL_UNSIGNED_BYTE && srcFormat == GL_BGRA)
+	{
+		// BGRA byte-order → RGBA (swap R and B)
+		uint8_t* rgba = (uint8_t*) malloc(width * height * 4);
+		const uint8_t* s = (const uint8_t*) imageMemory;
+		for (int i = 0; i < width * height; i++)
+		{
+			rgba[i*4+0] = s[i*4+2];  // R from B
+			rgba[i*4+1] = s[i*4+1];  // G
+			rgba[i*4+2] = s[i*4+0];  // B from R
+			rgba[i*4+3] = s[i*4+3];  // A
+		}
+		convertedPixels = rgba;
+		srcFormat = GL_RGBA;
+		destFormat = GL_RGBA;
+		dataType = GL_UNSIGNED_BYTE;
+	}
+	else if (dataType == GL_UNSIGNED_BYTE)
+	{
+		// WebGL requires internalFormat == format for UNSIGNED_BYTE.
+		if (destFormat == GL_RGB5_A1)
+			destFormat = (srcFormat == GL_RGBA) ? GL_RGBA : GL_RGB;
+		if (srcFormat == GL_RGBA && destFormat == GL_RGB)
+			destFormat = GL_RGBA;
+		if (srcFormat == GL_RGB && destFormat == GL_RGBA)
+			destFormat = GL_RGB;
+		if (srcFormat != destFormat)
+			destFormat = srcFormat;
+	}
+	if (convertedPixels) imageMemory = convertedPixels;
+#endif // __EMSCRIPTEN__
 
 #if 0
 	if (textureInRAM)
@@ -1164,6 +1242,11 @@ GLuint	textureName;
 				srcFormat,								// what my format is
 				dataType,								// size of each r,g,b
 				imageMemory);							// pointer to the actual texture pixels
+
+#ifdef __EMSCRIPTEN__
+	if (convertedPixels)
+		free(convertedPixels);
+#endif
 
 			/* SEE IF RAN OUT OF MEMORY WHILE COPYING TO OPENGL */
 
@@ -1783,6 +1866,15 @@ OGLLightDefType	*lights;
 
 GLenum OGL_CheckError_Impl(const char* file, const int line)
 {
+#ifdef __EMSCRIPTEN__
+	// On WASM/WebGL, skip glGetError() entirely.  Each glGetError() call
+	// crosses the WASM→JS boundary and forces the GL command queue to flush,
+	// stalling the GPU pipeline.  Return GL_NO_ERROR immediately; real errors
+	// remain visible in the browser's WebGL error log (DevTools → Console).
+	(void)file;
+	(void)line;
+	return GL_NO_ERROR;
+#else
 	GLenum error = glGetError();
 	if (error != 0)
 	{
@@ -1801,6 +1893,7 @@ GLenum OGL_CheckError_Impl(const char* file, const int line)
 		DoFatalAlert("OpenGL error 0x%x (%s)\nin %s:%d", error, text, file, line);
 	}
 	return error;
+#endif
 }
 
 

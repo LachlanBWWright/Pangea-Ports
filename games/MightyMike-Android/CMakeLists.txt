@@ -98,6 +98,16 @@ else()
 	endif()
 	message("Building SDL3 from source: " ${SDL3_DIR})
 	add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
+	# SDL3 writes SDL3Config.cmake into its binary directory during configure.
+	# Update SDL3_DIR so that subsequent find_package(SDL3) calls in
+	# subdirectories (e.g. Pomme) can locate those generated config files.
+	file(RELATIVE_PATH _sdl3_relpath "${CMAKE_SOURCE_DIR}" "${SDL3_DIR}")
+	set(SDL3_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}" CACHE PATH "" FORCE)
+	# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY. set(CACHE FORCE)
+	# does NOT update the local variable, so we must explicitly use the binary path
+	# so that Pomme's find_package(SDL3) can locate SDL3Config.cmake.
+	list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
+	unset(_sdl3_relpath)
 endif()
 
 #------------------------------------------------------------------------------
@@ -106,8 +116,8 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
-# OpenGL is not available under Emscripten; it uses WebGL through OpenGL ES.
-if(NOT EMSCRIPTEN)
+# OpenGL is not available under Emscripten (WebGL) or Android (GLES3).
+if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)  # only actually required if we want to force GLRENDER
 endif()
 
@@ -133,7 +143,11 @@ elseif(APPLE)
 	set_source_files_properties(${CMAKE_SOURCE_DIR}/packaging/${GAME_TARGET}.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 endif()
 
-add_executable(${GAME_TARGET} ${GAME_SOURCES})
+if(ANDROID)
+	add_library(${GAME_TARGET} SHARED ${GAME_SOURCES})
+else()
+	add_executable(${GAME_TARGET} ${GAME_SOURCES})
+endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 
@@ -143,8 +157,8 @@ target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 
 add_compile_definitions(
 	"$<$<CONFIG:DEBUG>:_DEBUG>"
-	# On Emscripten we use the SDL 2D renderer (WebGL) instead of desktop OpenGL.
-	"$<$<NOT:$<BOOL:${EMSCRIPTEN}>>:GLRENDER>"
+	# On Emscripten and Android we use SDL's renderer instead of desktop OpenGL.
+	"$<$<AND:$<NOT:$<BOOL:${EMSCRIPTEN}>>,$<NOT:$<BOOL:${ANDROID}>>>:GLRENDER>"
 	#NOVSYNC    # Mighty Mike only
 )
 
@@ -230,11 +244,17 @@ else()
 endif()
 
 # Link core dependencies
-if(EMSCRIPTEN)
+if(EMSCRIPTEN OR ANDROID)
 	# Emscripten provides its own OpenGL ES / WebGL layer; no system GL needed.
+	# Android links GLES3 below.
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme)
 else()
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+endif()
+
+# Android-specific libraries
+if(ANDROID)
+	target_link_libraries(${GAME_TARGET} PRIVATE GLESv3 EGL android log)
 endif()
 
 # Add required frameworks for KillMacMouseAcceleration

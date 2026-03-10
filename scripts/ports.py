@@ -41,7 +41,8 @@ PORTS = [
         'site_level_example': 'game/billyfrontier.html?level=1',
         'site_override_example': "Module.FS.writeFile('Data/Terrain/custom_level.ter', bytes); Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter'])",
         'has_docs_landing': False,
-        'android_apk': False,
+        'android_apk': True,
+        'android_package': 'io.jor.billyfrontier',
         'browser_test': 'bugdom-wasm',
         'skip_to_level': {
             'status': 'supported',
@@ -75,7 +76,8 @@ PORTS = [
         'site_level_example': 'game.html?level=3',
         'site_override_example': '?terrainFile=:Terrain:Custom.ter or Module.ccall(\'BugdomSetTerrainOverride\', null, [\'string\'], [\':Terrain:Custom.ter\'])',
         'has_docs_landing': False,
-        'android_apk': False,
+        'android_apk': True,
+        'android_package': 'io.jor.bugdom',
         'browser_test': None,
         'skip_to_level': {
             'status': 'supported',
@@ -132,7 +134,8 @@ PORTS = [
         'site_level_example': 'game/CroMagRally.html?track=2&car=1',
         'site_override_example': '?levelOverride=:Terrain:MyLevel.ter',
         'has_docs_landing': False,
-        'android_apk': False,
+        'android_apk': True,
+        'android_package': 'io.jor.cromagrally',
         'browser_test': None,
         'skip_to_level': {
             'status': 'partial',
@@ -158,7 +161,8 @@ PORTS = [
         'site_level_example': '?level=1:1',
         'site_override_example': '?mapOverride=:Maps:custom.map-1',
         'has_docs_landing': True,
-        'android_apk': False,
+        'android_apk': True,
+        'android_package': 'io.jor.mightymike',
         'browser_test': None,
         'skip_to_level': {
             'status': 'supported',
@@ -192,7 +196,8 @@ PORTS = [
         'site_level_example': 'game/index.html?level=0&skipMenu=1',
         'site_override_example': '?terrainFile=:Terrain:custom.ter',
         'has_docs_landing': False,
-        'android_apk': False,
+        'android_apk': True,
+        'android_package': 'io.jor.nanosaur',
         'browser_test': None,
         'skip_to_level': {
             'status': 'supported',
@@ -220,7 +225,8 @@ PORTS = [
         'site_level_example': 'Nanosaur2.html?level=0',
         'site_override_example': '?terrainOverride=:Terrain:custom.ter',
         'has_docs_landing': False,
-        'android_apk': False,
+        'android_apk': True,
+        'android_package': 'io.jor.nanosaur2',
         'browser_test': None,
         'skip_to_level': {
             'status': 'supported',
@@ -248,7 +254,8 @@ PORTS = [
         'site_level_example': 'OttoMatic.html?level=1',
         'site_override_example': '?terrain=/Data/Terrain/custom.ter',
         'has_docs_landing': False,
-        'android_apk': False,
+        'android_apk': True,
+        'android_package': 'io.jor.ottomatic',
         'browser_test': None,
         'skip_to_level': {
             'status': 'supported',

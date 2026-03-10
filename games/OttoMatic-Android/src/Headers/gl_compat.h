@@ -1,13 +1,13 @@
 //
 // gl_compat.h
-// OpenGL compatibility layer - wraps legacy OpenGL calls for WebGL
+// OpenGL compatibility layer - wraps legacy OpenGL calls for WebGL and Android
 //
 
 #pragma once
 
 #include <SDL3/SDL_opengl.h>
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #include "modern_gl.h"
 #include "vertex_array_compat.h"
 #include "state_compat.h"
@@ -25,7 +25,7 @@
 #define glVertex3f(x,y,z) ModernGL_ImmediateVertex(x,y,z)
 #define glVertex3fv(v) ModernGL_ImmediateVertex((v)[0],(v)[1],(v)[2])
 
-// GL_QUADS not supported in WebGL - need to convert to triangles
+// GL_QUADS not supported in WebGL/GLES — need to convert to triangles
 // This is handled in the immediate mode implementation
 // For GL_QUADS: vertices 0,1,2,3 become triangles 0,1,2 and 0,2,3
 
@@ -40,11 +40,11 @@
 // glMatrixMode, glLoadMatrix*, glMultMatrix*, glPushMatrix, glPopMatrix,
 // glTranslate*, glRotate*, glScale*, glFrustum, glOrtho
 
-// Functions that don't exist in WebGL/GLES2 — no-op
+// Functions that don't exist in WebGL/GLES — no-op
 #define glPolygonMode(face, mode) ((void)0)
 
 // Note: glHint IS a valid GLES2 function but only for GL_GENERATE_MIPMAP_HINT.
 // GL_FOG_HINT calls are guarded with #ifndef __EMSCRIPTEN__ in the source code
 // instead of a macro, to avoid conflicting with the GLES2/gl2.h declaration.
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

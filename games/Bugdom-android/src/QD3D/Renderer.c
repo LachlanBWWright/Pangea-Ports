@@ -761,13 +761,18 @@ if (flags & kRendererTextureFlags_ClampV)
 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 #ifdef __EMSCRIPTEN__
-// WebGL 1 does not support GL_REPEAT on non-power-of-two textures: sampling
-// such a texture returns black (0,0,0,0) instead of the correct colour.
-// Force CLAMP_TO_EDGE on every texture unit regardless of the requested flags.
-if (!(flags & kRendererTextureFlags_ClampU))
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-if (!(flags & kRendererTextureFlags_ClampV))
-glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+// WebGL 1 does not support GL_REPEAT on non-power-of-two (NPOT) textures:
+// sampling such a texture returns black (0,0,0,0) instead of the correct colour.
+// Only force CLAMP_TO_EDGE for NPOT textures; POT textures may legitimately
+// use GL_REPEAT (e.g. the log barrel uses UV coords up to ~4.8).
+{
+	bool npotW = (width  & (width  - 1)) != 0;
+	bool npotH = (height & (height - 1)) != 0;
+	if ((npotW || npotH) && !(flags & kRendererTextureFlags_ClampU))
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	if ((npotW || npotH) && !(flags & kRendererTextureFlags_ClampV))
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -864,7 +869,10 @@ else if (bufferFormat == GL_BGR && bufferType == GL_UNSIGNED_BYTE)
 }
 else if (bufferFormat == GL_BGRA && bufferType == GL_UNSIGNED_SHORT_1_5_5_5_REV)
 {
-	converted = Convert1555ToRGBA8(srcPixels, width, height, true);
+	// Terrain supertile textures are GL_RGB (fully opaque). Force alpha=255 so that
+	// the WebGL canvas (alpha:true) does not composite tile pixels as transparent,
+	// which would show the page background through the terrain.
+	converted = Convert1555ToRGBA8(srcPixels, width, height, false);
 	glFormat  = GL_RGBA;
 	glType    = GL_UNSIGNED_BYTE;
 }

@@ -936,6 +936,14 @@ uint32_t				matFlags;
 				/* SET TEXTURE WRAPPING MODE */
 				/*****************************/
 
+#ifdef __EMSCRIPTEN__
+					// WebGL 1: GL_REPEAT on NPOT textures causes texture-incompleteness (samples as black).
+					// Only restore GL_REPEAT when the texture dimensions are power-of-two.
+					// matData->width/height are set at load time and never change during the material's lifetime.
+					bool npotTex = ((matData->width  & (matData->width  - 1)) != 0) ||
+					               ((matData->height & (matData->height - 1)) != 0);
+#endif
+
 						/* U */
 
 		if (matFlags & BG3D_MATERIALFLAG_CLAMP_U)										// we want to clamp the U
@@ -950,6 +958,9 @@ uint32_t				matFlags;
 		{
 			if (matData->flags & BG3D_MATERIALFLAG_CLAMP_U_TRUE)						// see clamping is still enabled
 			{
+#ifdef __EMSCRIPTEN__
+			    if (!npotTex)															// only restore GL_REPEAT for POT textures
+#endif
 			    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			    matData->flags &= ~BG3D_MATERIALFLAG_CLAMP_U_TRUE;						// and remember that we cleared it
 			}
@@ -969,6 +980,9 @@ uint32_t				matFlags;
 		{
 			if (matData->flags & BG3D_MATERIALFLAG_CLAMP_V_TRUE)						// see clamping is still enabled
 			{
+#ifdef __EMSCRIPTEN__
+			    if (!npotTex)															// only restore GL_REPEAT for POT textures
+#endif
 			    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 			    matData->flags &= ~BG3D_MATERIALFLAG_CLAMP_V_TRUE;						// and remember that we cleared it
 			}

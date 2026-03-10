@@ -87,6 +87,16 @@ else()
 	endif()
 	message("Building SDL3 from source: " ${SDL3_DIR})
 	add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
+	# SDL3 writes SDL3Config.cmake into its binary directory during configure.
+	# Update SDL3_DIR so that subsequent find_package(SDL3) calls in
+	# subdirectories (e.g. Pomme) can locate those generated config files.
+	file(RELATIVE_PATH _sdl3_relpath "${CMAKE_SOURCE_DIR}" "${SDL3_DIR}")
+	set(SDL3_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}" CACHE PATH "" FORCE)
+	# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY. set(CACHE FORCE)
+	# does NOT update the local variable, so we must explicitly use the binary path
+	# so that Pomme's find_package(SDL3) can locate SDL3Config.cmake.
+	list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
+	unset(_sdl3_relpath)
 endif()
 
 #------------------------------------------------------------------------------

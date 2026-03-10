@@ -1047,9 +1047,16 @@ GLuint	textureName;
 
 #ifdef __EMSCRIPTEN__
 	// WebGL 1: NPOT textures with GL_REPEAT are texture-incomplete (render as black).
-	// Always clamp to edge so every texture is WebGL-complete regardless of dimensions.
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	// Only force CLAMP_TO_EDGE for NPOT textures; POT textures may use GL_REPEAT.
+	{
+		bool npotW = (width  & (width  - 1)) != 0;
+		bool npotH = (height & (height - 1)) != 0;
+		if (npotW || npotH)
+		{
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+	}
 #endif
 
 	if (!(gLoadTextureFlags & kLoadTextureFlags_NoGammaFix))
@@ -1308,10 +1315,16 @@ OGLLightDefType	*lights;
 GLenum _OGL_CheckError(const char* file, const int line)
 {
 #ifdef __EMSCRIPTEN__
-	// LEGACY_GL_EMULATION generates spurious GL_INVALID_ENUM errors.
-	// Drain the error queue and return GL_NO_ERROR to prevent false crashes.
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR) { /* drain */ }
+	// On WASM/WebGL, skip glGetError() entirely.  Each glGetError() call
+	// crosses the WASM→JS boundary and forces the GL command queue to flush,
+	// stalling the GPU pipeline.  With many calls per draw and hundreds of
+	// draws per frame, this adds hundreds of synchronous round-trips per frame.
+	//
+	// Return GL_NO_ERROR so callers' "if (OGL_CheckError()) DoFatalAlert()"
+	// patterns are satisfied.  Any real GL errors will still be visible in
+	// the browser's WebGL error log (DevTools → Console).
+	(void)file;
+	(void)line;
 	return GL_NO_ERROR;
 #else
 	GLenum error = glGetError();

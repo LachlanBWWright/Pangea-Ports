@@ -34,10 +34,25 @@ Repository-level workflows live in [`.github/workflows`](./.github/workflows) an
 
 ### Build / publish workflow
 
-- WebAssembly builds for all eight games
-- WASM artifacts uploaded per game
-- GitHub Pages artifact assembled as a multi-game site
-- Optional GitHub release publishing on tag push or manual dispatch
+The build and release pipeline is split into two dedicated workflows:
+
+#### WASM pipeline (`build-wasm.yml`)
+- Triggers automatically on push to `main`/`master` and on tags
+- WebAssembly builds for all eight games (matrix strategy, independent per-game jobs)
+- WASM artifacts uploaded per game as zipped site bundles
+- **GitHub Pages deployment on `main`/`master` only**: deploys the assembled multi-game site
+  to GitHub Pages when **all** WASM builds succeed (no deployment if any game fails)
+- Optional GitHub release publishing on tag push or `workflow_dispatch`
+
+#### Android APK pipeline (`build-android-apk.yml`)
+- Triggers automatically on push to `main`/`master` and on tags
+- Currently builds only Bugdom 2 (the only imported game with a checked-in Gradle project)
+- APK artifacts (debug + release) uploaded per game
+- Optional GitHub release publishing on tag push or `workflow_dispatch`
+
+#### Legacy combined workflow (`build-and-release.yml`)
+- Manual-only (`workflow_dispatch`), no automatic triggers
+- Retained for backwards compatibility; use the dedicated workflows above instead
 
 > This monorepo now includes a shared upstream `Pomme` dependency checkout at [`extern/Pomme`](./extern/Pomme), with each imported game exposing it through its existing `extern/Pomme` path. This keeps the vendored game trees stable while making the original upstream native/WASM build flows reproducible from the monorepo again.
 

@@ -100,7 +100,10 @@ if(EMSCRIPTEN)
 
 	# SDL3's add_subdirectory creates targets in its binary dir.
 	# Point SDL3_DIR there so Pomme's find_package(SDL3) succeeds.
+	# Android/Emscripten toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY;
+	# set(CACHE FORCE) does NOT update the local var, so use explicit path.
 	set(SDL3_DIR "${CMAKE_BINARY_DIR}/SDL3" CACHE PATH "" FORCE)
+	list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/SDL3")
 else()
 	# If SDL3_DIR wasn't specified, discover if the user put some prebuilt SDL3
 	# package in the 'extern' directory
@@ -129,6 +132,14 @@ else()
 		endif()
 		message("Building SDL3 from source: " ${SDL3_DIR})
 		add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
+		# SDL3 writes SDL3Config.cmake into its binary directory during configure.
+		# Update SDL3_DIR so subsequent find_package(SDL3) calls (e.g. in Pomme) can find it.
+		file(RELATIVE_PATH _sdl3_relpath "${CMAKE_SOURCE_DIR}" "${SDL3_DIR}")
+		set(SDL3_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}" CACHE PATH "" FORCE)
+		# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY. set(CACHE FORCE)
+		# does NOT update the local variable, so use explicit binary path.
+		list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
+		unset(_sdl3_relpath)
 	endif()
 endif()
 
@@ -138,7 +149,7 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
-if(NOT EMSCRIPTEN)
+if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)
 endif()
 
@@ -164,7 +175,11 @@ elseif(APPLE)
 	set_source_files_properties(${CMAKE_SOURCE_DIR}/packaging/${GAME_TARGET}.icns PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 endif()
 
-add_executable(${GAME_TARGET} ${GAME_SOURCES})
+if(ANDROID)
+	add_library(${GAME_TARGET} SHARED ${GAME_SOURCES})
+else()
+	add_executable(${GAME_TARGET} ${GAME_SOURCES})
+endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 
@@ -259,10 +274,15 @@ else()
 endif()
 
 # Link core dependencies
-if(EMSCRIPTEN)
+if(EMSCRIPTEN OR ANDROID)
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme)
 else()
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+endif()
+
+# Android-specific libraries
+if(ANDROID)
+	target_link_libraries(${GAME_TARGET} PRIVATE GLESv3 EGL android log)
 endif()
 
 # Add required frameworks for KillMacMouseAcceleration

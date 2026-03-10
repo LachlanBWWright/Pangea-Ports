@@ -16,7 +16,7 @@
 //   • glGetFloatv for GL_MODELVIEW_MATRIX / GL_PROJECTION_MATRIX returns our
 //     software stack top.
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include <SDL3/SDL.h>
 #include "gl_compat.h"
@@ -33,6 +33,9 @@
 
 // ── Forward declarations for Emscripten's real GL functions ───────────────────
 // These are provided by Emscripten's WebGL library and bypass our wrappers.
+#ifdef __EMSCRIPTEN__
+// On Emscripten, use the emscripten_gl* functions which bypass our macro wrappers
+// and call the underlying WebGL functions directly.
 extern void emscripten_glEnable(GLenum cap);
 extern void emscripten_glDisable(GLenum cap);
 extern void emscripten_glGetFloatv(GLenum pname, GLfloat *data);
@@ -41,6 +44,37 @@ extern void emscripten_glDrawElements(GLenum mode, GLsizei count, GLenum type, c
 extern void emscripten_glDrawArrays(GLenum mode, GLint first, GLsizei count);
 extern void emscripten_glHint(GLenum target, GLenum mode);
 extern GLboolean emscripten_glIsEnabled(GLenum cap);
+#define REAL_glEnable           emscripten_glEnable
+#define REAL_glDisable          emscripten_glDisable
+#define REAL_glGetFloatv        emscripten_glGetFloatv
+#define REAL_glGetIntegerv      emscripten_glGetIntegerv
+#define REAL_glDrawElements     emscripten_glDrawElements
+#define REAL_glDrawArrays       emscripten_glDrawArrays
+#define REAL_glHint             emscripten_glHint
+#define REAL_glIsEnabled        emscripten_glIsEnabled
+#else // __ANDROID__
+// On Android, we define our own gl wrappers with the same names as GLES2 functions.
+// To call the REAL GLES2 implementation from within those wrappers (without recursion),
+// we use dlsym(RTLD_NEXT, ...) to obtain function pointers from the next DSO in the
+// search order (i.e., libGLESv2.so).  The pointers are populated in COMPAT_GL_Init.
+#include <dlfcn.h>
+static void      (*real_glEnable)      (GLenum)                              = NULL;
+static void      (*real_glDisable)     (GLenum)                              = NULL;
+static void      (*real_glGetFloatv)   (GLenum, GLfloat*)                    = NULL;
+static void      (*real_glGetIntegerv) (GLenum, GLint*)                      = NULL;
+static void      (*real_glDrawElements)(GLenum, GLsizei, GLenum, const void*)= NULL;
+static void      (*real_glDrawArrays)  (GLenum, GLint, GLsizei)              = NULL;
+static void      (*real_glHint)        (GLenum, GLenum)                      = NULL;
+static GLboolean (*real_glIsEnabled)   (GLenum)                              = NULL;
+#define REAL_glEnable           real_glEnable
+#define REAL_glDisable          real_glDisable
+#define REAL_glGetFloatv        real_glGetFloatv
+#define REAL_glGetIntegerv      real_glGetIntegerv
+#define REAL_glDrawElements     real_glDrawElements
+#define REAL_glDrawArrays       real_glDrawArrays
+#define REAL_glHint             real_glHint
+#define REAL_glIsEnabled        real_glIsEnabled
+#endif // __EMSCRIPTEN__ || __ANDROID__
 
 // ── 4×4 float matrix ─────────────────────────────────────────────────────────
 typedef struct { float m[16]; } Mat4;
@@ -474,6 +508,19 @@ static void disable_vertex_attribs(void) {
 
 // ── Public: init ──────────────────────────────────────────────────────────────
 void COMPAT_GL_Init(void) {
+#ifdef __ANDROID__
+    // Load real GLES2 function pointers via dlsym(RTLD_NEXT, ...) to avoid infinite
+    // recursion when our wrappers (same symbol names as GLES2 functions) call the
+    // underlying GLES2 implementation.
+    real_glEnable       = (void(*)(GLenum))       dlsym(RTLD_NEXT, "glEnable");
+    real_glDisable      = (void(*)(GLenum))       dlsym(RTLD_NEXT, "glDisable");
+    real_glGetFloatv    = (void(*)(GLenum,GLfloat*)) dlsym(RTLD_NEXT, "glGetFloatv");
+    real_glGetIntegerv  = (void(*)(GLenum,GLint*))   dlsym(RTLD_NEXT, "glGetIntegerv");
+    real_glDrawElements = (void(*)(GLenum,GLsizei,GLenum,const void*)) dlsym(RTLD_NEXT, "glDrawElements");
+    real_glDrawArrays   = (void(*)(GLenum,GLint,GLsizei)) dlsym(RTLD_NEXT, "glDrawArrays");
+    real_glHint         = (void(*)(GLenum,GLenum)) dlsym(RTLD_NEXT, "glHint");
+    real_glIsEnabled    = (GLboolean(*)(GLenum))  dlsym(RTLD_NEXT, "glIsEnabled");
+#endif // __ANDROID__
     // Init matrix stacks
     for (int i = 0; i < MATRIX_STACK_DEPTH; i++) {
         mat4_identity(&s_modelview_stack[i]);
@@ -648,7 +695,7 @@ void glGetFloatv(GLenum pname, GLfloat *data) {
     }
     // Pass through all other queries to GLES2
     // Use the real GLES2 glGetFloatv via a direct call (avoid macro recursion)
-    emscripten_glGetFloatv(pname, data);
+    REAL_glGetFloatv(pname, data);
 }
 
 void glGetDoublev(GLenum pname, GLdouble *data) {
@@ -675,7 +722,7 @@ void glEnable(GLenum cap) {
         default:
             // Pass through to GLES2
             {
-                emscripten_glEnable(cap);
+                REAL_glEnable(cap);
             }
     }
 }
@@ -695,7 +742,7 @@ void glDisable(GLenum cap) {
         case GL_TEXTURE_2D:  break;  // not valid in GLES2
         default:
             {
-                emscripten_glDisable(cap);
+                REAL_glDisable(cap);
             }
     }
 }
@@ -762,7 +809,7 @@ void glTexEnvi(GLenum target, GLenum pname, GLint param) {
     // Determine which texture unit
     GLint unit = 0;
     typedef void (*getiv_t)(GLenum, GLint*);
-    emscripten_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
+    REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
     int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
     if (tu < 0 || tu > 1) tu = 0;
 
@@ -882,7 +929,7 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
     }
 
     typedef void (*real_draw_t)(GLenum,GLsizei,GLenum,const void*);
-    emscripten_glDrawElements(mode, count, type, 0);
+    REAL_glDrawElements(mode, count, type, 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glDeleteBuffers(1, &ibo);
@@ -906,7 +953,7 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     s_ca_vertex.ptr = orig;
 
     typedef void (*real_draw_t)(GLenum,GLint,GLsizei);
-    emscripten_glDrawArrays(mode, 0, count);
+    REAL_glDrawArrays(mode, 0, count);
 
     disable_vertex_attribs();
 }
@@ -1006,13 +1053,19 @@ void glEnd(void) {
     glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
     glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(12*sizeof(float)));
 
-    // Force use_color_array = true for immediate mode (we baked per-vertex color)
-    int saved_use_color = s_ca_color.enabled;
+    // Force use_color_array = true for immediate mode (we baked per-vertex color).
+    // Also force texcoord[0] array enabled so the shader uses the texture when one
+    // is bound — even though GL_TEXTURE_COORD_ARRAY isn't explicitly enabled for
+    // immediate-mode drawing (which uses glTexCoord2f, not a client array).
+    int saved_use_color   = s_ca_color.enabled;
+    int saved_tex0_enabled = s_ca_texcoord[0].enabled;
     s_ca_color.enabled = 1;
+    s_ca_texcoord[0].enabled = 1;
     upload_uniforms();
     s_ca_color.enabled = saved_use_color;
+    s_ca_texcoord[0].enabled = saved_tex0_enabled;
 
-    emscripten_glDrawArrays(draw_prim, 0, draw_cnt);
+    REAL_glDrawArrays(draw_prim, 0, draw_cnt);
 
     disable_vertex_attribs();
     s_imm_count = 0;
@@ -1028,7 +1081,7 @@ void glDrawBuffer(GLenum buf) { (void)buf; }
 // unsupported hints like GL_FOG_HINT to prevent GL_INVALID_ENUM errors.
 void glHint(GLenum target, GLenum mode) {
     if (target == GL_GENERATE_MIPMAP_HINT) {
-        emscripten_glHint(target, mode);
+        REAL_glHint(target, mode);
     }
     // All other hints (GL_FOG_HINT, etc.) are no-ops in WebGL
 }
@@ -1047,7 +1100,7 @@ GLboolean glIsEnabled(GLenum cap) {
         case GL_TEXTURE_GEN_S:  return s_texgen_s ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_GEN_T:  return s_texgen_t ? GL_TRUE : GL_FALSE;
         default:
-            return emscripten_glIsEnabled(cap);
+            return REAL_glIsEnabled(cap);
     }
 }
 
@@ -1064,4 +1117,4 @@ void glFlushVertexArrayRangeAPPLE(GLsizei l, void *p){ (void)l; (void)p; }
 void glVertexArrayRangeAPPLE(GLsizei l, void *p)     { (void)l; (void)p; }
 void glVertexArrayParameteriAPPLE(GLenum pname, GLint param) { (void)pname; (void)param; }
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

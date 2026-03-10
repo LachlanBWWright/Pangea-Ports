@@ -12,6 +12,28 @@
 
 #include "game.h"
 
+#ifdef __ANDROID__
+// glFrustum is not available in OpenGL ES 3.0.
+// Provide a software implementation that builds the perspective matrix and
+// loads it into the projection slot via glLoadMatrixf.
+// NOTE: glLoadMatrixf and other matrix functions (glMatrixMode, glLoadIdentity)
+// are NOT in GLES3 either, but they are available on Android at runtime via
+// libGLESv1_CM.so which SDL3 loads.  The CI confirmed this: only glPolygonMode
+// and glFrustum were missing at link time; all other matrix functions resolved.
+void OttoMatic_Android_Frustum(double l, double r, double b, double t, double n, double f)
+{
+	float m[16] = {0};
+	m[0]  = (float)(2.0 * n / (r - l));
+	m[5]  = (float)(2.0 * n / (t - b));
+	m[8]  = (float)((r + l) / (r - l));
+	m[9]  = (float)((t + b) / (t - b));
+	m[10] = (float)(-(f + n) / (f - n));
+	m[11] = -1.0f;
+	m[14] = (float)(-(2.0 * f * n) / (f - n));
+	glLoadMatrixf(m);
+}
+#endif // __ANDROID__
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
