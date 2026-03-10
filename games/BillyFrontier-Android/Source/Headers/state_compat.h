@@ -5,7 +5,7 @@
 
 #pragma once
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include "modern_gl.h"
 
@@ -83,4 +83,4 @@ void CompatGL_GetBooleanv(GLenum pname, GLboolean* params);
 #undef glActiveTextureARB
 #define glActiveTextureARB CompatGL_ActiveTexture
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

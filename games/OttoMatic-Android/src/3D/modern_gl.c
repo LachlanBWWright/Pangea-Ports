@@ -3,7 +3,7 @@
 // Modern OpenGL/WebGL implementation for Emscripten
 //
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include "game.h"
 #include <string.h>
@@ -11,7 +11,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <GLES2/gl2.h>
+#ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
+#endif
 
 // IMPORTANT: #undef macros that redirect to the compat layer, so this file
 // can call the REAL GLES2 functions.  Without this, ModernGL_DrawGeometry
@@ -254,6 +256,7 @@ void ModernGL_Init(void)
 {
     printf("[ModernGL] Initializing modern GL subsystem...\n");
 
+#ifdef __EMSCRIPTEN__
     // Enable OES_element_index_uint extension for 32-bit index buffers in WebGL 1.0
     // Without this, glDrawElements with GL_UNSIGNED_INT would fail.
     {
@@ -270,6 +273,7 @@ void ModernGL_Init(void)
             printf("[ModernGL] WARNING: No WebGL context — cannot enable extensions\n");
         }
     }
+#endif // __EMSCRIPTEN__
 
     // Initialize state
     memset(&gModernGLState, 0, sizeof(ModernGLState));
@@ -953,4 +957,4 @@ void ModernGL_Matrix3x3FromMatrix4x4(const OGLMatrix4x4* in, float* out)
     out[6] = in->value[M02]; out[7] = in->value[M12]; out[8] = in->value[M22];
 }
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

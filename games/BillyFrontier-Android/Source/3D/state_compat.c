@@ -3,12 +3,14 @@
 // OpenGL state management compatibility implementation
 //
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include "game.h"
 #include <string.h>
 #include <math.h>
+#ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+#endif
 
 // IMPORTANT: #undef macros that this file implements, so the default/passthrough
 // cases can call the REAL OpenGL functions provided by Emscripten's GL emulation
@@ -38,17 +40,29 @@
 
 static void WebGL_Enable(GLenum cap)
 {
+#ifdef __EMSCRIPTEN__
     EM_ASM({ GLctx.enable($0); }, cap);
+#else
+    glEnable(cap);
+#endif
 }
 
 static void WebGL_Disable(GLenum cap)
 {
+#ifdef __EMSCRIPTEN__
     EM_ASM({ GLctx.disable($0); }, cap);
+#else
+    glDisable(cap);
+#endif
 }
 
 static GLboolean WebGL_IsEnabled(GLenum cap)
 {
+#ifdef __EMSCRIPTEN__
     return (GLboolean)EM_ASM_INT({ return GLctx.isEnabled($0) ? 1 : 0; }, cap);
+#else
+    return glIsEnabled(cap);
+#endif
 }
 
 static void WebGL_GetFloatv(GLenum pname, GLfloat* params)
@@ -708,4 +722,4 @@ void CompatGL_GetBooleanv(GLenum pname, GLboolean* params)
     }
 }
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

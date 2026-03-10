@@ -137,8 +137,8 @@ void DoSDLMaintenance(void)
 		gDebugTextLastUpdatedAt = 0;
 		QD3D_UpdateDebugTextMesh(NULL);
 
-#ifndef __EMSCRIPTEN__
-		// glPolygonMode is not available in WebGL
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+		// glPolygonMode is not available in WebGL or Android GLES
 		glPolygonMode(GL_FRONT_AND_BACK, gDebugMode == DEBUG_MODE_WIREFRAME? GL_LINE: GL_FILL);
 #endif
 	}

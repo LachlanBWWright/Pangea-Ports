@@ -5,7 +5,7 @@
 
 #pragma once
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include <SDL3/SDL_opengles2.h>
 
@@ -234,4 +234,4 @@ void ModernGL_ImmediateVertex(float x, float y, float z);
 void ModernGL_Matrix4x4ToFloat16(const OGLMatrix4x4* in, float* out);
 void ModernGL_Matrix3x3FromMatrix4x4(const OGLMatrix4x4* in, float* out);
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

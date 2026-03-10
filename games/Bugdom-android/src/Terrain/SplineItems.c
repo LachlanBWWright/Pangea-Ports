@@ -432,8 +432,8 @@ float			numPointsInSpline;
 
 void DrawSplines(void)
 {
-#ifdef __EMSCRIPTEN__
-	// glBegin/glEnd not available in WebGL; skip debug spline drawing.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	// glBegin/glEnd not available in WebGL/GLES; skip debug spline drawing.
 	return;
 #else
 	for (int i = 0; i < gNumSplines; i++)

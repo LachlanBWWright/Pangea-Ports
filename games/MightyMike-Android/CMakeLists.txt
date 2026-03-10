@@ -157,8 +157,8 @@ target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 
 add_compile_definitions(
 	"$<$<CONFIG:DEBUG>:_DEBUG>"
-	# On Emscripten we use the SDL 2D renderer (WebGL) instead of desktop OpenGL.
-	"$<$<NOT:$<BOOL:${EMSCRIPTEN}>>:GLRENDER>"
+	# On Emscripten and Android we use SDL's renderer instead of desktop OpenGL.
+	"$<$<AND:$<NOT:$<BOOL:${EMSCRIPTEN}>>,$<NOT:$<BOOL:${ANDROID}>>>:GLRENDER>"
 	#NOVSYNC    # Mighty Mike only
 )
 

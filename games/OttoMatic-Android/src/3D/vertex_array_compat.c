@@ -15,7 +15,7 @@
 //   do the 0–255 → 0.0–1.0 conversion, also eliminating CPU work.
 //
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include "game.h"
 #include <string.h>
@@ -455,4 +455,4 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
     gBufferUploadsThisFrame += uploads;
 }
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__

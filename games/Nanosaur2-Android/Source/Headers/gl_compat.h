@@ -12,10 +12,12 @@
 
 #pragma once
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include <SDL3/SDL_opengles2.h>   // GLES2 types and real function declarations
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -245,4 +247,4 @@ void glGetDoublev_stub(GLenum pname, GLdouble *params);
 } // extern "C"
 #endif
 
-#endif // __EMSCRIPTEN__
+#endif // __EMSCRIPTEN__ || __ANDROID__
