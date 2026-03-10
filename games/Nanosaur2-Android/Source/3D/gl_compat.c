@@ -1053,11 +1053,17 @@ void glEnd(void) {
     glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
     glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(12*sizeof(float)));
 
-    // Force use_color_array = true for immediate mode (we baked per-vertex color)
-    int saved_use_color = s_ca_color.enabled;
+    // Force use_color_array = true for immediate mode (we baked per-vertex color).
+    // Also force texcoord[0] array enabled so the shader uses the texture when one
+    // is bound — even though GL_TEXTURE_COORD_ARRAY isn't explicitly enabled for
+    // immediate-mode drawing (which uses glTexCoord2f, not a client array).
+    int saved_use_color   = s_ca_color.enabled;
+    int saved_tex0_enabled = s_ca_texcoord[0].enabled;
     s_ca_color.enabled = 1;
+    s_ca_texcoord[0].enabled = 1;
     upload_uniforms();
     s_ca_color.enabled = saved_use_color;
+    s_ca_texcoord[0].enabled = saved_tex0_enabled;
 
     REAL_glDrawArrays(draw_prim, 0, draw_cnt);
 

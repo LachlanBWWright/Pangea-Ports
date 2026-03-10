@@ -717,7 +717,7 @@ uint32_t				matFlags;
 //			DoFatalAlert("MO_DrawMaterial: texture is not assigned to this draw context");
 
 
-		if (matData->pixelDstFormat == GL_RGBA)						// if 32bit with alpha, then turn blending on (see below)
+		if (matData->pixelDstFormat == GL_RGBA || matData->pixelDstFormat == GL_RGB5_A1)	// if has alpha, then turn blending on
 			textureHasAlpha = true;
 
 					/* SET APPROPRIATE ALPHA MODE */
