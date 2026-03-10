@@ -250,7 +250,7 @@ TQ3TriMeshData			**localTriMeshes = skelNode->MeshList;
 	
 	if (!currentSkelObjData->JointsAreGlobal)
 	{
-		MatrixMultiply((TQ3Matrix4x4 *)jointMat, (TQ3Matrix4x4 *)matPtr, (TQ3Matrix4x4 *)matPtr);				
+		Q3MatrixMultiply((TQ3Matrix4x4 *)jointMat, (TQ3Matrix4x4 *)matPtr, (TQ3Matrix4x4 *)matPtr);				
 
 		m00 = matPtr[0];	m01 = matPtr[1];	m02 = matPtr[2];
 		m10 = matPtr[4];	m11 = matPtr[5];	m12 = matPtr[6];

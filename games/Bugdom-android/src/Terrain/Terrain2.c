@@ -403,7 +403,7 @@ TQ3Matrix4x4	*m,m2;
 	Q3Matrix4x4_SetScale(&m2, theNode->Scale.x,				// make scale matrix
 							 	theNode->Scale.y,			
 							 	theNode->Scale.z);
-	MatrixMultiply(&m2, m, m);
+	Q3MatrixMultiply(&m2, m, m);
 }
 
 

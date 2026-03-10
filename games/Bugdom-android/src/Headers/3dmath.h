@@ -20,7 +20,7 @@ extern	Boolean PointsAreCloseEnough(TQ3Point3D *v1, TQ3Point3D *v2);
 extern	float IntersectionOfYAndPlane_Func(float x, float z, TQ3PlaneEquation *p);
 
 extern	Boolean IsPointInTriangle3D(const TQ3Point3D *point3D,	const TQ3Point3D *trianglePoints, TQ3Vector3D *normal);
-void MatrixMultiply(TQ3Matrix4x4 *a, TQ3Matrix4x4 *b, TQ3Matrix4x4 *result);
+void Q3MatrixMultiply(TQ3Matrix4x4 *a, TQ3Matrix4x4 *b, TQ3Matrix4x4 *result);
 void SetLookAtMatrix(TQ3Matrix4x4 *m, const TQ3Vector3D *upVector, const TQ3Point3D *from, const TQ3Point3D *to);
 void SetLookAtMatrixAndTranslate(TQ3Matrix4x4 *m, const TQ3Vector3D *upVector, const TQ3Point3D *from, const TQ3Point3D *to);
 Boolean IntersectLineSegments(double x1, double y1, double x2, double y2,

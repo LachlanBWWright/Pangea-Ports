@@ -154,7 +154,7 @@ BoneDefinitionType	*bonePtr;
 	{
 		jointNum = bonePtr[jointNum].parentBone;
 		
-  		MatrixMultiply(outMatrix,&skeletonPtr->jointTransformMatrix[jointNum],outMatrix);				
+  		Q3MatrixMultiply(outMatrix,&skeletonPtr->jointTransformMatrix[jointNum],outMatrix);				
 	}
 	
 			/* ALSO FACTOR IN THE BASE MATRIX */
@@ -162,7 +162,7 @@ BoneDefinitionType	*bonePtr;
 			// Caller should make sure this is up to date!
 			//
 
-	MatrixMultiply(outMatrix,&theNode->BaseTransformMatrix,outMatrix);
+	Q3MatrixMultiply(outMatrix,&theNode->BaseTransformMatrix,outMatrix);
 }
 
 
