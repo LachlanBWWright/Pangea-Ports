@@ -12,3 +12,10 @@ dist/
 *.user
 _codeql_detected_source_root
 docs/game
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+android/.cxx/

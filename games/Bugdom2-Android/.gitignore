@@ -28,3 +28,4 @@ android/local.properties
 .idea/
 .DS_Store
 *.user
+android/app/.cxx/

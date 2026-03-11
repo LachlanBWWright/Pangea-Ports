@@ -11,3 +11,9 @@ dist/
 
 # CodeQL detection artifact
 _codeql_detected_source_root
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/local.properties
