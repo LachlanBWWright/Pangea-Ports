@@ -147,7 +147,7 @@ jobs:
         run: |
           cd "${{ matrix.path }}/android"
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug -Pandroid.injected.build.abi=x86_64
       - name: Emulator smoke launch
         uses: reactivecircus/android-emulator-runner@v2
         with:
