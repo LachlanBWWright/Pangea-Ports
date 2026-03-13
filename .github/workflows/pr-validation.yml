@@ -147,7 +147,7 @@ jobs:
         run: |
           cd "${{ matrix.path }}/android"
           chmod +x gradlew
-          ./gradlew assembleDebug -Pandroid.injected.build.abi=x86_64
+          ./gradlew assembleDebug
       - name: Emulator smoke launch
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -157,7 +157,9 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            adb install -r "${{ matrix.path }}/android/app/build/outputs/apk/debug/app-debug.apk"
+            APK=$(find "${{ matrix.path }}/android/app/build" -name "app-debug.apk" | head -1)
+            if [ -z "$APK" ]; then echo "ERROR: app-debug.apk not found in ${{ matrix.path }}/android/app/build" && exit 1; fi
+            adb install -r "$APK"
             adb logcat -c
             adb shell monkey -p "$(python3 -c "import scripts.ports as p; print(p.PORTS_BY_NAME['${{ matrix.name }}']['android_package'])")" -c android.intent.category.LAUNCHER 1
             sleep 20
