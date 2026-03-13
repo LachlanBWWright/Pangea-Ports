@@ -233,6 +233,40 @@ class MonorepoMetadataTests(unittest.TestCase):
                     content,
                     f"{game_name}: build.gradle must reference package '{port['android_package']}'",
                 )
+                # Must have a custom GameActivity that overrides getLibraries() with the correct library name
+                cmake_content = (ports.ROOT / port['path'] / 'CMakeLists.txt').read_text(encoding='utf-8')
+                game_target = next(
+                    line.split('"')[1]
+                    for line in cmake_content.split('\n')
+                    if line.strip().startswith('set(GAME_TARGET')
+                )
+                pkg = port['android_package']
+                pkg_path = pkg.replace('.', '/')
+                game_activity = (
+                    android_dir / 'app' / 'src' / 'main' / 'java' / pkg_path / 'GameActivity.java'
+                )
+                self.assertTrue(
+                    game_activity.exists(),
+                    f"{game_name}: {game_activity.relative_to(ports.ROOT)} must exist to override getLibraries()",
+                )
+                activity_content = game_activity.read_text(encoding='utf-8')
+                self.assertIn(
+                    f'"{game_target}"',
+                    activity_content,
+                    f"{game_name}: GameActivity.java must return library '{game_target}' in getLibraries()",
+                )
+                # AndroidManifest.xml must use the custom GameActivity
+                manifest = (android_dir / 'app' / 'src' / 'main' / 'AndroidManifest.xml').read_text(encoding='utf-8')
+                self.assertNotIn(
+                    'org.libsdl.app.SDLActivity',
+                    manifest,
+                    f"{game_name}: AndroidManifest.xml must use .GameActivity, not org.libsdl.app.SDLActivity directly",
+                )
+                self.assertIn(
+                    '.GameActivity',
+                    manifest,
+                    f"{game_name}: AndroidManifest.xml must reference .GameActivity",
+                )
 
     def test_all_games_have_android_apk_flag(self):
         """All 8 games must have android_apk=True in ports.py."""
