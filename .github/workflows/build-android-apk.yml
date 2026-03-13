@@ -67,9 +67,7 @@ jobs:
       - name: Collect APK artifacts
         run: |
           mkdir -p "${{ matrix.path }}/android/apk-artifacts"
-          find "${{ matrix.path }}/android/app/build" -name "*.apk" | while read f; do
-            cp "$f" "${{ matrix.path }}/android/apk-artifacts/"
-          done
+          find "${{ matrix.path }}/android/app/build" -name "*.apk" -exec cp {} "${{ matrix.path }}/android/apk-artifacts/" \;
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
