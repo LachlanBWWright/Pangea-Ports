@@ -221,11 +221,51 @@ class MonorepoMetadataTests(unittest.TestCase):
                     content,
                     f"{game_name}: build.gradle must auto-download SDL3",
                 )
+                # Must include SDL3 Java sources so SDLActivity is in the APK
+                self.assertIn(
+                    'extern/SDL/android-project/app/src/main/java',
+                    content,
+                    f"{game_name}: build.gradle must include SDL3 Java sources in java.srcDirs",
+                )
                 # Must have a known package identifier
                 self.assertIn(
                     port['android_package'],
                     content,
                     f"{game_name}: build.gradle must reference package '{port['android_package']}'",
+                )
+                # Must have a custom GameActivity that overrides getLibraries() with the correct library name
+                cmake_content = (ports.ROOT / port['path'] / 'CMakeLists.txt').read_text(encoding='utf-8')
+                game_target = next(
+                    line.split('"')[1]
+                    for line in cmake_content.split('\n')
+                    if line.strip().startswith('set(GAME_TARGET')
+                )
+                pkg = port['android_package']
+                pkg_path = pkg.replace('.', '/')
+                game_activity = (
+                    android_dir / 'app' / 'src' / 'main' / 'java' / pkg_path / 'GameActivity.java'
+                )
+                self.assertTrue(
+                    game_activity.exists(),
+                    f"{game_name}: {game_activity.relative_to(ports.ROOT)} must exist to override getLibraries()",
+                )
+                activity_content = game_activity.read_text(encoding='utf-8')
+                self.assertIn(
+                    f'"{game_target}"',
+                    activity_content,
+                    f"{game_name}: GameActivity.java must return library '{game_target}' in getLibraries()",
+                )
+                # AndroidManifest.xml must use the custom GameActivity
+                manifest = (android_dir / 'app' / 'src' / 'main' / 'AndroidManifest.xml').read_text(encoding='utf-8')
+                self.assertNotIn(
+                    'org.libsdl.app.SDLActivity',
+                    manifest,
+                    f"{game_name}: AndroidManifest.xml must use .GameActivity, not org.libsdl.app.SDLActivity directly",
+                )
+                self.assertIn(
+                    '.GameActivity',
+                    manifest,
+                    f"{game_name}: AndroidManifest.xml must reference .GameActivity",
                 )
 
     def test_all_games_have_android_apk_flag(self):

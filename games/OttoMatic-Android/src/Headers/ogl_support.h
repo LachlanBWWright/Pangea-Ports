@@ -6,8 +6,8 @@
 
 #define	MAX_FILL_LIGHTS		4
 
-// glColorMaterial is not supported in WebGL/Emscripten, so disable it for WASM builds
-#ifdef __EMSCRIPTEN__
+// glColorMaterial is not supported in WebGL/Emscripten or Android GLES2
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	#define	USE_GL_COLOR_MATERIAL	0
 #else
 	#define	USE_GL_COLOR_MATERIAL	1

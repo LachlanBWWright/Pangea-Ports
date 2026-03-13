@@ -73,6 +73,7 @@ jobs:
           echo "$EMSDK/upstream/emscripten" >> "$GITHUB_PATH"
           echo "$EMSDK/upstream/bin" >> "$GITHUB_PATH"
           for d in "$EMSDK/node/"*/bin; do [ -d "$d" ] && echo "$d" >> "$GITHUB_PATH"; done
+          echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
       - name: Build WASM port
         run: python3 scripts/ports.py run --game "${{ matrix.name }}" --task wasm-build
       - name: Stage WASM site files

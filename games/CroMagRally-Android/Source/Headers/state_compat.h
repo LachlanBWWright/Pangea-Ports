@@ -83,4 +83,11 @@ void CompatGL_GetBooleanv(GLenum pname, GLboolean* params);
 #undef glActiveTextureARB
 #define glActiveTextureARB CompatGL_ActiveTexture
 
+// GLES2 lacks glColorMaterial; provide a no-op on Android so the linker is
+// satisfied (the call-site comment "provided by our gl_compat.h layer" refers
+// to this definition).
+#ifdef __ANDROID__
+#define glColorMaterial(face, mode) ((void)0)
+#endif
+
 #endif // __EMSCRIPTEN__ || __ANDROID__

@@ -98,6 +98,7 @@ jobs:
           echo "$EMSDK/upstream/emscripten" >> "$GITHUB_PATH"
           echo "$EMSDK/upstream/bin" >> "$GITHUB_PATH"
           for d in "$EMSDK/node/"*/bin; do [ -d "$d" ] && echo "$d" >> "$GITHUB_PATH"; done
+          echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
       - name: Install browser test dependencies
         if: matrix.browser_test == 'bugdom2-playwright'
         uses: actions/setup-node@v4
@@ -147,6 +148,17 @@ jobs:
           cd "${{ matrix.path }}/android"
           chmod +x gradlew
           ./gradlew assembleDebug
+      - name: Find debug APK
+        id: find-apk
+        run: |
+          APK=$(find "$GITHUB_WORKSPACE/${{ matrix.path }}/android/app/build" -name "app-debug.apk" 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then
+            echo "ERROR: app-debug.apk not found under $GITHUB_WORKSPACE/${{ matrix.path }}/android/app/build"
+            ls -la "$GITHUB_WORKSPACE/${{ matrix.path }}/android/app/build/" || true
+            exit 1
+          fi
+          echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
+          echo "Found APK: $APK"
       - name: Emulator smoke launch
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -156,15 +168,12 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            adb install -r "${{ matrix.path }}/android/app/build/outputs/apk/debug/app-debug.apk"
+            adb install -r "${{ steps.find-apk.outputs.apk_path }}"
             adb logcat -c
             adb shell monkey -p "$(python3 -c "import scripts.ports as p; print(p.PORTS_BY_NAME['${{ matrix.name }}']['android_package'])")" -c android.intent.category.LAUNCHER 1
             sleep 20
             adb logcat -d > "${{ matrix.name }}-logcat.txt"
-            if grep -q "FATAL EXCEPTION" "${{ matrix.name }}-logcat.txt"; then
-              cat "${{ matrix.name }}-logcat.txt"
-              exit 1
-            fi
+            if grep -qF "FATAL EXCEPTION" "${{ matrix.name }}-logcat.txt"; then cat "${{ matrix.name }}-logcat.txt"; exit 1; fi
       - name: Upload emulator log
         if: always()
         uses: actions/upload-artifact@v4

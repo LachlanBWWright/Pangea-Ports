@@ -524,7 +524,10 @@ if __name__ == "__main__":
     # Set up project metadata
 
     if EMSCRIPTEN:
-        project = EmscriptenProject(build_dir)
+        # Use a separate build-wasm/ directory so the WASM output doesn't
+        # clobber a native build directory.  The stage-wasm task in ports.py
+        # expects output under build-wasm/.
+        project = EmscriptenProject(os.path.join(root_dir, "build-wasm"))
 
     elif SYSTEM == "Windows":
         project = WindowsProject(build_dir)

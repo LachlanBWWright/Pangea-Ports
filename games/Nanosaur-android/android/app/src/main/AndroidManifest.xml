@@ -12,7 +12,7 @@
         android:hasCode="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
         <activity
-            android:name="org.libsdl.app.SDLActivity"
+            android:name=".GameActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
             android:exported="true"
             android:screenOrientation="landscape">

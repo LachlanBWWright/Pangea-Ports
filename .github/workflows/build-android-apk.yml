@@ -64,11 +64,15 @@ jobs:
           cd "${{ matrix.path }}/android"
           chmod +x gradlew
           ./gradlew assembleDebug assembleRelease
+      - name: Collect APK artifacts
+        run: |
+          mkdir -p "${{ matrix.path }}/android/apk-artifacts"
+          find "${{ matrix.path }}/android/app/build" -name "*.apk" -exec cp {} "${{ matrix.path }}/android/apk-artifacts/" \;
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-apk
-          path: ${{ matrix.path }}/android/app/build/outputs/apk
+          path: ${{ matrix.path }}/android/apk-artifacts
           compression-level: 0
 
   publish-apk-release:

@@ -315,7 +315,7 @@ TQ3Matrix4x4			transMatrix,scaleMatrix,rotMatrix;
 						 &rotMatrix,
 						 &theNode->BaseTransformMatrix);
 
-	MatrixMultiply(&theNode->BaseTransformMatrix,							// mult by trans matrix
+	Q3MatrixMultiply(&theNode->BaseTransformMatrix,							// mult by trans matrix
 						 &transMatrix,
 						 &theNode->BaseTransformMatrix);
 }

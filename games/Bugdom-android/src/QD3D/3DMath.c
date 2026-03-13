@@ -654,7 +654,7 @@ float IntersectionOfYAndPlane_Func(float x, float z, TQ3PlaneEquation *p)
 // Multiply matrix Mat1 by matrix Mat2, return result in Result
 //
 
-void MatrixMultiply(TQ3Matrix4x4 *a, TQ3Matrix4x4 *b, TQ3Matrix4x4 *result)
+void Q3MatrixMultiply(TQ3Matrix4x4 *a, TQ3Matrix4x4 *b, TQ3Matrix4x4 *result)
 {
 TQ3Matrix4x4	*r2,temp;
 unsigned short	i,j;
