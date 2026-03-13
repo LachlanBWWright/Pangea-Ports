@@ -221,6 +221,12 @@ class MonorepoMetadataTests(unittest.TestCase):
                     content,
                     f"{game_name}: build.gradle must auto-download SDL3",
                 )
+                # Must include SDL3 Java sources so SDLActivity is in the APK
+                self.assertIn(
+                    'extern/SDL/android-project/app/src/main/java',
+                    content,
+                    f"{game_name}: build.gradle must include SDL3 Java sources in java.srcDirs",
+                )
                 # Must have a known package identifier
                 self.assertIn(
                     port['android_package'],

@@ -99,6 +99,8 @@ android {
         main {
             // Game data assets packaged into APK
             assets.srcDirs = ['../../Data']
+            // SDL3 Java sources (downloaded by prepareSdlSource task)
+            java.srcDirs = ['../../extern/SDL/android-project/app/src/main/java']
         }
     }
 }
