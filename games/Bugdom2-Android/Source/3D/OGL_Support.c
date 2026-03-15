@@ -1258,7 +1258,7 @@ void OGL_Texture_SetOpenGLTexture(GLuint textureName)
 //	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);	// disable mipmaps & turn on filtering
 //	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	glGetError();
+	glGetError();	// clear any error from the above calls
 
 	glEnable(GL_TEXTURE_2D);
 }
@@ -1433,6 +1433,20 @@ OGLLightDefType	*lights;
 
 GLenum OGL_CheckError_Impl(const char* file, const int line)
 {
+#ifdef __EMSCRIPTEN__
+	// On WASM/WebGL, skip glGetError() entirely.  Each glGetError() call
+	// crosses the WASM→JS boundary and forces the GL command queue to flush,
+	// stalling the GPU pipeline.  With many OGL_CheckError() calls per draw
+	// and dozens of geometry objects per frame, this adds hundreds of
+	// synchronous round-trips per frame – the dominant CPU-side perf cost.
+	//
+	// Any real GL errors will still be visible in the browser's WebGL error
+	// log (DevTools → Console).  Return GL_NO_ERROR so callers' conditional
+	// patterns are satisfied without triggering false-positive fatal alerts.
+	(void)file;
+	(void)line;
+	return GL_NO_ERROR;
+#else
 	GLenum error = glGetError();
 	if (error != 0)
 	{
@@ -1448,16 +1462,10 @@ GLenum OGL_CheckError_Impl(const char* file, const int line)
 				text = "";
 		}
 
-#ifdef __EMSCRIPTEN__
-		// WebGL2 has stricter validation than desktop GL.
-		// Many GL errors are non-fatal in practice (e.g. unsupported format combos,
-		// client-side array edge cases). Log and continue instead of crashing.
-		SDL_Log("WebGL warning: GL error 0x%x (%s) in %s:%d", error, text, file, line);
-#else
 		DoFatalAlert("OpenGL error 0x%x (%s)\nin %s:%d", error, text, file, line);
-#endif
 	}
 	return error;
+#endif
 }
 
 
