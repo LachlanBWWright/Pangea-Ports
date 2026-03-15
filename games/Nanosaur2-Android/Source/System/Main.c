@@ -31,7 +31,7 @@ static void MoveTimeDemoOnSpline(ObjNode *theNode);
 static void ShowTimeDemoResults(int numFrames, float numSeconds, float averageFPS);
 
 #ifdef __EMSCRIPTEN__
-static void PlayLevelTick(void);
+static bool PlayLevelTick(void);
 #endif
 
 
