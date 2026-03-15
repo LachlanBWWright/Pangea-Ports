@@ -220,6 +220,19 @@
       console.error('[BillyFrontier] Unhandled promise rejection:', e.reason);
     });
 
+    function syncCanvasSize() {
+      if (typeof Module === 'undefined' || !Module.canvas) return;
+      var dpr = window.devicePixelRatio || 1;
+      var cssW = Module.canvas.clientWidth  || Module.canvas.width;
+      var cssH = Module.canvas.clientHeight || Module.canvas.height;
+      var w = Math.floor(cssW * dpr);
+      var h = Math.floor(cssH * dpr);
+      if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
+        if (Module.setCanvasSize) Module.setCanvasSize(w, h);
+        else { Module.canvas.width = w; Module.canvas.height = h; }
+      }
+    }
+
     // ── Emscripten Module ─────────────────────────────────
     var Module = {
       canvas: document.getElementById('canvas'),
@@ -319,6 +332,7 @@
         } else {
           // Loading finished — hide the loading overlay, show toolbar, focus canvas
           if (card)    card.style.display   = 'none';
+          syncCanvasSize();
           if (canvas)  canvas.focus();
           if (toolbar) toolbar.style.display = 'flex';
         }
@@ -442,6 +456,10 @@
         }
       });
     })();
+
+    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      window.addEventListener(evt, syncCanvasSize);
+    });
   </script>
 </body>
 </html>

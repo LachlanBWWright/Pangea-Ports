@@ -361,9 +361,12 @@ if(EMSCRIPTEN)
 		# without the JS-side hooks that LEGACY_GL_EMULATION installs.
 		# Our custom compat layer (gl_compat.c) handles legacy GL translation.
 		"-s FULL_ES2=1"
-		# Enable WebGL 2.0 alongside WebGL 1.0.  WebGL 2.0 natively supports
-		# 32-bit (GL_UNSIGNED_INT) index buffers, which is required by the game.
+		# Require a WebGL 2.0 context so UNSIGNED_INT index buffers are available
+		# without emulation.  Falling back to WebGL 1.0 could leave the renderer
+		# stuck before the first frame.
 		"-s MAX_WEBGL_VERSION=2"
+		"-s MIN_WEBGL_VERSION=2"
+		"-s USE_WEBGL2=1"
 		# Export the C functions callable from JavaScript
 		"-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
 		"-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath']"

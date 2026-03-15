@@ -406,7 +406,8 @@ if(EMSCRIPTEN)
 		# WebGL 2 for better compatibility; UNSIGNED_INT index buffers are natively
 		# supported in WebGL 2 (no OES_element_index_uint extension needed).
 		-sMAX_WEBGL_VERSION=2
-		-sMIN_WEBGL_VERSION=1
+		-sMIN_WEBGL_VERSION=2
+		-sUSE_WEBGL2=1
 
 		# Export functions callable from JavaScript
 		-sEXPORTED_FUNCTIONS=_main,_BF_SetFenceCollision,_BF_GetFenceCollision,_BF_SetDirectLaunchLevel,_BF_SetTerrainFile,_BF_LoadTerrainData
