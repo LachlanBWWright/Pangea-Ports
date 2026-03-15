@@ -266,6 +266,19 @@
     var _muted = false;
     var _fenceEnabled = true;
 
+    function syncCanvasSize() {
+      if (typeof Module === 'undefined' || !Module.canvas) return;
+      var dpr = window.devicePixelRatio || 1;
+      var cssW = Module.canvas.clientWidth  || Module.canvas.width;
+      var cssH = Module.canvas.clientHeight || Module.canvas.height;
+      var w = Math.floor(cssW * dpr);
+      var h = Math.floor(cssH * dpr);
+      if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
+        if (Module.setCanvasSize) Module.setCanvasSize(w, h);
+        else { Module.canvas.width = w; Module.canvas.height = h; }
+      }
+    }
+
     var Module = {
       canvas: document.getElementById('canvas'),
 
@@ -280,6 +293,7 @@
           if (card) card.style.display = 'none';
           var tb = document.getElementById('toolbar');
           if (tb) tb.style.display = 'flex';
+          syncCanvasSize();
           return;
         }
         if (lbl) lbl.textContent = text;
@@ -311,6 +325,7 @@
         if (card) card.style.display = 'none';
         var tb = document.getElementById('toolbar');
         if (tb) tb.style.display = 'flex';
+        syncCanvasSize();
       },
 
       // Display fatal errors in the loading card instead of silently failing
@@ -376,6 +391,10 @@
         btn.className   = 'btn' + (_fenceEnabled ? ' on' : ' danger');
       }
     }
+
+    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      window.addEventListener(evt, syncCanvasSize);
+    });
   </script>
 
   {{{ SCRIPT }}}

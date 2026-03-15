@@ -304,6 +304,19 @@
     var _fenceEnabled = true;
     var _muted        = false;
 
+    function syncCanvasSize() {
+      if (!Module || !Module.canvas) return;
+      var dpr = window.devicePixelRatio || 1;
+      var cssW = Module.canvas.clientWidth  || Module.canvas.width;
+      var cssH = Module.canvas.clientHeight || Module.canvas.height;
+      var w = Math.floor(cssW * dpr);
+      var h = Math.floor(cssH * dpr);
+      if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
+        if (Module.setCanvasSize) Module.setCanvasSize(w, h);
+        else { Module.canvas.width = w; Module.canvas.height = h; }
+      }
+    }
+
     function showPlayButton() {
       spinnerEl.style.display   = 'none';
       statusEl.style.display    = 'none';
@@ -315,12 +328,22 @@
       loadingCard.onclick       = startGame;
     }
 
+    function finishLoading() {
+      if (loadingDone) return;
+      loadingDone = true;
+      if (!gameStarted) {
+        showPlayButton();
+      }
+    }
+
     function startGame() {
       if (gameStarted) return;
+      finishLoading();
       gameStarted = true;
       loadingCard.style.display = 'none';
       document.getElementById('toolbar').style.display = 'flex';
       document.getElementById('api-panel').style.display = 'block';
+      syncCanvasSize();
       canvas.focus();
       Module.callMain([]);
     }
@@ -335,8 +358,7 @@
 
       setStatus: function(text) {
         if (!text) {
-          loadingDone = true;
-          if (!gameStarted) showPlayButton();
+          finishLoading();
           return;
         }
         statusEl.innerText = text;
@@ -350,6 +372,7 @@
 
       onRuntimeInitialized: function() {
         console.log('[Bugdom2] Runtime initialized');
+        finishLoading();
 
         // ── Standard PangeaGame API ───────────────────────────────────────
         // Consistent interface for level-editor integration across all Pangea
@@ -476,6 +499,11 @@
       };
       reader.readAsArrayBuffer(file);
     }
+
+    // Keep canvas size in sync when the viewport or fullscreen state changes
+    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      document.addEventListener(evt, syncCanvasSize);
+    });
   </script>
 
   {{{ SCRIPT }}}
