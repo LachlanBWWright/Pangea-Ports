@@ -51,6 +51,20 @@ static uint8_t sEnabledAttribMask = 0x1F;  // all 5 enabled by ModernGL_Init
 static GLuint* sIdxConvertBuf = NULL;
 static int sIdxConvertBufCap = 0;
 
+// Vertex count hint: set by CompatGL_SetVertexCount() before glDrawElements to
+// skip the O(count) index-buffer scan that scans all 'count' indices to find the
+// maximum index value and thereby determine vertexCount.
+// The hint is consumed (reset to 0) by the next CompatGL_DrawElements call.
+static GLsizei sVertexCountHint = 0;
+
+// Allow callers to provide the vertex count, avoiding the O(count) index scan
+// in CompatGL_DrawElements (where 'count' is the number of indices, not vertices).
+// Call immediately before the glDrawElements macro call (which maps to CompatGL_DrawElements).
+void CompatGL_SetVertexCount(GLsizei n)
+{
+    sVertexCountHint = n;
+}
+
 // ── Attribute enable/disable helpers ────────────────────────────────────
 
 // Ensure exactly the attributes in 'needed' (bitmask) are enabled.
@@ -197,25 +211,31 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         return; // Unsupported index type
 
     // ── Find maximum index to determine vertex count ──────────────────
-    // This scan is still needed because the client-side vertex array
-    // functions (glVertexPointer, glNormalPointer, etc.) do not receive
-    // a count parameter.  The loop is ~0.01ms for typical index counts
-    // (~600) which is a small fraction of the total savings.
-    GLuint maxIdx = 0;
-    if (type == GL_UNSIGNED_INT)
+    // If the caller provided a hint via CompatGL_SetVertexCount(), use it
+    // directly to skip the O(count) scan.  Otherwise scan the index buffer.
+    int vertexCount;
+    if (sVertexCountHint > 0)
     {
-        const GLuint* idx = (const GLuint*)indices;
-        for (GLsizei i = 0; i < count; i++)
-            if (idx[i] > maxIdx) maxIdx = idx[i];
+        vertexCount = (int)sVertexCountHint;
+        sVertexCountHint = 0;  // consume hint
     }
     else
     {
-        const GLushort* idx = (const GLushort*)indices;
-        for (GLsizei i = 0; i < count; i++)
-            if ((GLuint)idx[i] > maxIdx) maxIdx = idx[i];
+        GLuint maxIdx = 0;
+        if (type == GL_UNSIGNED_INT)
+        {
+            const GLuint* idx = (const GLuint*)indices;
+            for (GLsizei i = 0; i < count; i++)
+                if (idx[i] > maxIdx) maxIdx = idx[i];
+        }
+        else
+        {
+            const GLushort* idx = (const GLushort*)indices;
+            for (GLsizei i = 0; i < count; i++)
+                if ((GLuint)idx[i] > maxIdx) maxIdx = idx[i];
+        }
+        vertexCount = (int)maxIdx + 1;
     }
-
-    int vertexCount = (int)maxIdx + 1;
 
     // ── Create persistent VBOs on first use ──────────────────────────
     if (!sAttrVBO[0])

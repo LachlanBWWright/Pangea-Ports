@@ -689,6 +689,10 @@ void OGL_DrawScene(void (*drawRoutine)(void))
            /* SWAP THE BUFFS */
 
 	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
+
+#ifdef __EMSCRIPTEN__
+	emscripten_sleep(0);							// yield to browser event loop (ASYNCIFY)
+#endif
 }
 
 

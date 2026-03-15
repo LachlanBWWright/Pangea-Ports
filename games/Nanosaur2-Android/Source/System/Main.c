@@ -536,8 +536,9 @@ OGLSetupInputType	viewDef;
 
 #ifdef __EMSCRIPTEN__
 
-// Per-frame tick body used by Emscripten's main loop callback
-static void PlayLevelTick(void)
+// Per-frame tick body used by the ASYNCIFY while-loop in PlayLevel.
+// Returns true if the level should continue, false when it is over.
+static bool PlayLevelTick(void)
 {
 	float fps;
 
@@ -551,7 +552,7 @@ static void PlayLevelTick(void)
 		CalcFramesPerSecond();
 		DoPlayerTerrainUpdate();
 		OGL_DrawScene(DrawLevelCallback);
-		return;
+		return true;
 	}
 
 	for (int i = 0; i < gNumPlayers; i++)
@@ -625,16 +626,17 @@ static void PlayLevelTick(void)
 
 	if (gGameOver)
 	{
-		emscripten_cancel_main_loop();
-		return;
+		return false;
 	}
 
 	if (gLevelCompleted)
 	{
 		gLevelCompletedCoolDownTimer -= fps;
 		if (gLevelCompletedCoolDownTimer <= 0.0f)
-			emscripten_cancel_main_loop();
+			return false;
 	}
+
+	return true;
 }
 
 static void PlayLevel(void)
@@ -649,9 +651,12 @@ static void PlayLevel(void)
 
 	GrabMouse(true);
 
-	// emscripten_set_main_loop runs PlayLevelTick repeatedly, yielding to the browser
-	// between each call.  The '1' means simulate infinite loop (blocks until cancelled).
-	emscripten_set_main_loop(PlayLevelTick, 0, 1);
+	// With ASYNCIFY, OGL_DrawScene -> SDL_GL_SwapWindow -> emscripten_sleep(0)
+	// yields to the browser event loop between frames, so a plain while loop works.
+	while (PlayLevelTick())
+	{
+		/* continue until game over or level complete */
+	}
 
 	GrabMouse(false);
 

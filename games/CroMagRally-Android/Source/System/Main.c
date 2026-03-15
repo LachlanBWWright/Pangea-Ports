@@ -1659,6 +1659,12 @@ void GameMain(void)
 
 //	HideCursor();
 
+#ifdef __EMSCRIPTEN__
+	// Browsers require user interaction before going fullscreen;
+	// override the "fullscreen=true" default for the WASM build.
+	gGamePrefs.fullscreen = false;
+	SetFullscreenMode(false);
+#endif
 
 	if (gCommandLine.bootToTrack != 0)
 	{
@@ -1687,10 +1693,12 @@ void GameMain(void)
 
 		/* SHOW TITLE SCREEN */
 
+#ifndef __EMSCRIPTEN__		// skip multi-second intro logo on web
 	if (gDebugMode == 0)		// in debug mode, skip title
 	{
 		DoTitleScreen();
 	}
+#endif
 
 
 		/* MAIN LOOP */
@@ -1745,12 +1753,39 @@ static Boolean GetURLParamString(const char* name, char* buf, int bufLen)
 	return found != 0;
 }
 
-/**************** GAME MAIN: INIT FOR EMSCRIPTEN *****************/
+/**************** GAME MAIN: READ URL PARAMS FOR EMSCRIPTEN *****************/
 //
-// Called once at startup in WASM mode.
-// Reads URL params to determine track/car/options, initializes game,
-// then returns. GameMain_RunFrame() is called each browser frame.
+// Called once at startup in WASM mode BEFORE GameMain().
+// Reads URL query params and maps them to gCommandLine fields so that
+// GameMain() can use them just as it would use CLI arguments.
+// When ?track=N is absent the default is 0 (no direct-launch), which
+// causes GameMain() to show the normal main-menu flow.
 //
+
+void GameMain_ReadURLParams(void)
+{
+	// 1-based track number; 0 means "not specified → show main menu"
+	int track = GetURLParamInt("track", 0);
+	if (track > 0)
+		gCommandLine.bootToTrack = track;
+
+	// 1-based car override (0 = use default/saved preference)
+	int car = GetURLParamInt("car", 0);
+	if (car > 0)
+		gCommandLine.car = car;
+
+	// Fence collision cheat
+	if (GetURLParamInt("noFenceCollision", 0))
+		gCommandLine.noFenceCollision = 1;
+
+	// Level-override path (for the level editor)
+	if (!gCommandLine.levelOverridePath[0])
+	{
+		char overrideBuf[512];
+		if (GetURLParamString("levelOverride", overrideBuf, sizeof(overrideBuf)))
+			SDL_strlcpy(gCommandLine.levelOverridePath, overrideBuf, sizeof(gCommandLine.levelOverridePath));
+	}
+}
 
 void GameMain_InitEmscripten(void)
 {
