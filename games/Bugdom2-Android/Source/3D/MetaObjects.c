@@ -754,6 +754,9 @@ go_here:
 			/***********/
 
 //	glLockArraysEXT(0, data->numPoints);
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	GLES3_SetVertexCount(data->numPoints);
+#endif
 	glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
 	OGL_CheckError();
 //	glUnlockArraysEXT();

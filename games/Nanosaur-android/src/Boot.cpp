@@ -192,9 +192,9 @@ retryVideo:
 
 	// Create window
 #ifdef __EMSCRIPTEN__
-	// On Emscripten use OpenGL compatibility profile so that LEGACY_GL_EMULATION
-	// can satisfy the fixed-function pipeline calls (glLightfv, glMatrixMode, etc.)
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	// Use GLES2 profile for WebGL2 context.  The game uses a custom gl_compat
+	// layer (FULL_ES2) instead of LEGACY_GL_EMULATION.
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #else

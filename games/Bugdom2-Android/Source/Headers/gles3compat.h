@@ -195,6 +195,7 @@ void GLES3_Enable(GLenum cap);
 void GLES3_Disable(GLenum cap);
 GLboolean GLES3_IsEnabled(GLenum cap);
 void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
+void GLES3_SetVertexCount(GLsizei n);
 void GLES3_GetFloatv(GLenum pname, GLfloat* params);
 void GLES3_GetIntegerv(GLenum pname, GLint* params);
 void GLES3_Hint(GLenum target, GLenum mode);

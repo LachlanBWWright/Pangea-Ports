@@ -819,7 +819,15 @@ uint32_t				matFlags;
 
 
 	if (textureHasAlpha || (diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))		// if has alpha, then we need blending on
+	{
 	    glEnable(GL_BLEND);
+#ifdef __EMSCRIPTEN__
+	    // Transparent materials must not write to the depth buffer; otherwise
+	    // opaque geometry drawn later at greater depth would be erroneously
+	    // rejected by the depth test and become invisible.
+	    glDepthMask(GL_FALSE);
+#endif
+	}
 	else
 	    glDisable(GL_BLEND);
 

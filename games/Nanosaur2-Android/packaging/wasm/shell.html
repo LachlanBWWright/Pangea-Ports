@@ -275,9 +275,11 @@
         var plbl = document.getElementById('progress-label');
         var bar  = document.getElementById('progress-bar');
         if (!text) {
-          // Empty string → loading finished
-          if (lbl) lbl.textContent = 'Starting game…';
-          if (bar) bar.value = 1;
+          // Empty string → loading finished; hide the loading card
+          var card = document.getElementById('loading-card');
+          if (card) card.style.display = 'none';
+          var tb = document.getElementById('toolbar');
+          if (tb) tb.style.display = 'flex';
           return;
         }
         if (lbl) lbl.textContent = text;

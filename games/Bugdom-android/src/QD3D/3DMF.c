@@ -77,6 +77,19 @@ void LoadGrouped3DMF(FSSpec *spec, Byte groupNum)
 
 	Render_Load3DMFTextures(the3DMFFile, gObjectGroupTextures[groupNum], false);
 
+			/* NORMALIZE DIFFUSE ALPHA */
+			//
+			// Pomme's 3DMF parser only stores R,G,B from the 'kdif' diffuse chunk.
+			// The alpha field remains 0 (calloc default) unless a 'kxpr' transparency
+			// chunk is also present.  Treat alpha == 0 as fully opaque (1.0f) so that
+			// IsMeshTransparent() and PrepareAlphaShading() work correctly.
+
+	for (int i = 0; i < the3DMFFile->numMeshes; i++)
+	{
+		if (the3DMFFile->meshes[i]->diffuseColor.a == 0.0f)
+			the3DMFFile->meshes[i]->diffuseColor.a = 1.0f;
+	}
+
 			/* BUILD OBJECT LIST */
 
 	int nObjects = the3DMFFile->numTopLevelGroups;
