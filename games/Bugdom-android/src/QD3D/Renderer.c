@@ -786,6 +786,16 @@ if (bufferFormat == GL_BGRA && bufferType == GL_UNSIGNED_INT_8_8_8_8_REV)
 {
 converted = ConvertBGRA32ToRGBA(pixels, width, height);
 glFormat  = GL_RGBA;
+// RGB32 textures (internalFormat==GL_RGB) have no real alpha; the source
+// byte is zero (unused Mac padding). Force alpha=255 so the WebGL canvas
+// does not write transparent pixels and show the HTML background through
+// opaque geometry. (Same principle as the 1555 fix in Render_UpdateTexture.)
+if (internalFormat == GL_RGB)
+{
+	uint8_t* p = (uint8_t*) converted;
+	for (int i = 0; i < width * height; i++)
+		p[i*4+3] = 255;
+}
 }
 else if (bufferFormat == GL_BGR && bufferType == GL_UNSIGNED_BYTE)
 {
