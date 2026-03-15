@@ -672,6 +672,16 @@ void CompatGL_GetFloatv(GLenum pname, GLfloat* params)
             params[2] = gImmediateModeBuffer.currentColor[2];
             params[3] = gImmediateModeBuffer.currentColor[3];
             break;
+        case GL_MODELVIEW_MATRIX:
+            // Return the current modelview matrix from our software stack
+            EnsureMatrixStacksInitialized();
+            memcpy(params, gModelViewStack.matrices[gModelViewStack.depth], 16 * sizeof(float));
+            break;
+        case GL_PROJECTION_MATRIX:
+            // Return the current projection matrix from our software stack
+            EnsureMatrixStacksInitialized();
+            memcpy(params, gProjectionStack.matrices[gProjectionStack.depth], 16 * sizeof(float));
+            break;
         default:
             WebGL_GetFloatv(pname, params);
             break;
