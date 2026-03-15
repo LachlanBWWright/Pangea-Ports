@@ -374,6 +374,10 @@ if(EMSCRIPTEN)
 		# (menus, legal screen, warm-up, etc.) would freeze the tab.
 		"-s ASYNCIFY=1"
 		"-s ASYNCIFY_STACK_SIZE=65536"
+		# JS-based C++ exception handling is compatible with ASYNCIFY.
+		# (Native wasm exceptions via -fwasm-exceptions are NOT compatible.)
+		"-fexceptions"
+		"-s DISABLE_EXCEPTION_CATCHING=0"
 		# Export the C functions callable from JavaScript
 		"-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
 		"-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath']"

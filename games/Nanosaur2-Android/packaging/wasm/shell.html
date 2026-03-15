@@ -267,7 +267,7 @@
     var _fenceEnabled = true;
 
     function syncCanvasSize() {
-      if (!Module || !Module.canvas) return;
+      if (typeof Module === 'undefined' || !Module.canvas) return;
       var dpr = window.devicePixelRatio || 1;
       var cssW = Module.canvas.clientWidth;
       var cssH = Module.canvas.clientHeight;

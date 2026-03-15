@@ -52,12 +52,14 @@ static GLuint* sIdxConvertBuf = NULL;
 static int sIdxConvertBufCap = 0;
 
 // Vertex count hint: set by CompatGL_SetVertexCount() before glDrawElements to
-// skip the O(count) index-buffer scan that would otherwise determine vertexCount.
+// skip the O(count) index-buffer scan that scans all 'count' indices to find the
+// maximum index value and thereby determine vertexCount.
 // The hint is consumed (reset to 0) by the next CompatGL_DrawElements call.
 static GLsizei sVertexCountHint = 0;
 
 // Allow callers to provide the vertex count, avoiding the O(count) index scan
-// in CompatGL_DrawElements.  Call immediately before glDrawElements.
+// in CompatGL_DrawElements (where 'count' is the number of indices, not vertices).
+// Call immediately before the glDrawElements macro call (which maps to CompatGL_DrawElements).
 void CompatGL_SetVertexCount(GLsizei n)
 {
     sVertexCountHint = n;

@@ -421,7 +421,11 @@
         if (bar) {
           if (left === 0) {
             bar.value = 1;
-            // Also mark data as ready in case setStatus('') has already fired
+            // Emscripten may call monitorRunDependencies(0) before setStatus('').
+            // In that case setStatus('') fires later and calls finishLoading() again
+            // (which is a no-op if already done).  But if setStatus('') somehow never
+            // fires (e.g. in some Emscripten versions that don't clear status), this
+            // ensures dataReady is still set so the play button can appear.
             dataReady = true;
             finishLoading();
           } else {
