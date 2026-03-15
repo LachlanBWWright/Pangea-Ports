@@ -57,6 +57,7 @@ void CompatGL_NormalPointer(GLenum type, GLsizei stride, const void* pointer);
 void CompatGL_ColorPointer(GLint size, GLenum type, GLsizei stride, const void* pointer);
 void CompatGL_TexCoordPointer(GLint size, GLenum type, GLsizei stride, const void* pointer);
 void CompatGL_ClientActiveTexture(GLenum texture);
+void CompatGL_SetVertexCount(GLsizei n);
 void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
 void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count);
 

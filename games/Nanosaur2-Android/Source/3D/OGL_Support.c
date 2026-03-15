@@ -13,6 +13,10 @@
 #include "game.h"
 #include "stb_image.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -954,6 +958,10 @@ do_anaglyph:
            /* SWAP THE BUFFS */
 
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
+
+#ifdef __EMSCRIPTEN__
+	emscripten_sleep(0);									// yield to browser event loop (required for ASYNCIFY)
+#endif
 
 	if (!gGamePaused)										// freeze frame count if paused (otherwise double-buffered skeletons will flicker)
 	{

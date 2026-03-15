@@ -267,10 +267,11 @@
     var _fenceEnabled = true;
 
     function syncCanvasSize() {
-      if (typeof Module === 'undefined' || !Module.canvas) return;
+      if (!Module || !Module.canvas) return;
       var dpr = window.devicePixelRatio || 1;
-      var cssW = Module.canvas.clientWidth  || Module.canvas.width;
-      var cssH = Module.canvas.clientHeight || Module.canvas.height;
+      var cssW = Module.canvas.clientWidth;
+      var cssH = Module.canvas.clientHeight;
+      if (!cssW || !cssH) return;  // layout not settled yet (e.g. mid-fullscreen transition)
       var w = Math.floor(cssW * dpr);
       var h = Math.floor(cssH * dpr);
       if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
@@ -393,7 +394,11 @@
     }
 
     ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
-      window.addEventListener(evt, syncCanvasSize);
+      window.addEventListener(evt, function() {
+        // Delay by one rAF so the browser can complete its layout/resize after
+        // the fullscreen transition before we read clientWidth/clientHeight.
+        requestAnimationFrame(syncCanvasSize);
+      });
     });
   </script>
 

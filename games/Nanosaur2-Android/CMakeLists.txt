@@ -367,6 +367,13 @@ if(EMSCRIPTEN)
 		"-s MAX_WEBGL_VERSION=2"
 		"-s MIN_WEBGL_VERSION=2"
 		"-s USE_WEBGL2=1"
+		# ASYNCIFY allows the blocking game-loop / menu-screen architecture to work
+		# in the browser.  emscripten_sleep(0) is called after every SDL_GL_SwapWindow
+		# (in OGL_DrawScene) so that the browser event loop can process input and
+		# repaint between frames.  Without ASYNCIFY all blocking while-loops
+		# (menus, legal screen, warm-up, etc.) would freeze the tab.
+		"-s ASYNCIFY=1"
+		"-s ASYNCIFY_STACK_SIZE=65536"
 		# Export the C functions callable from JavaScript
 		"-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
 		"-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath']"
