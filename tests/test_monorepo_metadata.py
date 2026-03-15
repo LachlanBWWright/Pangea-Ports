@@ -100,6 +100,34 @@ class MonorepoMetadataTests(unittest.TestCase):
                 self.assertIn("embedded-shell", shell)
                 self.assertIn("embed') === '1'", shell)
 
+    def test_bugdom2_gles3_compat_reuses_webgl_buffers(self):
+        compat = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "3D"
+            / "GLES3Compat.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("gArrayVBOSize", compat)
+        self.assertIn("gArrayEBOSize", compat)
+        self.assertIn("gImmVBOSize", compat)
+        self.assertIn("glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0", compat)
+        self.assertNotIn("glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_STREAM_DRAW)", compat)
+        self.assertNotIn("glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STREAM_DRAW)", compat)
+
+    def test_cromag_alpha_masked_materials_keep_depth_writes(self):
+        meta = (
+            ports.ROOT
+            / "games"
+            / "CroMagRally-Android"
+            / "Source"
+            / "3D"
+            / "MetaObjects.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Alpha-masked textures still need depth writes", meta)
+        self.assertIn("if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))", meta)
+
     def test_billy_frontier_docs_use_standard_query_params(self):
         billy_docs = (ports.ROOT / "games" / "BillyFrontier-Android" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn("?level=1", billy_docs)
