@@ -248,6 +248,7 @@
         // ── Standard PangeaGame API ───────────────────────────────────────
         // Consistent interface for level-editor integration.
         // CroMagRally uses ?track=N (1-based) for level skip at page load.
+        // Without ?track=N the game shows the main menu (default behaviour).
         window.PangeaGame = {
           skipToLevel: function(n) {
             var url = new URL(window.location.href);
@@ -257,7 +258,7 @@
           getCurrentLevel: function() {
             var params = new URLSearchParams(window.location.search);
             var t = params.get('track');
-            return t !== null ? parseInt(t, 10) : 1;
+            return t !== null ? parseInt(t, 10) : 0;  // 0 = no direct-launch (main menu)
           },
           setFenceCollisions: function(enabled) {
             return Module.ccall('WASM_SetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
@@ -266,7 +267,7 @@
             return Module.ccall('WASM_GetFenceCollision', 'number', [], []) !== 0;
           },
         };
-        console.log('[CroMag] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a track.');
+        console.log('[CroMag] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a track (1-based). Default: main menu.');
 
         // Sync fence state
         _fenceEnabled = window.GameCheat.getFenceCollision() !== 0;

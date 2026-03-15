@@ -109,3 +109,6 @@ void ToolBoxInit(void);
 void FadeOutArea(void);
 void MoveEverything(void);
 void InitDefaultPrefs(void);
+#ifdef __EMSCRIPTEN__
+void GameMain_ReadURLParams(void);
+#endif

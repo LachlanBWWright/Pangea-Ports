@@ -24,10 +24,12 @@ extern "C"
 	int gCurrentAntialiasingLevel;
 
 #ifdef __EMSCRIPTEN__
-	// Called once per browser frame when running in WASM mode
+	// Called once per browser frame when running in WASM mode (legacy path, kept for reference)
 	void GameMain_RunFrame(void);
 	void GameMain_InitEmscripten(void);
 	Boolean GameMain_IsEmscriptenDone(void);
+	// New unified entry point: reads URL params into gCommandLine, then calls GameMain()
+	void GameMain_ReadURLParams(void);
 
 	// JavaScript-callable cheat command handler
 	EMSCRIPTEN_KEEPALIVE
@@ -277,10 +279,13 @@ int main(int argc, char** argv)
 		Boot(argc, argv);
 
 #ifdef __EMSCRIPTEN__
-		// On Emscripten, apply fence collision cheat early if specified via URL params.
-		// URL params are read in GameMain_InitEmscripten().
-		GameMain_InitEmscripten();
-		emscripten_set_main_loop(GameMain_RunFrame, 0, 1);
+		// Read URL query params into gCommandLine BEFORE GameMain so that
+		// ?track=N skips the menu (same as --track N on the command line).
+		// When ?track is absent, gCommandLine.bootToTrack stays 0 and
+		// GameMain() will show the normal main-menu flow instead of
+		// launching directly into a race.
+		GameMain_ReadURLParams();
+		GameMain();
 #else
 		GameMain();
 #endif

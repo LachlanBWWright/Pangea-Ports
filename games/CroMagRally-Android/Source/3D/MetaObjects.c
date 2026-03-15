@@ -822,16 +822,11 @@ uint32_t				matFlags;
 	{
 	    glEnable(GL_BLEND);
 #ifdef __EMSCRIPTEN__
-	    // Only truly transparent materials (reduced diffuse alpha or explicitly
-	    // marked ALWAYSBLEND) must not write to the depth buffer.  Materials
-	    // that merely have an alpha channel in their texture (textureHasAlpha)
-	    // use the alpha-test via the shader (modern_gl.c) to discard transparent
-	    // pixels, so their opaque pixels still need correct depth writes.
-	    // Disabling depth writes for ALL blended materials caused opaque geometry
-	    // drawn later in the frame to erroneously appear in front of alpha-masked
-	    // objects (geometry sorting regression).
-	    if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))
-	        glDepthMask(GL_FALSE);
+	    // Disable depth writes whenever blending is on so that semi-transparent
+	    // or alpha-keyed billboard pixels (e.g. power-up sprites) do not write
+	    // stale depth values that would hide opaque geometry drawn later.
+	    // Depth writes are restored after each node in Objects.c DrawObjects().
+	    glDepthMask(GL_FALSE);
 #endif
 	}
 	else
