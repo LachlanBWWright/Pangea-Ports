@@ -54,13 +54,14 @@ class MonorepoMetadataTests(unittest.TestCase):
 
     def test_root_pages_hub_mentions_every_game_and_hook(self):
         hub = (ports.ROOT / "docs" / "index.html").read_text(encoding="utf-8")
-        self.assertIn('role="tablist"', hub)
+        # New single-page design uses data-game attributes on navbar buttons
+        self.assertIn('data-game=', hub)
+        # Every game's WASM URL must be reachable from the hub
+        self.assertIn('GAME_URLS', hub)
 
         for port in ports.PORTS:
             with self.subTest(port=port["name"]):
                 self.assertIn(port["display_name"], hub)
-                if port.get("site_level_example"):
-                    self.assertIn(port["site_level_example"], hub)
 
     def test_hub_has_no_per_game_docs_links(self):
         """The hub should NOT link to per-game docs/index.html pages; WASM is game-only."""

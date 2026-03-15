@@ -259,6 +259,9 @@ static GLenum       gColorArrayType     = GL_FLOAT;
 static GLint        gColorArraySize     = 4;
 static const void*  gTexcArrayPtr       = NULL;
 static int          gClientActiveUnit   = 0;  // texture unit for ClientActiveTexture
+// Vertex count hint set by callers via GLES3_SetVertexCount() to avoid O(count)
+// index scan in GLES3_DrawElements.
+static GLsizei      gVertexCountHint    = 0;
 
 //=============================================================
 // Immediate mode
@@ -342,6 +345,13 @@ static GLuint CompileShader(GLenum type, const char* src)
 //=============================================================
 // GLES3Compat_Init
 //=============================================================
+
+// Allow callers to provide the vertex count hint, avoiding the O(count)
+// index scan in GLES3_DrawElements.  Call before glDrawElements.
+void GLES3_SetVertexCount(GLsizei n)
+{
+    gVertexCountHint = n;
+}
 
 void GLES3Compat_Init(void)
 {
@@ -589,15 +599,21 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     size_t totalSize = 0;
     int nVerts = 0;
 
-    // Determine vertex count from the index data
-    if (type == GL_UNSIGNED_INT) {
-        const GLuint* idx = (const GLuint*)indices;
-        for (GLsizei i = 0; i < count; i++)
-            if ((int)idx[i] + 1 > nVerts) nVerts = (int)idx[i] + 1;
-    } else if (type == GL_UNSIGNED_SHORT) {
-        const GLushort* idx = (const GLushort*)indices;
-        for (GLsizei i = 0; i < count; i++)
-            if ((int)idx[i] + 1 > nVerts) nVerts = (int)idx[i] + 1;
+    // Use the vertex count hint if set by the caller (avoids O(count) index scan).
+    if (gVertexCountHint > 0) {
+        nVerts = (int)gVertexCountHint;
+        gVertexCountHint = 0;  // consume hint
+    } else {
+        // Determine vertex count from the index data
+        if (type == GL_UNSIGNED_INT) {
+            const GLuint* idx = (const GLuint*)indices;
+            for (GLsizei i = 0; i < count; i++)
+                if ((int)idx[i] + 1 > nVerts) nVerts = (int)idx[i] + 1;
+        } else if (type == GL_UNSIGNED_SHORT) {
+            const GLushort* idx = (const GLushort*)indices;
+            for (GLsizei i = 0; i < count; i++)
+                if ((int)idx[i] + 1 > nVerts) nVerts = (int)idx[i] + 1;
+        }
     }
     if (nVerts == 0) return;
 
