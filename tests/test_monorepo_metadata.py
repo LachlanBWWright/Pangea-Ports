@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+import re
 
 import scripts.ports as ports
 
@@ -112,9 +113,22 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("gArrayVBOSize", compat)
         self.assertIn("gArrayEBOSize", compat)
         self.assertIn("gImmVBOSize", compat)
+        self.assertIn("glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offVert", compat)
         self.assertIn("glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0", compat)
-        self.assertNotIn("glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_STREAM_DRAW)", compat)
-        self.assertNotIn("glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STREAM_DRAW)", compat)
+        self.assertIsNone(re.search(r"glBufferData\(GL_ARRAY_BUFFER,\s*\(GLsizeiptr\)totalSize,\s*NULL,\s*GL_STREAM_DRAW\)", compat))
+        self.assertIsNone(re.search(r"glBufferData\(GL_ELEMENT_ARRAY_BUFFER,\s*\(GLsizeiptr\)indexSize,\s*indices,\s*GL_STREAM_DRAW\)", compat))
+
+    def test_bugdom2_ogl_draw_scene_yields_to_browser_event_loop(self):
+        ogl = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "3D"
+            / "OGL_Support.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("SDL_GL_SwapWindow(gSDLWindow);", ogl)
+        self.assertIn("emscripten_sleep(0);", ogl)
 
     def test_cromag_alpha_masked_materials_keep_depth_writes(self):
         meta = (
@@ -125,8 +139,18 @@ class MonorepoMetadataTests(unittest.TestCase):
             / "3D"
             / "MetaObjects.c"
         ).read_text(encoding="utf-8")
+        objects = (
+            ports.ROOT
+            / "games"
+            / "CroMagRally-Android"
+            / "Source"
+            / "System"
+            / "Objects.c"
+        ).read_text(encoding="utf-8")
         self.assertIn("Alpha-masked textures still need depth writes", meta)
         self.assertIn("if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))", meta)
+        self.assertIn("if (!noZWrites)", objects)
+        self.assertIn("glDepthMask(GL_TRUE);", objects)
 
     def test_nanosaur2_show_helpers_clear_stale_cull_bits(self):
         player = (
