@@ -128,6 +128,36 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("Alpha-masked textures still need depth writes", meta)
         self.assertIn("if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))", meta)
 
+    def test_nanosaur2_show_helpers_clear_stale_cull_bits(self):
+        player = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "Player"
+            / "Player.c"
+        ).read_text(encoding="utf-8")
+        objects = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "System"
+            / "Objects.c"
+        ).read_text(encoding="utf-8")
+        objects2 = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "System"
+            / "Objects2.c"
+        ).read_text(encoding="utf-8")
+        cull_clear = "STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3"
+        self.assertGreaterEqual(player.count(cull_clear), 2)
+        self.assertIn(cull_clear, objects)
+        self.assertGreaterEqual(objects2.count(cull_clear), 2)
+
     def test_billy_frontier_docs_use_standard_query_params(self):
         billy_docs = (ports.ROOT / "games" / "BillyFrontier-Android" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn("?level=1", billy_docs)
