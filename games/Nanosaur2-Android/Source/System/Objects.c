@@ -1802,7 +1802,7 @@ Boolean SetObjectVisible(ObjNode* theNode, Boolean visible)
 {
 	if (visible)
 	{
-		theNode->StatusBits &= ~STATUS_BIT_HIDDEN;
+		theNode->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3);
 	}
 	else
 	{

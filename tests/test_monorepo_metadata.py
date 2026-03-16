@@ -75,6 +75,89 @@ class MonorepoMetadataTests(unittest.TestCase):
             "Hub should not contain per-game 'Docs' links: " + str(docs_hrefs),
         )
 
+    def test_hub_launches_games_in_embed_mode(self):
+        hub = (ports.ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+        for game_id in ["billy", "bugdom", "bugdom2", "cromag", "mighty", "nanosaur", "nanosaur2", "otto"]:
+            with self.subTest(game=game_id):
+                self.assertIn("?embed=1", hub)
+                self.assertRegex(hub, rf"{game_id}\s*:\s*'[^']+\?embed=1'")
+
+    def test_game_shell_templates_support_embedded_mode(self):
+        shell_paths = [
+            ports.ROOT / "games" / "BillyFrontier-Android" / "packaging" / "emscripten_shell.html",
+            ports.ROOT / "games" / "Bugdom-android" / "docs" / "shell.html",
+            ports.ROOT / "games" / "Bugdom2-Android" / "packaging" / "shell.html",
+            ports.ROOT / "games" / "CroMagRally-Android" / "packaging" / "emscripten" / "shell.html",
+            ports.ROOT / "games" / "MightyMike-Android" / "docs" / "index.html",
+            ports.ROOT / "games" / "Nanosaur-android" / "packaging" / "emscripten" / "shell.html",
+            ports.ROOT / "games" / "Nanosaur2-Android" / "packaging" / "wasm" / "shell.html",
+            ports.ROOT / "games" / "OttoMatic-Android" / "docs" / "shell.html",
+        ]
+
+        for shell_path in shell_paths:
+            with self.subTest(shell=str(shell_path.relative_to(ports.ROOT))):
+                shell = shell_path.read_text(encoding="utf-8")
+                self.assertIn("embedded-shell", shell)
+                self.assertIn("embed') === '1'", shell)
+
+    def test_bugdom2_gles3_compat_reuses_webgl_buffers(self):
+        compat = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "3D"
+            / "GLES3Compat.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("gArrayVBOSize", compat)
+        self.assertIn("gArrayEBOSize", compat)
+        self.assertIn("gImmVBOSize", compat)
+        self.assertIn("glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0", compat)
+        self.assertNotIn("glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_STREAM_DRAW)", compat)
+        self.assertNotIn("glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STREAM_DRAW)", compat)
+
+    def test_cromag_alpha_masked_materials_keep_depth_writes(self):
+        meta = (
+            ports.ROOT
+            / "games"
+            / "CroMagRally-Android"
+            / "Source"
+            / "3D"
+            / "MetaObjects.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Alpha-masked textures still need depth writes", meta)
+        self.assertIn("if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))", meta)
+
+    def test_nanosaur2_show_helpers_clear_stale_cull_bits(self):
+        player = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "Player"
+            / "Player.c"
+        ).read_text(encoding="utf-8")
+        objects = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "System"
+            / "Objects.c"
+        ).read_text(encoding="utf-8")
+        objects2 = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "System"
+            / "Objects2.c"
+        ).read_text(encoding="utf-8")
+        cull_clear = "STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3"
+        self.assertGreaterEqual(player.count(cull_clear), 2)
+        self.assertIn(cull_clear, objects)
+        self.assertGreaterEqual(objects2.count(cull_clear), 2)
+
     def test_billy_frontier_docs_use_standard_query_params(self):
         billy_docs = (ports.ROOT / "games" / "BillyFrontier-Android" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn("?level=1", billy_docs)

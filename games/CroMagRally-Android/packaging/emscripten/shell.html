@@ -150,6 +150,46 @@
       font-size: 0.88rem;
       color: #ccc;
     }
+    body.embedded-shell {
+      height: 100dvh;
+      overflow: hidden;
+    }
+    body.embedded-shell #header,
+    body.embedded-shell #editor-panel {
+      display: none !important;
+    }
+    body.embedded-shell #game-wrap {
+      padding: 0;
+      height: 100dvh;
+      align-items: stretch;
+    }
+    body.embedded-shell #canvas {
+      display: block;
+      width: 100%;
+      height: 100dvh;
+      max-width: none;
+      border-radius: 0;
+    }
+    body.embedded-shell #loading-card {
+      inset: 0;
+      transform: none;
+      max-width: none;
+      border: none;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    body.embedded-shell #toolbar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 11;
+      padding: 0.75rem;
+      background: linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,0.92) 100%);
+    }
   </style>
 </head>
 <body>
@@ -206,6 +246,25 @@
     var _fenceEnabled = true;
     var _muted = false;
     var _launched = false;
+    var _isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+
+    if (_isEmbedded) {
+      document.body.classList.add('embedded-shell');
+    }
+
+    function syncCanvasSize() {
+      if (typeof Module === 'undefined' || !Module.canvas) return;
+      var dpr = window.devicePixelRatio || 1;
+      var cssW = Module.canvas.clientWidth;
+      var cssH = Module.canvas.clientHeight;
+      if (!cssW || !cssH) return;
+      var w = Math.floor(cssW * dpr);
+      var h = Math.floor(cssH * dpr);
+      if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
+        if (Module.setCanvasSize) Module.setCanvasSize(w, h);
+        else { Module.canvas.width = w; Module.canvas.height = h; }
+      }
+    }
 
     // ── Module config (Emscripten) ────────────────────────
     var Module = {
@@ -237,6 +296,7 @@
         // Hide loading card, show toolbar
         var card = document.getElementById('loading-card');
         if (card) card.style.display = 'none';
+        syncCanvasSize();
         document.getElementById('toolbar').style.display = 'flex';
 
         // Expose cheat helpers
@@ -407,6 +467,12 @@
       console.log('[CroMag] Level override written to', vfsPath,
                   '– reload with ?levelOverride=' + encodeURIComponent(virtualPath));
     };
+
+    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      window.addEventListener(evt, function() {
+        requestAnimationFrame(syncCanvasSize);
+      });
+    });
   </script>
 
   {{{ SCRIPT }}}

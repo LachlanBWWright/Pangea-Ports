@@ -154,6 +154,9 @@ static GLuint gVAO       = 0;
 static GLuint gImmVBO    = 0;   // VBO for immediate mode vertex data
 static GLuint gArrayVBO  = 0;   // VBO for vertex array draw calls
 static GLuint gArrayEBO  = 0;   // EBO for vertex array draw calls
+static size_t gImmVBOSize   = 0;
+static size_t gArrayVBOSize = 0;
+static size_t gArrayEBOSize = 0;
 
 // Uniform locations
 static GLint uProj, uMV, uLighting, uAmbient, uNLights;
@@ -634,7 +637,10 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     totalSize       = offTexc + texcBytes;
 
     if (totalSize > 0) {
-        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_STREAM_DRAW);
+        if (totalSize > gArrayVBOSize) {
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_DYNAMIC_DRAW);
+            gArrayVBOSize = totalSize;
+        }
         if (vertBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offVert,  (GLsizeiptr)vertBytes,  gVertArrayPtr);
         if (normBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offNorm,  (GLsizeiptr)normBytes,  gNormArrayPtr);
         if (colorBytes) glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offColor, (GLsizeiptr)colorBytes, gColorArrayPtr);
@@ -680,7 +686,11 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     // Upload index data to EBO
     size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gArrayEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STREAM_DRAW);
+    if (indexSize > gArrayEBOSize) {
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, NULL, GL_DYNAMIC_DRAW);
+        gArrayEBOSize = indexSize;
+    }
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)indexSize, indices);
 
     UploadUniforms();
 
@@ -1023,7 +1033,12 @@ void glEnd(void)
 
     if (outCount == 0) return;
 
-    glBufferData(GL_ARRAY_BUFFER, outCount * (GLsizei)sizeof(IMVert), expanded, GL_DYNAMIC_DRAW);
+    size_t immBytes = (size_t)outCount * sizeof(IMVert);
+    if (immBytes > gImmVBOSize) {
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)immBytes, NULL, GL_DYNAMIC_DRAW);
+        gImmVBOSize = immBytes;
+    }
+    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)immBytes, expanded);
 
     // Set up attrib pointers into the interleaved VBO
     #define STRIDE ((GLsizei)sizeof(IMVert))
