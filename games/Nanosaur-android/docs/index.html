@@ -11,15 +11,13 @@
   <meta property="og:image" content="screenshot.png">
   <meta property="og:type" content="website">
   <style>
-        :root {
-      color-scheme: dark;
-      --bg: #09111f;
-      --panel: #13203a;
-      --accent: #8cd0ff;
-      --accent-2: #ffd280;
-      --text: #edf5ff;
-      --muted: #c2d4e7;
-      --border: #27456f;
+    :root {
+      --accent: #ff8800;
+      --bg:     #0d0d0d;
+      --panel:  #1a1a1a;
+      --border: #333;
+      --text:   #eee;
+      --dim:    #aaa;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -45,7 +43,7 @@
     }
 
     header p {
-      color: var(--muted);
+      color: var(--dim);
       font-size: 0.9em;
     }
 
@@ -104,7 +102,7 @@
     }
 
     .info-card h3 { color: var(--accent); margin-bottom: 8px; font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.05em; }
-    .info-card p, .info-card li { font-size: 0.85em; color: var(--muted); line-height: 1.6; }
+    .info-card p, .info-card li { font-size: 0.85em; color: var(--dim); line-height: 1.6; }
     .info-card ul { padding-left: 16px; }
 
     .url-params {
@@ -125,7 +123,7 @@
       font-size: 0.85em;
     }
 
-    .url-params p { font-size: 0.85em; color: var(--muted); margin-bottom: 8px; line-height: 1.6; }
+    .url-params p { font-size: 0.85em; color: var(--dim); margin-bottom: 8px; line-height: 1.6; }
 
     .param-example {
       font-family: monospace;
@@ -148,29 +146,7 @@
     }
 
     footer a { color: #666; }
-
-    body.embedded-shell {
-      background: transparent;
-    }
-    body.embedded-shell header {
-      display: none;
-    }
-    body.embedded-shell #game-wrap {
-      padding: 0;
-      height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: center;
-    }
-    body.embedded-shell #canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      max-width: none;
-      border-radius: 0;
-    }
-</style>
+  </style>
 </head>
 <body>
 
