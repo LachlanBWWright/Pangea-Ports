@@ -256,9 +256,10 @@
       if (!GAME_SCRIPTS[id]) return;
 
       // If a different game is already running, reload the page to switch
+      // (Emscripten modules cannot be unloaded; we update the hash then force a reload)
       if (activeGame && activeGame !== id) {
-        location.hash = '#' + id;
-        location.reload();
+        location.hash = '#' + id;   // update hash so the reload resumes the new game
+        location.reload();           // full reload needed to clear the running Emscripten module
         return;
       }
 
@@ -340,7 +341,10 @@
       if (!canvas) return;
       var cssW = canvas.clientWidth;
       var cssH = canvas.clientHeight;
-      if (!cssW || !cssH) return;
+      if (!cssW || !cssH) {
+        console.warn('syncCanvasSize: canvas has no CSS dimensions (cssW=' + cssW + ', cssH=' + cssH + ')');
+        return;
+      }
       var dpr = window.devicePixelRatio || 1;
       var w = Math.round(cssW * dpr);
       var h = Math.round(cssH * dpr);
@@ -363,9 +367,9 @@
     });
 
     // Restore from URL hash (e.g. after a game-switch reload)
-    var _hash = window.location.hash.replace('#', '');
-    if (_hash && GAME_SCRIPTS[_hash]) {
-      selectGame(_hash);
+    var hash = window.location.hash.replace('#', '');
+    if (hash && GAME_SCRIPTS[hash]) {
+      selectGame(hash);
     }
   </script>
 </body>

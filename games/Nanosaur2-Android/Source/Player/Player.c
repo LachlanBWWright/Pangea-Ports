@@ -368,6 +368,8 @@ ObjNode	*node = player;
 	while(node)
 	{
 		node->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE;
+		if (node->ShadowNode)								// hide shadow so it doesn't linger after death
+			node->ShadowNode->StatusBits |= STATUS_BIT_HIDDEN;
 		node = node->ChainNode;
 	}
 
@@ -384,6 +386,8 @@ ObjNode	*node = player;
 	while(node)
 	{
 		node->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE | STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3);
+		if (node->ShadowNode)								// restore shadow visibility on respawn
+			node->ShadowNode->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3);
 		node = node->ChainNode;
 	}
 

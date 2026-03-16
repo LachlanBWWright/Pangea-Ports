@@ -69,8 +69,15 @@ static const int kLevelSoundBanks[NUM_LEVELS] =
 short	gPrefsFolderVRefNum;
 long	gPrefsFolderDirID;
 
+// For WebAssembly, cap rendering features to maintain acceptable frame rates.
+// gSlowCPU=true disables sphere-map reflections; gG4=false skips extra model sheen.
+#if defined(__EMSCRIPTEN__)
+Boolean				gG4 = false;
+Boolean				gSlowCPU = true;
+#else
 Boolean				gG4 = true;
 Boolean				gSlowCPU = false;
+#endif
 
 float				gGravity = NORMAL_GRAVITY;
 

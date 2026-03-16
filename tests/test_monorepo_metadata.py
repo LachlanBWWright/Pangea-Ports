@@ -188,6 +188,26 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn(cull_clear, objects)
         self.assertGreaterEqual(objects2.count(cull_clear), 2)
 
+    def test_nanosaur2_hide_player_also_hides_shadow(self):
+        """HidePlayer and ShowPlayer must propagate to ShadowNode to avoid ghost shadows on death."""
+        player = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "Player"
+            / "Player.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "ShadowNode",
+            player,
+            "HidePlayer/ShowPlayer must also update the ShadowNode",
+        )
+        self.assertIn(
+            "hide shadow so it doesn't linger after death",
+            player,
+        )
+
     def test_bugdom_main_menu_icons_keep_backfaces(self):
         main_menu = (
             ports.ROOT
