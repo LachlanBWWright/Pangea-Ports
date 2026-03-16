@@ -158,6 +158,20 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn(cull_clear, objects)
         self.assertGreaterEqual(objects2.count(cull_clear), 2)
 
+    def test_bugdom_main_menu_icons_keep_backfaces(self):
+        main_menu = (
+            ports.ROOT
+            / "games"
+            / "Bugdom-android"
+            / "src"
+            / "Screens"
+            / "MainMenu.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "STATUS_BIT_NULLSHADER | STATUS_BIT_KEEPBACKFACES",
+            main_menu,
+        )
+
     def test_billy_frontier_docs_use_standard_query_params(self):
         billy_docs = (ports.ROOT / "games" / "BillyFrontier-Android" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn("?level=1", billy_docs)
