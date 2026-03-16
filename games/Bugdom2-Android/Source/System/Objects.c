@@ -26,7 +26,7 @@ static void DrawCollisionBoxes(ObjNode *theNode, Boolean old);
 /****************************/
 
 #define	OBJ_DEL_Q_SIZE	200
-#define	MAX_POOLED_OBJS	2500
+#define	MAX_POOLED_OBJS	5000
 
 
 /**********************/

@@ -20,7 +20,7 @@
 #define	MAX_DECOMPOSED_POINTS	1200
 #define	MAX_DECOMPOSED_NORMALS	1100
 #define	MAX_POINT_REFS			10		// max times a point can be re-used in multiple places
-#define	MAX_DECOMPOSED_TRIMESHES 10
+#define	MAX_DECOMPOSED_TRIMESHES 24
 
 #define	MAX_MORPH_TRIMESHES		10
 #define	MAX_MORPH_POINTS		1000
