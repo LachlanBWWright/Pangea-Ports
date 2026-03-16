@@ -196,6 +196,47 @@
     }
     #footer a { color: #7070a0; text-decoration: none; }
     #footer a:hover { color: var(--accent); }
+    body.embedded-shell {
+      height: 100dvh;
+      overflow: hidden;
+    }
+    body.embedded-shell #header,
+    body.embedded-shell #dev-panel,
+    body.embedded-shell #footer {
+      display: none !important;
+    }
+    body.embedded-shell #game-wrap {
+      padding: 0;
+      height: 100dvh;
+      align-items: stretch;
+    }
+    body.embedded-shell #canvas {
+      display: block;
+      width: 100%;
+      height: 100dvh;
+      max-width: none;
+      border-radius: 0;
+    }
+    body.embedded-shell #loading-card {
+      inset: 0;
+      transform: none;
+      max-width: none;
+      border: none;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    body.embedded-shell #toolbar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 11;
+      padding: 0.75rem;
+      background: linear-gradient(180deg, rgba(10,10,18,0) 0%, rgba(10,10,18,0.92) 100%);
+    }
 
     {{{ STYLE }}}
   </style>
@@ -376,6 +417,26 @@
     });
 
     // ── Emscripten Module ─────────────────────────────────
+    var _isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+
+    if (_isEmbedded) {
+      document.body.classList.add('embedded-shell');
+    }
+
+    function syncCanvasSize() {
+      if (typeof Module === 'undefined' || !Module.canvas) return;
+      var dpr = window.devicePixelRatio || 1;
+      var cssW = Module.canvas.clientWidth;
+      var cssH = Module.canvas.clientHeight;
+      if (!cssW || !cssH) return;
+      var w = Math.floor(cssW * dpr);
+      var h = Math.floor(cssH * dpr);
+      if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
+        if (Module.setCanvasSize) Module.setCanvasSize(w, h);
+        else { Module.canvas.width = w; Module.canvas.height = h; }
+      }
+    }
+
     var Module = {
       canvas: document.getElementById('canvas'),
 
@@ -495,6 +556,7 @@
         } else {
           // Loading finished — hide the loading overlay, focus canvas
           if (card)    card.style.display    = 'none';
+          syncCanvasSize();
           if (canvas)  canvas.focus();
           if (toolbar) toolbar.style.display  = 'flex';
         }
@@ -665,6 +727,12 @@
       } catch (e) { /* ignore */ }
       if (btn) btn.textContent = _muted ? '🔇 Muted' : '🔊 Unmute';
     }
+
+    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      window.addEventListener(evt, function() {
+        requestAnimationFrame(syncCanvasSize);
+      });
+    });
   </script>
 
   {{{ SCRIPT }}}

@@ -822,11 +822,12 @@ uint32_t				matFlags;
 	{
 	    glEnable(GL_BLEND);
 #ifdef __EMSCRIPTEN__
-	    // Disable depth writes whenever blending is on so that semi-transparent
-	    // or alpha-keyed billboard pixels (e.g. power-up sprites) do not write
-	    // stale depth values that would hide opaque geometry drawn later.
-	    // Depth writes are restored after each node in Objects.c DrawObjects().
-	    glDepthMask(GL_FALSE);
+	    // Alpha-masked textures still need depth writes so that cut-out geometry
+	    // (such as fences/foliage using glAlphaFunc) sorts correctly against the
+	    // rest of the scene.  Only disable depth writes for truly translucent
+	    // materials or materials explicitly forcing blending.
+	    if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))
+	        glDepthMask(GL_FALSE);
 #endif
 	}
 	else
@@ -1533,7 +1534,6 @@ MOVertexArrayObject	*vObj;
 		uvPtr[i].v += dv;
 	}
 }
-
 
 
 

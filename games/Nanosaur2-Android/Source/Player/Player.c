@@ -383,7 +383,7 @@ ObjNode	*node = player;
 
 	while(node)
 	{
-		node->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE);
+		node->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE | STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3);
 		node = node->ChainNode;
 	}
 
@@ -1016,7 +1016,7 @@ float	fps = gFramesPerSecondFrac;
 	if (player->StatusBits & STATUS_BIT_HIDDEN)
 		shield->StatusBits |= STATUS_BIT_HIDDEN;
 	else
-		shield->StatusBits &= ~STATUS_BIT_HIDDEN;
+		shield->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3);
 
 
 			/* DO TEXTURE ANIMATION */
@@ -1265,4 +1265,3 @@ void UpdatePlayerSteering(int playerNum)
 			CreatePlayerShield(playerNum);
 	}
 }
-

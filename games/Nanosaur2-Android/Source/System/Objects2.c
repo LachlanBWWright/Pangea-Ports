@@ -445,7 +445,7 @@ Boolean	onBlocker = false;
 	if (theNode->StatusBits & STATUS_BIT_HIDDEN)					// hide shadow if parent hidden
 		shadowNode->StatusBits |= STATUS_BIT_HIDDEN;
 	else
-		shadowNode->StatusBits &= ~STATUS_BIT_HIDDEN;
+		shadowNode->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3);
 
 
 	shadowNode->ColorFilter.a = theNode->ColorFilter.a * .9f;		// match fade and decay a little to adjust it how we want it
@@ -1025,7 +1025,7 @@ ObjNode	*node = theNode;
 
 	while(node)
 	{
-		node->StatusBits &= ~STATUS_BIT_HIDDEN;
+		node->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_ISCULLED1 | STATUS_BIT_ISCULLED2 | STATUS_BIT_ISCULLED3);
 		node = node->ChainNode;
 	}
 }
@@ -1062,7 +1062,5 @@ ObjNode* MakeBackgroundPictureObject(const char* imagePath)
 	MO_DisposeObjectReference(backgroundPicture);
 	return obj;
 }
-
-
 
 

@@ -366,7 +366,7 @@ ObjNode					*newObj;
 
 		gNewObjectDefinition.type 		= iconType[i];	
 		gNewObjectDefinition.coord		= iconCoords[i];
-		gNewObjectDefinition.flags 		= STATUS_BIT_NULLSHADER;
+		gNewObjectDefinition.flags 		= STATUS_BIT_NULLSHADER | STATUS_BIT_KEEPBACKFACES;
 		gNewObjectDefinition.moveCall 	= nil;
 		gNewObjectDefinition.rot 		= 0;
 		gNewObjectDefinition.scale 		= .25;
@@ -464,7 +464,6 @@ Boolean	b = FlushMouseButtonPress() || GetNewKeyState(kKey_UI_PadConfirm);
 
 	MorphToSkeletonAnim(gSpider->Skeleton, 0, 4);
 }
-
 
 
 
