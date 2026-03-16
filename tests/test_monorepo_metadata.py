@@ -172,6 +172,18 @@ class MonorepoMetadataTests(unittest.TestCase):
             main_menu,
         )
 
+    def test_billy_and_bugdom2_shells_guard_fullscreen_canvas_resize(self):
+        shell_paths = [
+            ports.ROOT / "games" / "BillyFrontier-Android" / "packaging" / "emscripten_shell.html",
+            ports.ROOT / "games" / "Bugdom2-Android" / "packaging" / "shell.html",
+        ]
+
+        for shell_path in shell_paths:
+            with self.subTest(shell=str(shell_path.relative_to(ports.ROOT))):
+                shell = shell_path.read_text(encoding="utf-8")
+                self.assertIn("if (!cssW || !cssH) return;", shell)
+                self.assertIn("requestAnimationFrame(syncCanvasSize);", shell)
+
     def test_billy_frontier_docs_use_standard_query_params(self):
         billy_docs = (ports.ROOT / "games" / "BillyFrontier-Android" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn("?level=1", billy_docs)
