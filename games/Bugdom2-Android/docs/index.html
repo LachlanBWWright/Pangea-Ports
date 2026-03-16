@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bugdom 2 – WebAssembly</title>
   <style>
-    :root {
-      --accent: #6fbf6f;
-      --bg:     #0d0d0d;
-      --panel:  #111a11;
-      --border: #1f3a1f;
-      --text:   #d0d0d0;
-      --dim:    #666;
+        :root {
+      color-scheme: dark;
+      --bg: #09111f;
+      --panel: #13203a;
+      --accent: #8cd0ff;
+      --accent-2: #ffd280;
+      --text: #edf5ff;
+      --muted: #c2d4e7;
+      --border: #27456f;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -40,7 +42,7 @@
 
     header p {
       font-size: 0.9em;
-      color: var(--dim);
+      color: var(--muted);
     }
 
     .container {
@@ -183,7 +185,29 @@
       border-top: 1px solid #1a1a1a;
     }
     footer a { color: #5a9f5a; }
-  </style>
+
+    body.embedded-shell {
+      background: transparent;
+    }
+    body.embedded-shell header {
+      display: none;
+    }
+    body.embedded-shell #game-wrap {
+      padding: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+    }
+    body.embedded-shell #canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      border-radius: 0;
+    }
+</style>
 </head>
 <body>
 
@@ -267,6 +291,11 @@ fetch('my_custom_level.ter')
 </footer>
 
 <script>
+    var _isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+    if (_isEmbedded) {
+      document.body.classList.add('embedded-shell');
+    }
+
   var GAME_URL = 'Bugdom2.html';
 
   var levels = [

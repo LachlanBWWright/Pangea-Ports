@@ -270,7 +270,7 @@ static GLsizei      gVertexCountHint    = 0;
 // Immediate mode
 //=============================================================
 
-#define IM_MAX_VERTS 2048
+#define IM_MAX_VERTS 8192
 
 typedef struct {
     float x,  y,  z;

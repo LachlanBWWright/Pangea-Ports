@@ -14,11 +14,11 @@
 #define MAX_FLAGS_IN_OBJNODE			4		// # flags in ObjNode
 
 
-#define	MAX_DECOMPOSED_POINTS	1000
-#define	MAX_DECOMPOSED_NORMALS	800
+#define	MAX_DECOMPOSED_POINTS	2000
+#define	MAX_DECOMPOSED_NORMALS	1600
 #define	MAX_POINTS_ON_BONE		100		// DONT CHANGE!! MUST MATCH VALUE IN BIO-OREO PRO SINCE IS WIRED INTO ARRAY IN SKELETON FILE!!
 #define	MAX_POINT_REFS			10		// max times a point can be re-used in multiple places
-#define	MAX_DECOMPOSED_TRIMESHES 36		// 10 is enough for most of the game, but the endgame throne room is made of 36 submeshes
+#define	MAX_DECOMPOSED_TRIMESHES 64		// 10 is enough for most of the game, but the endgame throne room is made of 36 submeshes
 
 
 

@@ -29,7 +29,7 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 #define MAX_FILL_LIGHTS   4
 #define MATRIX_STACK_DEPTH 32
-#define IMMED_MAX_VERTS   4096
+#define IMMED_MAX_VERTS   16384
 
 // ── Forward declarations for Emscripten's real GL functions ───────────────────
 // These are provided by Emscripten's WebGL library and bypass our wrappers.
