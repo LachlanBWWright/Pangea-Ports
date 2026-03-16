@@ -100,7 +100,7 @@ float	rotY;
 	gNewObjectDefinition.type		= 0;
 	gNewObjectDefinition.scale 		= PLAYER_BALL_SCALE;
 	gNewObjectDefinition.coord		= gMyCoord;
-	gNewObjectDefinition.flags 		= STATUS_BIT_DONTCULL;
+	gNewObjectDefinition.flags 		= STATUS_BIT_DONTCULL | STATUS_BIT_KEEPBACKFACES;
 	gNewObjectDefinition.slot 		= PLAYER_SLOT;
 	gNewObjectDefinition.moveCall 	= MovePlayer_Ball;
 	gNewObjectDefinition.rot 		= rotY;

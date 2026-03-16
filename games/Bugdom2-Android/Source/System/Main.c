@@ -556,6 +556,8 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_SIDEWALK:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
+#elif defined(__EMSCRIPTEN__)
+				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -588,6 +590,8 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_PLAYROOM:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
+#elif defined(__EMSCRIPTEN__)
+				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -614,6 +618,8 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_GARBAGE:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
+#elif defined(__EMSCRIPTEN__)
+				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -657,6 +663,8 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_PARK:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
+#elif defined(__EMSCRIPTEN__)
+				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -672,6 +680,8 @@ OGLSetupInputType	viewDef;
 		default:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
+#elif defined(__EMSCRIPTEN__)
+				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gSlowCPU)
 					gSuperTileActiveRange = 3;
