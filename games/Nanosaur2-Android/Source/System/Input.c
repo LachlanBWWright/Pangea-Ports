@@ -1010,6 +1010,7 @@ void ResetDefaultMouseBindings(void)
 #if MOUSE_SMOOTHING
 static void MouseSmoothing_PopOldestSnapshot(void)
 {
+	static const float kAccumulatorEpsilon = 0.0001f;
 	struct MouseSmoothingState* state = &gMouseSmoothing;
 
 	state->dxAccu -= state->snapshots[state->ringStart].dx;
@@ -1018,7 +1019,7 @@ static void MouseSmoothing_PopOldestSnapshot(void)
 	state->ringStart = (state->ringStart + 1) % DELTA_MOUSE_MAX_SNAPSHOTS;
 	state->ringLength--;
 
-	GAME_ASSERT(state->ringLength != 0 || (state->dxAccu == 0 && state->dyAccu == 0));
+	GAME_ASSERT(state->ringLength != 0 || (fabsf(state->dxAccu) < kAccumulatorEpsilon && fabsf(state->dyAccu) < kAccumulatorEpsilon));
 }
 
 static void MouseSmoothing_ResetState(void)

@@ -158,6 +158,59 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("if (!noZWrites)", objects)
         self.assertIn("glDepthMask(GL_TRUE);", objects)
 
+    def test_bugdom2_and_nanosaur2_restore_depth_writes_after_blended_materials(self):
+        for game in ["Bugdom2-Android", "Nanosaur2-Android"]:
+            with self.subTest(game=game):
+                meta = (
+                    ports.ROOT
+                    / "games"
+                    / game
+                    / "Source"
+                    / "3D"
+                    / "MetaObjects.c"
+                ).read_text(encoding="utf-8")
+                objects = (
+                    ports.ROOT
+                    / "games"
+                    / game
+                    / "Source"
+                    / "System"
+                    / "Objects.c"
+                ).read_text(encoding="utf-8")
+                self.assertIn("Alpha-masked textures still need depth writes", meta)
+                self.assertIn("transparent material was drawn", objects)
+                self.assertIn("if (!noZWrites)", objects)
+                self.assertIn("glDepthMask(GL_TRUE);", objects)
+
+    def test_bugdom2_and_nanosaur2_mouse_smoothing_uses_epsilon_assert(self):
+        for game in ["Bugdom2-Android", "Nanosaur2-Android"]:
+            with self.subTest(game=game):
+                input_c = (
+                    ports.ROOT
+                    / "games"
+                    / game
+                    / "Source"
+                    / "System"
+                    / "Input.c"
+                ).read_text(encoding="utf-8")
+                self.assertIn("kAccumulatorEpsilon", input_c)
+                self.assertIn("fabsf(state->dxAccu) < kAccumulatorEpsilon", input_c)
+                self.assertIn("fabsf(state->dyAccu) < kAccumulatorEpsilon", input_c)
+
+    def test_bugdom_cyclorama_keeps_backfaces(self):
+        items = (
+            ports.ROOT
+            / "games"
+            / "Bugdom-android"
+            / "src"
+            / "Items"
+            / "Items.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "STATUS_BIT_DONTCULL | STATUS_BIT_KEEPBACKFACES | STATUS_BIT_NULLSHADER | STATUS_BIT_NOFOG | STATUS_BIT_HIDDEN",
+            items,
+        )
+
     def test_nanosaur2_show_helpers_clear_stale_cull_bits(self):
         player = (
             ports.ROOT
