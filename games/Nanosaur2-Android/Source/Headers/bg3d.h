@@ -47,6 +47,7 @@ enum
 	BG3D_MATERIALFLAG_MULTITEXTURE	=	(1<<4),
 	BG3D_MATERIALFLAG_CLAMP_U_TRUE	=	(1<<5),	// this flag is set after glTexParameterf has been called to set clamping for this texture
 	BG3D_MATERIALFLAG_CLAMP_V_TRUE	=	(1<<6),
+	BG3D_MATERIALFLAG_CLIPALPHA		=	(1<<7),	// runtime-only: current draw uses alpha clipping instead of translucent blending
 };
 
 
@@ -129,4 +130,3 @@ void SetSphereMapInfoOnMaterialObject(MOMaterialObject *mat, uint16_t combineMod
 
 
 #endif
-

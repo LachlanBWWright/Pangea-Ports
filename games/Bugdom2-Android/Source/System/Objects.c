@@ -637,13 +637,17 @@ float			cameraX, cameraZ;
 				glAlphaFunc(GL_EQUAL, 1);	// draw any pixel who's Alpha == 1, skip semi-transparent pixels
 				clipAlpha = true;
 			}
+			gGlobalMaterialFlags |= BG3D_MATERIALFLAG_CLIPALPHA;
 		}
 		else
 		if (clipAlpha)
 		{
 			clipAlpha = false;
 			glAlphaFunc(GL_NOTEQUAL, 0);	// draw any pixel who's Alpha != 0
+			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 		}
+		else
+			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 
 
 			/* AIM AT CAMERA */
@@ -824,6 +828,7 @@ next:
 
 	if (clipAlpha)
 		glAlphaFunc(GL_NOTEQUAL, 0);
+	gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 
 
 	gGlobalTransparency = 			// reset this in case it has changed

@@ -753,6 +753,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 				clipAlpha = true;
 //				glEnable(GL_ALPHA_TEST);	//--------
 			}
+			gGlobalMaterialFlags |= BG3D_MATERIALFLAG_CLIPALPHA;
 		}
 		else
 		if (clipAlpha)
@@ -761,7 +762,10 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 			glAlphaFunc(GL_NOTEQUAL, 0);	// draw any pixel who's Alpha != 0
 
 //			glDisable(GL_ALPHA_TEST);	//--------
+			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 		}
+		else
+			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 
 
 			/* AIM AT CAMERA */
@@ -959,6 +963,7 @@ next:
 
 	if (clipAlpha)
 		glAlphaFunc(GL_NOTEQUAL, 0);
+	gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 
 
 	gGlobalTransparency = 			// reset this in case it has changed
