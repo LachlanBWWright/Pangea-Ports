@@ -348,6 +348,30 @@ class MonorepoMetadataTests(unittest.TestCase):
             main_menu,
         )
 
+    def test_bugdom_renderer_averages_multi_mesh_depth_for_sorting(self):
+        renderer = (
+            ports.ROOT
+            / "games"
+            / "Bugdom-android"
+            / "src"
+            / "QD3D"
+            / "Renderer.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("float mult = 1.0f / (2.0f * (float) numMeshes);", renderer)
+
+    def test_bugdom_vertex_color_alpha_pass_applies_render_modifier_alpha(self):
+        renderer = (
+            ports.ROOT
+            / "games"
+            / "Bugdom-android"
+            / "src"
+            / "QD3D"
+            / "Renderer.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("* mesh->diffuseColor.a", renderer)
+        self.assertIn("* entry->mods->diffuseColor.a", renderer)
+        self.assertIn("* entry->mods->autoFadeFactor;", renderer)
+
     def test_bugdom_player_ball_keeps_backfaces(self):
         """Player_Ball.c must use STATUS_BIT_KEEPBACKFACES so the roll-mode mesh renders."""
         ball = (
