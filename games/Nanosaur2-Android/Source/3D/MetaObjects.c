@@ -1023,7 +1023,7 @@ uint32_t				matFlags;
 
 
 	bool clipAlpha = 0 != (matFlags & BG3D_MATERIALFLAG_CLIPALPHA);
-	bool wantBlend = (!clipAlpha && textureHasAlpha) || (diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND);
+	bool wantBlend = !clipAlpha && ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND));
 
 	if (wantBlend)		// if has translucent alpha, then we need blending on
 	{

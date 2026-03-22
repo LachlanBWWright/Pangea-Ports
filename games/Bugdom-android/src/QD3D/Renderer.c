@@ -734,6 +734,14 @@ return dst;
 }
 #endif // __EMSCRIPTEN__
 
+/********************* CLASSIFY PIXMAP OPACITY ************************/
+//
+// Inspect the 3DMF pixmap's alpha usage so we can choose the least-expensive
+// correct texturing mode:
+//   - fully opaque alpha    -> kQ3TexturingModeOpaque
+//   - binary 0/255 alpha    -> kQ3TexturingModeAlphaTest
+//   - intermediate alpha    -> kQ3TexturingModeAlphaBlend
+//
 static TQ3TexturingMode ClassifyPixmapOpacity(const TQ3TextureShader* textureShader)
 {
 	switch (textureShader->pixmap->pixelType)
@@ -960,6 +968,7 @@ for (int i = 0; i < metaFile->numTextures; i++)
 {
 TQ3TextureShader* textureShader = &metaFile->textures[i];
 GAME_ASSERT(textureShader->pixmap);
+GAME_ASSERT(textureShader->pixmap->image);
 
 TQ3TexturingMode meshTexturingMode = kQ3TexturingModeOff;
 GLenum internalFormat;

@@ -38,6 +38,7 @@ static void ReadUVArray(short refNum);
 static void ReadVertexColorArray(short refNum);
 static void ReadTriangleArray(short refNum);
 static void PreLoadTextureMaterials(void);
+static void ClassifyMaterialTextureOpacityRGBA(MOMaterialData* matData, const uint8_t* pixels, int width, int height);
 
 
 /****************************/
@@ -766,6 +767,10 @@ void				*pixels;
 			pixels 		= matData->texturePixels[0];			// get ptr to pixel buffer
 			w 			= matData->width;						// get width
 			h 			= matData->height;						// get height
+			GAME_ASSERT(pixels);
+
+			if ((matData->pixelSrcFormat == GL_RGBA) && (matData->pixelDstFormat == GL_RGBA))
+				ClassifyMaterialTextureOpacityRGBA(matData, pixels, w, h);
 
 
 				/* LOAD INTO OPENGL */
@@ -791,6 +796,39 @@ void				*pixels;
 //			MoviesTask(gSongMovie, 0);
 
 	}
+}
+
+/********************* CLASSIFY MATERIAL TEXTURE OPACITY ************************/
+//
+// Inspect an RGBA texture's alpha channel so we can collapse obviously opaque
+// textures to GL_RGB and tag binary-alpha textures as clip-alpha materials.
+// Truly translucent textures are left unchanged so the runtime still blends them.
+//
+static void ClassifyMaterialTextureOpacityRGBA(MOMaterialData* matData, const uint8_t* pixels, int width, int height)
+{
+	bool sawTransparentPixel = false;
+	size_t pixelCount = (size_t) width * (size_t) height;
+
+	// This only clears the runtime opacity-classification bit that we derive from
+	// the actual texture contents while loading the material.  File-authored
+	// material flags live in the lower bits and are preserved.
+	matData->flags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
+
+	for (size_t i = 0; i < pixelCount; i++)
+	{
+		uint8_t alpha = pixels[i * 4 + 3];
+		if (alpha == 255)
+			continue;
+
+		sawTransparentPixel = true;
+		if (alpha != 0)
+			return;
+	}
+
+	if (sawTransparentPixel)
+		matData->flags |= BG3D_MATERIALFLAG_CLIPALPHA;
+	else
+		matData->pixelDstFormat = GL_RGB;
 }
 
 
@@ -871,15 +909,6 @@ int					n,i;
 		mat->objectData.flags |= flags;					// set flags
 	}
 }
-
-
-
-
-
-
-
-
-
 
 
 
