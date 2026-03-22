@@ -10,6 +10,7 @@ dist/
 .idea/
 .DS_Store
 *.user
+android/app/.cxx/
 
 # Python
 __pycache__/
