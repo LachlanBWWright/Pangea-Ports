@@ -196,6 +196,46 @@ class MonorepoMetadataTests(unittest.TestCase):
                 self.assertIn("kAccumulatorEpsilon", input_c)
                 self.assertIn("fabsf(state->dxAccu) < kAccumulatorEpsilon", input_c)
                 self.assertIn("fabsf(state->dyAccu) < kAccumulatorEpsilon", input_c)
+                if game == "Bugdom2-Android":
+                    self.assertIn("if (state->ringLength <= 0)", input_c)
+                    self.assertIn("state->dxAccu = 0;", input_c)
+                    self.assertIn("state->dyAccu = 0;", input_c)
+
+    def test_bugdom2_gles3_compat_tracks_webgl_state_without_queries(self):
+        compat_h = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "Headers"
+            / "gles3compat.h"
+        ).read_text(encoding="utf-8")
+        compat_c = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "3D"
+            / "GLES3Compat.c"
+        ).read_text(encoding="utf-8")
+        ogl = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "3D"
+            / "OGL_Support.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("#define glBlendFunc     GLES3_BlendFunc", compat_h)
+        self.assertIn("#define glDepthMask     GLES3_DepthMask", compat_h)
+        self.assertIn("#define glGetBooleanv   GLES3_GetBooleanv", compat_h)
+        self.assertIn("static bool  gDepthWriteEnabled     = true;", compat_c)
+        self.assertIn("static GLenum gBlendSrcFactor       = GL_ONE;", compat_c)
+        self.assertIn("static GLenum gBlendDstFactor       = GL_ZERO;", compat_c)
+        self.assertIn("case GL_DEPTH_WRITEMASK:", compat_c)
+        self.assertIn("*p = (GLint) gBlendSrcFactor;", compat_c)
+        self.assertIn("*p = (GLint) gBlendDstFactor;", compat_c)
+        self.assertIn("glGetBooleanv(GL_DEPTH_WRITEMASK, &gStateStack_DepthMask[i]);", ogl)
 
     def test_bugdom_cyclorama_keeps_backfaces(self):
         items = (
