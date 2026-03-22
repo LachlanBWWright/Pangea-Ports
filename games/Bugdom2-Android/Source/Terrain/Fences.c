@@ -499,7 +499,7 @@ float			cameraX, cameraZ;
 
 			/* SET GLOBAL MATERIAL FLAGS */
 
-	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V|BG3D_MATERIALFLAG_ALWAYSBLEND;
+	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V;
 
 
 			/*******************/
@@ -675,6 +675,12 @@ Boolean					overrideAlphaFunc = false;
 
 		/* ACTIVATE MATERIAL */
 
+	uint32_t oldMaterialFlags = gGlobalMaterialFlags;
+	if (overrideAlphaFunc)
+		gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;
+	else
+		gGlobalMaterialFlags |= BG3D_MATERIALFLAG_CLIPALPHA;
+
 	MO_DrawMaterial(gFenceMaterials[f]);
 
 	if (overrideAlphaFunc)				// override alpha func settings if any vertex alphas are not opaque
@@ -684,6 +690,8 @@ Boolean					overrideAlphaFunc = false;
 			/* SUBMIT GEO */
 
 	MO_DrawGeometry_VertexArray(&gFenceMeshes[f]);
+
+	gGlobalMaterialFlags = oldMaterialFlags;
 
 
 			/* SUBMIT BACKFACES SEPARATELY IF LIT */
@@ -1074,7 +1082,6 @@ Boolean			intersected;
 
 	return(false);
 }
-
 
 
 

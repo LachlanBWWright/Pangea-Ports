@@ -42,7 +42,8 @@ enum
 	BG3D_MATERIALFLAG_ALWAYSBLEND	=	(1<<1),	// set if always want to GL_BLEND this texture when drawn
 	BG3D_MATERIALFLAG_CLAMP_U		=	(1<<2),
 	BG3D_MATERIALFLAG_CLAMP_V		=	(1<<3),
-	BG3D_MATERIALFLAG_MULTITEXTURE	=	(1<<4)
+	BG3D_MATERIALFLAG_MULTITEXTURE	=	(1<<4),
+	BG3D_MATERIALFLAG_CLIPALPHA		=	(1<<7),	// runtime-only: current draw uses alpha clipping instead of translucent blending
 
 };
 

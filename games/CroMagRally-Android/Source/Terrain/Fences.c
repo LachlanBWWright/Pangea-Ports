@@ -562,6 +562,7 @@ float					dist,alpha = 1.0f;
 long					i,numNubs,j;
 FenceDefType			*fence;
 OGLPoint3D				*nubs;
+Boolean					hasTransparentVertexAlpha = false;
 
 			/* GET FENCE INFO */
 
@@ -602,6 +603,8 @@ OGLPoint3D				*nubs;
 //		else
 //			dist = 1.0f;
 
+		hasTransparentVertexAlpha |= alpha < 1.0f;
+
 		gFenceColors[f][j].a =
 		gFenceColors[f][j+1].a = 255.0f * alpha;
 	}
@@ -617,7 +620,14 @@ OGLPoint3D				*nubs;
 		gFenceTriMeshData[f].materials[0] = gFenceMaterials[FENCE_TYPE_SEAWEED + gSeaweedFrame];	// set illegal temporary ref to material
 	}
 
+	uint32_t oldMaterialFlags = gGlobalMaterialFlags;
+	if (hasTransparentVertexAlpha)
+		gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;
+	else
+		gGlobalMaterialFlags |= BG3D_MATERIALFLAG_CLIPALPHA;
+
 	MO_DrawGeometry_VertexArray(&gFenceTriMeshData[f]);
+	gGlobalMaterialFlags = oldMaterialFlags;
 }
 
 
@@ -948,6 +958,3 @@ float			intersectX,intersectZ;
 
 	return(false);
 }
-
-
-

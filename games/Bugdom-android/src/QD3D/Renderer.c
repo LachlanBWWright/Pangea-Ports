@@ -734,6 +734,59 @@ return dst;
 }
 #endif // __EMSCRIPTEN__
 
+/********************* CLASSIFY PIXMAP OPACITY ************************/
+//
+// Inspect the 3DMF pixmap's alpha usage so we can choose the least-expensive
+// correct texturing mode:
+//   - fully opaque alpha    -> kQ3TexturingModeOpaque
+//   - binary 0/255 alpha    -> kQ3TexturingModeAlphaTest
+//   - intermediate alpha    -> kQ3TexturingModeAlphaBlend
+//
+static TQ3TexturingMode ClassifyPixmapOpacity(const TQ3TextureShader* textureShader)
+{
+	switch (textureShader->pixmap->pixelType)
+	{
+		case kQ3PixelTypeRGB32:
+		case kQ3PixelTypeRGB16:
+		case kQ3PixelTypeRGB24:
+			return kQ3TexturingModeOpaque;
+
+		case kQ3PixelTypeARGB16:
+			return kQ3TexturingModeAlphaTest;
+
+		case kQ3PixelTypeARGB32:
+		{
+			bool sawTransparentPixel = false;
+			const uint8_t* pixels = (const uint8_t*) textureShader->pixmap->image;
+			int width = textureShader->pixmap->width;
+			int height = textureShader->pixmap->height;
+			int rowBytes = textureShader->pixmap->rowBytes;
+			if (rowBytes <= 0)
+				rowBytes = width * 4;
+
+			for (int y = 0; y < height; y++)
+			{
+				const uint8_t* row = pixels + y * rowBytes;
+				for (int x = 0; x < width; x++)
+				{
+					uint8_t alpha = row[x * 4 + 3];
+					if (alpha == 255)
+						continue;
+
+					sawTransparentPixel = true;
+					if (alpha != 0)
+						return kQ3TexturingModeAlphaBlend;
+				}
+			}
+
+			return sawTransparentPixel ? kQ3TexturingModeAlphaTest : kQ3TexturingModeOpaque;
+		}
+
+		default:
+			return kQ3TexturingModeOff;
+	}
+}
+
 GLuint Render_LoadTexture(
 GLenum internalFormat,
 int width,
@@ -915,48 +968,54 @@ for (int i = 0; i < metaFile->numTextures; i++)
 {
 TQ3TextureShader* textureShader = &metaFile->textures[i];
 GAME_ASSERT(textureShader->pixmap);
+GAME_ASSERT(textureShader->pixmap->image);
 
 TQ3TexturingMode meshTexturingMode = kQ3TexturingModeOff;
 GLenum internalFormat;
 GLenum format;
 GLenum type;
 
-switch (textureShader->pixmap->pixelType)
-{
-case kQ3PixelTypeRGB32:
-meshTexturingMode = kQ3TexturingModeOpaque;
-internalFormat = GL_RGB;
-format = GL_BGRA;
-type   = GL_UNSIGNED_INT_8_8_8_8_REV;
-break;
-case kQ3PixelTypeARGB32:
-meshTexturingMode = kQ3TexturingModeAlphaBlend;
-internalFormat = GL_RGBA;
-format = GL_BGRA;
-type   = GL_UNSIGNED_INT_8_8_8_8_REV;
-break;
-case kQ3PixelTypeRGB16:
-meshTexturingMode = kQ3TexturingModeOpaque;
-internalFormat = GL_RGB;
-format = GL_BGRA;
-type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
-break;
-case kQ3PixelTypeARGB16:
-meshTexturingMode = kQ3TexturingModeAlphaTest;
-internalFormat = GL_RGBA;
-format = GL_BGRA;
-type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
-break;
-case kQ3PixelTypeRGB24:
-meshTexturingMode = kQ3TexturingModeOpaque;
-internalFormat = GL_RGB;
-format = GL_BGR;
-type   = GL_UNSIGNED_BYTE;
-break;
-default:
-DoAlert("3DMF texture: Unsupported kQ3PixelType");
-continue;
-}
+	switch (textureShader->pixmap->pixelType)
+	{
+		case kQ3PixelTypeRGB32:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGB;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_INT_8_8_8_8_REV;
+			break;
+
+		case kQ3PixelTypeARGB32:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGBA;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_INT_8_8_8_8_REV;
+			break;
+
+		case kQ3PixelTypeRGB16:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGB;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
+			break;
+
+		case kQ3PixelTypeARGB16:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGBA;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
+			break;
+
+		case kQ3PixelTypeRGB24:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGB;
+			format = GL_BGR;
+			type   = GL_UNSIGNED_BYTE;
+			break;
+
+		default:
+			DoAlert("3DMF texture: Unsupported kQ3PixelType");
+			continue;
+	}
 
 int clampFlags = forceClampUVs ? kRendererTextureFlags_ClampBoth : 0;
 if (textureShader->boundaryU == kQ3ShaderUVBoundaryClamp)

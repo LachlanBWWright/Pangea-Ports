@@ -485,6 +485,7 @@ static void DrawFences(ObjNode *theNode)
 {
 long		f,type;
 Byte		buffNum;
+Boolean		hasTransparentVertexAlpha;
 
 #pragma unused	(theNode)
 
@@ -493,7 +494,7 @@ Byte		buffNum;
 
 			/* SET GLOBAL MATERIAL FLAGS */
 
-	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V|BG3D_MATERIALFLAG_ALWAYSBLEND;
+	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V;
 
 
 			/*******************/
@@ -505,6 +506,7 @@ Byte		buffNum;
 	for (f = 0; f < gNumFences; f++)
 	{
 		type = gFenceList[f].type;							// get type
+		hasTransparentVertexAlpha = false;
 
 		if (type == FENCE_TYPE_INVISIBLEBLOCKENEMY			// don't bother with invisible fences
 			&& gDebugMode != 2)								// unless we're in debug mode
@@ -526,8 +528,24 @@ Byte		buffNum;
 
 					/* SUBMIT IT */
 
+			for (int j = 0; j < gFenceList[f].numNubs * 2; j++)
+			{
+				if (gFenceVertexArrays[buffNum].fenceColors[f][j].a < 1.0f)
+				{
+					hasTransparentVertexAlpha = true;
+					break;
+				}
+			}
+
+			uint32_t oldMaterialFlags = gGlobalMaterialFlags;
+			if (hasTransparentVertexAlpha)
+				gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;
+			else
+				gGlobalMaterialFlags |= BG3D_MATERIALFLAG_CLIPALPHA;
+
 			MO_DrawMaterial(gFenceMaterials[f]);
 			MO_DrawGeometry_VertexArray(&gFenceTriMeshData[f][buffNum]);
+			gGlobalMaterialFlags = oldMaterialFlags;
 
 			gNumFencesDrawn++;
 
@@ -970,4 +988,3 @@ Boolean			intersected;
 }
 
 #endif
-

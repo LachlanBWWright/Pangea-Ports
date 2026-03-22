@@ -731,13 +731,17 @@ short			skelType, playerNum;
 				glAlphaFunc(GL_EQUAL, 1);	// draw any pixel who's Alpha == 1, skip semi-transparent pixels
 				clipAlpha = true;
 			}
+			gGlobalMaterialFlags |= BG3D_MATERIALFLAG_CLIPALPHA;
 		}
 		else
 		if (clipAlpha)
 		{
 			clipAlpha = false;
 			glAlphaFunc(GL_NOTEQUAL, 0);	// draw any pixel who's Alpha != 0
+			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 		}
+		else
+			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 #endif
 
 
@@ -942,6 +946,7 @@ next:
 	if (clipAlpha)
 		glAlphaFunc(GL_NOTEQUAL, 0);
 #endif
+	gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
 
 
 #if ALLOW_GL_CLIP_HINTS
