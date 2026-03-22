@@ -287,6 +287,8 @@
       var labelEl    = document.getElementById('progress-label');
       var card       = document.getElementById('loading-card');
       var scriptSrc  = GAME_SCRIPTS[id];
+      var scriptUrl  = new URL(scriptSrc, document.baseURI);
+      var assetBase  = scriptUrl.href.substring(0, scriptUrl.href.lastIndexOf('/') + 1);
 
       statusEl.textContent = 'Loading ' + GAME_NAMES[id] + '…';
 
@@ -296,10 +298,15 @@
       // Configure Emscripten Module before the script is evaluated
       window.Module = {
         canvas: document.getElementById('canvas'),
-        // Let Emscripten resolve .wasm/.data from the script's own directory.
+        // Resolve all runtime assets from the selected game's deployment directory.
         locateFile: function(path, prefix) {
-          return prefix + path;
+          return assetBase + path;
         },
+        // Some Emscripten file-packager loaders pass an empty prefix for .data files.
+        locateFilePackage: function(path) {
+          return assetBase + path;
+        },
+        mainScriptUrlOrBlob: scriptUrl.href,
 
         setStatus: function(text) {
           if (!text) {
