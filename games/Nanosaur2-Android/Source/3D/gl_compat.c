@@ -143,6 +143,7 @@ static float s_alpha_ref   = 0.0f;
 // ── Texture-env state ─────────────────────────────────────────────────────────
 // 0=MODULATE 1=ADD 2=REPLACE 3=COMBINE_ADD
 static int s_texenv_mode[2] = {0, 0};
+static int s_texture_2d_enabled[2] = {0, 0};
 static int s_texgen_s = 0, s_texgen_t = 0;  // sphere mapping enabled
 
 // ── Current vertex color ──────────────────────────────────────────────────────
@@ -405,8 +406,8 @@ static void upload_uniforms(void) {
     // Restore active texture to 0 for default behaviour
     glActiveTexture(GL_TEXTURE0);
 
-    int has_tex0 = (tex0 != 0) && s_ca_texcoord[0].enabled;
-    int has_tex1 = (tex1 != 0) && (s_ca_texcoord[1].enabled || s_texgen_s);
+    int has_tex0 = s_texture_2d_enabled[0] && (tex0 != 0) && s_ca_texcoord[0].enabled;
+    int has_tex1 = s_texture_2d_enabled[1] && (tex1 != 0) && (s_ca_texcoord[1].enabled || s_texgen_s);
 
     glUniform1i(u_texture0, has_tex0 ? 1 : 0);
     glUniform1i(u_texture1, has_tex1 ? 1 : 0);
@@ -718,7 +719,15 @@ void glEnable(GLenum cap) {
         case GL_NORMALIZE:   break;  // handled by per-vertex normalize in shader
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL; normalize handled in shader
         case GL_COLOR_MATERIAL: break;  // silently ignore
-        case GL_TEXTURE_2D:  break;  // not valid in GLES2; texture state is inferred from bindings
+        case GL_TEXTURE_2D:
+        {
+            GLint unit = 0;
+            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
+            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
+            if (tu < 0 || tu > 1) tu = 0;
+            s_texture_2d_enabled[tu] = 1;
+            break;
+        }
         default:
             // Pass through to GLES2
             {
@@ -739,7 +748,15 @@ void glDisable(GLenum cap) {
         case GL_NORMALIZE:   break;
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL
         case GL_COLOR_MATERIAL: break;
-        case GL_TEXTURE_2D:  break;  // not valid in GLES2
+        case GL_TEXTURE_2D:
+        {
+            GLint unit = 0;
+            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
+            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
+            if (tu < 0 || tu > 1) tu = 0;
+            s_texture_2d_enabled[tu] = 0;
+            break;
+        }
         default:
             {
                 REAL_glDisable(cap);
@@ -1096,7 +1113,14 @@ GLboolean glIsEnabled(GLenum cap) {
         case GL_NORMALIZE:      return GL_FALSE;  // normalize is always handled in shader
         case GL_RESCALE_NORMAL: return GL_FALSE;
         case GL_COLOR_MATERIAL: return GL_FALSE;
-        case GL_TEXTURE_2D:     return GL_FALSE;  // not tracked per-unit; state inferred from bindings
+        case GL_TEXTURE_2D:
+        {
+            GLint unit = 0;
+            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
+            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
+            if (tu < 0 || tu > 1) tu = 0;
+            return s_texture_2d_enabled[tu] ? GL_TRUE : GL_FALSE;
+        }
         case GL_TEXTURE_GEN_S:  return s_texgen_s ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_GEN_T:  return s_texgen_t ? GL_TRUE : GL_FALSE;
         default:

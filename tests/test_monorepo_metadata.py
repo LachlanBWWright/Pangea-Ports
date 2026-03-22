@@ -158,6 +158,21 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("if (!noZWrites)", objects)
         self.assertIn("glDepthMask(GL_TRUE);", objects)
 
+    def test_cromag_translucent_billboards_disable_depth_writes_per_object(self):
+        objects = (
+            ports.ROOT
+            / "games"
+            / "CroMagRally-Android"
+            / "Source"
+            / "System"
+            / "Objects.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("disableDepthWritesForBillboard", objects)
+        self.assertIn("(statusBits & STATUS_BIT_AIMATCAMERA)", objects)
+        self.assertIn("!(statusBits & STATUS_BIT_CLIPALPHA)", objects)
+        self.assertIn("glDepthMask(GL_FALSE);", objects)
+        self.assertIn("if (disableDepthWritesForBillboard)", objects)
+
     def test_bugdom2_and_nanosaur2_restore_depth_writes_after_blended_materials(self):
         for game in ["Bugdom2-Android", "Nanosaur2-Android"]:
             with self.subTest(game=game):
@@ -281,6 +296,23 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertGreaterEqual(player.count(cull_clear), 2)
         self.assertIn(cull_clear, objects)
         self.assertGreaterEqual(objects2.count(cull_clear), 2)
+
+    def test_nanosaur2_gl_compat_tracks_texture_2d_enable_state(self):
+        compat = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "3D"
+            / "gl_compat.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("static int s_texture_2d_enabled[2] = {0, 0};", compat)
+        self.assertIn("case GL_TEXTURE_2D:", compat)
+        self.assertIn("s_texture_2d_enabled[tu] = 1;", compat)
+        self.assertIn("s_texture_2d_enabled[tu] = 0;", compat)
+        self.assertIn("return s_texture_2d_enabled[tu] ? GL_TRUE : GL_FALSE;", compat)
+        self.assertIn("int has_tex0 = s_texture_2d_enabled[0] && (tex0 != 0) && s_ca_texcoord[0].enabled;", compat)
+        self.assertIn("int has_tex1 = s_texture_2d_enabled[1] && (tex1 != 0) && (s_ca_texcoord[1].enabled || s_texgen_s);", compat)
 
     def test_nanosaur2_hide_player_also_hides_shadow(self):
         """HidePlayer and ShowPlayer must propagate to ShadowNode to avoid ghost shadows on death."""

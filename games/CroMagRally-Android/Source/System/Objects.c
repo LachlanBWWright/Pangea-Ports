@@ -488,6 +488,7 @@ short			skelType, playerNum;
 	do
 	{
 		statusBits = theNode->StatusBits;						// get obj's status bits
+		bool disableDepthWritesForBillboard = false;
 
 		if (statusBits & (STATUS_BIT_ISCULLED|STATUS_BIT_HIDDEN))	// see if is culled or hidden
 			goto next;
@@ -686,6 +687,17 @@ short			skelType, playerNum;
 			noZWrites = false;
 		}
 
+		if ((statusBits & STATUS_BIT_AIMATCAMERA)
+			&& !(statusBits & STATUS_BIT_CLIPALPHA)
+			&& !noZWrites)
+		{
+			// Camera-facing billboards commonly use translucent texture alpha rather
+			// than clip-alpha. Prevent them from stamping the depth buffer so they
+			// don't occlude later geometry behind their transparent regions.
+			glDepthMask(GL_FALSE);
+			disableDepthWritesForBillboard = true;
+		}
+
 
 			/*****************/
 			/* CHECK ZBUFFER */
@@ -874,15 +886,17 @@ short			skelType, playerNum;
 					break;
 		}
 
-#ifdef __EMSCRIPTEN__
 				/* RESTORE DEPTH WRITES */
 				//
 				// MO_DrawMaterial may have disabled depth writes when a
 				// transparent material was drawn.  Restore the correct state
 				// based on STATUS_BIT_NOZWRITES so the next node starts clean.
+#ifdef __EMSCRIPTEN__
 		if (!noZWrites)
 			glDepthMask(GL_TRUE);
 #endif
+		if (disableDepthWritesForBillboard)
+			glDepthMask(GL_TRUE);
 
 
 			/* NEXT NODE */
