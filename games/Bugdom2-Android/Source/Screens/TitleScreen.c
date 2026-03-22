@@ -128,6 +128,9 @@ ObjNode			*fly;
 
 	SetTerrainScale(100);
 	gSuperTileActiveRange = 5;
+#if defined(__EMSCRIPTEN__)
+	gSuperTileActiveRange = 4;								// cap for WebAssembly performance
+#endif
 
 	gScatterFlies = false;
 	gDeleteFlies = false;

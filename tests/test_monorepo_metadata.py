@@ -57,8 +57,8 @@ class MonorepoMetadataTests(unittest.TestCase):
         hub = (ports.ROOT / "docs" / "index.html").read_text(encoding="utf-8")
         # New single-page design uses data-game attributes on navbar buttons
         self.assertIn('data-game=', hub)
-        # Every game's WASM URL must be reachable from the hub
-        self.assertIn('GAME_URLS', hub)
+        # Every game's JS script must be directly loadable from the hub
+        self.assertIn('GAME_SCRIPTS', hub)
 
         for port in ports.PORTS:
             with self.subTest(port=port["name"]):
@@ -76,12 +76,18 @@ class MonorepoMetadataTests(unittest.TestCase):
             "Hub should not contain per-game 'Docs' links: " + str(docs_hrefs),
         )
 
-    def test_hub_launches_games_in_embed_mode(self):
+    def test_hub_directly_embeds_game_scripts(self):
+        """Hub loads game JS directly into the page (no iframe wrappers)."""
         hub = (ports.ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+        # Hub must declare GAME_SCRIPTS dict with .js paths (no iframe src URLs)
+        self.assertIn('GAME_SCRIPTS', hub)
+        self.assertNotIn('<iframe', hub)
         for game_id in ["billy", "bugdom", "bugdom2", "cromag", "mighty", "nanosaur", "nanosaur2", "otto"]:
             with self.subTest(game=game_id):
-                self.assertIn("?embed=1", hub)
-                self.assertRegex(hub, rf"{game_id}\s*:\s*'[^']+\?embed=1'")
+                # Each game must have a JS path in GAME_SCRIPTS
+                self.assertRegex(hub, rf"{game_id}\s*:\s*'[^']+\.js'")
+        # Canvas must be embedded directly in the page (not inside an iframe)
+        self.assertIn('<canvas id="canvas"', hub)
 
     def test_game_shell_templates_support_embedded_mode(self):
         shell_paths = [
@@ -182,6 +188,26 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn(cull_clear, objects)
         self.assertGreaterEqual(objects2.count(cull_clear), 2)
 
+    def test_nanosaur2_hide_player_also_hides_shadow(self):
+        """HidePlayer and ShowPlayer must propagate to ShadowNode to avoid ghost shadows on death."""
+        player = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "Player"
+            / "Player.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "ShadowNode",
+            player,
+            "HidePlayer/ShowPlayer must also update the ShadowNode",
+        )
+        self.assertIn(
+            "hide shadow so it doesn't linger after death",
+            player,
+        )
+
     def test_bugdom_main_menu_icons_keep_backfaces(self):
         main_menu = (
             ports.ROOT
@@ -194,6 +220,43 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn(
             "STATUS_BIT_NULLSHADER | STATUS_BIT_KEEPBACKFACES",
             main_menu,
+        )
+
+    def test_bugdom_player_ball_keeps_backfaces(self):
+        """Player_Ball.c must use STATUS_BIT_KEEPBACKFACES so the roll-mode mesh renders."""
+        ball = (
+            ports.ROOT
+            / "games"
+            / "Bugdom-android"
+            / "src"
+            / "Player"
+            / "Player_Ball.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "STATUS_BIT_KEEPBACKFACES",
+            ball,
+            "Player_Ball.c must set STATUS_BIT_KEEPBACKFACES on the ball object",
+        )
+
+    def test_bugdom2_wasm_supertile_range_capped(self):
+        """Bugdom2 Main.c must cap gSuperTileActiveRange for Emscripten to avoid CPU geometry overload."""
+        main_c = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "System"
+            / "Main.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "defined(__EMSCRIPTEN__)",
+            main_c,
+            "Bugdom2 Main.c must have an __EMSCRIPTEN__ guard to cap gSuperTileActiveRange",
+        )
+        self.assertIn(
+            "cap for WebAssembly performance",
+            main_c,
+            "Bugdom2 Main.c must comment the WebAssembly supertile range cap",
         )
 
     def test_billy_and_bugdom2_shells_guard_fullscreen_canvas_resize(self):

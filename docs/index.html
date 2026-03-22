@@ -134,16 +134,57 @@
       border-color: var(--accent);
     }
 
-    /* Game iframes — stacked, only one visible at a time */
-    .game-frame {
+    /* ── Game area: directly hosts the WebGL canvas ──────────── */
+    #game-area {
       display: none;
       position: absolute;
       inset: 0;
+      background: #000;
+    }
+    #game-area.active { display: block; }
+
+    /* WebGL canvas fills the game area */
+    #canvas {
+      display: block;
       width: 100%;
       height: 100%;
-      border: none;
+      outline: none;
+      background: #000;
     }
-    .game-frame.active { display: block; }
+
+    /* Loading card overlays the canvas until the game starts */
+    #loading-card {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      width: min(90%, 480px);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+    #loading-card.hidden { display: none; }
+    #status-text {
+      font-size: 1rem;
+      color: var(--accent);
+      min-height: 1.5rem;
+      margin: 0 0 .75rem;
+    }
+    #progress-bar {
+      width: 100%;
+      max-width: 380px;
+      height: 6px;
+      accent-color: var(--accent);
+      display: block;
+      margin: 0 auto .4rem;
+    }
+    #progress-label {
+      font-size: .78rem;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -176,68 +217,158 @@
       </div>
     </div>
 
-    <!-- One iframe per game; src is set lazily when first selected -->
-    <iframe class="game-frame" id="frame-billy"     title="Billy Frontier"  allow="fullscreen; autoplay"></iframe>
-    <iframe class="game-frame" id="frame-bugdom"    title="Bugdom"          allow="fullscreen; autoplay"></iframe>
-    <iframe class="game-frame" id="frame-bugdom2"   title="Bugdom 2"        allow="fullscreen; autoplay"></iframe>
-    <iframe class="game-frame" id="frame-cromag"    title="Cro-Mag Rally"   allow="fullscreen; autoplay"></iframe>
-    <iframe class="game-frame" id="frame-mighty"    title="Mighty Mike"     allow="fullscreen; autoplay"></iframe>
-    <iframe class="game-frame" id="frame-nanosaur"  title="Nanosaur"        allow="fullscreen; autoplay"></iframe>
-    <iframe class="game-frame" id="frame-nanosaur2" title="Nanosaur 2"      allow="fullscreen; autoplay"></iframe>
-    <iframe class="game-frame" id="frame-otto"      title="Otto Matic"      allow="fullscreen; autoplay"></iframe>
+    <!-- Directly-embedded game canvas (no iframe; WASM runs in this page's context) -->
+    <div id="game-area">
+      <!-- Loading overlay: shown until the game runtime is ready -->
+      <div id="loading-card">
+        <p id="status-text">Loading…</p>
+        <progress id="progress-bar" value="0" max="100"></progress>
+        <p id="progress-label">Downloading game data…</p>
+      </div>
+      <!-- WebGL canvas — always in DOM so SDL3 can read clientWidth/clientHeight -->
+      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"
+              width="1280" height="720"></canvas>
+    </div>
   </div>
 
   <script>
-    var GAME_URLS = {
-      billy:     './BillyFrontier-Android/billyfrontier.html?embed=1',
-      bugdom:    './Bugdom-android/game.html?embed=1',
-      bugdom2:   './Bugdom2-Android/Bugdom2.html?embed=1',
-      cromag:    './CroMagRally-Android/CroMagRally.html?embed=1',
-      mighty:    './MightyMike-Android/index.html?embed=1',
-      nanosaur:  './Nanosaur-android/index.html?embed=1',
-      nanosaur2: './Nanosaur2-Android/Nanosaur2.html?embed=1',
-      otto:      './OttoMatic-Android/OttoMatic.html?embed=1'
+    // GAME_SCRIPTS: game-id → JS loader path (loaded directly into this page, no iframe wrapper)
+    var GAME_SCRIPTS = {
+      billy:     './BillyFrontier-Android/game/billyfrontier.js',
+      bugdom:    './Bugdom-android/Bugdom.js',
+      bugdom2:   './Bugdom2-Android/Bugdom2.js',
+      cromag:    './CroMagRally-Android/game/CroMagRally.js',
+      mighty:    './MightyMike-Android/MightyMike.js',
+      nanosaur:  './Nanosaur-android/game/Nanosaur.js',
+      nanosaur2: './Nanosaur2-Android/Nanosaur2.js',
+      otto:      './OttoMatic-Android/OttoMatic.js'
     };
 
-    var currentGame = null;
+    var GAME_NAMES = {
+      billy: 'Billy Frontier', bugdom: 'Bugdom', bugdom2: 'Bugdom 2',
+      cromag: 'Cro-Mag Rally', mighty: 'Mighty Mike', nanosaur: 'Nanosaur',
+      nanosaur2: 'Nanosaur 2', otto: 'Otto Matic'
+    };
+
+    var activeGame = null;
 
     function selectGame(id) {
-      if (!GAME_URLS[id]) return;
-      currentGame = id;
+      if (!GAME_SCRIPTS[id]) return;
 
-      // Update navbar button states
+      // If a different game is already running, reload the page to switch
+      // (Emscripten modules cannot be unloaded; we update the hash then force a reload)
+      if (activeGame && activeGame !== id) {
+        location.hash = '#' + id;   // update hash so the reload resumes the new game
+        location.reload();           // full reload needed to clear the running Emscripten module
+        return;
+      }
+
+      // Mark button active
       document.querySelectorAll('.nav-btn').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.game === id);
       });
 
-      // Hide welcome screen
+      // Swap welcome → game area
       document.getElementById('welcome').style.display = 'none';
+      document.getElementById('game-area').classList.add('active');
 
-      // Show/hide iframes; load src lazily on first activation
-      document.querySelectorAll('.game-frame').forEach(function(frame) {
-        var frameGame = frame.id.replace('frame-', '');
-        if (frameGame === id) {
-          if (!frame.getAttribute('src')) {
-            frame.src = GAME_URLS[id];
-          }
-          frame.classList.add('active');
-        } else {
-          frame.classList.remove('active');
-        }
-      });
+      if (!activeGame) {
+        activeGame = id;
+        document.title = GAME_NAMES[id] + ' – Pangea Ports';
+        loadGame(id);
+      }
 
-      // Persist selection in the URL hash so reloads restore the same game
       history.replaceState(null, '', '#' + id);
     }
 
-    // Wire up all game-selection buttons (navbar + welcome chips)
+    function loadGame(id) {
+      var statusEl   = document.getElementById('status-text');
+      var progressEl = document.getElementById('progress-bar');
+      var labelEl    = document.getElementById('progress-label');
+      var card       = document.getElementById('loading-card');
+
+      statusEl.textContent = 'Loading ' + GAME_NAMES[id] + '…';
+
+      // Sync canvas to its actual CSS size before the game initialises
+      syncCanvasSize();
+
+      // Configure Emscripten Module before the script is evaluated
+      window.Module = {
+        canvas: document.getElementById('canvas'),
+
+        setStatus: function(text) {
+          if (!text) {
+            card.classList.add('hidden');
+            return;
+          }
+          statusEl.textContent = text;
+          var m = text.match(/(\d+)\/(\d+)/);
+          if (m) {
+            progressEl.value = parseInt(m[1], 10);
+            progressEl.max   = parseInt(m[2], 10);
+          }
+        },
+
+        monitorRunDependencies: function(n) {
+          if (n === 0) {
+            card.classList.add('hidden');
+          } else {
+            labelEl.textContent = 'Loading assets (' + n + ' remaining)…';
+          }
+        },
+
+        onRuntimeInitialized: function() {
+          card.classList.add('hidden');
+        },
+
+        print:    function(t) { console.log(t);   },
+        printErr: function(t) { console.error(t); }
+      };
+
+      // Inject the game script – Emscripten resolves .wasm/.data relative to this JS URL
+      var script  = document.createElement('script');
+      script.src  = GAME_SCRIPTS[id];
+      script.onerror = function() {
+        statusEl.textContent = 'Failed to load ' + GAME_NAMES[id] + '.';
+        labelEl.textContent  = 'Build artifacts may be missing from the deployment.';
+      };
+      document.body.appendChild(script);
+    }
+
+    // Keep canvas physical-pixel size in sync with its CSS size + device pixel ratio
+    function syncCanvasSize() {
+      var canvas = document.getElementById('canvas');
+      if (!canvas) return;
+      var cssW = canvas.clientWidth;
+      var cssH = canvas.clientHeight;
+      if (!cssW || !cssH) {
+        console.warn('syncCanvasSize: canvas has no CSS dimensions (cssW=' + cssW + ', cssH=' + cssH + ')');
+        return;
+      }
+      var dpr = window.devicePixelRatio || 1;
+      var w = Math.round(cssW * dpr);
+      var h = Math.round(cssH * dpr);
+      if (w && h && (canvas.width !== w || canvas.height !== h)) {
+        canvas.width  = w;
+        canvas.height = h;
+        if (window.Module && Module.setCanvasSize) {
+          Module.setCanvasSize(w, h);
+        }
+      }
+    }
+
+    ['resize', 'fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'].forEach(
+      function(e) { window.addEventListener(e, function() { requestAnimationFrame(syncCanvasSize); }); }
+    );
+
+    // Wire all data-game buttons (navbar + welcome chips)
     document.querySelectorAll('[data-game]').forEach(function(btn) {
       btn.addEventListener('click', function() { selectGame(btn.dataset.game); });
     });
 
-    // Restore game from URL hash on page load
+    // Restore from URL hash (e.g. after a game-switch reload)
     var hash = window.location.hash.replace('#', '');
-    if (hash && GAME_URLS[hash]) {
+    if (hash && GAME_SCRIPTS[hash]) {
       selectGame(hash);
     }
   </script>
