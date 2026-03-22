@@ -233,6 +233,7 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("static GLenum gBlendSrcFactor       = GL_ONE;", compat_c)
         self.assertIn("static GLenum gBlendDstFactor       = GL_ZERO;", compat_c)
         self.assertIn("case GL_DEPTH_WRITEMASK:", compat_c)
+        self.assertIn("*p = gDepthWriteEnabled ? GL_TRUE : GL_FALSE;", compat_c)
         self.assertIn("*p = (GLint) gBlendSrcFactor;", compat_c)
         self.assertIn("*p = (GLint) gBlendDstFactor;", compat_c)
         self.assertIn("glGetBooleanv(GL_DEPTH_WRITEMASK, &gStateStack_DepthMask[i]);", ogl)
