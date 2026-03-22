@@ -1023,7 +1023,17 @@ uint32_t				matFlags;
 
 
 	if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))		// if has alpha, then we need blending on
+	{
 		OGL_EnableBlend();
+#ifdef __EMSCRIPTEN__
+		// Alpha-masked textures still need depth writes so that cut-out geometry
+		// (such as fences/foliage using glAlphaFunc) sorts correctly against the
+		// rest of the scene.  Only disable depth writes for truly translucent
+		// materials or materials explicitly forcing blending.
+		if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))
+			glDepthMask(GL_FALSE);
+#endif
+	}
 	else
 		OGL_DisableBlend();
 
@@ -1912,4 +1922,3 @@ MOVertexArrayObject	*vObj;
 
 	OGL_SetVertexArrayRangeDirty(data->VARtype);
 }
-

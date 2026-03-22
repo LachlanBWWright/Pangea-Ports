@@ -1,0 +1,156 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2
+					],
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "extern/SDL",
+					"jsonFile" : "directory-extern.SDL-Debug-dfed15ad6583e4a7ddfa.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "extern/SDL",
+					"targetIndexes" : 
+					[
+						2,
+						3,
+						4
+					]
+				},
+				{
+					"build" : "extern/Pomme",
+					"jsonFile" : "directory-extern.Pomme-Debug-5ac37ceaf0554b2a65fc.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 2,
+					"source" : "extern/Pomme",
+					"targetIndexes" : 
+					[
+						1
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1,
+						2
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "Bugdom",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "SDL3",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						2,
+						3,
+						4
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						2
+					],
+					"name" : "Pomme",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						1
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "Bugdom::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Bugdom-Debug-df1a668135188e04f0bc.json",
+					"name" : "Bugdom",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "Pomme::@4bed7659774468e94699",
+					"jsonFile" : "target-Pomme-Debug-ee44bb044eb529139e25.json",
+					"name" : "Pomme",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "SDL3-static::@f0608b1d4101c050ccee",
+					"jsonFile" : "target-SDL3-static-Debug-6e825761a7390b5b3d62.json",
+					"name" : "SDL3-static",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "SDL3_test::@f0608b1d4101c050ccee",
+					"jsonFile" : "target-SDL3_test-Debug-1c04d7487d63b70ecc21.json",
+					"name" : "SDL3_test",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "SDL_uclibc::@f0608b1d4101c050ccee",
+					"jsonFile" : "target-SDL_uclibc-Debug-3ba4754c9ddf83bf10c7.json",
+					"name" : "SDL_uclibc",
+					"projectIndex" : 1
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/runner/work/Pangea-Ports/Pangea-Ports/games/Bugdom-android/android/app/.cxx/Debug/4j12a374/x86_64",
+		"source" : "/home/runner/work/Pangea-Ports/Pangea-Ports/games/Bugdom-android"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}
