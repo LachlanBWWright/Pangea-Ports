@@ -286,6 +286,7 @@
       var progressEl = document.getElementById('progress-bar');
       var labelEl    = document.getElementById('progress-label');
       var card       = document.getElementById('loading-card');
+      var scriptSrc  = GAME_SCRIPTS[id];
 
       statusEl.textContent = 'Loading ' + GAME_NAMES[id] + '…';
 
@@ -295,6 +296,10 @@
       // Configure Emscripten Module before the script is evaluated
       window.Module = {
         canvas: document.getElementById('canvas'),
+        // Let Emscripten resolve .wasm/.data from the script's own directory.
+        locateFile: function(path, prefix) {
+          return prefix + path;
+        },
 
         setStatus: function(text) {
           if (!text) {
@@ -327,7 +332,7 @@
 
       // Inject the game script – Emscripten resolves .wasm/.data relative to this JS URL
       var script  = document.createElement('script');
-      script.src  = GAME_SCRIPTS[id];
+      script.src  = scriptSrc;
       script.onerror = function() {
         statusEl.textContent = 'Failed to load ' + GAME_NAMES[id] + '.';
         labelEl.textContent  = 'Build artifacts may be missing from the deployment.';
