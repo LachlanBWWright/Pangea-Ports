@@ -548,7 +548,6 @@ void GLES3_GetIntegerv(GLenum pname, GLint* p)
             return;
         default:
             glGetIntegerv(pname, p);
-            break;
     }
 }
 

@@ -886,12 +886,12 @@ short			skelType, playerNum;
 					break;
 		}
 
+#ifdef __EMSCRIPTEN__
 				/* RESTORE DEPTH WRITES */
 				//
 				// MO_DrawMaterial may have disabled depth writes when a
 				// transparent material was drawn.  Restore the correct state
 				// based on STATUS_BIT_NOZWRITES so the next node starts clean.
-#ifdef __EMSCRIPTEN__
 		if (!noZWrites)
 			glDepthMask(GL_TRUE);
 #endif

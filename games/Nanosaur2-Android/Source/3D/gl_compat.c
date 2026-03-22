@@ -724,7 +724,7 @@ void glEnable(GLenum cap) {
             GLint unit = 0;
             REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
             int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
-            if (tu < 0 || tu > 1) tu = 0;
+            if (tu > 1) tu = 0;
             s_texture_2d_enabled[tu] = 1;
             break;
         }
@@ -753,7 +753,7 @@ void glDisable(GLenum cap) {
             GLint unit = 0;
             REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
             int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
-            if (tu < 0 || tu > 1) tu = 0;
+            if (tu > 1) tu = 0;
             s_texture_2d_enabled[tu] = 0;
             break;
         }
@@ -1118,7 +1118,7 @@ GLboolean glIsEnabled(GLenum cap) {
             GLint unit = 0;
             REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
             int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
-            if (tu < 0 || tu > 1) tu = 0;
+            if (tu > 1) tu = 0;
             return s_texture_2d_enabled[tu] ? GL_TRUE : GL_FALSE;
         }
         case GL_TEXTURE_GEN_S:  return s_texgen_s ? GL_TRUE : GL_FALSE;
