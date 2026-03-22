@@ -737,6 +737,13 @@ static void MouseSmoothing_PopOldestSnapshot(void)
 	static const float kAccumulatorEpsilon = 0.0001f;
 	struct MouseSmoothingState* state = &gMouseSmoothing;
 
+	if (state->ringLength <= 0)
+	{
+		state->dxAccu = 0;
+		state->dyAccu = 0;
+		return;
+	}
+
 	state->dxAccu -= state->snapshots[state->ringStart].dx;
 	state->dyAccu -= state->snapshots[state->ringStart].dy;
 

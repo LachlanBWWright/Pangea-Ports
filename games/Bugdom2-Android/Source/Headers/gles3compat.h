@@ -198,13 +198,19 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
 void GLES3_SetVertexCount(GLsizei n);
 void GLES3_GetFloatv(GLenum pname, GLfloat* params);
 void GLES3_GetIntegerv(GLenum pname, GLint* params);
+void GLES3_GetBooleanv(GLenum pname, GLboolean* params);
 void GLES3_Hint(GLenum target, GLenum mode);
+void GLES3_BlendFunc(GLenum sfactor, GLenum dfactor);
+void GLES3_DepthMask(GLboolean flag);
 
 // Redirect valid-GLES3 calls that need our interception
 #define glEnable        GLES3_Enable
 #define glDisable       GLES3_Disable
 #define glIsEnabled     GLES3_IsEnabled
+#define glBlendFunc     GLES3_BlendFunc
+#define glDepthMask     GLES3_DepthMask
 #define glDrawElements  GLES3_DrawElements
+#define glGetBooleanv   GLES3_GetBooleanv
 #define glGetFloatv     GLES3_GetFloatv
 #define glGetIntegerv   GLES3_GetIntegerv
 #define glHint          GLES3_Hint

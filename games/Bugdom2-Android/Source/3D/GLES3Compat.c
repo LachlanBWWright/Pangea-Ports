@@ -243,6 +243,12 @@ static bool  gColorMaterialEnabled  = false;
 static bool  gTexture2DEnabled      = false;
 static bool  gTexGenSEnabled        = false;
 static bool  gTexGenTEnabled        = false;
+static bool  gBlendEnabled          = false;
+static bool  gCullFaceEnabled       = false;
+static bool  gDepthTestEnabled      = false;
+static bool  gDepthWriteEnabled     = true;
+static GLenum gBlendSrcFactor       = GL_ONE;
+static GLenum gBlendDstFactor       = GL_ZERO;
 static float gCurrentColor[4]       = {1,1,1,1};
 static float gCurrentNormal[3]      = {0,0,1};
 static float gCurrentTexCoord[2]    = {0,0};
@@ -424,6 +430,9 @@ void GLES3_Enable(GLenum cap)
 {
     switch (cap)
     {
+        case GL_BLEND:          gBlendEnabled      = true; glEnable(cap); return;
+        case GL_CULL_FACE:      gCullFaceEnabled   = true; glEnable(cap); return;
+        case GL_DEPTH_TEST:     gDepthTestEnabled  = true; glEnable(cap); return;
         case GL_LIGHTING:       gLightingEnabled   = true; return;
         case GL_LIGHT0:         gLightEnabled[0]   = true; return;
         case GL_LIGHT1:         gLightEnabled[1]   = true; return;
@@ -445,6 +454,9 @@ void GLES3_Disable(GLenum cap)
 {
     switch (cap)
     {
+        case GL_BLEND:          gBlendEnabled      = false; glDisable(cap); return;
+        case GL_CULL_FACE:      gCullFaceEnabled   = false; glDisable(cap); return;
+        case GL_DEPTH_TEST:     gDepthTestEnabled  = false; glDisable(cap); return;
         case GL_LIGHTING:       gLightingEnabled   = false; return;
         case GL_LIGHT0:         gLightEnabled[0]   = false; return;
         case GL_LIGHT1:         gLightEnabled[1]   = false; return;
@@ -466,12 +478,28 @@ GLboolean GLES3_IsEnabled(GLenum cap)
 {
     switch (cap)
     {
+        case GL_BLEND:          return gBlendEnabled      ? GL_TRUE : GL_FALSE;
+        case GL_CULL_FACE:      return gCullFaceEnabled   ? GL_TRUE : GL_FALSE;
+        case GL_DEPTH_TEST:     return gDepthTestEnabled  ? GL_TRUE : GL_FALSE;
         case GL_LIGHTING:       return gLightingEnabled   ? GL_TRUE : GL_FALSE;
         case GL_FOG:            return gFogEnabled        ? GL_TRUE : GL_FALSE;
         case GL_NORMALIZE:      return gNormalizeEnabled  ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_2D_COMPAT: return gTexture2DEnabled ? GL_TRUE : GL_FALSE;
         default: return glIsEnabled(cap);
     }
+}
+
+void GLES3_BlendFunc(GLenum sfactor, GLenum dfactor)
+{
+    gBlendSrcFactor = sfactor;
+    gBlendDstFactor = dfactor;
+    glBlendFunc(sfactor, dfactor);
+}
+
+void GLES3_DepthMask(GLboolean flag)
+{
+    gDepthWriteEnabled = flag ? true : false;
+    glDepthMask(flag);
 }
 
 //=============================================================
@@ -513,13 +541,25 @@ void GLES3_GetIntegerv(GLenum pname, GLint* p)
     switch (pname)
     {
         case GL_BLEND_SRC_COMPAT:  // 0x0BE1
-            glGetIntegerv(GL_BLEND_SRC_RGB, p);
+            *p = (GLint) gBlendSrcFactor;
             return;
         case GL_BLEND_DST_COMPAT:  // 0x0BE0
-            glGetIntegerv(GL_BLEND_DST_RGB, p);
+            *p = (GLint) gBlendDstFactor;
             return;
         default:
             glGetIntegerv(pname, p);
+    }
+}
+
+void GLES3_GetBooleanv(GLenum pname, GLboolean* p)
+{
+    switch (pname)
+    {
+        case GL_DEPTH_WRITEMASK:
+            *p = gDepthWriteEnabled ? GL_TRUE : GL_FALSE;
+            return;
+        default:
+            glGetBooleanv(pname, p);
             break;
     }
 }
