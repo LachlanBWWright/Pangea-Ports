@@ -968,40 +968,45 @@ GLenum type;
 
 	switch (textureShader->pixmap->pixelType)
 	{
-	case kQ3PixelTypeRGB32:
-	meshTexturingMode = ClassifyPixmapOpacity(textureShader);
-	internalFormat = GL_RGB;
-	format = GL_BGRA;
-	type   = GL_UNSIGNED_INT_8_8_8_8_REV;
-	break;
-	case kQ3PixelTypeARGB32:
-	meshTexturingMode = ClassifyPixmapOpacity(textureShader);
-	internalFormat = GL_RGBA;
-	format = GL_BGRA;
-	type   = GL_UNSIGNED_INT_8_8_8_8_REV;
-	break;
-	case kQ3PixelTypeRGB16:
-	meshTexturingMode = ClassifyPixmapOpacity(textureShader);
-	internalFormat = GL_RGB;
-	format = GL_BGRA;
-	type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
-	break;
-	case kQ3PixelTypeARGB16:
-	meshTexturingMode = ClassifyPixmapOpacity(textureShader);
-	internalFormat = GL_RGBA;
-	format = GL_BGRA;
-	type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
-	break;
-	case kQ3PixelTypeRGB24:
-	meshTexturingMode = ClassifyPixmapOpacity(textureShader);
-	internalFormat = GL_RGB;
-	format = GL_BGR;
-	type   = GL_UNSIGNED_BYTE;
-break;
-default:
-DoAlert("3DMF texture: Unsupported kQ3PixelType");
-continue;
-}
+		case kQ3PixelTypeRGB32:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGB;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_INT_8_8_8_8_REV;
+			break;
+
+		case kQ3PixelTypeARGB32:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGBA;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_INT_8_8_8_8_REV;
+			break;
+
+		case kQ3PixelTypeRGB16:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGB;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
+			break;
+
+		case kQ3PixelTypeARGB16:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGBA;
+			format = GL_BGRA;
+			type   = GL_UNSIGNED_SHORT_1_5_5_5_REV;
+			break;
+
+		case kQ3PixelTypeRGB24:
+			meshTexturingMode = ClassifyPixmapOpacity(textureShader);
+			internalFormat = GL_RGB;
+			format = GL_BGR;
+			type   = GL_UNSIGNED_BYTE;
+			break;
+
+		default:
+			DoAlert("3DMF texture: Unsupported kQ3PixelType");
+			continue;
+	}
 
 int clampFlags = forceClampUVs ? kRendererTextureFlags_ClampBoth : 0;
 if (textureShader->boundaryU == kQ3ShaderUVBoundaryClamp)
