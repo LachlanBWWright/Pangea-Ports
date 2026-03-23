@@ -203,6 +203,7 @@ static inline float AnchorCenterY(float y)
 
 static void DrawPaneDivider(ObjNode* theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 	if (gActiveSplitScreenMode == SPLITSCREEN_MODE_NONE)
 		return;
 
@@ -543,6 +544,7 @@ void SetInfobarSpriteState(float anaglyphZ, float zoom)
 
 void DrawInfobar(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 	(void) theNode;
 
 			/* DRAW SOME OTHER GOODIES WHILE WE'RE HERE */
@@ -1715,7 +1717,9 @@ float		dot, cross;
 
 static void DrawAnaglyphCrosshairs(ObjNode *theNode)
 {
-short	playerNum = gCurrentSplitScreenPane;
+	if (gCurrentDrawPass == 0) return;
+	short	playerNum = gCurrentSplitScreenPane;
+
 short	i;
 OGLPoint3D		*coord;
 OGLMatrix4x4	m;

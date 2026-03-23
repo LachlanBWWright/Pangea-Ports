@@ -418,7 +418,7 @@ deleteConfetti:
 
 static void DrawConfettiGroups(ObjNode *theNode)
 {
-float				baseScale;
+	float				baseScale;
 OGLColorRGBA_Byte	*vertexColors;
 MOVertexArrayData	*geoData;
 OGLBoundingBox	bbox;

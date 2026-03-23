@@ -237,6 +237,7 @@ float	speed = theNode->Speed * fps;
 
 static void DrawFadePane(ObjNode* theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 	OGL_PushState();
 	SetInfobarSpriteState(0, 1);
 

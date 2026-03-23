@@ -1022,6 +1022,7 @@ static void MoveDarkenPane(ObjNode *theNode)
 
 static void DrawDarkenPane(ObjNode *theNode)
 {
+	(void) theNode;
 	OGL_PushState();
 	SetInfobarSpriteState();
 

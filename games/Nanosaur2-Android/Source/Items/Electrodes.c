@@ -723,6 +723,7 @@ OGLPoint3D			worldHitCoord;
 
 static void DrawZaps(ObjNode *dummy)
 {
+	if (gCurrentDrawPass == 0) return;
 #pragma unused (dummy)
 
 short	i;

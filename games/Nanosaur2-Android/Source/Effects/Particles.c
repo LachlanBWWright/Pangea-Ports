@@ -794,6 +794,7 @@ short				paneNum;
 
 static void DrawParticleGroups(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 long				buffNum;
 short				paneNum = gCurrentSplitScreenPane;
 
@@ -1822,6 +1823,7 @@ static void MoveFlame(ObjNode *theNode)
 
 static void DrawFlame(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 OGLMatrix4x4	m;
 const OGLVector3D	up = {0,1,0};
 OGLPoint3D	frame[4];
@@ -1926,6 +1928,7 @@ float	fps = gFramesPerSecondFrac;
 
 static void DrawFireRing(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 OGLPoint3D	verts[4];
 float		x,y,z,s;
 

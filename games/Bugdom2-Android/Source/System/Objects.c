@@ -421,6 +421,21 @@ float			cameraX, cameraZ;
 	cameraX = gGameView.cameraPlacement.cameraLocation.x;
 	cameraZ = gGameView.cameraPlacement.cameraLocation.z;
 
+	gDepthWriteShouldBeOn = true;
+
+	DrawCyclorama();
+
+	noLighting = false;
+	noZBuffer = false;
+	noZWrites = false;
+	glow = false;
+	noCullFaces = false;
+	texWrap = false;
+	noFog = false;
+	clipAlpha = false;
+
+	theNode = gFirstNodePtr;
+
 			/***********************/
 			/* MAIN NODE TASK LOOP */
 			/***********************/
@@ -592,6 +607,7 @@ float			cameraX, cameraZ;
 
 		if (statusBits & STATUS_BIT_NOZWRITES)
 		{
+			gDepthWriteShouldBeOn = false;
 			if (!noZWrites)
 			{
 				glDepthMask(GL_FALSE);
@@ -599,10 +615,13 @@ float			cameraX, cameraZ;
 			}
 		}
 		else
-		if (noZWrites)
 		{
-			glDepthMask(GL_TRUE);
-			noZWrites = false;
+			gDepthWriteShouldBeOn = true;
+			if (noZWrites)
+			{
+				glDepthMask(GL_TRUE);
+				noZWrites = false;
+			}
 		}
 
 
@@ -777,25 +796,18 @@ custom_draw:
 
 
 
-	#ifdef __EMSCRIPTEN__
-				/* RESTORE DEPTH WRITES */
-				//
-				// MO_DrawMaterial may have disabled depth writes when a
-				// transparent material was drawn.  Restore the correct state
-				// based on STATUS_BIT_NOZWRITES so the next node starts clean.
-		if (!noZWrites)
-			glDepthMask(GL_TRUE);
-	#endif
+				/* NEXT NODE */
+	next:
 
-			/* NEXT NODE */
-next:
-		theNode = theNode->NextNode;
+		theNode = (ObjNode *)theNode->NextNode;
 	}while (theNode != nil);
 
+	gCurrentDrawPass = -1;
 
 				/*****************************/
 				/* RESET SETTINGS TO DEFAULT */
 				/*****************************/
+
 
 	if (noLighting)
 		OGL_EnableLighting();

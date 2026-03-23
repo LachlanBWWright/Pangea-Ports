@@ -55,6 +55,43 @@ uint32_t				gGlobalMaterialFlags = 0;
 
 MOMaterialObject	*gMostRecentMaterial;
 
+int gCurrentDrawPass = -1;			// -1 = draw all, 0 = opaque only, 1 = transparent only
+Boolean gDepthWriteShouldBeOn = true;
+
+/************************ MO: MATERIAL IS TRANSPARENT **************************/
+
+static Boolean MO_MaterialIsTransparent(MOMaterialObject *matObj)
+{
+	MOMaterialData *matData = &matObj->objectData;
+	uint32_t matFlags = matData->flags | gGlobalMaterialFlags;
+
+	// check if color has alpha
+	if (matData->diffuseColor.a < 1.0f)
+		return true;
+
+	// check if global transparency is less than 1
+	if (gGlobalTransparency < 1.0f)
+		return true;
+
+	bool clipAlpha = 0 != (matFlags & BG3D_MATERIALFLAG_CLIPALPHA);
+	bool wantBlend = !clipAlpha && ((matData->diffuseColor.a * gGlobalTransparency != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND));
+
+	if (wantBlend)
+		return true;
+
+	// check if texture has alpha
+	if (matFlags & BG3D_MATERIALFLAG_TEXTURED)
+	{
+		if (matData->pixelDstFormat == GL_RGBA)
+		{
+			if (!(matFlags & BG3D_MATERIALFLAG_CLIPALPHA))		// if it's clipAlpha, it's not transparent (blended)
+				return true;
+		}
+	}
+
+	return false;
+}
+
 
 /***************** INIT META OBJECT HANDLER ******************/
 
@@ -63,6 +100,8 @@ void MO_InitHandler(void)
 	gFirstMetaObject = nil;				// no meta object nodes yet
 	gLastMetaObject = nil;
 	gNumMetaObjects = 0;
+	gCurrentDrawPass = -1;
+	gDepthWriteShouldBeOn = true;
 }
 
 
@@ -347,7 +386,8 @@ static void SetMetaObjectToPicture(MOPictureObject *pictObj, const char* path)
 
 	/* LOAD PICTURE FILE */
 
-	GLuint textureName = OGL_TextureMap_LoadImageFile(path, &width, &height, NULL);
+	int hasAlpha;
+	GLuint textureName = OGL_TextureMap_LoadImageFile(path, &width, &height, &hasAlpha);
 	OGL_CheckError();
 
 	/***************************/
@@ -359,6 +399,7 @@ static void SetMetaObjectToPicture(MOPictureObject *pictObj, const char* path)
 	matData.numMipmaps		= 1;
 	matData.width			= width;
 	matData.height			= height;
+	matData.pixelDstFormat	= hasAlpha ? GL_RGBA : GL_RGB;
 	matData.textureName[0]	= textureName;
 	picData->material		= MO_CreateNewObjectOfType(MO_TYPE_MATERIAL, 0, &matData);
 	OGL_CheckError();
@@ -586,6 +627,7 @@ Boolean		useTexture = false, multiTexture = false, texGen = false;
 uint32_t 		materialFlags;
 short		i;
 Boolean		needNormals;
+
 
 			/**********************/
 			/* SETUP VERTEX ARRAY */
@@ -1028,12 +1070,11 @@ uint32_t				matFlags;
 	if (wantBlend)		// if has translucent alpha, then we need blending on
 	{
 		OGL_EnableBlend();
-#ifdef __EMSCRIPTEN__
-		glDepthMask(GL_FALSE);
-#endif
 	}
 	else
+	{
 		OGL_DisableBlend();
+	}
 
 
 			/* SAVE THIS STUFF */
@@ -1060,6 +1101,7 @@ const OGLMatrix4x4		*m;
 void MO_DrawPicture(const MOPictureObject *picObj)
 {
 const MOPictureData	*picData = &picObj->objectData;
+
 
 	OGL_PushState();
 
@@ -1121,6 +1163,7 @@ float			scaleX,scaleY,x,y;
 MOMaterialObject	*mo;
 float				aspect, xoff, yoff;
 OGLPoint2D			p[4];
+
 
 	x = spriteData->coord.x;
 	y = spriteData->coord.y;

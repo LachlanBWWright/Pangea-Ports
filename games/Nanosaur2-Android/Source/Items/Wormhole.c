@@ -363,6 +363,7 @@ ObjNode *MakeEntryWormhole(short playerNum)
 
 static void DrawWormhole(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 MOVertexArrayObject	*mo;
 MOVertexArrayData	*va;
 

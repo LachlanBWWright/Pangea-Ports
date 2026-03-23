@@ -507,6 +507,7 @@ float					x,y,z, q;
 
 static void DrawOrbLaserBeam(ObjNode *beam)
 {
+	if (gCurrentDrawPass == 0) return;
 ObjNode	*orb = beam->ChainHead->ChainHead;
 
 		/***********************/

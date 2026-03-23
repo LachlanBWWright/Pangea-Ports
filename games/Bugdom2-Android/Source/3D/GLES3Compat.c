@@ -41,6 +41,14 @@
 #define GL_TEXTURE_GEN_T          0x0C61
 #define GL_RESCALE_NORMAL         0x803A
 #define GL_ALPHA_TEST             0x0BC0
+#define GL_NEVER                  0x0200
+#define GL_LESS                   0x0201
+#define GL_EQUAL                  0x0202
+#define GL_LEQUAL                 0x0203
+#define GL_GREATER                0x0204
+#define GL_NOTEQUAL               0x0205
+#define GL_GEQUAL                 0x0206
+#define GL_ALWAYS                 0x0207
 #define GL_VERTEX_ARRAY           0x8074
 #define GL_NORMAL_ARRAY           0x8075
 #define GL_COLOR_ARRAY            0x8076
@@ -129,6 +137,9 @@ static const char* kFragSrc =
 "uniform sampler2D u_tex;\n"
 "uniform bool u_useTex;\n"
 "uniform vec4 u_fogColor;\n"
+"uniform bool u_alphaTest;\n"
+"uniform int u_alphaFunc;\n"
+"uniform float u_alphaRef;\n"
 "in vec4 v_color;\n"
 "in vec2 v_uv;\n"
 "in float v_fog;\n"
@@ -140,7 +151,19 @@ static const char* kFragSrc =
 "  } else {\n"
 "    c=v_color;\n"
 "  }\n"
-"  if(c.a==0.0) discard;\n"
+"  if(u_alphaTest){\n"
+"    float a = c.a;\n"
+"    if      (u_alphaFunc == 0) discard; // NEVER\n"
+"    else if (u_alphaFunc == 1 && a >= u_alphaRef) discard; // LESS\n"
+"    else if (u_alphaFunc == 2 && a != u_alphaRef) discard; // EQUAL\n"
+"    else if (u_alphaFunc == 3 && a >  u_alphaRef) discard; // LEQUAL\n"
+"    else if (u_alphaFunc == 4 && a <= u_alphaRef) discard; // GREATER\n"
+"    else if (u_alphaFunc == 5 && a == u_alphaRef) discard; // NOTEQUAL\n"
+"    else if (u_alphaFunc == 6 && a <  u_alphaRef) discard; // GEQUAL\n"
+"    else if (u_alphaFunc == 7) {} // ALWAYS\n"
+"  } else {\n"
+"    if(c.a==0.0) discard;\n"
+"  }\n"
 "  c.rgb=mix(u_fogColor.rgb,c.rgb,v_fog);\n"
 "  fragColor=c;\n"
 "}\n";
@@ -163,6 +186,7 @@ static GLint uProj, uMV, uLighting, uAmbient, uNLights;
 static GLint uLightDir[4], uLightDiff[4];
 static GLint uFog, uFogMode, uFogDensity, uFogStart, uFogEnd, uFogColor;
 static GLint uUseTex, uTex;
+static GLint uAlphaTest, uAlphaFunc, uAlphaRef;
 
 //=============================================================
 // Matrix stack (software, column-major like OpenGL)
@@ -247,6 +271,9 @@ static bool  gBlendEnabled          = false;
 static bool  gCullFaceEnabled       = false;
 static bool  gDepthTestEnabled      = false;
 static bool  gDepthWriteEnabled     = true;
+static bool  gAlphaTestEnabled      = false;
+static int   gAlphaFuncVal          = GL_ALWAYS;
+static float gAlphaRefVal           = 0.0f;
 static GLenum gBlendSrcFactor       = GL_ONE;
 static GLenum gBlendDstFactor       = GL_ZERO;
 static float gCurrentColor[4]       = {1,1,1,1};
@@ -328,6 +355,21 @@ static void UploadUniforms(void)
     // Texture
     glUniform1i(uUseTex, gTexture2DEnabled ? 1 : 0);
     glUniform1i(uTex, 0);
+
+    // Alpha test
+    glUniform1i(uAlphaTest, gAlphaTestEnabled ? 1 : 0);
+    if (gAlphaTestEnabled) {
+        int af = 7; // ALWAYS
+        if      (gAlphaFuncVal == GL_NEVER)    af = 0;
+        else if (gAlphaFuncVal == GL_LESS)     af = 1;
+        else if (gAlphaFuncVal == GL_EQUAL)    af = 2;
+        else if (gAlphaFuncVal == GL_LEQUAL)   af = 3;
+        else if (gAlphaFuncVal == GL_GREATER)  af = 4;
+        else if (gAlphaFuncVal == GL_NOTEQUAL) af = 5;
+        else if (gAlphaFuncVal == GL_GEQUAL)   af = 6;
+        glUniform1i(uAlphaFunc, af);
+        glUniform1f(uAlphaRef,  gAlphaRefVal);
+    }
 }
 
 //=============================================================
@@ -406,6 +448,9 @@ void GLES3Compat_Init(void)
     uFogColor    = glGetUniformLocation(gProgram, "u_fogColor");
     uUseTex      = glGetUniformLocation(gProgram, "u_useTex");
     uTex         = glGetUniformLocation(gProgram, "u_tex");
+    uAlphaTest   = glGetUniformLocation(gProgram, "u_alphaTest");
+    uAlphaFunc   = glGetUniformLocation(gProgram, "u_alphaFunc");
+    uAlphaRef    = glGetUniformLocation(gProgram, "u_alphaRef");
 
     // Create VAO and immediate-mode VBO
     glGenVertexArrays(1, &gVAO);
@@ -444,7 +489,7 @@ void GLES3_Enable(GLenum cap)
         case GL_TEXTURE_GEN_S:  gTexGenSEnabled    = true; return;
         case GL_TEXTURE_GEN_T:  gTexGenTEnabled    = true; return;
         case GL_RESCALE_NORMAL: return;  // no-op
-        case GL_ALPHA_TEST:     return;  // handled in shader (discard if a==0)
+        case GL_ALPHA_TEST:     gAlphaTestEnabled  = true; return;
         case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = true; return;
         default: glEnable(cap); break;
     }
@@ -468,7 +513,7 @@ void GLES3_Disable(GLenum cap)
         case GL_TEXTURE_GEN_S:  gTexGenSEnabled    = false; return;
         case GL_TEXTURE_GEN_T:  gTexGenTEnabled    = false; return;
         case GL_RESCALE_NORMAL: return;
-        case GL_ALPHA_TEST:     return;
+        case GL_ALPHA_TEST:     gAlphaTestEnabled  = false; return;
         case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = false; return;
         default: glDisable(cap); break;
     }
@@ -484,6 +529,7 @@ GLboolean GLES3_IsEnabled(GLenum cap)
         case GL_LIGHTING:       return gLightingEnabled   ? GL_TRUE : GL_FALSE;
         case GL_FOG:            return gFogEnabled        ? GL_TRUE : GL_FALSE;
         case GL_NORMALIZE:      return gNormalizeEnabled  ? GL_TRUE : GL_FALSE;
+        case GL_ALPHA_TEST:     return gAlphaTestEnabled  ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_2D_COMPAT: return gTexture2DEnabled ? GL_TRUE : GL_FALSE;
         default: return glIsEnabled(cap);
     }
@@ -942,12 +988,13 @@ void glTexGeni(GLenum coord, GLenum pname, GLint param)
 }
 
 //=============================================================
-// Alpha func (stub – shader discards a==0 fragments)
+// Alpha func
 //=============================================================
 
 void glAlphaFunc(GLenum func, GLclampf ref)
 {
-    (void)func; (void)ref;
+    gAlphaFuncVal = (int)func;
+    gAlphaRefVal  = (float)ref;
 }
 
 //=============================================================

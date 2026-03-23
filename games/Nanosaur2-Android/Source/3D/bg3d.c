@@ -34,6 +34,7 @@ static void ReadUVArray(short refNum);
 static void ReadVertexColorArray(short refNum);
 static void ReadTriangleArray(short refNum);
 static void ReadBoundingBox(short refNum);
+static void ClassifyMaterialTextureOpacityRGBA(MOMaterialData *matData, const uint8_t *pixels, size_t pixelCount);
 
 
 
@@ -434,6 +435,8 @@ MOMaterialData	*data;
 		// the few that don't use JPEG always use GL_RGBA in practice.
 		case GL_RGBA:
 			data->textureName[i] = OGL_TextureMap_Load(texturePixels, w, h, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE);
+			data->pixelDstFormat = GL_RGBA;
+			ClassifyMaterialTextureOpacityRGBA(data, texturePixels, (size_t)w * h);
 			break;
 
 		// Just in case we want to import models from other games or whatever...
@@ -441,6 +444,8 @@ MOMaterialData	*data;
 		case GL_UNSIGNED_INT_8_8_8_8_REV:		// ARGB (standard Mac)
 			// pass on format as dataType
 			data->textureName[i] = OGL_TextureMap_Load(texturePixels, w, h, GL_RGBA, GL_RGBA, textureHeader.srcPixelFormat);
+			data->pixelDstFormat = GL_RGBA;
+			// we don't classify non-RGBA8 textures yet
 			break;
 
 		default:
@@ -559,6 +564,9 @@ Boolean					hasAlpha;
 
 	int i = data->numMipmaps++;						// increment the mipmap count
 	data->textureName[i] = OGL_TextureMap_Load(textureRGBA, w, h, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE);		// load GL texture
+	data->pixelDstFormat = hasAlpha ? GL_RGBA : GL_RGB;
+	if (hasAlpha)
+		ClassifyMaterialTextureOpacityRGBA(data, textureRGBA, (size_t)w * h);
 	SafeDisposePtr(textureRGBA);
 }
 
@@ -1180,6 +1188,38 @@ void SetSphereMapInfoOnMaterialObject(MOMaterialObject *mat, uint16_t combineMod
 	mat->objectData.multiTextureMode	= MULTI_TEXTURE_MODE_REFLECTIONSPHERE;	// set type of multi-texturing
 	mat->objectData.multiTextureCombine	= combineMode;							// set combining mode
 	mat->objectData.envMapNum			= envMapNum;							// set sphere map texture # to use
+}
+
+
+/******************* CLASSIFY MATERIAL TEXTURE OPACITY RGBA ********************/
+
+static void ClassifyMaterialTextureOpacityRGBA(MOMaterialData *matData, const uint8_t *pixels, size_t pixelCount)
+{
+	bool sawTransparentPixel = false;
+
+	// Note: We don't distinguish between binary and partial alpha here yet,
+	// but we tag materials that only use binary alpha as clip-alpha materials.
+	matData->flags &= ~BG3D_MATERIALFLAG_CLIPALPHA;
+
+	for (size_t i = 0; i < pixelCount; i++)
+	{
+		uint8_t alpha = pixels[i * 4 + 3];
+		if (alpha == 255)
+			continue;
+
+		sawTransparentPixel = true;
+		if (alpha != 0)
+		{
+			// Partial alpha found: must use blending.
+			return;
+		}
+	}
+
+	if (sawTransparentPixel)
+	{
+		// Only binary alpha found: can use alpha testing.
+		matData->flags |= BG3D_MATERIALFLAG_CLIPALPHA;
+	}
 }
 
 

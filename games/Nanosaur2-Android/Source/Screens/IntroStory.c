@@ -339,6 +339,8 @@ static void FreeIntroStoryScreen(void)
 
 static void DrawBottomGradient(ObjNode* theNode)
 {
+	if (gCurrentDrawPass == 0) return;
+	(void) theNode;
 	OGL_PushState();
 	SetInfobarSpriteState(0, 1);
 	OGL_DisableTexture2D();

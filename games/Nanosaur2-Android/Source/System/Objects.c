@@ -523,11 +523,11 @@ void DrawObjects(void)
 {
 ObjNode		*theNode;
 unsigned long	statusBits;
-Boolean			noLighting = false;
-Boolean			noZBuffer = false;
-Boolean			noZWrites = false;
-Boolean			texWrap = false;
-Boolean			clipAlpha= false;
+Boolean			noLighting;
+Boolean			noZBuffer;
+Boolean			noZWrites;
+Boolean			texWrap;
+Boolean			clipAlpha;
 float			cameraX, cameraZ;
 Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw context is being drawn
 
@@ -540,8 +540,6 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 	CullTestAllObjects();
 
-	theNode = gFirstNodePtr;
-
 
 			/* GET CAMERA COORDS */
 
@@ -550,6 +548,18 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 
 	bool isOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
+
+	gDepthWriteShouldBeOn = true;
+
+	DrawCyclorama();
+
+	noLighting = false;
+	noZBuffer = false;
+	noZWrites = false;
+	texWrap = false;
+	clipAlpha = false;
+
+	theNode = gFirstNodePtr;
 
 			/***********************/
 			/* MAIN NODE TASK LOOP */
@@ -560,6 +570,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 		if (statusBits & ((STATUS_BIT_ISCULLED1 << gCurrentSplitScreenPane) | STATUS_BIT_HIDDEN))	// see if is culled or hidden
 			goto next;
+
 
 		if (statusBits & STATUS_BIT_ONLYSHOWTHISPLAYER)			// see if only show for current player's draw context
 		{
@@ -651,7 +662,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 			OGL_EnableLighting();
 		}
 
- 			/****************/
+			/****************/
 			/* CHECK NO FOG */
 			/****************/
 
@@ -675,7 +686,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 		else
 		{
 			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_ALWAYSBLEND;
-		    OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
 
 			/**********************/
@@ -694,7 +705,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 		if (texWrap)
 		{
 			texWrap = false;
-		    gGlobalMaterialFlags &= ~(BG3D_MATERIALFLAG_CLAMP_U|BG3D_MATERIALFLAG_CLAMP_V);
+			gGlobalMaterialFlags &= ~(BG3D_MATERIALFLAG_CLAMP_U|BG3D_MATERIALFLAG_CLAMP_V);
 		}
 
 
@@ -706,6 +717,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 		if (statusBits & STATUS_BIT_NOZWRITES)
 		{
+			gDepthWriteShouldBeOn = false;
 			if (!noZWrites)
 			{
 				glDepthMask(GL_FALSE);
@@ -713,10 +725,13 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 			}
 		}
 		else
-		if (noZWrites)
 		{
-			glDepthMask(GL_TRUE);
-			noZWrites = false;
+			gDepthWriteShouldBeOn = true;
+			if (noZWrites)
+			{
+				glDepthMask(GL_TRUE);
+				noZWrites = false;
+			}
 		}
 
 
@@ -834,10 +849,10 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 		}
 #endif
 
- 		if (noLighting || (theNode->Scale.y == 1.0f))				// if scale == 1 or no lighting, then dont need to normalize vectors
- 			glDisable(GL_NORMALIZE);
- 		else
- 			glEnable(GL_NORMALIZE);
+		if (noLighting || (theNode->Scale.y == 1.0f))				// if scale == 1 or no lighting, then dont need to normalize vectors
+			glDisable(GL_NORMALIZE);
+		else
+			glEnable(GL_NORMALIZE);
 
 		if (theNode->CustomDrawFunction)							// if has custom draw function, then override and use that
 			goto custom_draw;
@@ -926,22 +941,13 @@ custom_draw:
 
 
 
-	#ifdef __EMSCRIPTEN__
-				/* RESTORE DEPTH WRITES */
-				//
-				// MO_DrawMaterial may have disabled depth writes when a
-				// transparent material was drawn.  Restore the correct state
-				// based on STATUS_BIT_NOZWRITES so the next node starts clean.
-		if (!noZWrites)
-			glDepthMask(GL_TRUE);
-	#endif
-
 			/* NEXT NODE */
 next:
 
 		theNode = (ObjNode *)theNode->NextNode;
 	}while (theNode != nil);
 
+	gCurrentDrawPass = -1;
 
 				/*****************************/
 				/* RESET SETTINGS TO DEFAULT */

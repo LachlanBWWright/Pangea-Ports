@@ -983,6 +983,8 @@ int				i,unique;
 Boolean			superTileVisible;
 #pragma unused(theNode)
 
+	if (gCurrentDrawPass == 1) return;		// terrain is always opaque
+
 
 				/**************/
 				/* DRAW STUFF */

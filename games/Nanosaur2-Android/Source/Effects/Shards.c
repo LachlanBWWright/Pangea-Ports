@@ -452,6 +452,7 @@ del:
 
 static void DrawShards(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 #pragma unused (theNode)
 long	i;
 

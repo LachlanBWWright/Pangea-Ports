@@ -709,6 +709,7 @@ static void TwitchSelectionNopeWiggle(void)
 
 static void DrawDarkenPane(ObjNode* node)
 {
+	if (gCurrentDrawPass == 0) return;
 	OGL_PushState();
 
 	SetInfobarSpriteState(0, 1);

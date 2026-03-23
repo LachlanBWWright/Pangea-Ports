@@ -491,8 +491,9 @@ Boolean		hasTransparentVertexAlpha;
 
 	buffNum = gGameViewInfoPtr->frameCount & 1;				// which VAR buffer to use?
 
+	if (gCurrentDrawPass == -1) return;
 
-			/* SET GLOBAL MATERIAL FLAGS */
+	/* SET GLOBAL MATERIAL FLAGS */
 
 	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V;
 
@@ -506,7 +507,6 @@ Boolean		hasTransparentVertexAlpha;
 	for (f = 0; f < gNumFences; f++)
 	{
 		type = gFenceList[f].type;							// get type
-		hasTransparentVertexAlpha = false;
 
 		if (type == FENCE_TYPE_INVISIBLEBLOCKENEMY			// don't bother with invisible fences
 			&& gDebugMode != 2)								// unless we're in debug mode
@@ -518,6 +518,27 @@ Boolean		hasTransparentVertexAlpha;
 
 		if (OGL_IsBBoxVisible(&gFenceList[f].bBox, nil))
 		{
+			hasTransparentVertexAlpha = false;
+			for (int j = 0; j < gFenceList[f].numNubs * 2; j++)
+			{
+				if (gFenceVertexArrays[buffNum].fenceColors[f][j].a < 1.0f)
+				{
+					hasTransparentVertexAlpha = true;
+					break;
+				}
+			}
+
+			Boolean isTrans = hasTransparentVertexAlpha || (gFenceMaterials[f]->objectData.diffuseColor.a < 1.0f);
+
+			if (gCurrentDrawPass == 0)		// OPAQUE PASS
+			{
+				if (isTrans) continue;
+			}
+			else							// TRANSPARENT PASS
+			{
+				if (!isTrans) continue;
+			}
+
 					/* CHECK LIGHTING */
 
 			if (gFenceIsLit[type])
@@ -527,15 +548,6 @@ Boolean		hasTransparentVertexAlpha;
 
 
 					/* SUBMIT IT */
-
-			for (int j = 0; j < gFenceList[f].numNubs * 2; j++)
-			{
-				if (gFenceVertexArrays[buffNum].fenceColors[f][j].a < 1.0f)
-				{
-					hasTransparentVertexAlpha = true;
-					break;
-				}
-			}
 
 			uint32_t oldMaterialFlags = gGlobalMaterialFlags;
 			if (hasTransparentVertexAlpha)

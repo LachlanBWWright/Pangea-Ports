@@ -167,11 +167,10 @@ ObjNode	*newObj, *pipe, *grate;
 		.coord		= {0,0,0},
 		.flags 		= STATUS_BIT_DONTCULL|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOFOG,
 		.slot 		= CYC_SLOT,
-		.drawCall 	= DrawCyclorama,
 		.scale 		= gGameView.yon * .995f / 100.0f,
 	};
-	newObj = MakeNewDisplayGroupObject(&def);
-	newObj->TargetOff.y = -300.0f;
+	gCyclorama = MakeNewDisplayGroupObject(&def);
+	gCyclorama->TargetOff.y = -300.0f;
 
 			/******************/
 			/* DRAIN ENTRANCE */

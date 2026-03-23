@@ -650,8 +650,9 @@ TQ3ColorRGBA fogColor)
 {
 (void) camHither;
 
-gState.fogStart    = fogHither * camYon;
-gState.fogEnd      = fogYon   * camYon;
+float fogRefYon = (camYon > 4200.0f) ? 4200.0f : camYon;
+gState.fogStart    = fogHither * fogRefYon;
+gState.fogEnd      = fogYon   * fogRefYon;
 gState.fogColor[0] = fogColor.r;
 gState.fogColor[1] = fogColor.g;
 gState.fogColor[2] = fogColor.b;
@@ -1098,7 +1099,6 @@ DrawOrderComparator);
 //--------------------------------------------------------------
 // PASS 1: OPAQUE COLOR + DEPTH
 // Draw opaque meshes to color AND depth buffers.
-// Draw transparent meshes to depth buffer only (deferred).
 
 int numDeferredColorMeshes = 0;
 
@@ -1117,16 +1117,9 @@ SendGeometry(entry);
 }
 else
 {
-// Defer color pass; shoot back to start of queue
+// Defer transparent mesh to Pass 2
 GAME_ASSERT(numDeferredColorMeshes <= i);
 gMeshQueuePtrs[numDeferredColorMeshes++] = entry;
-
-// If the transparent mesh wants to write to Z, do it now
-if (!(entry->mods->statusBits & STATUS_BIT_NOZWRITE))
-{
-BeginDepthPass(entry);
-SendGeometry(entry);
-}
 }
 }
 

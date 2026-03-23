@@ -799,6 +799,7 @@ static void MoveCreditsLine(ObjNode* theNode)
 
 static void DrawBottomGradient(ObjNode* theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 	(void) theNode;
 
 	OGL_PushState();

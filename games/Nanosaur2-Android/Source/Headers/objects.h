@@ -15,7 +15,7 @@
 #define	FENCE_SLOT		(TERRAIN_SLOT+3)		// need to draw very early for alpha blending of other objects to look best
 #define	PARTICLE_SLOT	(SPRITE_SLOT-2)
 #define	CONFETTI_SLOT	(PARTICLE_SLOT-1)		// do confetti before particles since particles are xparent
-#define	WATER_SLOT		(SLOT_OF_DUMB - 50)		// do before DUMB because some glowing weapons need to be drawn after the water
+#define	WATER_SLOT		(SLOT_OF_DUMB + 50)		// do after DUMB because some glowing weapons need to be drawn after the water
 #define	CONTRAIL_SLOT	(SPRITE_SLOT - 10)
 #define	INFOBAR_SLOT	(SLOT_OF_DUMB + 3000)
 #define	FADEPANE_SLOT	(SLOT_OF_DUMB + 4000)

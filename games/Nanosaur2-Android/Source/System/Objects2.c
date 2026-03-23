@@ -570,6 +570,8 @@ static void DrawShadow(ObjNode *theNode)
 {
 int	shadowType = theNode->Kind;
 
+	if (gCurrentDrawPass == 0) return;		// shadows are always transparent
+
 	OGL_PushState();
 	OGL_DisableCullFace();
 

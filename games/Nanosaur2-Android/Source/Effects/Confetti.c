@@ -405,6 +405,7 @@ OGLVector3D	*delta;
 
 static void DrawConfettiGroups(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 float				scale,baseScale;
 OGLColorRGBA		*vertexColors;
 MOVertexArrayData	*geoData;

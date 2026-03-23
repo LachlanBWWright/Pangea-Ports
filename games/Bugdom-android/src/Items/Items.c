@@ -104,6 +104,7 @@ void CreateCyclorama(void)
 
 	gCyclorama = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	gCyclorama->RenderModifiers.drawOrder = kDrawOrder_Cyclorama;
+	QD3D_MirrorMeshesZ(gCyclorama);
 }
 
 /************************* DRAW CYCLORAMA *********************************/

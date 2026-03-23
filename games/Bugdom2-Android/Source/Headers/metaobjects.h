@@ -191,6 +191,9 @@ typedef struct
 
 
 
+extern int gCurrentDrawPass;
+extern Boolean gDepthWriteShouldBeOn;
+
 //-----------------------------
 
 void MO_InitHandler(void);

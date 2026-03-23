@@ -58,6 +58,40 @@ uint32_t				gGlobalMaterialFlags = 0;
 
 MOMaterialObject	*gMostRecentMaterial;
 
+int gCurrentDrawPass = -1;
+Boolean gDepthWriteShouldBeOn = true;
+
+/***************** MO_MATERIAL IS TRANSPARENT ******************/
+
+static Boolean MO_MaterialIsTransparent(MOMaterialObject *matObj)
+{
+	MOMaterialData *matData = &matObj->objectData;
+	uint32_t matFlags = matData->flags | gGlobalMaterialFlags;
+
+	// check if color has alpha
+	if (matData->diffuseColor.a < 1.0f)
+		return true;
+
+	// check if global transparency is less than 1
+	if (gGlobalTransparency < 1.0f)
+		return true;
+
+	// check if material flags indicate transparency
+	if (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND)
+		return true;
+
+	// check if texture has alpha
+	if (matFlags & BG3D_MATERIALFLAG_TEXTURED)
+	{
+		if (matData->pixelDstFormat == GL_RGBA)
+		{
+			if (!(matFlags & BG3D_MATERIALFLAG_CLIPALPHA))		// if it's clipAlpha, it's not transparent (blended)
+				return true;
+		}
+	}
+
+	return false;
+}
 
 /***************** INIT META OBJECT HANDLER ******************/
 
@@ -66,6 +100,8 @@ void MO_InitHandler(void)
 	gFirstMetaObject = nil;				// no meta object nodes yet
 	gLastMetaObject = nil;
 	gNumMetaObjects = 0;
+	gCurrentDrawPass = -1;
+	gDepthWriteShouldBeOn = true;
 }
 
 
@@ -902,13 +938,13 @@ uint32_t				matFlags;
 
 	if (wantBlend)		// if has translucent alpha, then we need blending on
 	{
-	    glEnable(GL_BLEND);
-#ifdef __EMSCRIPTEN__
-	    glDepthMask(GL_FALSE);
-#endif
+		glEnable(GL_BLEND);
 	}
 	else
-	    glDisable(GL_BLEND);
+	{
+		glDisable(GL_BLEND);
+	}
+
 
 
 			/* SAVE THIS STUFF */

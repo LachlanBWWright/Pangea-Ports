@@ -85,6 +85,7 @@ typedef struct
 
 	uint32_t		numMipmaps;						// # texture mipmaps to use
 	uint32_t		width,height;					// dimensions of texture
+	GLint			pixelDstFormat;					// OGL format (GL_RGBA, etc.) for VRAM
 	GLuint			textureName[MO_MAX_MIPMAPS]; 	// texture name assigned by OpenGL
 }MOMaterialData;
 
@@ -217,6 +218,9 @@ typedef struct
 
 
 //-----------------------------
+
+extern int gCurrentDrawPass;
+extern Boolean gDepthWriteShouldBeOn;
 
 void MO_InitHandler(void);
 MetaObjectPtr MO_CreateNewObjectOfType(uint32_t type, intptr_t subType, void *data);

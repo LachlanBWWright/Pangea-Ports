@@ -398,6 +398,7 @@ static int FindFreeDustDevilSlot(void)
 
 static void DrawDustDevils(ObjNode *dummyNode)
 {
+	if (gCurrentDrawPass == 0) return;
 const MOVertexArrayData	*mesh;													// point to trimesh data
 OGLMatrix4x4	m;
 Byte	buffNum;

@@ -144,9 +144,7 @@ static OGLPoint3D doorOff = {-135, 350, -50};
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= gGameView.yon * .995f / 100.0f;
-	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-
-	newObj->CustomDrawFunction = DrawCyclorama;
+	gCyclorama = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
 
 				/*************/

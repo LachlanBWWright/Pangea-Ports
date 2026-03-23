@@ -314,13 +314,9 @@ ObjNode				*newObj;
 	gNewObjectDefinition.moveCall 	= MoveScoreCyc;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= gGameView.yon * .99f / 100.0f;
-	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	gCyclorama = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	}
 
-	newObj->CustomDrawFunction = DrawCyclorama;
-
-
-
-}
 
 
 

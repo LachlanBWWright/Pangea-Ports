@@ -440,6 +440,7 @@ short				buffNum;
 
 static void DrawContrails(ObjNode *dummy)
 {
+	if (gCurrentDrawPass == 0) return;
 short		i;
 short		buffNum = gGameViewInfoPtr->frameCount & 1;					// which VAR buffer to use?
 

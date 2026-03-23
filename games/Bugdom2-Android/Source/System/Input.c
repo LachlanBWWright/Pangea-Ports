@@ -819,9 +819,10 @@ OGLVector2D GetMouseDelta(void)
 	sensitivity *= NUM_MOUSE_SENSITIVITY_LEVELS / (1.0f + DEFAULT_MOUSE_SENSITIVITY_LEVEL);
 
 #if MOUSE_SMOOTHING
+	static const float kAccumulatorEpsilon = 0.001f;
 	struct MouseSmoothingState* state = &gMouseSmoothing;
 
-	GAME_ASSERT(state->ringLength != 0 || (state->dxAccu == 0 && state->dyAccu == 0));
+	GAME_ASSERT(state->ringLength != 0 || (fabsf(state->dxAccu) < kAccumulatorEpsilon && fabsf(state->dyAccu) < kAccumulatorEpsilon));
 
 	return (OGLVector2D) {state->dxAccu * sensitivity, state->dyAccu * sensitivity};
 #else

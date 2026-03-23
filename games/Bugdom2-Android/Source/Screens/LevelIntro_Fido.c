@@ -144,10 +144,9 @@ static const OGLVector3D	fillDirection1 = { -1.0, -.7, -.7 };
 		.coord		= {0,0,0},
 		.flags		= STATUS_BIT_DONTCULL|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOFOG,
 		.slot		= CYC_SLOT,
-		.drawCall	= DrawCyclorama,
 		.scale		= gGameView.yon * .995f / 100.0f,
 	};
-	MakeNewDisplayGroupObject(&def);
+	gCyclorama = MakeNewDisplayGroupObject(&def);
 
 
 			/* DOG HOUSE */

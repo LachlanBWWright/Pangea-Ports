@@ -161,10 +161,9 @@ int		i,x,z;
 		.flags 		= STATUS_BIT_DONTCULL|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOFOG,
 		.slot 		= CYC_SLOT,
 		.scale 		= gGameView.yon * .995f / 100.0f,
-		.drawCall	= DrawCyclorama,
 	};
-	newObj = MakeNewDisplayGroupObject(&def);
-	newObj->TargetOff.y = -300.0f;
+	gCyclorama = MakeNewDisplayGroupObject(&def);
+	gCyclorama->TargetOff.y = -300.0f;
 
 			/* BOTTLES */
 

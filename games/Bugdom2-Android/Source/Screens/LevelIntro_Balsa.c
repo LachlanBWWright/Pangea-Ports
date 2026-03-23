@@ -149,7 +149,7 @@ ObjNode	*newObj, *prop, *band;
 	gNewObjectDefinition.scale 		= gGameView.yon * .85f / 100.0f;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
-	newObj->CustomDrawFunction = DrawCyclorama;
+	gCyclorama = newObj;
 
 	newObj->TargetOff.y = -300.0f;
 

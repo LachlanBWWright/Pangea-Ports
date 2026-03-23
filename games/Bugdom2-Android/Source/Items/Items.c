@@ -51,6 +51,8 @@ static void MoveGlassBottle(ObjNode *theNode);
 #define WobbleMag	SpecialF[1]
 #define	WobbleSpeed	SpecialF[2]
 
+ObjNode	*gCyclorama = nil;
+
 
 /********************* INIT ITEMS MANAGER *************************/
 
@@ -78,8 +80,6 @@ void InitItemsManager(void)
 
 void CreateCyclorama(void)
 {
-ObjNode	*newObj;
-
 	switch(gLevelNum)
 	{
 		case	LEVEL_NUM_FIDO:
@@ -100,9 +100,7 @@ ObjNode	*newObj;
 				gNewObjectDefinition.moveCall = nil;
 				gNewObjectDefinition.rot 	= 0;
 				gNewObjectDefinition.scale 	= gGameView.yon * .995f / 100.0f;
-				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-
-				newObj->CustomDrawFunction = DrawCyclorama;
+				gCyclorama = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 				break;
 
 
@@ -124,9 +122,7 @@ ObjNode	*newObj;
 				gNewObjectDefinition.moveCall = nil;
 				gNewObjectDefinition.rot 	= 0;
 				gNewObjectDefinition.scale 	= gGameView.yon * .995f / 100.0f;
-				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-
-				newObj->CustomDrawFunction = DrawCyclorama;
+				gCyclorama = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 				break;
 
 
@@ -142,18 +138,20 @@ regular:
 				gNewObjectDefinition.moveCall = nil;
 				gNewObjectDefinition.rot 	= 0;
 				gNewObjectDefinition.scale 	= gGameView.yon * .995f / 100.0f;
-				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-
-				newObj->CustomDrawFunction = DrawCyclorama;
+				gCyclorama = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	}
 }
 
 
 /********************** DRAW CYCLORAMA *************************/
 
-void DrawCyclorama(ObjNode *theNode)
+void DrawCyclorama(void)
 {
-OGLPoint3D cameraCoord = gGameView.cameraPlacement.cameraLocation;
+	if (!gCyclorama)
+		return;
+
+	ObjNode *theNode = gCyclorama;
+	OGLPoint3D cameraCoord = gGameView.cameraPlacement.cameraLocation;
 
 		/* UPDATE CYCLORAMA COORD INFO */
 

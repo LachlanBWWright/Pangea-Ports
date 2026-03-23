@@ -38,6 +38,7 @@ static void MoveGasMound(ObjNode *theNode);
 
 
 static OGLVector2D	gCloudScroll;
+ObjNode				*gCyclorama = nil;
 
 
 /********************* INIT ITEMS MANAGER *************************/
@@ -72,19 +73,20 @@ void CreateCyclorama(void)
 		.flags		= STATUS_BIT_DONTCULL|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOFOG, //|STATUS_BIT_NOZWRITES;
 		.slot		= TERRAIN_SLOT+1,					// draw after terrain for better performance since terrain blocks much of the pixels
 		.moveCall	= nil,
-		.drawCall	= DrawCyclorama,
 		.rot		= 0,
 		.scale		= gGameViewInfoPtr->yon * .01,
 	};
 
-	MakeNewDisplayGroupObject(&def);
+	gCyclorama = MakeNewDisplayGroupObject(&def);
 }
 
 
 /********************** DRAW CYCLORAMA *************************/
 
-void DrawCyclorama(ObjNode *theNode)
+void DrawCyclorama(void)
 {
+	if (!gCyclorama) return;
+	ObjNode *theNode = gCyclorama;
 OGLPoint3D cameraCoord = gGameViewInfoPtr->cameraPlacement[gCurrentSplitScreenPane].cameraLocation;
 
 	glDisable(GL_ALPHA_TEST);	//--------

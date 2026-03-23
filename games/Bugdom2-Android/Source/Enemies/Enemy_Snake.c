@@ -421,6 +421,7 @@ Boolean	runAway;
 
 static void DrawSnakes(ObjNode *theNode)
 {
+	(void) theNode;
 int				i,p,j,pointNum,numRingsCreated;
 float			u,v,s;
 OGLVector3D		dir;

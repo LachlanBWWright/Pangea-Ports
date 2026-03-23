@@ -225,7 +225,7 @@ class Project:
         fatlog(f"Configuring {self.dir_name}")
 
         if os.path.exists(self.dir_name):
-            if not os.path.exists(self.dir_name + "/CMakeCache.txt"):
+            if os.listdir(self.dir_name) and not os.path.exists(self.dir_name + "/CMakeCache.txt"):
                 die(f"Path exists and isn't an old build directory: {self.dir_name}")
             shutil.rmtree(self.dir_name)
 
@@ -482,7 +482,7 @@ class EmscriptenProject(Project):
         fatlog(f"Configuring {self.dir_name} (Emscripten)")
 
         if os.path.exists(self.dir_name):
-            if not os.path.exists(self.dir_name + "/CMakeCache.txt"):
+            if os.listdir(self.dir_name) and not os.path.exists(self.dir_name + "/CMakeCache.txt"):
                 die(f"Path exists and isn't an old build directory: {self.dir_name}")
             shutil.rmtree(self.dir_name)
 

@@ -137,14 +137,10 @@ int			i,n;
 		.group		= MODEL_GROUP_LEVELSPECIFIC,
 		.type 		= PARK_ObjType_Cyclorama,
 		.flags 		= STATUS_BIT_DONTCULL | STATUS_BIT_NOLIGHTING,
-		.slot 		= CYC_SLOT,
 		.scale 		= gGameView.yon * .995f / 100.0f,
 	};
-	newObj = MakeNewDisplayGroupObject(&def);
-
-	newObj->CustomDrawFunction = DrawCyclorama;
-
-	newObj->TargetOff.y = -130.0f;
+	gCyclorama = MakeNewDisplayGroupObject(&def);
+	gCyclorama->TargetOff.y = -130.0f;
 
 
 				/* GROUND */

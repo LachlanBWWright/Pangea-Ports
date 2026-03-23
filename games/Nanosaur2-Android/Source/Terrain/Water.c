@@ -511,6 +511,7 @@ short	i;
 
 static void DrawWater(ObjNode *theNode)
 {
+	if (gCurrentDrawPass == 0) return;
 long	prevType = -1;
 
 	(void) theNode;

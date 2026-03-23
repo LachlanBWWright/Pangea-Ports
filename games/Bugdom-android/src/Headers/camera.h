@@ -3,7 +3,7 @@
 //
 
 #define	HITHER_DISTANCE	20.0f
-#define	YON_DISTANCE	2500.0f
+#define	YON_DISTANCE	10000.0f
 
 void InitCamera(void);
 void UpdateCamera(void);
