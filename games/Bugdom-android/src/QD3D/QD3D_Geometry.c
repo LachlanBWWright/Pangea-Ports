@@ -111,20 +111,26 @@ void QD3D_CalcObjectBoundingSphere(int numMeshes, TQ3TriMeshData** meshList, TQ3
 		}
 	}
 
-	origin.x /= (float)totalNumPoints;
-	origin.y /= (float)totalNumPoints;
-	origin.z /= (float)totalNumPoints;
+	if (totalNumPoints > 0)
+	{
+		origin.x /= (float)totalNumPoints;
+		origin.y /= (float)totalNumPoints;
+		origin.z /= (float)totalNumPoints;
+	}
 
 	float radiusSquared = 0;
 
-	for (int i = 0; i < numMeshes; i++)
+	if (totalNumPoints > 0)
 	{
-		TQ3TriMeshData* mesh = meshList[i];
-		for (int v = 0; v < mesh->numPoints; v++)
+		for (int i = 0; i < numMeshes; i++)
 		{
-			float newRadius = Q3Point3D_DistanceSquared(&origin, &mesh->points[v]);
-			if (newRadius > radiusSquared)
-				radiusSquared = newRadius;
+			TQ3TriMeshData* mesh = meshList[i];
+			for (int v = 0; v < mesh->numPoints; v++)
+			{
+				float newRadius = Q3Point3D_DistanceSquared(&origin, &mesh->points[v]);
+				if (newRadius > radiusSquared)
+					radiusSquared = newRadius;
+			}
 		}
 	}
 

@@ -1195,6 +1195,10 @@ void DeleteObject(ObjNode	*theNode)
 	if (theNode == nil)								// see if passed a bogus node
 		return;
 
+	extern ObjNode* gCyclorama;
+	if (theNode == gCyclorama)
+		gCyclorama = nil;
+
 	if (theNode->CType == INVALID_NODE_FLAG)		// see if already deleted
 	{
 		SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Attempted to double delete object");

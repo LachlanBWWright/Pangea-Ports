@@ -1286,7 +1286,7 @@ if (a->mods->drawOrder > b->mods->drawOrder)    return BFirst;
 if (a->meshIsTransparent != b->meshIsTransparent)
 return b->meshIsTransparent ? AFirst : BFirst;
 
-// Opaque: front-to-back; transparent: back-to-front
+// Then sort by depth
 if (!a->meshIsTransparent)
 {
 if (a->depth < b->depth)    return AFirst;
@@ -1324,7 +1324,7 @@ if (gState.currentTransform != entry->transform)
 if (entry->transform)
 {
 TQ3Matrix4x4 combined;
-Q3Matrix4x4_Multiply(&gCurrentModelView, entry->transform, &combined);
+Q3Matrix4x4_Multiply(entry->transform, &gCurrentModelView, &combined);
 UploadMatrix4x4(gState.loc_u_ModelView, &combined);
 UploadMatrix3x3NormalFromMV(&combined);
 }

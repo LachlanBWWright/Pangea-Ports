@@ -1347,6 +1347,10 @@ int		i;
 	if (theNode == nil)								// see if passed a bogus node
 		return;
 
+	extern ObjNode* gCyclorama;
+	if (theNode == gCyclorama)
+		gCyclorama = nil;
+
 	if (theNode->CType == INVALID_NODE_FLAG)		// see if already deleted
 	{
 #if 0

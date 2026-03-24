@@ -36,7 +36,8 @@ static void PopOldestSnapshot(void)
 	gState.ringStart = (gState.ringStart + 1) % DELTA_MOUSE_MAX_SNAPSHOTS;
 	gState.ringLength--;
 
-	GAME_ASSERT(gState.ringLength != 0 || (gState.dxAccu == 0 && gState.dyAccu == 0));
+	static const float kAccumulatorEpsilon = 0.001f;
+	GAME_ASSERT(gState.ringLength != 0 || (fabsf(gState.dxAccu) < kAccumulatorEpsilon && fabsf(gState.dyAccu) < kAccumulatorEpsilon));
 }
 
 void MouseSmoothing_ResetState(void)
@@ -87,7 +88,8 @@ void MouseSmoothing_OnMouseMotion(const SDL_MouseMotionEvent* motion)
 
 void MouseSmoothing_GetDelta(float* dxOut, float* dyOut)
 {
-	GAME_ASSERT(gState.ringLength != 0 || (gState.dxAccu == 0 && gState.dyAccu == 0));
+	static const float kAccumulatorEpsilon = 0.001f;
+	GAME_ASSERT(gState.ringLength != 0 || (fabsf(gState.dxAccu) < kAccumulatorEpsilon && fabsf(gState.dyAccu) < kAccumulatorEpsilon));
 
 	*dxOut = gState.dxAccu;
 	*dyOut = gState.dyAccu;

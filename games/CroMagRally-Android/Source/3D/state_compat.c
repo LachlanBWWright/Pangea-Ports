@@ -162,6 +162,7 @@ void CompatGL_Enable(GLenum cap)
             break;
         case GL_ALPHA_TEST:
             gAlphaTestEnabled = true;
+            ModernGL_SetAlphaTest(gAlphaTestEnabled, gAlphaFunc, gAlphaRef);
             break;
         case GL_TEXTURE_2D:
             if (gCurrentTextureUnit >= 0 && gCurrentTextureUnit < 2)
@@ -216,6 +217,7 @@ void CompatGL_Disable(GLenum cap)
             break;
         case GL_ALPHA_TEST:
             gAlphaTestEnabled = false;
+            ModernGL_SetAlphaTest(gAlphaTestEnabled, gAlphaFunc, gAlphaRef);
             break;
         case GL_TEXTURE_2D:
             if (gCurrentTextureUnit >= 0 && gCurrentTextureUnit < 2)
@@ -267,6 +269,7 @@ void CompatGL_AlphaFunc(GLenum func, GLfloat ref)
         case GL_ALWAYS: gAlphaFunc = 7; break;
     }
     gAlphaRef = ref;
+    ModernGL_SetAlphaTest(gAlphaTestEnabled, gAlphaFunc, gAlphaRef);
 }
 
 void CompatGL_Fog(GLenum pname, GLfloat param)

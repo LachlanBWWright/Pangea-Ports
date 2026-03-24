@@ -438,9 +438,7 @@ static void OGL_InitDrawContext(void)
 
 static void OGL_SetStyles(OGLSetupInputType *setupDefPtr)
 {
-#ifndef __EMSCRIPTEN__
-OGLStyleDefType *styleDefPtr = &setupDefPtr->styles;
-#endif
+OGLStyleDefType *styleDefPtr = &setupDefPtr->styles; // Declare unconditionally
 
 
 	glEnable(GL_CULL_FACE);									// activate culling
@@ -450,12 +448,13 @@ OGLStyleDefType *styleDefPtr = &setupDefPtr->styles;
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);		// set default blend func
 	glDisable(GL_BLEND);									// but turn it off by default
 
-#ifndef __EMSCRIPTEN__
 	// GL_RESCALE_NORMAL, GL_FOG_HINT, GL_ALPHA_TEST, glAlphaFunc, glFog*
 	// are not available in WebGL/GLES2 — skip on Emscripten.
+#ifndef __EMSCRIPTEN__
 	glDisable(GL_RESCALE_NORMAL);
 
     glHint(GL_FOG_HINT, GL_NICEST);		// pixel accurate fog?
+#endif
 
 	OGL_CheckError();
 
@@ -464,7 +463,7 @@ OGLStyleDefType *styleDefPtr = &setupDefPtr->styles;
 	glEnable(GL_ALPHA_TEST);
 	glAlphaFunc(GL_NOTEQUAL, 0);	// draw any pixel who's Alpha != 0
 
-
+#ifndef __EMSCRIPTEN__ // Keep fog calls conditional for Emscripten
 		/* SET FOG */
 
 	glHint(GL_FOG_HINT, GL_FASTEST);

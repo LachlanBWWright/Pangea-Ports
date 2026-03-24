@@ -332,8 +332,8 @@ float	fps = gFramesPerSecondFrac;
 				break;				
 				
 		case	3:
-				gDelta.x += -sin(theNode->Rot.y) * 1300.0f * fps;
-				gDelta.z += -cos(theNode->Rot.y) * 1300.0f * fps;
+				gDelta.x = -sin(theNode->Rot.y) * 1300.0f;
+				gDelta.z = -cos(theNode->Rot.y) * 1300.0f;
 				gCoord.x += gDelta.x * fps;
 				gCoord.z += gDelta.z * fps;
 				theNode->Speed = sqrt(gDelta.x * gDelta.x + gDelta.z * gDelta.z);

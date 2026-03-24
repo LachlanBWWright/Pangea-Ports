@@ -70,7 +70,7 @@ void CreateCyclorama(void)
 		.group		= MODEL_GROUP_LEVELSPECIFIC,
 		.type		= 0,								// cyc is always 1st model in level bg3d files
 		.coord		= {0,0,0},
-		.flags		= STATUS_BIT_DONTCULL|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOFOG, //|STATUS_BIT_NOZWRITES;
+		.flags		= STATUS_BIT_DONTCULL|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOFOG|STATUS_BIT_HIDDEN, //|STATUS_BIT_NOZWRITES;
 		.slot		= TERRAIN_SLOT+1,					// draw after terrain for better performance since terrain blocks much of the pixels
 		.moveCall	= nil,
 		.rot		= 0,

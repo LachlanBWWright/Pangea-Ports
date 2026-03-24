@@ -824,9 +824,6 @@ uint32_t				matFlags;
 	if (wantBlend)		// if has translucent alpha, then we need blending on
 	{
 	    glEnable(GL_BLEND);
-#ifdef __EMSCRIPTEN__
-	    glDepthMask(GL_FALSE);
-#endif
 	}
 	else
 	    glDisable(GL_BLEND);

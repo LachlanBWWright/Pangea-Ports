@@ -491,8 +491,6 @@ Boolean		hasTransparentVertexAlpha;
 
 	buffNum = gGameViewInfoPtr->frameCount & 1;				// which VAR buffer to use?
 
-	if (gCurrentDrawPass == -1) return;
-
 	/* SET GLOBAL MATERIAL FLAGS */
 
 	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V;
@@ -526,17 +524,6 @@ Boolean		hasTransparentVertexAlpha;
 					hasTransparentVertexAlpha = true;
 					break;
 				}
-			}
-
-			Boolean isTrans = hasTransparentVertexAlpha || (gFenceMaterials[f]->objectData.diffuseColor.a < 1.0f);
-
-			if (gCurrentDrawPass == 0)		// OPAQUE PASS
-			{
-				if (isTrans) continue;
-			}
-			else							// TRANSPARENT PASS
-			{
-				if (!isTrans) continue;
 			}
 
 					/* CHECK LIGHTING */

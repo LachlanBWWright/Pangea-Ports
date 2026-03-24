@@ -681,20 +681,22 @@ short			skelType, playerNum;
 			}
 		}
 		else
-		if (noZWrites)
+		if (noZWrites || disableDepthWritesForBillboard)
 		{
 			glDepthMask(GL_TRUE);
 			noZWrites = false;
+			disableDepthWritesForBillboard = false;
 		}
 
 		if ((statusBits & STATUS_BIT_AIMATCAMERA)
-			&& !(statusBits & STATUS_BIT_CLIPALPHA)
-			&& !noZWrites)
+			&& !(statusBits & STATUS_BIT_CLIPALPHA))
 		{
 			// Camera-facing billboards commonly use translucent texture alpha rather
-			// than clip-alpha. Prevent them from stamping the depth buffer so they
-			// don't occlude later geometry behind their transparent regions.
-			glDepthMask(GL_FALSE);
+			// than clip-alpha.
+			// In single-pass rendering, we want them to write to the depth buffer.
+			// So no glDepthMask(GL_FALSE) here.
+			// But we need to keep track of this if we return from this node via 'goto next;'
+			// The glDepthMask(GL_TRUE) will be called if needed on the next frame.
 			disableDepthWritesForBillboard = true;
 		}
 

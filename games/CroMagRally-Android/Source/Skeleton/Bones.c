@@ -143,6 +143,14 @@ MOVertexArrayData	*data;
 																						// new ILLEGAL refs to any material objects
 	data = &gCurrentSkeleton->decomposedTriMeshes[n];
 
+	// Ensure material diffuse alpha is normalized to 1.0f (opaque)
+	// to prevent skeletal meshes from being misclassified as transparent.
+	for (int i = 0; i < data->numMaterials; i++) {
+		if (data->materials[i] && data->materials[i]->objectData.diffuseColor.a < 1.0f) {
+			data->materials[i]->objectData.diffuseColor.a = 1.0f;
+		}
+	}
+
 	numVertecies = data->numPoints;														// get # verts in trimesh
 	vertexList = data->points;															// point to vert list
 	normalPtr  = data->normals; 															// point to normals

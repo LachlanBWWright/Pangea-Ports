@@ -63,6 +63,19 @@ void LoadBonesReferenceModel(const FSSpec	*inSpec, SkeletonDefType *skeleton)
 
 	Render_Load3DMFTextures(skeleton->associated3DMF, skeleton->textureNames, forceClampUVs);
 
+			/* NORMALIZE DIFFUSE ALPHA */
+			//
+			// Pomme's 3DMF parser only stores R,G,B from the 'kdif' diffuse chunk.
+			// The alpha field remains 0 (calloc default) unless a 'kxpr' transparency
+			// chunk is also present.  Treat alpha == 0 as fully opaque (1.0f) so that
+			// IsMeshTransparent() and PrepareAlphaShading() work correctly.
+
+	for (int i = 0; i < skeleton->associated3DMF->numMeshes; i++)
+	{
+		if (skeleton->associated3DMF->meshes[i]->diffuseColor.a == 0.0f)
+			skeleton->associated3DMF->meshes[i]->diffuseColor.a = 1.0f;
+	}
+
 			/* DECOMPOSE REFERENCE MODEL */
 
 	skeleton->numDecomposedTriMeshes	= 0;
