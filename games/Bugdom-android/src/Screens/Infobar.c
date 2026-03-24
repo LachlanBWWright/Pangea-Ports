@@ -1288,8 +1288,8 @@ void SubmitInfobarOverlay(void)
 		gInfobarTextureIsDirty = false;
 	}
 
-	Render_SubmitMesh(gInfobarTopMesh, NULL, &kDefaultRenderMods_UI, &kQ3Point3D_Zero);
+	Render_SubmitMesh(gInfobarTopMesh, NULL, &kDefaultRenderMods_UI, &kQ3Point3D_Zero, 0);
 
 	if (gGamePrefs.showBottomBar || gBossHealthWasUpdated)
-		Render_SubmitMesh(gInfobarBottomMesh, NULL, &kDefaultRenderMods_UI, &kQ3Point3D_Zero);
+		Render_SubmitMesh(gInfobarBottomMesh, NULL, &kDefaultRenderMods_UI, &kQ3Point3D_Zero, 0);
 }

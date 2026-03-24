@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -119,6 +120,7 @@ void ToolBoxInit(void)
 	OGL_Boot();
 
  	InitInput();
+	InitProfiling();
 
 	LoadLocalizedStrings(gGamePrefs.language);
 
@@ -290,10 +292,12 @@ static void PlayArea(void)
 				/* MOVE OBJECTS */
 
 		{
+			StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 			uint64_t t0 = SDL_GetPerformanceCounter();
 			MoveEverything();
 			uint64_t t1 = SDL_GetPerformanceCounter();
 			gLoopUpdateTimeMs = (t1 - t0) / sPerfFreqMs;
+			EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		}
 
 
@@ -310,10 +314,12 @@ static void PlayArea(void)
 			/* DRAW IT ALL */
 
 		{
+			StartProfilePhase(PROFILE_PHASE_RENDERING);
 			uint64_t t0 = SDL_GetPerformanceCounter();
 			OGL_DrawScene(DrawObjects);
 			uint64_t t1 = SDL_GetPerformanceCounter();
 			gLoopRenderTimeMs = (t1 - t0) / sPerfFreqMs;
+			EndProfilePhase(PROFILE_PHASE_RENDERING);
 		}
 
 #ifdef __EMSCRIPTEN__
@@ -380,7 +386,7 @@ static void PlayArea(void)
 		}
 
 		gDisableHiccupTimer = false;									// reenable this after the 1st frame
-
+		ResetProfilingForFrame();
 	}
 
 	gIsInGame = false;

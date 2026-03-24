@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -303,22 +304,28 @@ static void PlayArea_Terrain(void)
 	{
 					/* GET CONTROL INFORMATION FOR THIS FRAME */
 
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		UpdateInput();									// read local keys
+		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 				/* MOVE OBJECTS */
 
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything();
 
 
 			/* UPDATE THE TERRAIN */
 
 		DoPlayerTerrainUpdate(gPlayerInfo.camera.cameraLocation.x, gPlayerInfo.camera.cameraLocation.z);
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
 
 			/* DRAW IT ALL */
 
 
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DrawObjects);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 
@@ -326,6 +333,7 @@ static void PlayArea_Terrain(void)
 			/* MISC STUFF */
 			/**************/
 
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 			/* SEE IF PAUSED */
 
 		if (IsNeedDown(kNeed_UIPause))
@@ -352,6 +360,7 @@ static void PlayArea_Terrain(void)
 
 		gGameFrameNum++;
 		gGameLevelTimer += gFramesPerSecondFrac;
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
 				/* CHEATS */
@@ -408,6 +417,7 @@ static void PlayArea_Terrain(void)
 		}
 
 		gDisableHiccupTimer = false;									// reenable this after the 1st frame
+		ResetProfilingForFrame();
 	}
 }
 
@@ -1059,6 +1069,7 @@ unsigned long	someLong;
 
 	LoadLocalizedStrings(gGamePrefs.language);
 	InitInput();
+	InitProfiling();
 	OGL_Boot();
 	InitSpriteManager();
 	InitBG3DManager();

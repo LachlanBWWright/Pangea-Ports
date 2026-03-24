@@ -122,7 +122,8 @@ void DrawCyclorama(void)
 			gCyclorama->MeshList,
 			&gCyclorama->BaseTransformMatrix,
 			&gCyclorama->RenderModifiers,
-			&gCyclorama->Coord);
+			&gCyclorama->Coord,
+			0);
 }
 
 /******************** MOVE CYC ***********************/

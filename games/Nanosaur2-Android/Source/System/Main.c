@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 #include "uieffects.h"
 
 #ifdef __EMSCRIPTEN__
@@ -118,6 +119,7 @@ void ToolBoxInit(void)
 
 	VerifySystem();
 	InitInput();
+	InitProfiling();
 
 			/********************/
 			/* INIT PREFERENCES */
@@ -544,6 +546,7 @@ static bool PlayLevelTick(void)
 
 			/* INPUT */
 
+	StartProfilePhase(PROFILE_PHASE_INPUT);
 	DoSDLMaintenance();
 
 	if (gGamePaused)
@@ -552,28 +555,38 @@ static bool PlayLevelTick(void)
 		CalcFramesPerSecond();
 		DoPlayerTerrainUpdate();
 		OGL_DrawScene(DrawLevelCallback);
+		EndProfilePhase(PROFILE_PHASE_INPUT);
+		ResetProfilingForFrame();
 		return true;
 	}
 
 	for (int i = 0; i < gNumPlayers; i++)
 		UpdatePlayerSteering(i);
+	EndProfilePhase(PROFILE_PHASE_INPUT);
 
 			/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
+	StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 	MoveEverything();
 	DoPlayerTerrainUpdate();
+	EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+
+	StartProfilePhase(PROFILE_PHASE_RENDERING);
 	OGL_DrawScene(DrawLevelCallback);
+	EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 		/*************************/
 		/* UPDATE FPS AND TIMERS */
 		/*************************/
 
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	CalcFramesPerSecond();
 	fps = gFramesPerSecondFrac;
 
 	gGameFrameNum++;
 	gGameLevelTimer += fps;
 	gDisableHiccupTimer = false;
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 			/***************************/
 			/* SEE IF RESET PLAYER NOW */
@@ -636,6 +649,7 @@ static bool PlayLevelTick(void)
 			return false;
 	}
 
+	ResetProfilingForFrame();
 	return true;
 }
 
@@ -695,6 +709,7 @@ float	fps;
 	{
 				/* INPUT */
 
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		DoSDLMaintenance();
 
 
@@ -704,30 +719,40 @@ float	fps;
 			CalcFramesPerSecond();
 			DoPlayerTerrainUpdate();
 			OGL_DrawScene(DrawLevelCallback);
+			EndProfilePhase(PROFILE_PHASE_INPUT);
+			ResetProfilingForFrame();
 			continue;
 		}
 
 
 		for (int i = 0; i < gNumPlayers; i++)
 			UpdatePlayerSteering(i);
+		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 				/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything();
 		DoPlayerTerrainUpdate();
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DrawLevelCallback);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 		/*************************/
 		/* UPDATE FPS AND TIMERS */
 		/*************************/
 
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		CalcFramesPerSecond();
 		fps = gFramesPerSecondFrac;
 
 		gGameFrameNum++;
 		gGameLevelTimer += fps;
 		gDisableHiccupTimer = false;									// reenable this after the 1st frame
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
 				/***************************/
@@ -817,6 +842,7 @@ float	fps;
 			if (gLevelCompletedCoolDownTimer <= 0.0f)
 				break;
 		}
+		ResetProfilingForFrame();
 	}
 
 	GrabMouse(false);

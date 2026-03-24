@@ -149,6 +149,8 @@ ObjNode	*MakeNewObject(NewObjectDefinitionType *newObjDef)
 	newNodePtr->Genre		= newObjDef->genre;
 	newNodePtr->StatusBits	= newObjDef->flags;
 
+	newNodePtr->RenderModifiers.drawOrder = newObjDef->drawOrder;
+
 	newNodePtr->CType		= 0;						// must init ctype to something (INVALID_NODE_FLAG might be set from last delete)
 
 	newNodePtr->Coord		= newObjDef->coord;
@@ -457,7 +459,8 @@ float			cameraX, cameraZ;
 							theNode->MeshList,
 							nil,		// Don't mult matrix with BaseTransformMatrix -- skeleton code already does it
 							&theNode->RenderModifiers,
-							&theNode->Coord);
+							&theNode->Coord,
+							theNode->Slot);
 					break;
 			
 			case	DISPLAY_GROUP_GENRE:
@@ -466,7 +469,8 @@ float			cameraX, cameraZ;
 							theNode->MeshList,
 							&theNode->BaseTransformMatrix,
 							&theNode->RenderModifiers,
-							&theNode->Coord);
+							&theNode->Coord,
+							theNode->Slot);
 					break;
 					
 			case	CUSTOM_GENRE:

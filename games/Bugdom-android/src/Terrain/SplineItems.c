@@ -120,19 +120,7 @@ Boolean			flag;
 SplinePointType	*points;
 
 			/* ADJUST SPLINE TO GAME COORDINATES */
-			
-	for (s = 0; s < gNumSplines; s++)
-	{
-		spline = &(*gSplineList)[s];							// point to this spline
-		points = (*spline->pointList);							// point to points list
-		
-		for (i = 0; i < spline->numPoints; i++)
-		{
-			points[i].x *= MAP2UNIT_VALUE;
-			points[i].z *= MAP2UNIT_VALUE;
-		}
-
-	}	
+			// (Coordinates are now pre-calculated in File.c)
 	
 	
 				/* CLEAR SPLINE OBJECT LIST */

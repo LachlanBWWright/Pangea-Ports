@@ -931,7 +931,7 @@ static TQ3Vector3D	faceNormal[NUM_TRIS_IN_SUPERTILE];
 		{
 			row = row2 + startRow;
 	
-			for (col2 = textureMinCol; col2 < textureMaxRow; col2++)
+			for (col2 = textureMinCol; col2 < textureMaxCol; col2++)
 			{
 				col = col2 + startCol;
 	
@@ -1469,7 +1469,7 @@ void DrawTerrain(const QD3DSetupOutputType *setupInfo)
 
 						/* SUBMIT FOR DRAWING */
 
-			Render_SubmitMesh(gSuperTileMemoryList[i].triMeshDataPtrs[j], nil, &gTerrainRenderMods, &gSuperTileMemoryList[i].coord[j]);
+						Render_SubmitMesh(gSuperTileMemoryList[i].triMeshDataPtrs[j], nil, &gTerrainRenderMods, &gSuperTileMemoryList[i].coord[j], 0);
 		}
 	}
 
@@ -1477,9 +1477,6 @@ void DrawTerrain(const QD3DSetupOutputType *setupInfo)
 
 	DrawCyclorama();
 	DrawFences(setupInfo);												// draw these first
-
-	if (gDoAutoFade)													// avoid clover-shaped holes in fences
-		Render_FlushQueue();
 
 	DrawObjects(setupInfo);												// draw objNodes
 	QD3D_DrawShards(setupInfo);											// draw "shard" particles
@@ -1506,8 +1503,8 @@ void DrawTerrain(const QD3DSetupOutputType *setupInfo)
 
 	Render_Enter2D_NormalizedCoordinates(setupInfo->aspectRatio);
 	DrawLensFlare(setupInfo);
-	if (gPauseQuad)
-		Render_SubmitMesh(gPauseQuad, NULL, &kDefaultRenderMods_UI, &kQ3Point3D_Zero);
+		if (gPauseQuad)
+		Render_SubmitMesh(gPauseQuad, NULL, &kDefaultRenderMods_UI, &kQ3Point3D_Zero, 0);
 	Render_FlushQueue();
 	Render_Exit2D();
 }

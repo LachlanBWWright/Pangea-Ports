@@ -485,7 +485,7 @@ void QD3D_DrawShards(const QD3DSetupOutputType *setupInfo)
 	for (int i = Pool_First(gShardPool); i >= 0; i = Pool_Next(gShardPool, i))
 	{
 		ShardType* shard = &gShards[i];
-		Render_SubmitMesh(shard->mesh, &shard->matrix, &kShardRenderMods, &shard->coord);
+				Render_SubmitMesh(shard->mesh, &shard->matrix, &kShardRenderMods, &shard->coord, 0);
 	}
 }
 

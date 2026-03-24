@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 #include "tga.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -602,6 +603,22 @@ do_anaglyph:
 
 		OGL_DrawString("fps:", 20,y);
 		OGL_DrawInt(gFramesPerSecond+.5f, 100,y);
+		y += 15;
+
+		OGL_DrawString("input:", 20,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT), 100,y);
+		y += 15;
+
+		OGL_DrawString("logic:", 20,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC), 100,y);
+		y += 15;
+
+		OGL_DrawString("render:", 20,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), 100,y);
+		y += 15;
+
+		OGL_DrawString("swap:", 20,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS), 100,y);
 		y += 15;
 
 		OGL_DrawString("tris:", 20,y);

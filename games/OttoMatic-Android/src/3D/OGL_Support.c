@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 #ifdef __ANDROID__
 // glFrustum is not available in OpenGL ES 3.0.
@@ -695,9 +696,10 @@ do_anaglyph:
 			sizeof(debugString),
 			"fps:\t\t%d\n"
 			"frame:\t\t%.2fms\n"
-			"update:\t\t%.2fms\n"
-			"terrain:\t%.2fms\n"
+			"input:\t\t%.2fms\n"
+			"logic:\t\t%.2fms\n"
 			"render:\t\t%.2fms\n"
+			"swap:\t\t%.2fms\n"
 			"tris:\t\t%d\n"
 			"draws:\t\t%d\n"
 			"verts:\t\t%d\n"
@@ -735,9 +737,10 @@ do_anaglyph:
 			,
 			(int)(gFramesPerSecond+.5f),
 			(gFramesPerSecond > 0.0f ? 1000.0f / gFramesPerSecond : 0.0f),
-			gLoopUpdateTimeMs,
-			gLoopTerrainTimeMs,
-			gLoopRenderTimeMs,
+			GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
+			GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
+			GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
+			GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
 			gPolysThisFrame,
 			gDrawCallsThisFrame,
 			gVerticesThisFrame,

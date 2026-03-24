@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -263,13 +264,16 @@ FSSpec	spec;
 	
 	while(true)
 	{
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		fps = gFramesPerSecondFrac;
 		
 		UpdateInput();
+		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 
 				/* MOVE OBJECTS */
 				
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		CalcPlayerKeyControls();
 		MoveObjects();
 		QD3D_MoveShards();
@@ -279,14 +283,20 @@ FSSpec	spec;
 		UpdateLavaTextureAnimation();
 		UpdateWaterTextureAnimation();
 		DecAsteroidTimer();
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 	
 	
 				/* DRAW OBJECTS & TERRAIN */
 					
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		DoMyTerrainUpdate();
 		UpdateInfobar();
 		QD3D_DrawScene(gGameViewInfoPtr,DrawTerrain);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
+
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		QD3D_CalcFramesPerSecond();
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 				
 			/* SEE IF PAUSE GAME */
@@ -339,6 +349,7 @@ FSSpec	spec;
 				killDelay = KILL_DELAY;			// reset kill timer for next death
 			}
 		}	
+		ResetProfilingForFrame();
 	}
 
 			/* CLEANUP */
@@ -385,6 +396,7 @@ unsigned long	someLong;
 				/**************/
 				
 	ToolBoxInit();
+	InitProfiling();
  	 		 	 		
  	InitInput();
 

@@ -86,6 +86,10 @@ void CreateCyclorama(void)
 void DrawCyclorama(void)
 {
 	if (!gCyclorama) return;
+
+	if (gCurrentSplitScreenPane == GetOverlayPaneNumber())
+		return;
+
 	ObjNode *theNode = gCyclorama;
 OGLPoint3D cameraCoord = gGameViewInfoPtr->cameraPlacement[gCurrentSplitScreenPane].cameraLocation;
 
@@ -153,6 +157,9 @@ static void MoveCloudLayer(ObjNode *theNode)
 
 static void DrawCloudLayer(ObjNode *theNode)
 {
+	if (gCurrentSplitScreenPane == GetOverlayPaneNumber())
+		return;
+
 OGLPoint3D cameraCoord = gGameViewInfoPtr->cameraPlacement[gCurrentSplitScreenPane].cameraLocation;
 
 	glDisable(GL_ALPHA_TEST);	//--------

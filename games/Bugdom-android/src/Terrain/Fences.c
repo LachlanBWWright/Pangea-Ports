@@ -14,7 +14,7 @@
 /*    PROTOTYPES            */
 /****************************/
 
-static void SubmitFence(int f, float camX, float camZ);
+static void SubmitFence(int f, float camX, float camZ, uint16_t slot);
 
 
 /****************************/
@@ -51,7 +51,7 @@ long			gNumFences = 0;
 FenceDefType	*gFenceList = nil;
 
 static Boolean					gIsFenceVisible[MAX_FENCES];
-static TQ3TriMeshData*			gFenceTriMeshDataPtrs[MAX_FENCES];
+static TQ3TriMeshData*			gFenceSegmentMeshes[MAX_FENCES][MAX_NUBS_IN_FENCE - 1];
 static RenderModifiers			gFenceRenderMods[MAX_FENCES];
 static GLuint					gFenceTypeTextures[NUM_FENCE_SHADERS];
 
@@ -123,9 +123,11 @@ void InitFenceManager(void)
 
 	for (int f = 0; f < MAX_FENCES; f++)
 	{
-		gFenceTriMeshDataPtrs[f] = nil;
+		for (int s = 0; s < MAX_NUBS_IN_FENCE - 1; s++)
+			gFenceSegmentMeshes[f][s] = nil;
+
 		Render_SetDefaultModifiers(&gFenceRenderMods[f]);
-		gFenceRenderMods[f].drawOrder = kDrawOrder_Fences;
+		gFenceRenderMods[f].drawOrder = kDrawOrder_Default;
 	}
 }
 
@@ -148,10 +150,13 @@ void DisposeFences(void)
 
 	for (int f = 0; f < MAX_FENCES; f++)
 	{
-		if (gFenceTriMeshDataPtrs[f] != nil)
+		for (int s = 0; s < MAX_NUBS_IN_FENCE - 1; s++)
 		{
-			Q3TriMeshData_Dispose(gFenceTriMeshDataPtrs[f]);
-			gFenceTriMeshDataPtrs[f] = nil;
+			if (gFenceSegmentMeshes[f][s] != nil)
+			{
+				Q3TriMeshData_Dispose(gFenceSegmentMeshes[f][s]);
+				gFenceSegmentMeshes[f][s] = nil;
+			}
 		}
 	}
 }
@@ -164,7 +169,7 @@ void DisposeFences(void)
 
 void PrimeFences(void)
 {
-long					f,i,j,numNubs;
+long					f,i,numNubs;
 FenceDefType			*fence;
 FencePointType			*nubs;
 
@@ -179,6 +184,7 @@ FencePointType			*nubs;
 			/******************************/
 			/* ADJUST TO GAME COORDINATES */
 			/******************************/
+			// (Coordinates are now pre-calculated in File.c)
 
 	for (f = 0; f < gNumFences; f++)
 	{
@@ -192,17 +198,6 @@ FencePointType			*nubs;
 
 		GAME_ASSERT(numNubs <= MAX_NUBS_IN_FENCE);
 
-		for (i = 0; i < numNubs; i++)						// adjust nubs
-		{
-			nubs[i].x *= MAP2UNIT_VALUE;
-			nubs[i].z *= MAP2UNIT_VALUE;			
-		}
-
-		fence->bBox.left *= MAP2UNIT_VALUE;					// do bbox
-		fence->bBox.right *= MAP2UNIT_VALUE;
-		fence->bBox.top *= MAP2UNIT_VALUE;
-		fence->bBox.bottom *= MAP2UNIT_VALUE;
-		
 		
 		/* CALCULATE VECTOR FOR EACH SECTION */
 		
@@ -246,30 +241,30 @@ FencePointType			*nubs;
 
 	for (f = 0; f < MAX_FENCES; f++)
 	{
-		TQ3TriMeshData* tmd = Q3TriMeshData_New(
-				MAX_NUBS_IN_FENCE * 2,
-				MAX_NUBS_IN_FENCE * 2,
-				kQ3TriMeshDataFeatureVertexUVs | kQ3TriMeshDataFeatureVertexColors | kQ3TriMeshDataFeatureVertexNormals
-		);
-
-		gFenceTriMeshDataPtrs[f] = tmd;
-
-		if (gDoAutoFade)
-			tmd->texturingMode = kQ3TexturingModeAlphaBlend;		// Required for autofaded fences!
-		else
-			tmd->texturingMode = kQ3TexturingModeAlphaTest;
-
-				/* PREBUILD TRIANGLE INFO */
-
-		for (i = j = 0; i < MAX_NUBS_IN_FENCE; i++, j+=2)
+		for (int s = 0; s < MAX_NUBS_IN_FENCE - 1; s++)
 		{
-			tmd->triangles[j].pointIndices[0] = 1 + j;
-			tmd->triangles[j].pointIndices[1] = 0 + j;
-			tmd->triangles[j].pointIndices[2] = 3 + j;
+			TQ3TriMeshData* tmd = Q3TriMeshData_New(
+					2,	// 2 triangles per segment
+					4,	// 4 points per segment
+					kQ3TriMeshDataFeatureVertexUVs | kQ3TriMeshDataFeatureVertexColors | kQ3TriMeshDataFeatureVertexNormals
+			);
 
-			tmd->triangles[j+1].pointIndices[0] = 3 + j;
-			tmd->triangles[j+1].pointIndices[1] = 0 + j;
-			tmd->triangles[j+1].pointIndices[2] = 2 + j;
+			gFenceSegmentMeshes[f][s] = tmd;
+
+			if (gDoAutoFade)
+				tmd->texturingMode = kQ3TexturingModeAlphaBlend;		// Required for autofaded fences!
+			else
+				tmd->texturingMode = kQ3TexturingModeAlphaTest;
+
+					/* PREBUILD TRIANGLE INFO */
+
+			tmd->triangles[0].pointIndices[0] = 1;
+			tmd->triangles[0].pointIndices[1] = 0;
+			tmd->triangles[0].pointIndices[2] = 3;
+
+			tmd->triangles[1].pointIndices[0] = 3;
+			tmd->triangles[1].pointIndices[1] = 0;
+			tmd->triangles[1].pointIndices[2] = 2;
 		}
 	}
 }
@@ -337,7 +332,7 @@ drawit:
 
 				/* SUBMIT GEOMETRY */
 
-		SubmitFence(f, cameraX, cameraZ);
+		SubmitFence(f, cameraX, cameraZ, f);
 	}
 }
 
@@ -551,176 +546,129 @@ next_fence:;
 // Visibility checks have already been done, so there's a good chance the fence is visible
 //
 
-static void SubmitFence(int f, float camX, float camZ)
+static void SubmitFence(int f, float camX, float camZ, uint16_t slot)
 {
-u_short					type;
-float					u,height;
-long					i,numNubs,j;
-FenceDefType			*fence;
-FencePointType			*nubs;
-TQ3TriMeshData			*tmd;
+	u_short					type;
+	float					u,height;
+	long					i,numNubs;
+	FenceDefType			*fence;
+	FencePointType			*nubs;
 
 			/* GET FENCE INFO */
 
 	fence = &gFenceList[f];								// point to this fence
-	nubs = (*fence->nubList);							// point to nub list	
+	nubs = (*fence->nubList);							// point to nub list
 	numNubs = fence->numNubs;							// get # nubs in fence
-
-	tmd = gFenceTriMeshDataPtrs[f];
-
-		/* SET TRIMESH SHADER ATTRIBUTE */
 
 	type = fence->type;									// get fence type
 	GAME_ASSERT_MESSAGE(type < NUM_FENCE_SHADERS, "illegal fence type");
 
-	tmd->glTextureName = gFenceTypeTextures[type];
-
-	tmd->hasVertexColors = gDoAutoFade;					// use per-vertex colors only if auto-fade is enabled
-
-		/* SET TRIMESH POINT AND TRI INFO */
-
-	tmd->numPoints = numNubs * 2;						// 2 vertices per nub
-	tmd->numTriangles = (numNubs-1) * 2;				// 2 faces per nub (minus 1st)
-
-
-		/* SET TRIMESH BBOX X/Z (Y WILL BE COMPUTED LATER) */
-
-	tmd->bBox.isEmpty = false;
-	tmd->bBox.min.x = gFenceList[f].bBox.left;
-	tmd->bBox.max.x = gFenceList[f].bBox.right;
-	tmd->bBox.min.y = FLT_MAX;
-	tmd->bBox.max.y = -FLT_MAX;
-	tmd->bBox.min.z = gFenceList[f].bBox.top;
-	tmd->bBox.max.z = gFenceList[f].bBox.bottom;
-
-
-			/************************************/
-			/* BUILD POINTS, UV's & TRANSP LIST */
-			/************************************/
-
 	switch(type)
 	{
 		case	FENCE_TYPE_MOSS:
-				height = -gFenceHeight[type];						// get height						
+				height = -gFenceHeight[type];						// get height
 				break;
-						
+
 		default:
 				height = gFenceHeight[type];
 	}
-			
+
 	u = 0;
 
-	for (i = j = 0; i < numNubs; i++, j+=2)
+	for (i = 0; i < numNubs-1; i++)
 	{
-		float		x,y,z,y2;
+		TQ3TriMeshData* tmd = gFenceSegmentMeshes[f][i];
 
-		x = nubs[i].x;
-		z = nubs[i].z;
-		
+		tmd->glTextureName = gFenceTypeTextures[type];
+		tmd->hasVertexColors = gDoAutoFade;
+
+		// Get coords for this segment's two nubs
+		float x0 = nubs[i].x;
+		float z0 = nubs[i].z;
+		float x1 = nubs[i+1].x;
+		float z1 = nubs[i+1].z;
+
+		float y0, y0_top, y1, y1_top;
+
 		switch(type)
 		{
 			case	FENCE_TYPE_MOSS:
-					y = GetTerrainHeightAtCoord(x, z, CEILING);			
-					y += FENCE_SINK_FACTOR;										// sink into ceiling a little bit
-					y2 = y + height;
+					y0 = GetTerrainHeightAtCoord(x0, z0, CEILING) + FENCE_SINK_FACTOR;
+					y0_top = y0 + height;
+					y1 = GetTerrainHeightAtCoord(x1, z1, CEILING) + FENCE_SINK_FACTOR;
+					y1_top = y1 + height;
 					break;
-					
+
 			case	FENCE_TYPE_WOOD:
-					y = -400;
-					y2 = y + height;
+					y0 = y1 = -400;
+					y0_top = y1_top = y0 + height;
 					break;
-		
+
 			case	FENCE_TYPE_HIVE:
-					y = GetTerrainHeightAtCoord(x, z, FLOOR);			
-					y -= FENCE_SINK_FACTOR;	
-					y2 = GetTerrainHeightAtCoord(x, z, CEILING);
-					y2 += FENCE_SINK_FACTOR;
+					y0 = GetTerrainHeightAtCoord(x0, z0, FLOOR) - FENCE_SINK_FACTOR;
+					y0_top = GetTerrainHeightAtCoord(x0, z0, CEILING) + FENCE_SINK_FACTOR;
+					y1 = GetTerrainHeightAtCoord(x1, z1, FLOOR) - FENCE_SINK_FACTOR;
+					y1_top = GetTerrainHeightAtCoord(x1, z1, CEILING) + FENCE_SINK_FACTOR;
 					break;
-		
+
 			default:
-					y = GetTerrainHeightAtCoord(x, z, FLOOR);			
-					y -= FENCE_SINK_FACTOR;										// sink into ground a little bit
-					y2 = y + height;
+					y0 = GetTerrainHeightAtCoord(x0, z0, FLOOR) - FENCE_SINK_FACTOR;
+					y0_top = y0 + height;
+					y1 = GetTerrainHeightAtCoord(x1, z1, FLOOR) - FENCE_SINK_FACTOR;
+					y1_top = y1 + height;
 		}
 
-		tmd->points[j].x = x;
-		tmd->points[j].y = y;
-		tmd->points[j].z = z;
+		// Set points
+		tmd->points[0] = (TQ3Point3D){x0, y0, z0};
+		tmd->points[1] = (TQ3Point3D){x0, y0_top, z0};
+		tmd->points[2] = (TQ3Point3D){x1, y1, z1};
+		tmd->points[3] = (TQ3Point3D){x1, y1_top, z1};
 
-		tmd->points[j+1].x = x;
-		tmd->points[j+1].y = y2;
-		tmd->points[j+1].z = z;
+		// Update bbox
+		tmd->bBox.isEmpty = false;
+		tmd->bBox.min.x = SDL_min(x0, x1);
+		tmd->bBox.max.x = SDL_max(x0, x1);
+		tmd->bBox.min.y = SDL_min(SDL_min(y0, y0_top), SDL_min(y1, y1_top));
+		tmd->bBox.max.y = SDL_max(SDL_max(y0, y0_top), SDL_max(y1, y1_top));
+		tmd->bBox.min.z = SDL_min(z0, z1);
+		tmd->bBox.max.z = SDL_max(z0, z1);
 
-		// Update mesh bbox y min/max
-		if (y  < tmd->bBox.min.y) tmd->bBox.min.y = y;
-		if (y2 > tmd->bBox.max.y) tmd->bBox.max.y = y2;
+				// UVs
+		float nextU = u + Q3Point3D_Distance(&tmd->points[0], &tmd->points[2]) * gFenceTextureW[type];
+		tmd->vertexUVs[0] = (TQ3Param2D){u, 1};
+		tmd->vertexUVs[1] = (TQ3Param2D){u, 0};
+		tmd->vertexUVs[2] = (TQ3Param2D){nextU, 1};
+		tmd->vertexUVs[3] = (TQ3Param2D){nextU, 0};
+		u = nextU;
 
-		if (i > 0)
-			u += Q3Point3D_Distance(&tmd->points[j], &tmd->points[j-2]) * gFenceTextureW[type];
-
-		tmd->vertexUVs[j].v		= 1;
-		tmd->vertexUVs[j+1].v	= 0;
-		tmd->vertexUVs[j].u		= tmd->vertexUVs[j+1].u = u;
-
-
-				/* CALC & SET TRANSPARENCY */
-
-		if (gDoAutoFade)											// see if this level has xparency
+		// Vertex Colors (Autofade)
+		if (gDoAutoFade)
 		{
-			float dist = CalcQuickDistance(camX, camZ, x, z);		// see if in fade zone
-			if (dist < gAutoFadeStartDist)	
-				dist = 1.0;
-			else
-			{
-				dist -= gAutoFadeStartDist;							// calc xparency %
-				dist = 1.0f - (dist / AUTO_FADE_RANGE);
-				if (dist < 0.0f)
-					dist = 0;
-			}
-			tmd->vertexColors[j+0].a = dist;						// set xparency value
-			tmd->vertexColors[j+1].a = dist;
+			float dist0 = CalcQuickDistance(camX, camZ, x0, z0);
+			float fade0 = (dist0 < gAutoFadeStartDist) ? 1.0f : SDL_max(0.0f, 1.0f - (dist0 - gAutoFadeStartDist) / AUTO_FADE_RANGE);
+			tmd->vertexColors[0].a = tmd->vertexColors[1].a = fade0;
+
+			float dist1 = CalcQuickDistance(camX, camZ, x1, z1);
+			float fade1 = (dist1 < gAutoFadeStartDist) ? 1.0f : SDL_max(0.0f, 1.0f - (dist1 - gAutoFadeStartDist) / AUTO_FADE_RANGE);
+			tmd->vertexColors[2].a = tmd->vertexColors[3].a = fade1;
 		}
-	}
 
-			/**************************************************/
-			/* BUILD VERTEX NORMALS IF FENCE REQUIRES GOURAUD */
-			/**************************************************/
-
-	if (gFenceUsesNullShader[type])
-	{
-		tmd->hasVertexNormals = false;
-	}
-	else
-	{
-		GAME_ASSERT(tmd->vertexNormals != NULL);
-
-		tmd->hasVertexNormals = true;
-
-		SDL_memset(tmd->vertexNormals, 0, tmd->numPoints * sizeof(tmd->vertexNormals[0]));		// zero out all normals
-
-		for (i = j = 0; i < numNubs-1; i++, j+=2)
+		// Normals (Gouraud)
+		if (gFenceUsesNullShader[type])
 		{
-			float faceNormalX = -(nubs[i+1].z - nubs[i].z);			// compute face normal
-			float faceNormalZ = -(nubs[i+1].x - nubs[i].x);			// (negated because that's how moss looks in OS9 Bugdom)
-			// assume face normal Y=0 because fences always sit straight up
-
-			for (int k = 0; k < 4; k++)								// add to normal of all 4 vertices making up the face
-			{
-				tmd->vertexNormals[j+k].x += faceNormalX;
-				tmd->vertexNormals[j+k].z += faceNormalZ;
-			}
+			tmd->hasVertexNormals = false;
 		}
-
-		for (j = 0; j < tmd->numPoints; j++)						// normalize vertex normals to unit length
+		else
 		{
-			Q3Vector3D_Normalize(&tmd->vertexNormals[j], &tmd->vertexNormals[j]);
+			tmd->hasVertexNormals = true;
+			float faceNormalX = -(z1 - z0);
+			float faceNormalZ = -(x1 - x0);
+			TQ3Vector3D normal = {faceNormalX, 0, faceNormalZ};
+			Q3Vector3D_Normalize(&normal, &normal);
+			tmd->vertexNormals[0] = tmd->vertexNormals[1] = tmd->vertexNormals[2] = tmd->vertexNormals[3] = normal;
 		}
+
+		// Submit this segment
+		Render_SubmitMesh(tmd, nil, &gFenceRenderMods[f], nil, slot);
 	}
-
-		/*******************/
-		/* SUBMIT GEOMETRY */
-		/*******************/
-
-	Render_SubmitMesh(tmd, nil, &gFenceRenderMods[f], nil);
 }
-

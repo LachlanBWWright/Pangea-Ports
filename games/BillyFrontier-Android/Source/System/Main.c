@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -343,6 +344,7 @@ unsigned long	someLong;
 	SetFullscreenMode(true);
 
 	InitInput();
+	InitProfiling();
 	OGL_Boot();
 	InitSpriteManager();
 	InitBG3DManager();

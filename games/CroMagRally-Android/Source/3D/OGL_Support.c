@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 #include "stb_image.h"
 #include "pillarbox.h"
 #ifndef __EMSCRIPTEN__
@@ -1516,6 +1517,10 @@ static char* UpdateDebugText(void)
 
 	SDL_snprintf(debugTextBuffer, sizeof(debugTextBuffer),
 		"FPS:\t%d"
+		"\nIN:\t%.2f"
+		"\nLOG:\t%.2f"
+		"\nREN:\t%.2f"
+		"\nSWP:\t%.2f"
 		"\nTRIS:\t%d"
 		"\nOBJS:\t%d"
 		"\nVRAM:\t%d\vK"
@@ -1531,6 +1536,10 @@ static char* UpdateDebugText(void)
 		"\nZ:\t\t%d"
 		,
 		(int)(gFramesPerSecond + .5f),
+		GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
+		GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
+		GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
+		GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
 		gPolysThisFrame,
 		gNumObjectNodes,
 		gVRAMUsedThisFrame / 1024,

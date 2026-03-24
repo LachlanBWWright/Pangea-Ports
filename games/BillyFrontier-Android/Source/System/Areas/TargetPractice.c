@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -87,19 +88,29 @@ void PlayTargetPractice(void)
 	{
 				/* MOVE, UPDATE, & DRAW */
 				
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		ReadKeyboard();								
+		EndProfilePhase(PROFILE_PHASE_INPUT);
+
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_TargetPractice();
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DefaultDrawCallback);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 								
 				/* MISC STUFF */
 		
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		if (GetNewKeyState(SDL_SCANCODE_ESCAPE))						// see if paused
 			DoPaused();
 			
 		CalcFramesPerSecond();		
 
 		gGameFrameNum++;
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		
 				
 				/* SEE IF LEVEL IS COMPLETED */
@@ -116,7 +127,7 @@ void PlayTargetPractice(void)
 		
 		
 		gDisableHiccupTimer = false;									// reenable this after the 1st frame
-		
+		ResetProfilingForFrame();
 	}
 
 		/* CLEANUP LEVEL */

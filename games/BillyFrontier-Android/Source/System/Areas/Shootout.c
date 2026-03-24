@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -101,16 +102,25 @@ void PlayShootout(void)
 	{
 				/* MOVE, UPDATE, & DRAW */
 				
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		ReadKeyboard();								
+		EndProfilePhase(PROFILE_PHASE_INPUT);
+
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_Shootout();
 		KeepTerrainAlive();
-		OGL_DrawScene(DefaultDrawCallback);
-
 		gTimeSinceLastEnemyShot += gFramesPerSecondFrac;
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
+		OGL_DrawScene(DefaultDrawCallback);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
+
 		
 								
 				/* MISC STUFF */
 		
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 		if (IsCheatKeyComboDown())											// see if cheat to next stop-point		
 			gShootoutCanProceedToNextStopPoint = true;
@@ -122,6 +132,7 @@ void PlayShootout(void)
 		CalcFramesPerSecond();		
 		
 		gGameFrameNum++;
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		
 				
 				/* SEE IF LEVEL IS COMPLETED */
@@ -138,7 +149,7 @@ void PlayShootout(void)
 		
 		
 		gDisableHiccupTimer = false;									// reenable this after the 1st frame
-		
+		ResetProfilingForFrame();
 	}
 
 		/* CLEANUP LEVEL */

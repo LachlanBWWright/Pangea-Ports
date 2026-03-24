@@ -3,6 +3,7 @@
 // This file is part of Bugdom. https://github.com/jorio/bugdom
 
 #include "game.h"
+#include "../Headers/profiling.h"
 
 char					gTypedAsciiKey = '\0';
 
@@ -33,9 +34,18 @@ static void UpdateDebugStats(void)
 
 		SDL_snprintf(
 				gDebugTextBuffer, sizeof(gDebugTextBuffer),
-				"fps: %d\ntris: %d\nmeshes: %d+%d\ntiles: %ld/%ld%s\nnodes: %d\nheap: %dK, %dp\n\nx: %d\nz: %d\ny: %.3f %s%s\n%s\n%s\n%s\n\n\n\n\n\n\n\n\n"
+				"fps: %d\n"
+				"input: %.2fms\n"
+				"logic: %.2fms\n"
+				"render: %.2fms\n"
+				"swap: %.2fms\n"
+				"tris: %d\nmeshes: %d+%d\ntiles: %ld/%ld%s\nnodes: %d\nheap: %dK, %dp\n\nx: %d\nz: %d\ny: %.3f %s%s\n%s\n%s\n%s\n\n\n\n\n\n\n\n\n"
 				"Bugdom %s - SDL %s\nOpenGL %s, %s @ %dx%d",
 				(int)roundf(fps),
+				GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
+				GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
+				GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
+				GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
 				gRenderStats.triangles,
 				gRenderStats.meshesPass1,
 				gRenderStats.meshesPass2,

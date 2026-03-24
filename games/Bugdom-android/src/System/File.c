@@ -1084,6 +1084,15 @@ short					**xlateTableHand,*xlateTbl;
 		DetachResource(hand);
 		HLockHi(hand);
 		UNPACK_STRUCTS_HANDLE(SplinePointType, spline->numPoints, hand);
+		
+		// Convert points to world coordinates immediately
+		SplinePointType* pts = (SplinePointType*)*hand;
+		for (int p = 0; p < spline->numPoints; p++)
+		{
+			pts[p].x *= MAP2UNIT_VALUE;
+			pts[p].z *= MAP2UNIT_VALUE;
+		}
+
 		spline->pointList = (SplinePointType**)hand;
 		
 				/* READ SPLINE ITEM LIST */
@@ -1123,10 +1132,10 @@ short					**xlateTableHand,*xlateTbl;
 			gFenceList[i].type 		= inData[i].type;
 			gFenceList[i].numNubs 	= inData[i].numNubs;
 			gFenceList[i].nubList 	= nil;
-			gFenceList[i].bBox.top		= inData[i].bBox.top;
-			gFenceList[i].bBox.bottom	= inData[i].bBox.bottom;
-			gFenceList[i].bBox.left		= inData[i].bBox.left;
-			gFenceList[i].bBox.right	= inData[i].bBox.right;
+			gFenceList[i].bBox.top		= inData[i].bBox.top * MAP2UNIT_VALUE;
+			gFenceList[i].bBox.bottom	= inData[i].bBox.bottom * MAP2UNIT_VALUE;
+			gFenceList[i].bBox.left		= inData[i].bBox.left * MAP2UNIT_VALUE;
+			gFenceList[i].bBox.right	= inData[i].bBox.right * MAP2UNIT_VALUE;
 		}		
 		ReleaseResource(hand);
 	}
@@ -1147,6 +1156,15 @@ short					**xlateTableHand,*xlateTbl;
 			DetachResource(hand);
 			HLockHi(hand);
 			UNPACK_STRUCTS_HANDLE(FencePointType, gFenceList[i].numNubs, hand);
+			
+			// Convert nubs to game coordinates immediately after loading
+			FencePointType *nubs = (FencePointType *)*hand;
+			for (int n = 0; n < gFenceList[i].numNubs; n++)
+			{
+				nubs[n].x *= MAP2UNIT_VALUE;
+				nubs[n].z *= MAP2UNIT_VALUE;
+			}
+
 			gFenceList[i].nubList = (FencePointType **)hand;
 		}
 	}

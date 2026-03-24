@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -364,9 +365,12 @@ float fps;
 
 	while(true)
 	{
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		fps = gFramesPerSecondFrac;
 		UpdateInput();
+		EndProfilePhase(PROFILE_PHASE_INPUT);
 
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 				/* SPECIFIC MAINTENANCE */
 
 		CheckPlayerMorph();				
@@ -382,17 +386,22 @@ float fps;
 		QD3D_MoveShards();
 		MoveParticleGroups();
 		UpdateCamera();
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 	
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
 			/* DRAW OBJECTS & TERRAIN */
 					
 		UpdateInfobar();
 
 		DoMyTerrainUpdate();
 		QD3D_DrawScene(gGameViewInfoPtr,DrawTerrain);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		QD3D_CalcFramesPerSecond();
 		DoSDLMaintenance();
 		gDisableHiccupTimer = false;
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 			/* SEE IF PAUSE GAME */
 
@@ -434,6 +443,7 @@ float fps;
 			}
 			ResetInputState();
 		}	
+		ResetProfilingForFrame();
 	}
 	
 	CaptureMouse(false);
@@ -815,6 +825,7 @@ unsigned long	someLong;
 	TryOpenGamepad(true);
 
 	ToolBoxInit();
+	InitProfiling();
 
 			/* INIT SOME OF MY STUFF */
 

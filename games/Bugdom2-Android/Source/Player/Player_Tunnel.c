@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /**********************/
@@ -372,23 +373,30 @@ void PlayArea_Tunnel(void)
 	{
 				/* GET CONTROL INFORMATION FOR THIS FRAME */
 
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		UpdateInput();
+		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 
 				/* MOVE OBJECTS */
 
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything();
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
 
 			/* DRAW IT ALL */
 
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DrawTunnel);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 			/**************/
 			/* MISC STUFF */
 			/**************/
 
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 			/* SEE IF PAUSED */
 
 		if (IsNeedDown(kNeed_UIPause))
@@ -397,6 +405,8 @@ void PlayArea_Tunnel(void)
 		CalcFramesPerSecond();
 
 		gGameFrameNum++;
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+
 
 				/* CHEATS */
 
@@ -444,6 +454,7 @@ void PlayArea_Tunnel(void)
 					ResetPlayerInTunnel();
 			}
 		}
+		ResetProfilingForFrame();
 	}
 }
 

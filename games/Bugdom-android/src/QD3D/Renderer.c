@@ -94,6 +94,7 @@ const TQ3TriMeshData*   mesh;
 const TQ3Matrix4x4*     transform;
 const RenderModifiers*  mods;
 float                   depth;
+uint16_t                slot;
 bool                    meshIsTransparent;
 } MeshQueueEntry;
 
@@ -1081,83 +1082,84 @@ glViewport(x, y, w, h);
 
 void Render_FlushQueue(void)
 {
-GAME_ASSERT(gFrameStarted);
+	GAME_ASSERT(gFrameStarted);
 
-if (gMeshQueueSize == 0)
-return;
+	if (gMeshQueueSize == 0)
+		return;
 
-//--------------------------------------------------------------
-// SORT DRAW QUEUE ENTRIES
-// Opaque meshes are sorted front-to-back,
-// followed by transparent meshes sorted back-to-front.
-SDL_qsort(
-gMeshQueuePtrs,
-gMeshQueueSize,
-sizeof(gMeshQueuePtrs[0]),
-DrawOrderComparator);
+	//--------------------------------------------------------------
+	// SORT DRAW QUEUE ENTRIES
+	// Opaque meshes are sorted front-to-back,
+	// followed by transparent meshes sorted back-to-front.
+	SDL_qsort(
+			gMeshQueuePtrs,
+			gMeshQueueSize,
+			sizeof(gMeshQueuePtrs[0]),
+			DrawOrderComparator);
 
-//--------------------------------------------------------------
-// PASS 1: OPAQUE COLOR + DEPTH
-// Draw opaque meshes to color AND depth buffers.
+	//--------------------------------------------------------------
+	// PASS 1: OPAQUE COLOR + DEPTH
+	// Draw opaque meshes to color AND depth buffers.
 
-int numDeferredColorMeshes = 0;
+	int numDeferredColorMeshes = 0;
 
-glDepthFunc(GL_LESS);
-DisableState(GL_BLEND);
+	SetFlag(glDepthMask, true);
+	glDepthFunc(GL_LEQUAL);
+	DisableState(GL_BLEND);
 
-for (int i = 0; i < gMeshQueueSize; i++)
-{
-MeshQueueEntry* entry = gMeshQueuePtrs[i];
+	for (int i = 0; i < gMeshQueueSize; i++)
+	{
+		MeshQueueEntry* entry = gMeshQueuePtrs[i];
 
-if (!entry->meshIsTransparent)
-{
-BeginShadingPass(entry);
-PrepareOpaqueShading(entry);
-SendGeometry(entry);
-}
-else
-{
-// Defer transparent mesh to Pass 2
-GAME_ASSERT(numDeferredColorMeshes <= i);
-gMeshQueuePtrs[numDeferredColorMeshes++] = entry;
-}
-}
+		if (!entry->meshIsTransparent)
+		{
+			BeginShadingPass(entry);
+			PrepareOpaqueShading(entry);
+			SendGeometry(entry);
+		}
+		else
+		{
+			// Defer transparent mesh to Pass 2
+			GAME_ASSERT(numDeferredColorMeshes <= i);
+			gMeshQueuePtrs[numDeferredColorMeshes++] = entry;
+		}
+	}
 
-//--------------------------------------------------------------
-// PASS 2: ALPHA-BLENDED COLOR
-// Draw transparent meshes to color buffer only.
+	//--------------------------------------------------------------
+	// PASS 2: ALPHA-BLENDED COLOR
+	// Draw transparent meshes to color buffer only.
 
-gRenderStats.meshesPass2 += numDeferredColorMeshes;
+	gRenderStats.meshesPass2 += numDeferredColorMeshes;
 
-if (numDeferredColorMeshes > 0)
-{
-EnableState(GL_BLEND);
-gState.alphaTestEnabled = false;
-glUniform1i(gState.loc_u_AlphaTestEnabled, 0);
-SetFlag(glDepthMask, false);
-glDepthFunc(GL_LEQUAL);     // depth info already written in pass 1
+	if (numDeferredColorMeshes > 0)
+	{
+		EnableState(GL_BLEND);
+		gState.alphaTestEnabled = false;
+		glUniform1i(gState.loc_u_AlphaTestEnabled, 0);
+		SetFlag(glDepthMask, false);
+		glDepthFunc(GL_LEQUAL);     // depth info already written in pass 1
 
-for (int i = 0; i < numDeferredColorMeshes; i++)
-{
-const MeshQueueEntry* entry = gMeshQueuePtrs[i];
-BeginShadingPass(entry);
-PrepareAlphaShading(entry);
-SendGeometry(entry);
-}
-}
+		for (int i = 0; i < numDeferredColorMeshes; i++)
+		{
+			const MeshQueueEntry* entry = gMeshQueuePtrs[i];
+			BeginShadingPass(entry);
+			PrepareAlphaShading(entry);
+			SendGeometry(entry);
+		}
+	}
 
-//--------------------------------------------------------------
-// CLEAN UP
+	//--------------------------------------------------------------
+	// CLEAN UP
 
-// Restore camera-only modelview if a per-object transform was left active
-if (gState.currentTransform != NULL)
-{
-UploadMatrix4x4(gState.loc_u_ModelView, &gCurrentModelView);
-UploadMatrix3x3NormalFromMV(&gCurrentModelView);
-gState.currentTransform = NULL;
-}
+	// Restore camera-only modelview if a per-object transform was left active
+	if (gState.currentTransform != NULL)
+	{
+		UploadMatrix4x4(gState.loc_u_ModelView, &gCurrentModelView);
+		UploadMatrix3x3NormalFromMV(&gCurrentModelView);
+		gState.currentTransform = NULL;
+	}
 
-gMeshQueueSize = 0;
+	gMeshQueueSize = 0;
 }
 
 void Render_EndFrame(void)
@@ -1215,90 +1217,101 @@ return entry;
 }
 
 void Render_SubmitMeshList(
-int                     numMeshes,
-TQ3TriMeshData**        meshList,
-const TQ3Matrix4x4*     transform,
-const RenderModifiers*  mods,
-const TQ3Point3D*       centerCoord)
+		int                     numMeshes,
+		TQ3TriMeshData**        meshList,
+		const TQ3Matrix4x4*     transform,
+		const RenderModifiers*  mods,
+		const TQ3Point3D*       centerCoord,
+		uint16_t                slot)
 {
-if (numMeshes <= 0)
-SDL_Log("not drawing this!\n");
+	if (numMeshes <= 0)
+		SDL_Log("not drawing this!\n");
 
-GAME_ASSERT(gFrameStarted);
-GAME_ASSERT(gMeshQueueSize + numMeshes <= MESHQUEUE_MAX_SIZE);
+	GAME_ASSERT(gFrameStarted);
+	GAME_ASSERT(gMeshQueueSize + numMeshes <= MESHQUEUE_MAX_SIZE);
 
-float depth = GetDepth(numMeshes, meshList, centerCoord);
+	float depth = GetDepth(numMeshes, meshList, centerCoord);
 
-for (int i = 0; i < numMeshes; i++)
-{
-MeshQueueEntry* entry       = NewMeshQueueEntry();
-entry->mesh                 = meshList[i];
-entry->transform            = transform;
-entry->mods                 = mods ? mods : &kDefaultRenderMods;
-entry->depth                = depth;
-entry->meshIsTransparent    = IsMeshTransparent(entry->mesh, entry->mods);
+	for (int i = 0; i < numMeshes; i++)
+	{
+		MeshQueueEntry* entry       = NewMeshQueueEntry();
+		entry->mesh                 = meshList[i];
+		entry->transform            = transform;
+		entry->mods                 = mods ? mods : &kDefaultRenderMods;
+		entry->depth                = depth;
+		entry->slot                 = slot;
+		entry->meshIsTransparent    = IsMeshTransparent(entry->mesh, entry->mods);
 
-gRenderStats.meshesPass1++;
-gRenderStats.triangles += entry->mesh->numTriangles;
+		gRenderStats.meshesPass1++;
+		gRenderStats.triangles += entry->mesh->numTriangles;
 
-GAME_ASSERT(!(entry->mods->statusBits & STATUS_BIT_HIDDEN));
-}
+		GAME_ASSERT(!(entry->mods->statusBits & STATUS_BIT_HIDDEN));
+	}
 }
 
 void Render_SubmitMesh(
-const TQ3TriMeshData*   mesh,
-const TQ3Matrix4x4*     transform,
-const RenderModifiers*  mods,
-const TQ3Point3D*       centerCoord)
+		const TQ3TriMeshData*   mesh,
+		const TQ3Matrix4x4*     transform,
+		const RenderModifiers*  mods,
+		const TQ3Point3D*       centerCoord,
+		uint16_t                slot)
 {
-GAME_ASSERT(gFrameStarted);
-GAME_ASSERT(gMeshQueueSize < MESHQUEUE_MAX_SIZE);
+	GAME_ASSERT(gFrameStarted);
+	GAME_ASSERT(gMeshQueueSize < MESHQUEUE_MAX_SIZE);
 
-MeshQueueEntry* entry       = NewMeshQueueEntry();
-entry->mesh                 = mesh;
-entry->transform            = transform;
-entry->mods                 = mods ? mods : &kDefaultRenderMods;
-entry->depth                = GetDepth(1, (TQ3TriMeshData **) &mesh, centerCoord);
-entry->meshIsTransparent    = IsMeshTransparent(entry->mesh, entry->mods);
+	MeshQueueEntry* entry       = NewMeshQueueEntry();
+	entry->mesh                 = mesh;
+	entry->transform            = transform;
+	entry->mods                 = mods ? mods : &kDefaultRenderMods;
+	entry->depth                = GetDepth(1, (TQ3TriMeshData **) &mesh, centerCoord);
+	entry->slot                 = slot;
+	entry->meshIsTransparent    = IsMeshTransparent(entry->mesh, entry->mods);
 
-gRenderStats.meshesPass1++;
-gRenderStats.triangles += entry->mesh->numTriangles;
+	gRenderStats.meshesPass1++;
+	gRenderStats.triangles += entry->mesh->numTriangles;
 
-GAME_ASSERT(!(entry->mods->statusBits & STATUS_BIT_HIDDEN));
+	GAME_ASSERT(!(entry->mods->statusBits & STATUS_BIT_HIDDEN));
 }
 
 #pragma mark -
 
 static int DrawOrderComparator(const void* a_void, const void* b_void)
 {
-static const int AFirst   = -1;
-static const int BFirst   = +1;
-static const int DontCare =  0;
+	static const int AFirst   = -1;
+	static const int BFirst   = +1;
+	static const int DontCare =  0;
 
-const MeshQueueEntry* a = *(MeshQueueEntry**) a_void;
-const MeshQueueEntry* b = *(MeshQueueEntry**) b_void;
+	const MeshQueueEntry* a = *(MeshQueueEntry**) a_void;
+	const MeshQueueEntry* b = *(MeshQueueEntry**) b_void;
 
-// First check manual draw order
-if (a->mods->drawOrder < b->mods->drawOrder)    return AFirst;
-if (a->mods->drawOrder > b->mods->drawOrder)    return BFirst;
+	// 1. Manual draw order (e.g. Terrain < World < UI)
+	if (a->mods->drawOrder < b->mods->drawOrder)    return AFirst;
+	if (a->mods->drawOrder > b->mods->drawOrder)    return BFirst;
 
-// Opaque meshes before transparent meshes
-if (a->meshIsTransparent != b->meshIsTransparent)
-return b->meshIsTransparent ? AFirst : BFirst;
+	// 2. Opaque meshes before transparent meshes
+	if (a->meshIsTransparent != b->meshIsTransparent)
+		return b->meshIsTransparent ? AFirst : BFirst;
 
-// Then sort by depth
-if (!a->meshIsTransparent)
-{
-if (a->depth < b->depth)    return AFirst;
-if (a->depth > b->depth)    return BFirst;
-}
-else
-{
-if (a->depth < b->depth)    return BFirst;
-if (a->depth > b->depth)    return AFirst;
-}
+	// 3. Depth sort
+	if (!a->meshIsTransparent)
+	{
+		// Opaque: Front-to-Back (optimization)
+		if (a->depth < b->depth)    return AFirst;
+		if (a->depth > b->depth)    return BFirst;
+	}
+	else
+	{
+		// Transparent: Back-to-Front (required for blending)
+		if (a->depth < b->depth)    return BFirst;
+		if (a->depth > b->depth)    return AFirst;
+	}
 
-return DontCare;
+	// 4. Slot tie-breaker (linked list order)
+	// If depth is identical, use Slot to maintain a consistent order.
+	if (a->slot < b->slot) return AFirst;
+	if (a->slot > b->slot) return BFirst;
+
+	return DontCare;
 }
 
 #pragma mark -
@@ -1471,10 +1484,14 @@ mesh->diffuseColor.b * entry->mods->diffuseColor.b,
 
 static void PrepareAlphaShading(const MeshQueueEntry* entry)
 {
-const TQ3TriMeshData* mesh = entry->mesh;
-const uint32_t statusBits  = entry->mods->statusBits;
+	const TQ3TriMeshData* mesh = entry->mesh;
+	const uint32_t statusBits  = entry->mods->statusBits;
 
-// Additive blending for glow meshes
+	// In multi-pass rendering, transparent objects should NOT write to depth
+	// to avoid blocking other transparent objects behind them.
+	SetFlag(glDepthMask, false);
+
+	// Additive blending for glow meshes
 bool wantAdditive = !!(statusBits & STATUS_BIT_GLOW);
 if (gState.blendFuncIsAdditive != wantAdditive)
 {
@@ -1654,7 +1671,7 @@ void Render_DrawFadeOverlay(float opacity)
 GAME_ASSERT(gFullscreenQuad);
 gFullscreenQuad->texturingMode = kQ3TexturingModeOff;
 gFullscreenQuad->diffuseColor  = (TQ3ColorRGBA) { 0, 0, 0, 1.0f - opacity };
-Render_SubmitMesh(gFullscreenQuad, NULL, &kDefaultRenderMods_FadeOverlay, &kQ3Point3D_Zero);
+Render_SubmitMesh(gFullscreenQuad, NULL, &kDefaultRenderMods_FadeOverlay, &kQ3Point3D_Zero, 0);
 }
 
 #pragma mark -

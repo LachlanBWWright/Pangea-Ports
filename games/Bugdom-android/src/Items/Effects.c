@@ -702,7 +702,7 @@ static const TQ3Vector3D up = {0,1,0};
 
 					/* DRAW IT */
 
-		Render_SubmitMesh(tm, nil, &kParticleGroupRenderingMods, nil);
+				Render_SubmitMesh(tm, nil, &kParticleGroupRenderingMods, nil, 0);
 	}
 }
 

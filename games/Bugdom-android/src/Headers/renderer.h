@@ -47,9 +47,8 @@ enum
 {
 	kDrawOrder_Terrain = -128,
 	kDrawOrder_Cyclorama,
-	kDrawOrder_Fences,
-	kDrawOrder_Shadows,
 	kDrawOrder_Default = 0,
+	kDrawOrder_Shadows = kDrawOrder_Default,
 	kDrawOrder_Ripples,
 	kDrawOrder_GlowyParticles,
 	kDrawOrder_UI,
@@ -173,7 +172,8 @@ void Render_SubmitMeshList(
 		TQ3TriMeshData** meshList,
 		const TQ3Matrix4x4* transform,
 		const RenderModifiers* mods,
-		const TQ3Point3D* centerCoord);
+		const TQ3Point3D* centerCoord,
+		uint16_t slot);
 
 // Submits one trimesh for drawing.
 // Arguments transform and mods may be nil.
@@ -183,7 +183,8 @@ void Render_SubmitMesh(
 		const TQ3TriMeshData* mesh,
 		const TQ3Matrix4x4* transform,
 		const RenderModifiers* mods,
-		const TQ3Point3D* centerCoord);
+		const TQ3Point3D* centerCoord,
+		uint16_t slot);
 
 #pragma mark -
 

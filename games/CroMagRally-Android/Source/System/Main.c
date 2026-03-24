@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 #include "miscscreens.h"
 #include "network.h"
 #include <SDL3/SDL.h>
@@ -117,6 +118,7 @@ OSErr		iErr;
 			/* BOOT OGL */
 
 	OGL_Boot();
+	InitProfiling();
 
 
 			/* MAKE FSSPEC FOR DATA FOLDER */
@@ -922,6 +924,7 @@ static void PlayArea(void)
 
 	while(true)
 	{
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 				/******************************************/
 				/* GET CONTROL INFORMATION FOR THIS FRAME */
 				/******************************************/
@@ -949,12 +952,14 @@ static void PlayArea(void)
 				HostSend_ControlInfoToClients();			// now send everyone's key states to all clients
 			}
 		}
+		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 
 				/****************/
 				/* MOVE OBJECTS */
 				/****************/
 
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything();
 
 				/* DO GAME MODE SPECIFICS */
@@ -965,6 +970,7 @@ static void PlayArea(void)
 			/* UPDATE THE TERRAIN */
 
 		DoPlayerTerrainUpdate();
+		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
 
 
@@ -984,9 +990,11 @@ static void PlayArea(void)
 
 		if (gIsNetworkClient)
 		{
+			StartProfilePhase(PROFILE_PHASE_INPUT);
 			ReadKeyboard();									// read local client keys
 			GetLocalKeyState();								// build a control state bitfield
 			ClientSend_ControlInfoToHost();					// send this info to the host to be used the next frame
+			EndProfilePhase(PROFILE_PHASE_INPUT);
 		}
 
 
@@ -995,7 +1003,9 @@ static void PlayArea(void)
 			/* DRAW IT ALL */
 			/***************/
 
+		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DrawTerrain);
+		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 
@@ -1055,16 +1065,18 @@ static void PlayArea(void)
 
 			/* SEE IF PAUSED */
 
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		if (!gIsSelfRunningDemo)
 		{
 			if (GetNewNeedStateAnyP(kNeed_UIPause))
 				DoPaused();
 		}
 
-		if (!gIsNetworkClient)						// clients dont need to calc frame rate since its passed to them from host.
+		if (!gIsNetworkClient)					// clients dont need to calc frame rate since its passed to them from host.
 			CalcFramesPerSecond();
 
 		gGameFrameNum++;
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
 				/* SEE IF TRACK IS COMPLETED */
@@ -1079,8 +1091,6 @@ static void PlayArea(void)
 				break;
 		}
 
-		gDisableHiccupTimer = false;									// reenable this after the 1st frame
-
 			/* UPDATE SELF-RUNNING DEMO */
 
 		if (gIsSelfRunningDemo)
@@ -1094,6 +1104,9 @@ static void PlayArea(void)
 				break;
 			}
 		}
+
+		gDisableHiccupTimer = false;									// reenable this after the 1st frame
+		ResetProfilingForFrame();
 	}
 
 	gIsInGame = false;

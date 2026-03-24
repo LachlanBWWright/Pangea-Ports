@@ -615,8 +615,8 @@ void QD3D_DrawDebugTextMesh(void)
 	Q3Matrix4x4_SetScale(&m, s * 1.333f * gWindowHeight / gWindowWidth, -s, 1.0f);
 	m.value[3][0] = 2;
 	m.value[3][1] = 72;
-	m.value[3][2] = 0;
-	Render_SubmitMesh(gDebugTextMesh, &m, &kDefaultRenderMods_DebugUI, &kQ3Point3D_Zero);
+		m.value[3][2] = 0;
+	Render_SubmitMesh(gDebugTextMesh, &m, &kDefaultRenderMods_DebugUI, &kQ3Point3D_Zero, 0);
 }
 
 /************ DRAW PILLARBOX COVER QUADS *****************/
@@ -681,7 +681,7 @@ void QD3D_DrawPillarbox(void)
 
 	Render_SetViewport(0, 0, gWindowWidth, gWindowHeight);
 	Render_Enter2D_NativeResolution();
-	Render_SubmitMesh(gPillarboxMesh, NULL, &kDefaultRenderMods_Pillarbox, &kQ3Point3D_Zero);
+		Render_SubmitMesh(gPillarboxMesh, NULL, &kDefaultRenderMods_Pillarbox, &kQ3Point3D_Zero, 0);
 	Render_FlushQueue();
 	Render_Exit2D();
 }

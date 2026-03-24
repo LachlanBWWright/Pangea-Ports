@@ -691,6 +691,6 @@ const bool doMoon = gMoonFlareTextureName != 0;
 			mesh->glTextureName = gLensFlareTextureNames[gFlareImageTable[i]];
 	}
 
-	Render_SubmitMeshList(NUM_FLARES, gFlareMeshes, NULL, &gFlareRenderMods, &kQ3Point3D_Zero);
+		Render_SubmitMeshList(NUM_FLARES, gFlareMeshes, NULL, &gFlareRenderMods, &kQ3Point3D_Zero, 0);
 }
 

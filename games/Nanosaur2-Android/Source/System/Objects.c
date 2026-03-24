@@ -551,7 +551,8 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 	gDepthWriteShouldBeOn = true;
 
-	DrawCyclorama();
+	if (!isOverlayPane)
+		DrawCyclorama();
 
 	noLighting = false;
 	noZBuffer = false;
