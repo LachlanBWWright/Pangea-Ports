@@ -128,6 +128,7 @@ void PlayDuel(Byte difficulty)
 
 			/* FADE IN */
 
+	gIsInGame = true;
 	MakeFadeEvent(true);
 
 
@@ -140,22 +141,17 @@ void PlayDuel(Byte difficulty)
 				/* MOVE, UPDATE, & DRAW */
 
 		StartProfilePhase(PROFILE_PHASE_INPUT);
-		ReadKeyboard();								
-		EndProfilePhase(PROFILE_PHASE_INPUT);
+		ReadKeyboard();
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_Duel();
 		KeepTerrainAlive();
-		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
-		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DefaultDrawCallback);
-		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 				/* MISC STUFF */
 
-		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		if (IsCheatKeyComboDown())										// cheat to bail out
 		{
 			gPlayerToWinDuel = true;
@@ -169,8 +165,6 @@ void PlayDuel(Byte difficulty)
 		CalcFramesPerSecond();		
 
 		gGameFrameNum++;
-		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
-
 
 				/* SEE IF LEVEL IS COMPLETED */
 
@@ -193,6 +187,7 @@ void PlayDuel(Byte difficulty)
 		/* CLEANUP LEVEL */
 					
 	MyFlushEvents();
+	gIsInGame = false;
 	CleanupDuel();
 }
 

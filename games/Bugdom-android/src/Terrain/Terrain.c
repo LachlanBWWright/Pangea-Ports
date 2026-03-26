@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -1501,12 +1502,14 @@ void DrawTerrain(const QD3DSetupOutputType *setupInfo)
 
 		/* DRAW IN-GAME 2D ELEMENTS */
 
+	StartProfilePhase(PROFILE_PHASE_UI);
 	Render_Enter2D_NormalizedCoordinates(setupInfo->aspectRatio);
 	DrawLensFlare(setupInfo);
-		if (gPauseQuad)
+	if (gPauseQuad)
 		Render_SubmitMesh(gPauseQuad, NULL, &kDefaultRenderMods_UI, &kQ3Point3D_Zero, 0);
 	Render_FlushQueue();
 	Render_Exit2D();
+	EndProfilePhase(PROFILE_PHASE_UI);
 }
 
 

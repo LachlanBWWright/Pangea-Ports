@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 #define TILE_TEXTURE_INTERNAL_FORMAT	GL_RGB
 #define TILE_TEXTURE_FORMAT				GL_BGRA_EXT
@@ -1291,10 +1292,10 @@ void DrawTerrain(QD3DSetupOutputType *setupInfo)
 			/* DRAW THE TRIMESH IN THIS SUPERTILE */
 
 #if HQ_TERRAIN
-		Render_SubmitMesh(superTile->triMeshPtr, nil, nil, &superTile->coord);
+		Render_SubmitMesh(superTile->triMeshPtr, nil, nil, &superTile->coord, 0);
 #else
 		TQ3TriMeshData* mesh = superTile->isFlat ? superTile->triMeshPtr2 : superTile->triMeshPtr;
-		Render_SubmitMesh(mesh, nil, nil, &superTile->coord);
+		Render_SubmitMesh(mesh, nil, nil, &superTile->coord, 0);
 #endif
 	}
 

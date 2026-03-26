@@ -306,7 +306,6 @@ static void PlayArea_Terrain(void)
 
 		StartProfilePhase(PROFILE_PHASE_INPUT);
 		UpdateInput();									// read local keys
-		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 				/* MOVE OBJECTS */
 
@@ -317,15 +316,12 @@ static void PlayArea_Terrain(void)
 			/* UPDATE THE TERRAIN */
 
 		DoPlayerTerrainUpdate(gPlayerInfo.camera.cameraLocation.x, gPlayerInfo.camera.cameraLocation.z);
-		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
 
 			/* DRAW IT ALL */
 
 
-		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DrawObjects);
-		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 
@@ -333,7 +329,6 @@ static void PlayArea_Terrain(void)
 			/* MISC STUFF */
 			/**************/
 
-		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 			/* SEE IF PAUSED */
 
 		if (IsNeedDown(kNeed_UIPause))

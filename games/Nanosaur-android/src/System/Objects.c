@@ -41,6 +41,8 @@ ObjNode		*gFirstNodePtr = nil;
 					
 ObjNode		*gCurrentNode,*gMostRecentlyAddedNode, *gNextNode;
 
+int			gNumObjNodes = 0;
+
 
 NewObjectDefinitionType	gNewObjectDefinition;
 
@@ -71,6 +73,7 @@ void InitObjectManager(void)
 
 	gCurrentNode = nil;
 	gFirstNodePtr = nil;									// no node yet
+	gNumObjNodes = 0;
 
 		/* INIT OBJECT POOL */
 
@@ -186,6 +189,7 @@ ObjNode	*MakeNewObject(NewObjectDefinitionType *newObjDef)
 	}
 
 out:
+	gNumObjNodes++;
 	gMostRecentlyAddedNode = newNodePtr;					// remember this
 	return(newNodePtr);
 }
@@ -397,7 +401,8 @@ ObjNode		*theNode;
 							theNode->MeshList,
 							nil,		// Don't mult matrix with BaseTransformMatrix -- skeleton code already does it
 							&theNode->RenderModifiers,
-							&theNode->Coord);
+							&theNode->Coord,
+							theNode->Slot);
 					break;
 
 			case	DISPLAY_GROUP_GENRE:
@@ -406,7 +411,8 @@ ObjNode		*theNode;
 							theNode->MeshList,
 							&theNode->BaseTransformMatrix,
 							&theNode->RenderModifiers,
-							&theNode->Coord);
+							&theNode->Coord,
+							theNode->Slot);
 					break;
 		}
 
@@ -454,6 +460,8 @@ ObjNode *tempNode;
 
 	if (theNode == nil)								// see if passed a bogus node
 		return;
+
+	gNumObjNodes--;
 
 	if (theNode->CType == INVALID_NODE_FLAG)		// see if already deleted
 	{

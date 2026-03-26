@@ -12,13 +12,14 @@
 
 #include "game.h"
 #include <stddef.h>
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
 
 static void MakeInfobar(void);
-static void DrawInfobar(ObjNode* theNode);
+void DrawInfobar(ObjNode* theNode);
 
 static void Infobar_DrawMap(Byte whichPane);
 static void Infobar_MovePlace(ObjNode* objNode);
@@ -649,10 +650,12 @@ static void MakeInfobar(void)
 
 /********************** DRAW INFOBAR ****************************/
 
-static void DrawInfobar(ObjNode* theNode)
+void DrawInfobar(ObjNode* theNode)
 {
 	if (gHideInfobar)
 		return;
+
+	StartProfilePhase(PROFILE_PHASE_UI);
 
 		/***************/
 		/* DRAW THINGS */
@@ -679,6 +682,8 @@ static void DrawInfobar(ObjNode* theNode)
 				Infobar_DrawHealth(gCurrentSplitScreenPane);
 				break;
 	}
+
+	EndProfilePhase(PROFILE_PHASE_UI);
 }
 
 

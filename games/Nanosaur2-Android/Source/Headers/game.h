@@ -80,6 +80,7 @@ extern	Boolean					gDisableHiccupTimer;
 extern	Boolean					gDrawLensFlare;
 extern	Boolean					gGameOver;
 extern	Boolean					gGamePaused;
+extern	Boolean					gIsInGame;
 extern	Boolean					gLevelCompleted;
 extern	Boolean					gMyState_Lighting;
 extern	Boolean					gPlayNow;

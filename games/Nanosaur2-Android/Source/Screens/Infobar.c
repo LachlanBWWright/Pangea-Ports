@@ -10,6 +10,7 @@
 /****************************/
 
 #include	"game.h"
+#include	"profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */

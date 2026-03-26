@@ -56,6 +56,9 @@ static float	sEmscriptenKillDelay;
 
 QD3DSetupOutputType		*gGameViewInfoPtr = nil;
 
+Byte		gDebugMode = 0;
+Boolean		gIsInGame = false;
+
 PrefsType	gGamePrefs;
 
 
@@ -105,6 +108,7 @@ OSErr		iErr;
 	if (iErr)
 		DoFatalAlert("Cannot locate the Nanosaur Data folder.");
 
+	TextMesh_Init();
 
 
 			/* LOAD QD3D & QT */
@@ -253,6 +257,7 @@ FSSpec	spec;
 	InitLevel();
 
 	gGameOverFlag = false;
+	gIsInGame = true;
 
 	MakeFadeEvent(true);
 	QD3D_CalcFramesPerSecond();
@@ -268,7 +273,6 @@ FSSpec	spec;
 		fps = gFramesPerSecondFrac;
 		
 		UpdateInput();
-		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 
 				/* MOVE OBJECTS */
@@ -283,20 +287,17 @@ FSSpec	spec;
 		UpdateLavaTextureAnimation();
 		UpdateWaterTextureAnimation();
 		DecAsteroidTimer();
-		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 	
 	
 				/* DRAW OBJECTS & TERRAIN */
 					
-		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		DoMyTerrainUpdate();
-		UpdateInfobar();
-		QD3D_DrawScene(gGameViewInfoPtr,DrawTerrain);
-		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
-		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+		UpdateInfobar();
+
+		QD3D_DrawScene(gGameViewInfoPtr,DrawTerrain);
+
 		QD3D_CalcFramesPerSecond();
-		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 				
 			/* SEE IF PAUSE GAME */
@@ -332,6 +333,12 @@ FSSpec	spec;
 				
 		}
 
+		if (GetNewSDLKeyState(SDL_SCANCODE_F8))
+		{
+			if (++gDebugMode > 2)
+				gDebugMode = 0;
+		}
+
 			/* SEE IF GAME ENDED */				
 		
 		if (gGameOverFlag)
@@ -351,6 +358,8 @@ FSSpec	spec;
 		}	
 		ResetProfilingForFrame();
 	}
+
+	gIsInGame = false;
 
 			/* CLEANUP */
 	CleanupLevel();

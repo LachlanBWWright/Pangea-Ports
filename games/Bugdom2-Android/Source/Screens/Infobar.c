@@ -11,13 +11,14 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
 
-static void DrawInfobar(ObjNode* theNode);
+void DrawInfobar(ObjNode* theNode);
 static void DrawInfobarSprite_Rotated(float x, float y, float size, short texNum, float rot);
 static void DrawInfobarSprite_Centered(float x, float y, float size, short texNum);
 static void Infobar_DrawHealth(void);
@@ -235,12 +236,14 @@ void SetInfobarSpriteState(void)
 
 /********************** DRAW INFOBAR ****************************/
 
-static void DrawInfobar(ObjNode* theNode)
+void DrawInfobar(ObjNode* theNode)
 {
 	(void) theNode;
 
 	if (gHideInfobar)
 		return;
+
+	StartProfilePhase(PROFILE_PHASE_UI);
 
 		/*********************/
 		/* SET UP UI ANCHORS */
@@ -334,6 +337,8 @@ static void DrawInfobar(ObjNode* theNode)
 	gGlobalMaterialFlags = 0;
 	//if (gGameView.useFog)
 	//	glEnable(GL_FOG);
+
+	EndProfilePhase(PROFILE_PHASE_UI);
 }
 
 #pragma mark -

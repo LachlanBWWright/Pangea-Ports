@@ -287,6 +287,7 @@ static void PlayArea(void)
 		gVerticesThisFrame = 0;
 		gBufferUploadsThisFrame = 0;
 
+		StartProfilePhase(PROFILE_PHASE_INPUT);
 		UpdateInput();									// read local keys
 
 				/* MOVE OBJECTS */
@@ -297,7 +298,6 @@ static void PlayArea(void)
 			MoveEverything();
 			uint64_t t1 = SDL_GetPerformanceCounter();
 			gLoopUpdateTimeMs = (t1 - t0) / sPerfFreqMs;
-			EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		}
 
 
@@ -314,12 +314,10 @@ static void PlayArea(void)
 			/* DRAW IT ALL */
 
 		{
-			StartProfilePhase(PROFILE_PHASE_RENDERING);
-			uint64_t t0 = SDL_GetPerformanceCounter();
 			OGL_DrawScene(DrawObjects);
 			uint64_t t1 = SDL_GetPerformanceCounter();
-			gLoopRenderTimeMs = (t1 - t0) / sPerfFreqMs;
-			EndProfilePhase(PROFILE_PHASE_RENDERING);
+			// gLoopRenderTimeMs will be set inside OGL_DrawScene for better accuracy if needed, 
+			// but we can also just use the contiguous profiling.
 		}
 
 #ifdef __EMSCRIPTEN__

@@ -563,21 +563,26 @@ do_anaglyph:
 
 			/* CALL INPUT DRAW FUNCTION */
 
-	if (drawRoutine != nil)
-		drawRoutine();
+			StartProfilePhase(PROFILE_PHASE_RENDERING);
+			if (drawRoutine != nil)
+			drawRoutine();
 
+			StartProfilePhase(PROFILE_PHASE_UI);
+			if (gInGameNow)
+				DrawInfobar(nil);
 
-			/***********************************/
+			StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+
+			/***********************************/	
 			/* SEE IF DO ANOTHER ANAGLYPH PASS */
-			/***********************************/
+			/***********************************/	
 
-	if (gGamePrefs.anaglyph)
-	{
-		gAnaglyphPass++;
-		if (gAnaglyphPass == 1)
+			if (gGamePrefs.anaglyph)
+			{
+			gAnaglyphPass++;
+			if (gAnaglyphPass == 1)
 			goto do_anaglyph;
-	}
-
+			}
 
 		/**************************/
 		/* SEE IF SHOW DEBUG INFO */
@@ -615,6 +620,10 @@ do_anaglyph:
 
 		OGL_DrawString("render:", 20,y);
 		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), 100,y);
+		y += 15;
+
+		OGL_DrawString("ui:", 20,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_UI), 100,y);
 		y += 15;
 
 		OGL_DrawString("swap:", 20,y);
@@ -721,7 +730,7 @@ do_anaglyph:
            /* SWAP THE BUFFS */
 
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
-
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 #ifdef __EMSCRIPTEN__
 	emscripten_sleep(0);									// yield to browser event loop (ASYNCIFY)
 #endif

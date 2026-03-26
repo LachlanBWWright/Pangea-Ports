@@ -3,6 +3,7 @@
 
 ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 static uint64_t gPerformanceFrequency;
+static ProfilePhaseType gCurrentPhase = -1;
 
 void InitProfiling(void) {
     gPerformanceFrequency = SDL_GetPerformanceFrequency();
@@ -14,12 +15,21 @@ void InitProfiling(void) {
     gProfilePhases[PROFILE_PHASE_INPUT].name = "Input";
     gProfilePhases[PROFILE_PHASE_GAME_LOGIC].name = "Game Logic";
     gProfilePhases[PROFILE_PHASE_RENDERING].name = "Rendering";
+    gProfilePhases[PROFILE_PHASE_UI].name = "UI";
     gProfilePhases[PROFILE_PHASE_SWAP_BUFFERS].name = "Swap Buffers";
+    
+    gCurrentPhase = -1;
 }
 
 void StartProfilePhase(ProfilePhaseType phase_type) {
+    // Auto-end the current phase if one is active
+    if (gCurrentPhase != -1) {
+        EndProfilePhase(gCurrentPhase);
+    }
+
     if (phase_type >= 0 && phase_type < NUM_PROFILE_PHASES) {
         gProfilePhases[phase_type].start_tick = SDL_GetPerformanceCounter();
+        gCurrentPhase = phase_type;
     }
 }
 
@@ -31,13 +41,18 @@ void EndProfilePhase(ProfilePhaseType phase_type) {
             gProfilePhases[phase_type].samples++;
             gProfilePhases[phase_type].start_tick = 0; // Reset for next frame
         }
+        
+        // If we just ended the current tracking phase, mark it as none
+        if (gCurrentPhase == phase_type) {
+            gCurrentPhase = -1;
+        }
     }
 }
 
 float GetProfilePhaseAvgMs(ProfilePhaseType phase_type) {
     if (phase_type >= 0 && phase_type < NUM_PROFILE_PHASES && gProfilePhases[phase_type].samples > 0) {
-        double avg_ticks = (double)gProfilePhases[phase_type].total_ticks / gProfilePhases[phase_type].samples;
-        return (float)((avg_ticks / gPerformanceFrequency) * 1000.0);
+        double total_ms = ((double)gProfilePhases[phase_type].total_ticks * 1000.0) / (double)gPerformanceFrequency;
+        return (float)(total_ms / (double)gProfilePhases[phase_type].samples);
     }
     return 0.0f;
 }

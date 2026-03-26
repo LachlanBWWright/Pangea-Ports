@@ -313,7 +313,7 @@ static void OGL_InitDrawContext(OGLViewDefType* viewDefPtr)
 	SDL_GL_SwapWindow(gSDLWindow);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);		// clear buffer
 	SDL_GL_SwapWindow(gSDLWindow);
-
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 				/* SET VARIOUS STATE INFO */
 
@@ -567,8 +567,15 @@ do_anaglyph:
 
 			/* CALL INPUT DRAW FUNCTION */
 
+	StartProfilePhase(PROFILE_PHASE_RENDERING);
 	if (drawRoutine != nil)
 		drawRoutine();
+
+	StartProfilePhase(PROFILE_PHASE_UI);
+	if (gIsInGame)
+		DrawInfobar(nil);
+
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 			/***********************************/	
 			/* SEE IF DO ANOTHER ANAGLYPH PASS */
@@ -632,6 +639,10 @@ do_anaglyph:
 
 		OGL_DrawString("render:", 20,y);
 		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), 100,y);
+		y += 15;
+
+		OGL_DrawString("ui:", 20,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_UI), 100,y);
 		y += 15;
 
 		OGL_DrawString("swap:", 20,y);
@@ -715,7 +726,7 @@ do_anaglyph:
 	if (gGamePrefs.anaglyph)
 		RestoreCamerasFromAnaglyph();
 
-
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 }
 
 

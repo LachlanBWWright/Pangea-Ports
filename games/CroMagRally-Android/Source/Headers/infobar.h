@@ -9,6 +9,7 @@
 
 void InitInfobar(void);
 void DisposeInfobar(void);
+void DrawInfobar(ObjNode* theNode);
 void ShowLapNum(short playerNum);
 void ShowFinalPlace(short playerNum, int rankInScoreboard);
 void DecCurrentPOWQuantity(short playerNum);

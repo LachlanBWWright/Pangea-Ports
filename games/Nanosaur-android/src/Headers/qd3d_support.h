@@ -5,6 +5,7 @@
 #pragma once
 
 #include <QD3D.h>
+#include "textmesh.h"
 
 
 #define	MIN_FPS				4
@@ -98,3 +99,9 @@ extern	void	QD3D_CalcFramesPerSecond(void);
 extern	void QD3D_NewViewDef(QD3DSetupInputType *viewDef);
 void MakeShadowTexture(void);
 void QD3D_OnWindowResized(void);
+
+GLuint QD3D_LoadTextureFile(int textureRezID, int flags);
+
+void QD3D_UpdateDebugTextMesh(const char* text);
+void QD3D_DrawDebugTextMesh(void);
+void QD3D_DrawPillarbox(void);

@@ -636,9 +636,17 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	int numPasses = gNumSplitScreenPanes + 1;
 	gDrawingOverlayPane = false;
 
+	StartProfilePhase(PROFILE_PHASE_RENDERING);
+
 	for (gCurrentSplitScreenPane = 0; gCurrentSplitScreenPane < numPasses; gCurrentSplitScreenPane++)
 	{
 		gDrawingOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
+		if (gDrawingOverlayPane)
+		{
+			StartProfilePhase(PROFILE_PHASE_UI);
+			if (gIsInGame)
+				DrawInfobar(nil);
+		}
 
 		OGL_UpdatePaneDimensions(gCurrentSplitScreenPane);
 		glViewport(
@@ -688,8 +696,8 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 
            /* SWAP THE BUFFS */
 
-	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
-
+	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 #ifdef __EMSCRIPTEN__
 	emscripten_sleep(0);							// yield to browser event loop (ASYNCIFY)
 #endif
@@ -1520,6 +1528,7 @@ static char* UpdateDebugText(void)
 		"\nIN:\t%.2f"
 		"\nLOG:\t%.2f"
 		"\nREN:\t%.2f"
+		"\nUI:\t%.2f"
 		"\nSWP:\t%.2f"
 		"\nTRIS:\t%d"
 		"\nOBJS:\t%d"
@@ -1539,6 +1548,7 @@ static char* UpdateDebugText(void)
 		GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
 		GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
 		GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
+		GetProfilePhaseAvgMs(PROFILE_PHASE_UI),
 		GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
 		gPolysThisFrame,
 		gNumObjectNodes,

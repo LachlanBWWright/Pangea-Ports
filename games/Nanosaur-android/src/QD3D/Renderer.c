@@ -15,6 +15,7 @@
 #endif
 #endif
 #include "game.h"
+#include "profiling.h"
 
 extern TQ3Param2D				gEnvMapUVs[];
 extern RenderStats				gRenderStats;
@@ -77,7 +78,6 @@ static int					gMeshQueueSize = 0;
 
 static int DepthSortCompare(void const* a_void, void const* b_void);
 static void DrawMeshList(int renderPass, const MeshQueueEntry* entry);
-static void DrawFadeOverlay(float opacity);
 
 #pragma mark -
 
@@ -92,6 +92,22 @@ static const RenderModifiers kDefaultRenderMods =
 };
 
 static const float kFreezeFrameFadeOutDuration = .33f;
+
+const TQ3Point3D kQ3Point3D_Zero = {0,0,0};
+
+const RenderModifiers kDefaultRenderMods_DebugUI =
+{
+	.statusBits = STATUS_BIT_NULLSHADER | STATUS_BIT_DONTCULL | STATUS_BIT_NOZWRITE,
+	.diffuseColor = {1,1,1,1},
+	.sortPriority = kDrawOrder_DebugUI,
+};
+
+const RenderModifiers kDefaultRenderMods_Pillarbox =
+{
+	.statusBits = STATUS_BIT_NULLSHADER | STATUS_BIT_DONTCULL | STATUS_BIT_NOZWRITE,
+	.diffuseColor = {0,0,0,1},
+	.sortPriority = kDrawOrder_DebugUI + 1,
+};
 
 //		2----3
 //		| \  |
@@ -489,13 +505,9 @@ void Render_StartFrame(void)
 	gMeshQueueSize = 0;
 }
 
-void Render_SetViewport(TQ3Area pane)
+void Render_SetViewport(int x, int y, int w, int h)
 {
-	int x = pane.min.x;
-	int y = pane.min.y;
-	int w = pane.max.x-pane.min.x;
-	int h = pane.max.y-pane.min.y;
-	bool needScissor = x != 0 || y != 0 || ((int)pane.max.x != gWindowWidth) || ((int)pane.max.y != gWindowHeight);
+	bool needScissor = x != 0 || y != 0 || (x + w != gWindowWidth) || (y + h != gWindowHeight);
 
 	if (needScissor)
 	{
@@ -515,10 +527,10 @@ void Render_SetViewport(TQ3Area pane)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void Render_EndFrame(void)
+void Render_FlushQueue(void)
 {
 	// Keep track of transparent queue size for debug stats
-	gRenderStats.meshQueueSize = gMeshQueueSize;
+	gRenderStats.meshesPass1 = gMeshQueueSize; // Nanosaur 1 only has one submission pass
 
 	// Flush mesh draw queue
 	if (gMeshQueueSize != 0)
@@ -546,6 +558,11 @@ void Render_EndFrame(void)
 		// Clear mesh draw queue
 		gMeshQueueSize = 0;
 	}
+}
+
+void Render_EndFrame(void)
+{
+	Render_FlushQueue();
 
 	if (gState.hasState_GL_SCISSOR_TEST)
 	{
@@ -556,7 +573,7 @@ void Render_EndFrame(void)
 	// Draw fade overlay
 	if (gFadeOverlayOpacity > 0.01f)
 	{
-		DrawFadeOverlay(gFadeOverlayOpacity);
+		Render_DrawFadeOverlay(gFadeOverlayOpacity);
 	}
 #endif
 }
@@ -568,8 +585,10 @@ void Render_SubmitMeshList(
 		TQ3TriMeshData**		meshList,
 		const TQ3Matrix4x4*		transform,
 		const RenderModifiers*	mods,
-		const TQ3Point3D*		centerCoord)
+		const TQ3Point3D*		centerCoord,
+		uint16_t                slot)
 {
+	(void) slot;
 	TQ3Point3D coordInFrustum;
 	Q3Point3D_Transform(centerCoord, &gCameraWorldToFrustumMatrix, &coordInFrustum);
 
@@ -588,8 +607,10 @@ void Render_SubmitMesh(
 		TQ3TriMeshData*			mesh,
 		const TQ3Matrix4x4*		transform,
 		const RenderModifiers*	mods,
-		const TQ3Point3D*		centerCoord)
+		const TQ3Point3D*		centerCoord,
+		uint16_t                slot)
 {
+	(void) slot;
 	TQ3Point3D coordInFrustum;
 	Q3Point3D_Transform(centerCoord, &gCameraWorldToFrustumMatrix, &coordInFrustum);
 
@@ -793,7 +814,7 @@ static void DrawMeshList(int renderPass, const MeshQueueEntry* entry)
 		}
 
 		// Update stats
-		gRenderStats.trianglesDrawn += mesh->numTriangles;
+		gRenderStats.triangles += mesh->numTriangles;
 	}
 
 	if (matrixPushedYet)
@@ -853,6 +874,33 @@ static void Render_EnterExit2D(bool enter)
 void Render_Enter2D(void)
 {
 	Render_EnterExit2D(true);
+}
+
+void Render_Enter2D_Full640x480(void)
+{
+	Render_EnterExit2D(true);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, 640, 480, 0, 0, 1);
+	glMatrixMode(GL_MODELVIEW);
+}
+
+void Render_Enter2D_NativeResolution(void)
+{
+	Render_EnterExit2D(true);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, gWindowWidth, gWindowHeight, 0, 0, 1);
+	glMatrixMode(GL_MODELVIEW);
+}
+
+void Render_Enter2D_NormalizedCoordinates(float aspect)
+{
+	Render_EnterExit2D(true);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-aspect, aspect, -1, 1, 0, 1);
+	glMatrixMode(GL_MODELVIEW);
 }
 
 void Render_Exit2D(void)
@@ -1093,7 +1141,7 @@ void Render_DrawBackdrop(bool keepBackdropAspectRatio)
 	Render_Exit2D();
 }
 
-static void DrawFadeOverlay(float opacity)
+void Render_DrawFadeOverlay(float opacity)
 {
 	glViewport(0, 0, gWindowWidth, gWindowHeight);
 	Render_Enter2D();

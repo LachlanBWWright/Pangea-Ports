@@ -952,7 +952,6 @@ static void PlayArea(void)
 				HostSend_ControlInfoToClients();			// now send everyone's key states to all clients
 			}
 		}
-		EndProfilePhase(PROFILE_PHASE_INPUT);
 
 
 				/****************/
@@ -970,7 +969,6 @@ static void PlayArea(void)
 			/* UPDATE THE TERRAIN */
 
 		DoPlayerTerrainUpdate();
-		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
 
 
@@ -990,11 +988,9 @@ static void PlayArea(void)
 
 		if (gIsNetworkClient)
 		{
-			StartProfilePhase(PROFILE_PHASE_INPUT);
 			ReadKeyboard();									// read local client keys
 			GetLocalKeyState();								// build a control state bitfield
 			ClientSend_ControlInfoToHost();					// send this info to the host to be used the next frame
-			EndProfilePhase(PROFILE_PHASE_INPUT);
 		}
 
 
@@ -1003,9 +999,7 @@ static void PlayArea(void)
 			/* DRAW IT ALL */
 			/***************/
 
-		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DrawTerrain);
-		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 
@@ -1065,7 +1059,6 @@ static void PlayArea(void)
 
 			/* SEE IF PAUSED */
 
-		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		if (!gIsSelfRunningDemo)
 		{
 			if (GetNewNeedStateAnyP(kNeed_UIPause))
@@ -1076,7 +1069,6 @@ static void PlayArea(void)
 			CalcFramesPerSecond();
 
 		gGameFrameNum++;
-		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
 				/* SEE IF TRACK IS COMPLETED */

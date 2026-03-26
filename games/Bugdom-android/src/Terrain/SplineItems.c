@@ -117,7 +117,6 @@ long			s,i,type;
 SplineItemType 	*itemPtr;
 SplineDefType	*spline;
 Boolean			flag;
-SplinePointType	*points;
 
 			/* ADJUST SPLINE TO GAME COORDINATES */
 			// (Coordinates are now pre-calculated in File.c)

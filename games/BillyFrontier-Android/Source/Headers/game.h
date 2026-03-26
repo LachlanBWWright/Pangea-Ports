@@ -56,6 +56,7 @@ extern Boolean gDrawLensFlare;
 extern Boolean gFreezeCameraFromXZ;
 extern Boolean gFreezeCameraFromY;
 extern Boolean gGameOver;
+extern Boolean gIsInGame;
 extern Boolean gIsPicking;
 extern Boolean gLevelCompleted;
 extern Boolean gLostGame;

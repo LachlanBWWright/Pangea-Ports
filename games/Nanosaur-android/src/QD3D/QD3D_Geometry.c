@@ -408,7 +408,7 @@ void QD3D_DrawShards(QD3DSetupOutputType *setupInfo)
 	for (int i = Pool_First(gShardPool); i >= 0; i = Pool_Next(gShardPool, i))
 	{
 		ShardType* shard = &gShardMemory[i];
-		Render_SubmitMesh(shard->mesh, &shard->matrix, &gShardRenderMods, &shard->coord);
+		Render_SubmitMesh(shard->mesh, &shard->matrix, &gShardRenderMods, &shard->coord, 0);
 	}
 }
 

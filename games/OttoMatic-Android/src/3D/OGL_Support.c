@@ -651,20 +651,27 @@ do_anaglyph:
 
 			/* CALL INPUT DRAW FUNCTION */
 
-	if (drawRoutine != nil)
-		drawRoutine();
+			StartProfilePhase(PROFILE_PHASE_RENDERING);
+			if (drawRoutine != nil)
+			drawRoutine();
+
+			StartProfilePhase(PROFILE_PHASE_UI);
+			if (gIsInGame)
+				DrawInfobar();
+
+			StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
-			/***********************************/
+			/***********************************/	
 			/* SEE IF DO ANOTHER ANAGLYPH PASS */
-			/***********************************/
+			/***********************************/	
 
-	if (gGamePrefs.anaglyphMode != ANAGLYPH_OFF)
-	{
-		gAnaglyphPass++;
-		if (gAnaglyphPass == 1)
+			if (gGamePrefs.anaglyphMode != ANAGLYPH_OFF)
+			{
+			gAnaglyphPass++;
+			if (gAnaglyphPass == 1)
 			goto do_anaglyph;
-	}
+			}
 
 
 		/**************************/
@@ -699,6 +706,7 @@ do_anaglyph:
 			"input:\t\t%.2fms\n"
 			"logic:\t\t%.2fms\n"
 			"render:\t\t%.2fms\n"
+			"ui:\t\t%.2fms\n"
 			"swap:\t\t%.2fms\n"
 			"tris:\t\t%d\n"
 			"draws:\t\t%d\n"
@@ -740,6 +748,7 @@ do_anaglyph:
 			GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
 			GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
 			GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
+			GetProfilePhaseAvgMs(PROFILE_PHASE_UI),
 			GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
 			gPolysThisFrame,
 			gDrawCallsThisFrame,
@@ -797,8 +806,8 @@ do_anaglyph:
 
            /* SWAP THE BUFFS */
 
-	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
-
+	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 	if (gGamePrefs.anaglyphMode != ANAGLYPH_OFF)
 		RestoreCamerasFromAnaglyph();

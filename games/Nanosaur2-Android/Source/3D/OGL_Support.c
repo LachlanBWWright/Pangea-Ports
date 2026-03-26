@@ -598,9 +598,9 @@ static void ClearAllBuffersToBlack(void)
 		SDL_GL_SwapWindow(gSDLWindow);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);		// clear buffer
 		SDL_GL_SwapWindow(gSDLWindow);
-
-		OGL_CheckError();
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	}
+	OGL_CheckError();
 }
 
 
@@ -790,8 +790,14 @@ do_anaglyph:
 
 	int numPasses = gNumPlayers + 1;
 
+	StartProfilePhase(PROFILE_PHASE_RENDERING);
+
 	for (gCurrentSplitScreenPane = 0; gCurrentSplitScreenPane < numPasses; gCurrentSplitScreenPane++)
 	{
+		bool isOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
+		if (isOverlayPane)
+			StartProfilePhase(PROFILE_PHASE_UI);
+
 				/* OFFSET ANAGLYPH CAMERAS */
 
 		if (IsStereo())
@@ -837,7 +843,7 @@ do_anaglyph:
 		}
 	}
 
-
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
 		/**************************/
@@ -883,6 +889,10 @@ do_anaglyph:
 
 		OGL_DrawString("render:", 10,y);
 		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), x2,y);
+		y += 15;
+
+		OGL_DrawString("ui:", 10,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_UI), x2,y);
 		y += 15;
 
 		OGL_DrawString("swap:", 10,y);
@@ -988,7 +998,8 @@ do_anaglyph:
 	if (IsStereo())
 		RestoreCamerasFromAnaglyph();
 
-}
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+	}
 
 /***************** DRAW BLUE LINE ************************/
 //

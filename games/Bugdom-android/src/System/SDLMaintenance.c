@@ -38,6 +38,7 @@ static void UpdateDebugStats(void)
 				"input: %.2fms\n"
 				"logic: %.2fms\n"
 				"render: %.2fms\n"
+				"ui: %.2fms\n"
 				"swap: %.2fms\n"
 				"tris: %d\nmeshes: %d+%d\ntiles: %ld/%ld%s\nnodes: %d\nheap: %dK, %dp\n\nx: %d\nz: %d\ny: %.3f %s%s\n%s\n%s\n%s\n\n\n\n\n\n\n\n\n"
 				"Bugdom %s - SDL %s\nOpenGL %s, %s @ %dx%d",
@@ -45,6 +46,7 @@ static void UpdateDebugStats(void)
 				GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
 				GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
 				GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
+				GetProfilePhaseAvgMs(PROFILE_PHASE_UI),
 				GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
 				gRenderStats.triangles,
 				gRenderStats.meshesPass1,

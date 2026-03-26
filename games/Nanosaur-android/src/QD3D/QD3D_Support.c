@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -47,6 +48,9 @@ float	gAdditionalClipping = 0;
 int		gWindowWidth		= GAME_VIEW_WIDTH;
 int		gWindowHeight		= GAME_VIEW_HEIGHT;
 
+static TQ3TriMeshData*	gDebugTextMesh	= NULL;
+static TQ3TriMeshData*	gPillarboxMesh	= NULL;
+
 static const uint32_t	gDebugTextUpdateInterval = 50;
 static uint32_t			gDebugTextFrameAccumulator = 0;
 static uint32_t			gDebugTextLastUpdatedAt = 0;
@@ -72,10 +76,12 @@ void QD3D_Boot(void)
 }
 
 
-/******************** QD3D: SHUTDOWN ***************************/
+/******************** QD3D: SHUTDOWN ******************************/
 
 void QD3D_Shutdown(void)
 {
+	TextMesh_Shutdown();
+
 	if (gGLContext)
 	{
 		SDL_GL_DestroyContext(gGLContext);
@@ -353,7 +359,11 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(QD3DSetu
 			/* ENTER 3D VIEWPORT */
 
 	Render_SetViewportClearColor(setupInfo->clearColor);
-	Render_SetViewport(viewportPane);
+	Render_SetViewport(
+			(int)viewportPane.min.x,
+			(int)viewportPane.min.y,
+			(int)(viewportPane.max.x - viewportPane.min.x),
+			(int)(viewportPane.max.y - viewportPane.min.y));
 
 			/* PREPARE FRUSTUM CULLING PLANES */
 
@@ -361,14 +371,67 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(QD3DSetu
 
 			/* 3D SCENE RENDER LOOP */
 
+	StartProfilePhase(PROFILE_PHASE_RENDERING);
 	if (drawRoutine)
 		drawRoutine(setupInfo);
 
+			/******************/
 			/* DONE RENDERING */
+			/*****************/
 
+	Render_FlushQueue();
+
+	StartProfilePhase(PROFILE_PHASE_UI);
+	// Update and draw debug text
+	if (gDebugMode > 0)
+	{
+		uint32_t now = SDL_GetTicks();
+		if (now - gDebugTextLastUpdatedAt > gDebugTextUpdateInterval)
+		{
+			gDebugTextLastUpdatedAt = now;
+			SDL_snprintf(
+					gDebugTextBuffer, sizeof(gDebugTextBuffer),
+					"fps: %d\n"
+					"input: %.2fms\n"
+					"logic: %.2fms\n"
+					"render: %.2fms\n"
+					"ui: %.2fms\n"
+					"swap: %.2fms\n"
+					"tris: %d\nmeshes: %d+%d\nnodes: %d\n",
+					(int)roundf(gFramesPerSecond),
+					GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
+					GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
+					GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
+					GetProfilePhaseAvgMs(PROFILE_PHASE_UI),
+					GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
+					gRenderStats.triangles,
+					gRenderStats.meshesPass1,
+					gRenderStats.meshesPass2,
+					gNumObjNodes);
+			QD3D_UpdateDebugTextMesh(gDebugTextBuffer);
+		}
+
+		Render_Enter2D_Full640x480();
+		QD3D_DrawDebugTextMesh();
+		Render_FlushQueue();
+		Render_Exit2D();
+	}
+
+	if (gGamePrefs.force4x3)
+	{
+		float myAR = (float)gWindowWidth / (float)gWindowHeight;
+		float targetAR = 1.333333f;
+		if (SDL_fabsf(myAR - targetAR) > (1.0f / (float)GAME_VIEW_WIDTH))
+		{
+			QD3D_DrawPillarbox();
+		}
+	}
+
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	Render_EndFrame();
 
 	SDL_GL_SwapWindow(gSDLWindow);
+	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 }
 
 
@@ -495,8 +558,8 @@ void QD3D_CalcFramesPerSecond(void)
 					PRO_MODE ? " Extreme" : "",
 					GAME_VERSION,
 					(int)round(fps),
-					gRenderStats.trianglesDrawn,
-					gRenderStats.meshQueueSize,
+					gRenderStats.triangles,
+					gRenderStats.meshesPass1,
 					gObjNodePool? Pool_Size(gObjNodePool): 0,
 					(int)Pomme_GetNumAllocs(),
 					(int)(Pomme_GetHeapSize()/1024),
@@ -629,4 +692,239 @@ static TQ3Area GetAdjustedPane(Rect paneClip)
 	pane.max.y += offset.y;
 
 	return pane;
+}
+
+/************ UPDATE DEBUG TEXT MESH *****************/
+
+void QD3D_UpdateDebugTextMesh(const char* text)
+{
+	int len = (int) strlen(text);
+	int numTriangles = len * 2;
+	int numPoints = len * 4;
+
+	// No text to draw
+	if (len == 0)
+	{
+		if (gDebugTextMesh)
+		{
+			Q3TriMeshData_Dispose(gDebugTextMesh);
+			gDebugTextMesh = NULL;
+		}
+		return;
+	}
+
+	// Create mesh if it doesn't exist, or reallocate if it's too small
+	if (!gDebugTextMesh || gDebugTextMesh->numPoints < numPoints)
+	{
+		if (gDebugTextMesh)
+			Q3TriMeshData_Dispose(gDebugTextMesh);
+
+		gDebugTextMesh = Q3TriMeshData_New(numTriangles, numPoints, kQ3TriMeshDataFeatureVertexUVs);
+	}
+
+	// Reset triangle & point count in mesh so TextMesh_SetMesh knows the mesh's capacity
+	gDebugTextMesh->numTriangles	= numTriangles;
+	gDebugTextMesh->numPoints		= numPoints;
+
+	// Lay out the text
+	TextMesh_SetMesh(nil, text, gDebugTextMesh);
+}
+
+/************ SUBMIT DEBUG TEXT MESH FOR DRAWING *****************/
+//
+// Must be in 640x480 2D mode.
+// Does nothing if there's no text to draw.
+//
+
+void QD3D_DrawDebugTextMesh(void)
+{
+	// Static because matrix must survive beyond this call
+	static TQ3Matrix4x4 m;
+
+	// No text to draw
+	if (!gDebugTextMesh)
+		return;
+
+	float s = .33f;
+	Q3Matrix4x4_SetScale(&m, s * 1.333f * gWindowHeight / gWindowWidth, -s, 1.0f);
+	m.value[3][0] = 2;
+	m.value[3][1] = 72;
+	m.value[3][2] = 0;
+	Render_SubmitMesh(gDebugTextMesh, &m, &kDefaultRenderMods_DebugUI, &kQ3Point3D_Zero, 0);
+}
+
+/************ DRAW PILLARBOX COVER QUADS *****************/
+
+void QD3D_DrawPillarbox(void)
+{
+	if (!gPillarboxMesh)
+	{
+		gPillarboxMesh = Q3TriMeshData_New(2*2, 2*4, kQ3TriMeshDataFeatureNone);
+
+		int tri = 0;
+		for (int quad = 0; quad < 2; quad++)
+		{
+			gPillarboxMesh->triangles[tri].pointIndices[0] = quad*4 + 1;
+			gPillarboxMesh->triangles[tri].pointIndices[1] = quad*4 + 0;
+			gPillarboxMesh->triangles[tri].pointIndices[2] = quad*4 + 3;
+			tri++;
+
+			gPillarboxMesh->triangles[tri].pointIndices[0] = quad*4 + 3;
+			gPillarboxMesh->triangles[tri].pointIndices[1] = quad*4 + 0;
+			gPillarboxMesh->triangles[tri].pointIndices[2] = quad*4 + 2;
+			tri++;
+		}
+	}
+
+	float ww = (float) gWindowWidth;
+	float wh = (float) gWindowHeight;
+	float aspect = ww / wh;
+	if (aspect > 1.333333f)
+	{
+		float pillar = (ww - wh * 1.333333f) / 2.0f;
+		gPillarboxMesh->points[0] = (TQ3Point3D){ 0, 0, 0 };
+		gPillarboxMesh->points[1] = (TQ3Point3D){ pillar, 0, 0 };
+		gPillarboxMesh->points[2] = (TQ3Point3D){ pillar, wh, 0 };
+		gPillarboxMesh->points[3] = (TQ3Point3D){ 0, wh, 0 };
+
+		gPillarboxMesh->points[4] = (TQ3Point3D){ ww - pillar, 0, 0 };
+		gPillarboxMesh->points[5] = (TQ3Point3D){ ww, 0, 0 };
+		gPillarboxMesh->points[6] = (TQ3Point3D){ ww, wh, 0 };
+		gPillarboxMesh->points[7] = (TQ3Point3D){ ww - pillar, wh, 0 };
+	}
+	else
+	{
+		float pillar = (wh - ww / 1.333333f) / 2.0f;
+		gPillarboxMesh->points[0] = (TQ3Point3D){ 0, 0, 0 };
+		gPillarboxMesh->points[1] = (TQ3Point3D){ ww, 0, 0 };
+		gPillarboxMesh->points[2] = (TQ3Point3D){ ww, pillar, 0 };
+		gPillarboxMesh->points[3] = (TQ3Point3D){ 0, pillar, 0 };
+
+		gPillarboxMesh->points[4] = (TQ3Point3D){ 0, wh - pillar, 0 };
+		gPillarboxMesh->points[5] = (TQ3Point3D){ ww, wh - pillar, 0 };
+		gPillarboxMesh->points[6] = (TQ3Point3D){ ww, wh, 0 };
+		gPillarboxMesh->points[7] = (TQ3Point3D){ 0, wh, 0 };
+	}
+
+
+	Render_SetViewport(0, 0, gWindowWidth, gWindowHeight);
+	Render_Enter2D_NativeResolution();
+	Render_SubmitMesh(gPillarboxMesh, NULL, &kDefaultRenderMods_Pillarbox, &kQ3Point3D_Zero, 0);
+	Render_FlushQueue();
+	Render_Exit2D();
+}
+
+/******************** QD3D: LOAD TEXTURE FILE ******************************/
+
+GLuint QD3D_LoadTextureFile(int textureRezID, int flags)
+{
+char					path[128];
+FSSpec					spec;
+uint8_t*				pixelData = nil;
+TGAHeader				header;
+OSErr					err;
+
+	SDL_snprintf(path, sizeof(path), ":Images:Textures:%d.tga", textureRezID);
+
+	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, path, &spec);
+
+			/* LOAD RAW RGBA DATA FROM TGA FILE */
+
+	err = ReadTGA(&spec, &pixelData, &header, true);
+	if (err != noErr)
+	{
+		return 0;
+	}
+
+	GAME_ASSERT(header.bpp == 32);
+	GAME_ASSERT(header.imageType == TGA_IMAGETYPE_CONVERTED_ARGB);
+
+			/* PRE-PROCESS IMAGE */
+
+	int internalFormat = GL_RGB;
+
+	if (flags & kRendererTextureFlags_ForcePOT)
+	{
+		uint32_t potWidth = POTCeil32(header.width);
+		uint32_t potHeight = POTCeil32(header.height);
+		
+		if (potWidth != (uint32_t)header.width || potHeight != (uint32_t)header.height)
+		{
+			uint8_t* potPixelData = (uint8_t*) AllocPtr(potWidth * potHeight * 4);
+
+			for (int y = 0; y < header.height; y++)
+			{
+				SDL_memcpy(potPixelData + y*potWidth*4, pixelData + y*header.width*4, header.width*4);
+			}
+
+			DisposePtr((Ptr) pixelData);
+			pixelData = potPixelData;
+			header.width = (int)potWidth;
+			header.height = (int)potHeight;
+		}
+	}
+
+	if (flags & kRendererTextureFlags_SolidBlackIsAlpha)
+	{
+		for (int p = 0; p < 4 * header.width * header.height; p += 4)
+		{
+			// Nanosaur 1 TGA loader returns ARGB
+			bool isBlack = !pixelData[p+1] && !pixelData[p+2] && !pixelData[p+3];
+			pixelData[p+0] = isBlack? 0x00: 0xFF;
+		}
+
+		// Apply edge padding to avoid seams
+		TQ3Pixmap pm =
+		{
+			.image		= pixelData,
+			.width		= (uint32_t)header.width,
+			.height		= (uint32_t)header.height,
+			.rowBytes	= (uint32_t)header.width * (header.bpp / 8),
+			.pixelSize	= 0,
+			.pixelType	= kQ3PixelTypeRGBA32, // Pomme ARGB is called RGBA32
+			.bitOrder	= kQ3EndianBig,
+			.byteOrder	= kQ3EndianBig,
+		};
+		Q3Pixmap_ApplyEdgePadding(&pm);
+
+		internalFormat = GL_RGBA;
+	}
+	else if (flags & kRendererTextureFlags_GrayscaleIsAlpha)
+	{
+		for (int p = 0; p < 4 * header.width * header.height; p += 4)
+		{
+			// Nanosaur 1 TGA loader returns ARGB (A=p+0, R=p+1, G=p+2, B=p+3)
+			// put Blue into Alpha & leave map white
+			pixelData[p+0] = pixelData[p+3];	// put blue into alpha
+			pixelData[p+1] = 255;
+			pixelData[p+2] = 255;
+			pixelData[p+3] = 255;
+		}
+		internalFormat = GL_RGBA;
+	}
+	else if (flags & kRendererTextureFlags_KeepOriginalAlpha)
+	{
+		internalFormat = GL_RGBA;
+	}
+	else
+	{
+		internalFormat = GL_RGB;
+	}
+
+			/* LOAD TEXTURE */
+
+	GLuint glTextureName = Render_LoadTexture(
+			internalFormat,
+			header.width,
+			header.height,
+			GL_BGRA, // ARGB in memory is BGRA for OpenGL
+			GL_UNSIGNED_INT_8_8_8_8_REV,
+			pixelData,
+			(RendererTextureFlags)flags);
+
+			/* CLEAN UP */
+
+	DisposePtr((Ptr) pixelData);
+
+	return glTextureName;
 }

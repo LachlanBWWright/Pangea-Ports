@@ -10,12 +10,13 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
 
-static void DrawInfobar(ObjNode* infobarObj);
+void DrawInfobar(ObjNode* infobarObj);
 
 static void DrawDuelInfobar(void);
 
@@ -144,13 +145,14 @@ void SetInfobarSpriteState(float anaglyphZ)
 
 /********************** DRAW INFOBAR ****************************/
 
-static void DrawInfobar(ObjNode* infobarObj)
+void DrawInfobar(ObjNode* infobarObj)
 {
 	(void) infobarObj;
 
 	if (gIsPicking)
 		return;
 
+	StartProfilePhase(PROFILE_PHASE_UI);
 
 		/************/
 		/* SET TAGS */
@@ -208,6 +210,8 @@ static void DrawInfobar(ObjNode* infobarObj)
 	gGlobalMaterialFlags = 0;
 	if (gGameViewInfoPtr->useFog)
 		glEnable(GL_FOG);
+
+	EndProfilePhase(PROFILE_PHASE_UI);
 }
 
 

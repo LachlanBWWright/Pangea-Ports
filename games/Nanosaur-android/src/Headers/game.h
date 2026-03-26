@@ -14,6 +14,7 @@
 #include <Pomme.h>
 #include <QD3D.h>
 #include <QD3DMath.h>
+#include "profiling.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -73,6 +74,7 @@ extern "C"
 
 extern	Boolean					gDisableAnimSounds;
 extern	Boolean					gGamePaused;
+extern	Boolean					gIsInGame;
 extern	Boolean					gGameOverFlag;
 extern	Boolean					gMuteMusicFlag;
 extern	Boolean					gPlayerGotKilledFlag;
@@ -80,6 +82,7 @@ extern	Boolean					gPossibleAttackModes[];
 extern	Boolean					gResetSong;
 extern	Boolean					gSongPlayingFlag;
 extern	Boolean					gWonGameFlag;
+extern	Byte					gDebugMode;
 extern	Byte					gCameraMode;
 extern	Byte					gCurrentAttackMode;
 extern	Byte					gMyStartAim;
@@ -177,6 +180,11 @@ extern	UInt32*					gBackdropPixels;
 extern	uint32_t				gScore;
 extern	uint32_t				gInfobarUpdateBits;
 extern	WindowPtr				gCoverWindow;
+
+extern  int                     gNumObjNodes;
+extern  const TQ3Point3D        kQ3Point3D_Zero;
+extern  const RenderModifiers   kDefaultRenderMods_DebugUI;
+extern  const RenderModifiers   kDefaultRenderMods_Pillarbox;
 
 #ifdef __cplusplus
 }

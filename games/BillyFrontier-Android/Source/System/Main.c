@@ -59,6 +59,7 @@ uint32_t			gGameFrameNum = 0;
 
 Boolean				gPlayingFromSavedGame = false;
 Boolean				gGameOver = false;
+Boolean				gIsInGame = false;
 Boolean				gWonGame, gLostGame;
 Boolean				gLevelCompleted = false;
 float				gLevelCompletedCoolDownTimer = 0;

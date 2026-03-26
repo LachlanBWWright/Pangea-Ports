@@ -27,8 +27,9 @@
 
 typedef struct RenderStats
 {
-	int			trianglesDrawn;
-	int			meshQueueSize;
+	int			triangles;
+	int			meshesPass1;
+	int			meshesPass2;
 	int 		batchedStateChanges;
 } RenderStats;
 
@@ -49,12 +50,22 @@ typedef struct RenderModifiers
 	int						sortPriority;
 } RenderModifiers;
 
+enum
+{
+	kDrawOrder_Default = 0,
+	kDrawOrder_DebugUI = 127,
+};
+
 typedef enum
 {
 	kRendererTextureFlags_None			= 0,
 	kRendererTextureFlags_ClampU		= (1 << 0),
 	kRendererTextureFlags_ClampV		= (1 << 1),
 	kRendererTextureFlags_ClampBoth		= kRendererTextureFlags_ClampU | kRendererTextureFlags_ClampV,
+	kRendererTextureFlags_SolidBlackIsAlpha = (1 << 2),
+	kRendererTextureFlags_GrayscaleIsAlpha = (1 << 3),
+	kRendererTextureFlags_KeepOriginalAlpha = (1 << 4),
+	kRendererTextureFlags_ForcePOT		= (1 << 5),
 } RendererTextureFlags;
 
 #pragma mark -
@@ -104,35 +115,48 @@ void Render_SetBackdropClearColor(TQ3ColorRGBA clearColor);
 
 void Render_SetViewportClearColor(TQ3ColorRGBA clearColor);
 
-void Render_SetViewport(TQ3Area pane);
+void Render_SetViewport(int x, int y, int w, int h);
 
 #pragma mark -
 
 // Submits a list of trimeshes for drawing.
 // Arguments transform and mods may be nil.
-// Rendering will actually occur in Render_EndFrame(), after all meshes have been submitted.
-// IMPORTANT: the pointers must remain valid until you call Render_EndFrame(),
-// INCLUDING THE POINTER TO THE LIST OF MESHES!
+// Rendering will actually occur in Render_FlushQueue(), after all meshes have been submitted.
+// IMPORTANT: the pointers must remain valid until Render_FlushQueue().
 void Render_SubmitMeshList(
 		int numMeshes,
 		TQ3TriMeshData** meshList,
 		const TQ3Matrix4x4* transform,
 		const RenderModifiers* mods,
-		const TQ3Point3D* centerCoord);
+		const TQ3Point3D* centerCoord,
+		uint16_t slot);
 
 // Submits one trimesh for drawing.
 // Arguments transform and mods may be nil.
-// Rendering will actually occur in Render_EndFrame(), after all meshes have been submitted.
-// IMPORTANT: the pointers must remain valid until you call Render_EndFrame().
+// Rendering will actually occur in Render_FlushQueue(), after all meshes have been submitted.
+// IMPORTANT: the pointers must remain valid until Render_FlushQueue().
 void Render_SubmitMesh(
 		TQ3TriMeshData* mesh,
 		const TQ3Matrix4x4* transform,
 		const RenderModifiers* mods,
-		const TQ3Point3D* centerCoord);
+		const TQ3Point3D* centerCoord,
+		uint16_t slot);
+
+#pragma mark -
+
+// Flushes the rendering queue.
+// May be called multiple times between Render_StartFrame and Render_EndFrame.
+void Render_FlushQueue(void);
 
 #pragma mark -
 
 void Render_Enter2D(void);
+
+void Render_Enter2D_Full640x480(void);
+
+void Render_Enter2D_NormalizedCoordinates(float aspect);
+
+void Render_Enter2D_NativeResolution(void);
 
 void Render_Exit2D(void);
 
@@ -145,6 +169,8 @@ void Render_DisposeBackdrop(void);
 void Render_ClearBackdrop(uint32_t argb);
 
 void Render_DrawBackdrop(bool keepBackdropAspectRatio);
+
+void Render_DrawFadeOverlay(float opacity);
 
 #pragma mark -
 

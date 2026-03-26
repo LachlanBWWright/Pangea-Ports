@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -274,6 +275,8 @@ void DrawInfobar(void)
 	if (gHideInfobar)
 		return;
 
+	StartProfilePhase(PROFILE_PHASE_UI);
+
 		/*********************/
 		/* SET UP UI ANCHORS */
 		/*********************/
@@ -349,6 +352,8 @@ void DrawInfobar(void)
 
 	OGL_PopState();
 	gGlobalMaterialFlags = 0;
+
+	EndProfilePhase(PROFILE_PHASE_UI);
 }
 
 

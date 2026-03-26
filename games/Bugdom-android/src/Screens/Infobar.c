@@ -12,6 +12,7 @@
 
 #include "game.h"
 #include <stdlib.h>
+#include "profiling.h"
 
 
 /****************************/

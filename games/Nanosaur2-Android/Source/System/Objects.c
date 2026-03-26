@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -916,7 +917,9 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 custom_draw:
 					if (theNode->CustomDrawFunction)
 					{
+						if (isOverlayPane) StartProfilePhase(PROFILE_PHASE_UI);
 						theNode->CustomDrawFunction(theNode);
+						if (isOverlayPane) EndProfilePhase(PROFILE_PHASE_UI);
 					}
 					break;
 

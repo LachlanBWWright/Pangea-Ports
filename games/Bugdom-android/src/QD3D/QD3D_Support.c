@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 #ifdef __EMSCRIPTEN__
 #include <GLES2/gl2.h>
 #else
@@ -263,38 +264,42 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(const QD
 			/* RENDER LOOP */
 			/***************/
 
-	if (drawRoutine)
-		drawRoutine(setupInfo);
+			StartProfilePhase(PROFILE_PHASE_RENDERING);
+			if (drawRoutine)
+			drawRoutine(setupInfo);
 
 
 			/******************/
 			/* DONE RENDERING */
 			/*****************/
 
-	Render_FlushQueue();
+			Render_FlushQueue();
 
-	Render_Enter2D_Full640x480();
-	SubmitInfobarOverlay();			// draw 2D elements on top
-	if (gGammaFadeFactor < 1.0f)
-		Render_DrawFadeOverlay(gGammaFadeFactor);
-	QD3D_DrawDebugTextMesh();
-	Render_FlushQueue();
-	Render_Exit2D();
+			StartProfilePhase(PROFILE_PHASE_UI);
+			Render_Enter2D_Full640x480();
+			if (gIsInGame)
+				SubmitInfobarOverlay();			// draw 2D elements on top
+			if (gGammaFadeFactor < 1.0f)
+				Render_DrawFadeOverlay(gGammaFadeFactor);			QD3D_DrawDebugTextMesh();
+			Render_FlushQueue();
+			Render_Exit2D();
 
-	if (gGamePrefs.force4x3AspectRatio)
-	{
-		float myAR = (float)gWindowWidth / (float)gWindowHeight;
-		float targetAR = (float)GAME_VIEW_WIDTH / (float)GAME_VIEW_HEIGHT;
-		if (fabsf(myAR - targetAR) > (1.0f / GAME_VIEW_WIDTH))
-		{
+			if (gGamePrefs.force4x3AspectRatio)
+			{
+			float myAR = (float)gWindowWidth / (float)gWindowHeight;
+			float targetAR = (float)GAME_VIEW_WIDTH / (float)GAME_VIEW_HEIGHT;
+			if (fabsf(myAR - targetAR) > (1.0f / GAME_VIEW_WIDTH))
+			{
 			QD3D_DrawPillarbox();
-		}
-	}
+			}
+			}
 
-	Render_EndFrame();
+			StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+			Render_EndFrame();
 
-	SDL_GL_SwapWindow(gSDLWindow);
-}
+			SDL_GL_SwapWindow(gSDLWindow);
+			EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+			}
 
 
 //=======================================================================================================
