@@ -680,6 +680,7 @@ GLfloat	ambient[4];
 
 void OGL_DrawScene(void (*drawRoutine)(void))
 {
+	StartProfilePhase(PROFILE_PHASE_RENDERING);
 	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
 
 
@@ -790,8 +791,6 @@ do_anaglyph:
 
 	int numPasses = gNumPlayers + 1;
 
-	StartProfilePhase(PROFILE_PHASE_RENDERING);
-
 	for (gCurrentSplitScreenPane = 0; gCurrentSplitScreenPane < numPasses; gCurrentSplitScreenPane++)
 	{
 		bool isOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
@@ -843,7 +842,7 @@ do_anaglyph:
 		}
 	}
 
-	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+	StartProfilePhase(PROFILE_PHASE_UI);
 
 
 		/**************************/
@@ -891,12 +890,32 @@ do_anaglyph:
 		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), x2,y);
 		y += 15;
 
+		OGL_DrawString("  cull:", 10,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_CULLING), x2,y);
+		y += 15;
+
+		OGL_DrawString("  terr:", 10,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_TERRAIN), x2,y);
+		y += 15;
+
+		OGL_DrawString("  obj:", 10,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_OBJECTS), x2,y);
+		y += 15;
+
+		OGL_DrawString("  skel:", 10,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_SKELETONS), x2,y);
+		y += 15;
+
 		OGL_DrawString("ui:", 10,y);
 		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_UI), x2,y);
 		y += 15;
 
 		OGL_DrawString("swap:", 10,y);
 		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS), x2,y);
+		y += 15;
+
+		OGL_DrawString("yield:", 10,y);
+		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_ASYNC_YIELD), x2,y);
 		y += 15;
 
 		OGL_DrawString("tri:", 10,y);
@@ -984,10 +1003,13 @@ do_anaglyph:
 
            /* SWAP THE BUFFS */
 
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
 
 #ifdef __EMSCRIPTEN__
+	StartProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
 	emscripten_sleep(0);									// yield to browser event loop (required for ASYNCIFY)
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);			// Resume swap phase for any remaining cleanup
 #endif
 
 	if (!gGamePaused)										// freeze frame count if paused (otherwise double-buffered skeletons will flicker)
@@ -1902,11 +1924,11 @@ OGLLightDefType	*lights;
 
 GLenum OGL_CheckError_Impl(const char* file, const int line)
 {
-#ifdef __EMSCRIPTEN__
-	// On WASM/WebGL, skip glGetError() entirely.  Each glGetError() call
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || !defined(_DEBUG)
+	// On WASM/WebGL and Android, skip glGetError() entirely.  Each glGetError() call
 	// crosses the WASM→JS boundary and forces the GL command queue to flush,
-	// stalling the GPU pipeline.  Return GL_NO_ERROR immediately; real errors
-	// remain visible in the browser's WebGL error log (DevTools → Console).
+	// stalling the GPU pipeline.
+	// We also skip it in release builds for performance.
 	(void)file;
 	(void)line;
 	return GL_NO_ERROR;

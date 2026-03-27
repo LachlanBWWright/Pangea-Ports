@@ -46,9 +46,7 @@ int				gGameWindowWidth, gGameWindowHeight;
 
 void InitWindowStuff(void)
 {
-	// This is filled in from gSDLWindow in-game
-	gGameWindowWidth = 640;
-	gGameWindowHeight = 480;
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
 }
 
 
@@ -341,9 +339,10 @@ void SetFullscreenMode(bool enforceDisplayPref)
 		SDL_SyncWindow(gSDLWindow);
 	}
 
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
+
 	if (gGamePrefs.fullscreen)
 		SDL_HideCursor();
 	else
 		SDL_ShowCursor();
-	//SDL_GL_SetSwapInterval(gGamePrefs.vsync);
 }

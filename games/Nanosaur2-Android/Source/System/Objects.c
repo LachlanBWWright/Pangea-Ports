@@ -537,9 +537,20 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 		return;
 
 
-				/* FIRST DO OUR CULLING */
+	/* FIRST DO OUR CULLING */
 
-	CullTestAllObjects();
+	bool isOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
+
+	if (!isOverlayPane)
+	{
+		StartProfilePhase(PROFILE_PHASE_CULLING);
+		CullTestAllObjects();
+		StartProfilePhase(PROFILE_PHASE_OBJECTS);
+	}
+	else
+	{
+		StartProfilePhase(PROFILE_PHASE_OBJECTS);
+	}
 
 
 			/* GET CAMERA COORDS */
@@ -547,8 +558,6 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 	cameraX = gGameViewInfoPtr->cameraPlacement[gCurrentSplitScreenPane].cameraLocation.x;
 	cameraZ = gGameViewInfoPtr->cameraPlacement[gCurrentSplitScreenPane].cameraLocation.z;
 
-
-	bool isOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
 
 	gDepthWriteShouldBeOn = true;
 
@@ -866,6 +875,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 			case	SKELETON_GENRE:
 					DrawSkeleton(theNode);
+					StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					break;
 
 			case	DISPLAY_GROUP_GENRE:
@@ -920,6 +930,7 @@ custom_draw:
 						if (isOverlayPane) StartProfilePhase(PROFILE_PHASE_UI);
 						theNode->CustomDrawFunction(theNode);
 						if (isOverlayPane) EndProfilePhase(PROFILE_PHASE_UI);
+						StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					}
 					break;
 

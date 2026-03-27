@@ -143,6 +143,8 @@ void UpdateInput(void)
 
 //	MouseSmoothing_StartFrame();
 
+	QD3D_OnWindowResized();
+
 	int mouseWheelDelta = 0;
 
 	SDL_PumpEvents();

@@ -727,25 +727,20 @@ float	fps;
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything();
 		DoPlayerTerrainUpdate();
-		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
-		StartProfilePhase(PROFILE_PHASE_RENDERING);
 		OGL_DrawScene(DrawLevelCallback);
-		EndProfilePhase(PROFILE_PHASE_RENDERING);
 
 
 		/*************************/
 		/* UPDATE FPS AND TIMERS */
 		/*************************/
 
-		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		CalcFramesPerSecond();
 		fps = gFramesPerSecondFrac;
 
 		gGameFrameNum++;
 		gGameLevelTimer += fps;
 		gDisableHiccupTimer = false;									// reenable this after the 1st frame
-		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
 				/***************************/
@@ -868,6 +863,8 @@ float	fps;
 
 #endif // __EMSCRIPTEN__
 
+#ifndef __EMSCRIPTEN__
+
 /************************* SHOW TIME DEMO RESULTS *******************************/
 
 static void ShowTimeDemoResults(int numFrames, float numSeconds, float averageFPS)
@@ -879,6 +876,8 @@ static void ShowTimeDemoResults(int numFrames, float numSeconds, float averageFP
 			"Peak #Objs: %d",
 			__func__, numFrames, numSeconds, averageFPS, gNumObjectNodesPeak);
 }
+
+#endif
 
 
 /****************** DRAW LEVEL CALLBACK *********************/

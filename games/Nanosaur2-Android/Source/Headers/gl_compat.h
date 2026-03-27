@@ -210,6 +210,7 @@ void glTexCoord2fv(const GLfloat *v);
 
 // Draw call intercepts (set up shader + VBOs, then call real glDrawElements/Arrays)
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices);
+void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count);
 void glDrawArrays(GLenum mode, GLint first, GLsizei count);
 
 // Enable/Disable intercepted for lighting/fog/alpha-test/texgen state tracking

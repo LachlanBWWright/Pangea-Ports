@@ -48,8 +48,7 @@ int				gGameWindowHeight = 480;
 
 void InitWindowStuff(void)
 {
-	gGameWindowWidth = 640;
-	gGameWindowHeight = 480;
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
 }
 
 #pragma mark -

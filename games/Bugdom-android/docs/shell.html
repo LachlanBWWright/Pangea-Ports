@@ -532,6 +532,13 @@
       }],
     };
 
+    // Use ResizeObserver for more reliable canvas sizing
+    if (typeof ResizeObserver !== 'undefined' && Module.canvas) {
+      new ResizeObserver(function() {
+        window.requestAnimationFrame(syncCanvasSize);
+      }).observe(Module.canvas);
+    }
+
     // ── XHR progress for .data file ───────────────────────
     (function () {
       var origOpen = XMLHttpRequest.prototype.open;
@@ -706,6 +713,8 @@
     ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
       window.addEventListener(evt, function() {
         requestAnimationFrame(syncCanvasSize);
+        // And another one for good measure (some browsers lag)
+        requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
       });
     });
   </script>

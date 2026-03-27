@@ -906,7 +906,11 @@ go_here:
 	if (data->numTriangles)
 	{
 		GAME_ASSERT(data->triangles);
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		glDrawElements_WithVertexCount(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0], data->numPoints);
+#else
 		glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
+#endif
 		OGL_CheckError();
 	}
 

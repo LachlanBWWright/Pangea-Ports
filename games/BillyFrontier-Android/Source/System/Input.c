@@ -386,6 +386,9 @@ void DoSDLMaintenance(void)
 	int mouseWheelDeltaX = 0;
 	int mouseWheelDeltaY = 0;
 
+	// Ensure gGameWindowWidth/Height are up-to-date
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
+
 	// Update mouse DPI scale
 	{
 		int windowW = 1;
@@ -414,7 +417,7 @@ void DoSDLMaintenance(void)
 				return;
 
 			case SDL_EVENT_WINDOW_RESIZED:
-				// QD3D_OnWindowResized(event.window.data1, event.window.data2);
+				SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
 				break;
 
 			case SDL_EVENT_TEXT_INPUT:

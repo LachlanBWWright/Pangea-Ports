@@ -103,6 +103,8 @@ void UpdateInput(void)
 	/* DO SDL MAINTENANCE */
 	/**********************/
 
+	OnChangeIntegerScaling();
+
 	int mouseWheelDelta = 0;
 
 	SDL_PumpEvents();

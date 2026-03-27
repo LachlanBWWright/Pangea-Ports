@@ -46,6 +46,8 @@ int				gGameWindowWidth, gGameWindowHeight;
 
 void InitWindowStuff(void)
 {
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
+
 		/* SHOW A COUPLE BLACK FRAMES BEFORE WE BEGIN */
 
 	OGLSetupInputType viewDef;

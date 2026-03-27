@@ -182,6 +182,13 @@ static float   s_imm_cur_s0 = 0, s_imm_cur_t0 = 0;
 // ── GL objects ────────────────────────────────────────────────────────────────
 static GLuint  s_prog = 0;
 static GLuint  s_vbo  = 0;
+static GLuint  s_ibo  = 0;
+
+static float  *s_interleave_buf = NULL;
+static int     s_interleave_buf_capacity = 0;
+
+static GLushort *s_index_conv_buf = NULL;
+static int       s_index_conv_buf_capacity = 0;
 
 // Attribute locations (bound at compile time to fixed slots)
 #define ATTRIB_POSITION  0
@@ -428,32 +435,51 @@ static void upload_uniforms(void) {
 // vertex count (or -1 on error).  stride_out = per-vertex byte size.
 static int setup_vertex_attribs_from_arrays(int vertex_count) {
     // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
-    const int STRIDE = (3+3+4+2+2) * sizeof(float);  // 56 bytes
-    int buf_size = vertex_count * STRIDE;
-    float *buf = (float *)malloc(buf_size);
+    const int STRIDE_FLOATS = (3+3+4+2+2);
+    const int STRIDE_BYTES = STRIDE_FLOATS * sizeof(float);  // 56 bytes
+    int buf_size = vertex_count * STRIDE_BYTES;
+
+    if (buf_size > s_interleave_buf_capacity) {
+        s_interleave_buf = (float *)realloc(s_interleave_buf, buf_size);
+        s_interleave_buf_capacity = buf_size;
+    }
+    float *buf = s_interleave_buf;
     if (!buf) return -1;
 
+    const char *v_ptr = (const char *)s_ca_vertex.ptr;
+    int v_stride = s_ca_vertex.stride ? s_ca_vertex.stride : 3*sizeof(float);
+    int v_size = s_ca_vertex.size;
+
+    const char *n_ptr = (s_ca_normal.enabled && s_ca_normal.ptr) ? (const char *)s_ca_normal.ptr : NULL;
+    int n_stride = s_ca_normal.stride ? s_ca_normal.stride : 3*sizeof(float);
+
+    const char *c_ptr = (s_ca_color.enabled && s_ca_color.ptr) ? (const char *)s_ca_color.ptr : NULL;
+    int c_stride = s_ca_color.stride ? s_ca_color.stride : 4*sizeof(float);
+
+    const char *t0_ptr = (s_ca_texcoord[0].enabled && s_ca_texcoord[0].ptr) ? (const char *)s_ca_texcoord[0].ptr : NULL;
+    int t0_stride = s_ca_texcoord[0].stride ? s_ca_texcoord[0].stride : 2*sizeof(float);
+
+    const char *t1_ptr = (s_ca_texcoord[1].enabled && s_ca_texcoord[1].ptr) ? (const char *)s_ca_texcoord[1].ptr : NULL;
+    int t1_stride = s_ca_texcoord[1].stride ? s_ca_texcoord[1].stride : 2*sizeof(float);
+
     for (int i = 0; i < vertex_count; i++) {
-        float *dst = buf + i * (3+3+4+2+2);
+        float *dst = buf + i * STRIDE_FLOATS;
 
         // Position
-        if (s_ca_vertex.ptr) {
-            const float *src = (const float *)((const char *)s_ca_vertex.ptr
-                               + i * (s_ca_vertex.stride ? s_ca_vertex.stride : 3*sizeof(float)));
-            dst[0] = src[0]; dst[1] = src[1]; dst[2] = (s_ca_vertex.size >= 3) ? src[2] : 0.0f;
+        if (v_ptr) {
+            const float *src = (const float *)(v_ptr + i * v_stride);
+            dst[0] = src[0]; dst[1] = src[1]; dst[2] = (v_size >= 3) ? src[2] : 0.0f;
         } else { dst[0]=dst[1]=dst[2]=0; }
 
         // Normal
-        if (s_ca_normal.enabled && s_ca_normal.ptr) {
-            const float *src = (const float *)((const char *)s_ca_normal.ptr
-                               + i * (s_ca_normal.stride ? s_ca_normal.stride : 3*sizeof(float)));
+        if (n_ptr) {
+            const float *src = (const float *)(n_ptr + i * n_stride);
             dst[3] = src[0]; dst[4] = src[1]; dst[5] = src[2];
         } else { dst[3]=0; dst[4]=0; dst[5]=1; }
 
         // Color
-        if (s_ca_color.enabled && s_ca_color.ptr) {
-            const float *src = (const float *)((const char *)s_ca_color.ptr
-                               + i * (s_ca_color.stride ? s_ca_color.stride : 4*sizeof(float)));
+        if (c_ptr) {
+            const float *src = (const float *)(c_ptr + i * c_stride);
             dst[6] = src[0]; dst[7] = src[1]; dst[8] = src[2]; dst[9] = src[3];
         } else {
             dst[6]=s_current_color[0]; dst[7]=s_current_color[1];
@@ -461,39 +487,36 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
         }
 
         // Texcoord0
-        if (s_ca_texcoord[0].enabled && s_ca_texcoord[0].ptr) {
-            const float *src = (const float *)((const char *)s_ca_texcoord[0].ptr
-                               + i * (s_ca_texcoord[0].stride ? s_ca_texcoord[0].stride : 2*sizeof(float)));
+        if (t0_ptr) {
+            const float *src = (const float *)(t0_ptr + i * t0_stride);
             dst[10] = src[0]; dst[11] = src[1];
         } else { dst[10]=0; dst[11]=0; }
 
         // Texcoord1
-        if (s_ca_texcoord[1].enabled && s_ca_texcoord[1].ptr) {
-            const float *src = (const float *)((const char *)s_ca_texcoord[1].ptr
-                               + i * (s_ca_texcoord[1].stride ? s_ca_texcoord[1].stride : 2*sizeof(float)));
+        if (t1_ptr) {
+            const float *src = (const float *)(t1_ptr + i * t1_stride);
             dst[12] = src[0]; dst[13] = src[1];
         } else { dst[12]=0; dst[13]=0; }
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
     glBufferData(GL_ARRAY_BUFFER, buf_size, buf, GL_STREAM_DRAW);
-    free(buf);
 
     // Bind attributes
     glEnableVertexAttribArray(ATTRIB_POSITION);
-    glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(0*sizeof(float)));
+    glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(0*sizeof(float)));
 
     glEnableVertexAttribArray(ATTRIB_NORMAL);
-    glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(3*sizeof(float)));
+    glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(3*sizeof(float)));
 
     glEnableVertexAttribArray(ATTRIB_COLOR);
-    glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE, (void*)(6*sizeof(float)));
+    glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(6*sizeof(float)));
 
     glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
-    glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(10*sizeof(float)));
+    glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(10*sizeof(float)));
 
     glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
-    glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(12*sizeof(float)));
+    glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(12*sizeof(float)));
 
     return vertex_count;
 }
@@ -584,8 +607,9 @@ void COMPAT_GL_Init(void) {
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
     u_tex_matrix  = glGetUniformLocation(s_prog, "u_tex_matrix");
 
-    // VBO for interleaved vertex data
+    // VBO/IBO for interleaved vertex data and indices
     glGenBuffers(1, &s_vbo);
+    glGenBuffers(1, &s_ibo);
 
     SDL_Log("gl_compat: initialized (prog=%u)", s_prog);
 }
@@ -915,41 +939,51 @@ static int max_index(GLenum type, const void *indices, GLsizei count) {
 
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices) {
     if (!s_ca_vertex.ptr || count <= 0) return;
-
     int vertex_count = max_index(type, indices, count) + 1;
+    glDrawElements_WithVertexCount(mode, count, type, indices, vertex_count);
+}
+
+void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count) {
+    if (!s_ca_vertex.ptr || count <= 0) return;
+
     if (setup_vertex_attribs_from_arrays(vertex_count) < 0) return;
     upload_uniforms();
 
     // Upload index buffer to an element VBO
-    GLuint ibo; glGenBuffers(1, &ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_ibo);
 
     // Convert GL_UNSIGNED_INT indices to GL_UNSIGNED_SHORT if needed
     // (WebGL1 only supports UNSIGNED_BYTE and UNSIGNED_SHORT unless OES_element_index_uint)
     if (type == GL_UNSIGNED_INT) {
-        // Check if OES_element_index_uint is available (most WebGL2 contexts support it)
-        // For safety, try to use the extension or convert to short if small enough
+#if defined(USE_WEBGL2) || defined(__ANDROID__)
+        // WebGL2 and Android GLES typically support 32-bit indices directly.
+        // We only convert if we must (e.g. for WebGL1 compatibility if ever needed).
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STREAM_DRAW);
+#else
+        // For safety, convert to short if small enough
         if (vertex_count <= 65535) {
-            GLushort *short_idx = (GLushort *)malloc(count * sizeof(GLushort));
+            int needed_size = count * sizeof(GLushort);
+            if (needed_size > s_index_conv_buf_capacity) {
+                s_index_conv_buf = (GLushort *)realloc(s_index_conv_buf, needed_size);
+                s_index_conv_buf_capacity = needed_size;
+            }
+            GLushort *short_idx = s_index_conv_buf;
             const GLuint *uint_idx = (const GLuint *)indices;
             for (int i = 0; i < count; i++) short_idx[i] = (GLushort)uint_idx[i];
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLushort), short_idx, GL_STREAM_DRAW);
-            free(short_idx);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, needed_size, short_idx, GL_STREAM_DRAW);
             type = GL_UNSIGNED_SHORT;
         } else {
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STREAM_DRAW);
-            // GL_UNSIGNED_INT requires OES_element_index_uint; keep type as is
         }
+#endif
     } else {
         GLsizei sz = (type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sz, indices, GL_STREAM_DRAW);
     }
 
-    typedef void (*real_draw_t)(GLenum,GLsizei,GLenum,const void*);
     REAL_glDrawElements(mode, count, type, 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDeleteBuffers(1, &ibo);
     disable_vertex_attribs();
 }
 
@@ -969,7 +1003,6 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
 
     s_ca_vertex.ptr = orig;
 
-    typedef void (*real_draw_t)(GLenum,GLint,GLsizei);
     REAL_glDrawArrays(mode, 0, count);
 
     disable_vertex_attribs();

@@ -289,6 +289,9 @@ void DoSDLMaintenance(void)
 	int mouseWheelDeltaX = 0;
 	int mouseWheelDeltaY = 0;
 
+	// Ensure gGameWindowWidth/Height are up-to-date
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
+
 			/**********************/
 			/* DO SDL MAINTENANCE */
 			/**********************/
@@ -307,6 +310,10 @@ void DoSDLMaintenance(void)
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 				CleanQuit();			// throws Pomme::QuitRequest
 				return;
+
+			case SDL_EVENT_WINDOW_RESIZED:
+				SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
+				break;
 
 			case SDL_EVENT_KEY_DOWN:
 				gUserPrefersGamepad = false;

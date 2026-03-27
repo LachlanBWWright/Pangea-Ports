@@ -441,11 +441,18 @@
 
     ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
       window.addEventListener(evt, function() {
-        // Delay by one rAF so the browser can complete its layout/resize after
-        // the fullscreen transition before we read clientWidth/clientHeight.
         requestAnimationFrame(syncCanvasSize);
+        // And another one for good measure (some browsers lag)
+        requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
       });
     });
+
+    // Use ResizeObserver for more reliable canvas sizing
+    if (typeof ResizeObserver !== 'undefined' && Module.canvas) {
+      new ResizeObserver(function() {
+        window.requestAnimationFrame(syncCanvasSize);
+      }).observe(Module.canvas);
+    }
   </script>
 
   {{{ SCRIPT }}}

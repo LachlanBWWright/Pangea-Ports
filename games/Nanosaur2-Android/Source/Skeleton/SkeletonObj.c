@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -393,6 +394,8 @@ short	numDecomp, i;
 
 void DrawSkeleton(ObjNode *theNode)
 {
+	StartProfilePhase(PROFILE_PHASE_SKELETONS);
+
 short				i,numTriMeshes;
 short				skelType;
 MOMaterialObject	*overrideTexture, *oldTexture = nil;

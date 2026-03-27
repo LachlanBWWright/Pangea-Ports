@@ -318,5 +318,9 @@ void SetFullscreenMode(bool enforceDisplayPref)
 		SDL_SyncWindow(gSDLWindow);
 	}
 
+	int width, height;
+	SDL_GetWindowSizeInPixels(gSDLWindow, &width, &height);
+	QD3D_OnWindowResized(width, height);
+
 	SDL_GL_SetSwapInterval(gGamePrefs.vsync);
 }

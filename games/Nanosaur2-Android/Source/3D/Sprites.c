@@ -139,6 +139,7 @@ static SpriteType LoadSpriteFromDualImage(const char* path)
 
 void LoadSpriteGroupFromFile(int groupNum, const char* path, int flags)
 {
+	(void)flags;
 	AllocSpriteGroup(groupNum, 1);
 	gSpriteGroupList[groupNum][0] = LoadSpriteFromDualImage(path);
 	GAME_ASSERT(gSpriteGroupList[groupNum][0].materialObject);

@@ -266,6 +266,20 @@
     var _muted = false;
     var _fenceEnabled = true;
 
+    function syncCanvasSize() {
+      if (typeof Module === 'undefined' || !Module.canvas) return;
+      var dpr = window.devicePixelRatio || 1;
+      var cssW = Module.canvas.clientWidth;
+      var cssH = Module.canvas.clientHeight;
+      if (!cssW || !cssH) return;
+      var w = Math.floor(cssW * dpr);
+      var h = Math.floor(cssH * dpr);
+      if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
+        if (Module.setCanvasSize) Module.setCanvasSize(w, h);
+        else { Module.canvas.width = w; Module.canvas.height = h; }
+      }
+    }
+
     var Module = {
       canvas: document.getElementById('canvas'),
 
@@ -340,6 +354,13 @@
       },
     };
 
+    // Use ResizeObserver for more reliable canvas sizing
+    if (typeof ResizeObserver !== 'undefined' && Module.canvas) {
+      new ResizeObserver(function() {
+        window.requestAnimationFrame(syncCanvasSize);
+      }).observe(Module.canvas);
+    }
+
     // ── Browser compatibility check ──────────────────────────────────────
     (function() {
       var lbl = document.getElementById('status-text');
@@ -394,6 +415,14 @@
         btn.className   = 'btn' + (_fenceEnabled ? ' on' : ' danger');
       }
     }
+
+    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      window.addEventListener(evt, function() {
+        requestAnimationFrame(syncCanvasSize);
+        // And another one for good measure (some browsers lag)
+        requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
+      });
+    });
   </script>
 
   {{{ SCRIPT }}}
