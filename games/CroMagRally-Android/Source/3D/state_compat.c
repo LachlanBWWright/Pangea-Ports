@@ -115,6 +115,13 @@ static Boolean gAlphaTestEnabled = false;
 static Boolean gTexture2DEnabled[2] = {false, false}; // Per texture unit
 static Boolean gNormalizeEnabled = false;
 static int gAlphaFunc = 7; // GL_ALWAYS
+// Track these caps in software so CompatGL_IsEnabled() can answer without a
+// WebGL bridge call (EM_ASM per query).  GL_BLEND, GL_CULL_FACE, and
+// GL_DEPTH_TEST are the three caps queried by OGL_PushState() that previously
+// fell through to WebGL_IsEnabled()/EM_ASM.
+static Boolean gBlendEnabled = false;
+static Boolean gCullFaceEnabled = false;
+static Boolean gDepthTestEnabled = true;  // depth test is on by default
 static float gAlphaRef = 0.0f;
 
 // Track blend func state for glGetIntegerv compat
@@ -197,6 +204,11 @@ void CompatGL_Enable(GLenum cap)
         // Other states (GL_BLEND, GL_DEPTH_TEST, GL_CULL_FACE, etc.)
         // Call WebGL context directly to bypass LEGACY_GL_EMULATION hooks
         // that would crash before the first draw call (getCurTexUnit is null).
+        // Also track GL_BLEND, GL_CULL_FACE, GL_DEPTH_TEST in software so
+        // CompatGL_IsEnabled() avoids a WebGL bridge call per OGL_PushState.
+        case GL_BLEND:      gBlendEnabled = true;     WebGL_Enable(cap); break;
+        case GL_CULL_FACE:  gCullFaceEnabled = true;  WebGL_Enable(cap); break;
+        case GL_DEPTH_TEST: gDepthTestEnabled = true; WebGL_Enable(cap); break;
         default:
             WebGL_Enable(cap);
             break;
@@ -246,6 +258,9 @@ void CompatGL_Disable(GLenum cap)
         case GL_LIGHT3:
             break;
 
+        case GL_BLEND:      gBlendEnabled = false;     WebGL_Disable(cap); break;
+        case GL_CULL_FACE:  gCullFaceEnabled = false;  WebGL_Disable(cap); break;
+        case GL_DEPTH_TEST: gDepthTestEnabled = false; WebGL_Disable(cap); break;
         default:
             WebGL_Disable(cap);
             break;
@@ -653,6 +668,9 @@ GLboolean CompatGL_IsEnabled(GLenum cap)
         case GL_NORMALIZE:      return gNormalizeEnabled;
         case GL_RESCALE_NORMAL: return false;
         case GL_COLOR_MATERIAL: return false;
+        case GL_BLEND:          return gBlendEnabled;
+        case GL_CULL_FACE:      return gCullFaceEnabled;
+        case GL_DEPTH_TEST:     return gDepthTestEnabled;
         default:
             return WebGL_IsEnabled(cap);
     }
