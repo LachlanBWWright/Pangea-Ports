@@ -162,7 +162,13 @@ OGLSetupInputType	viewDef;
 
 	SetTerrainScale(DEFAULT_TERRAIN_SCALE);								// set scale to some default for now
 
+	// Stampede level needs a wide view for the cattle herd, but on WASM we cap
+	// it to 4 for acceptable frame rates.
+#if defined(__EMSCRIPTEN__)
+	gSuperTileActiveRange = 4;
+#else
 	gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE-1;
+#endif
 		
 		
 	if (gGamePrefs.anaglyph)

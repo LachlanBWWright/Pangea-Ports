@@ -151,7 +151,15 @@ void InitDefaultPrefs(void)
 	gGamePrefs.language				= GetBestLanguageIDFromSystemLocale();
 	gGamePrefs.cutsceneSubtitles	= !IsNativeEnglishSystem();		// enable subtitles if user's native language isn't English
 
+	// On WebAssembly, default to low-quality rendering for acceptable frame
+	// rates.  This disables expensive cloud layers (Items.c), reduces electrode
+	// zap complexity (Electrodes.c), and removes HUD element shadows (Infobar.c).
+	// The terrain range cap is applied separately in SetTerrainScale (Terrain.c).
+#if defined(__EMSCRIPTEN__)
+	gGamePrefs.lowRenderQuality		= true;
+#else
 	gGamePrefs.lowRenderQuality		= false;
+#endif
 	gGamePrefs.splitScreenMode		= SPLITSCREEN_MODE_VERT;
 	gGamePrefs.stereoGlassesMode	= STEREO_GLASSES_MODE_OFF;
 	gGamePrefs.anaglyphCalibrationRed = DEFAULT_ANAGLYPH_R;
