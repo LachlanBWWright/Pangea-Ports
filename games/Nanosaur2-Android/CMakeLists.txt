@@ -380,7 +380,7 @@ if(EMSCRIPTEN)
 		"-s DISABLE_EXCEPTION_CATCHING=0"
 		# Export the C functions callable from JavaScript
 		"-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
-		"-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath']"
+		"-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath','_Nanosaur2_GetProfilingJSON','_Nanosaur2_ToggleDebugMode','_Nanosaur2_GetDebugMode','_Nanosaur2_GetFPS']"
 		# Embed the game data (Data/ directory) into the wasm bundle
 		"--preload-file ${GAME_DATADIR}@/Data"
 		# Use requestAnimationFrame for the main loop (vsync, battery-efficient)

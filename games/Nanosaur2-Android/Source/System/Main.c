@@ -155,6 +155,9 @@ void InitDefaultPrefs(void)
 	gGamePrefs.cutsceneSubtitles	= !IsNativeEnglishSystem();		// enable subtitles if user's native language isn't English
 
 	gGamePrefs.lowRenderQuality		= false;
+#ifdef __EMSCRIPTEN__
+	gGamePrefs.lowRenderQuality		= true;		// cap rendering quality for WebAssembly performance
+#endif
 	gGamePrefs.splitScreenMode		= SPLITSCREEN_MODE_VERT;
 	gGamePrefs.stereoGlassesMode	= STEREO_GLASSES_MODE_OFF;
 	gGamePrefs.anaglyphCalibrationRed = DEFAULT_ANAGLYPH_R;

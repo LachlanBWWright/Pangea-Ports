@@ -212,7 +212,7 @@
       </button>
     </div>
 
-    <canvas id="canvas" width="640" height="480" tabindex="-1"
+    <canvas id="canvas" width="1280" height="720" tabindex="-1"
             oncontextmenu="event.preventDefault()"></canvas>
   </div>
 
@@ -326,8 +326,25 @@
           getFenceCollisions: function() {
             return Module.ccall('WASM_GetFenceCollision', 'number', [], []) !== 0;
           },
+          getProfilingData: function() {
+            // Returns a JS object with per-phase timing (ms) and fps
+            var bufLen = 512;
+            var ptr    = Module._malloc(bufLen);
+            Module.ccall('WASM_GetProfilingJSON', null, ['number','number'], [ptr, bufLen]);
+            var json = Module.UTF8ToString(ptr);
+            Module._free(ptr);
+            try { return JSON.parse(json); } catch(e) { return null; }
+          },
+          toggleDebugMode: function() {
+            return Module.ccall('WASM_ToggleDebugMode', null, [], []);
+          },
+          getFPS: function() {
+            return Module.ccall('WASM_GetFPS', 'number', [], []);
+          },
         };
-        console.log('[CroMag] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a track (1-based). Default: main menu.');
+        console.log('[CroMag] PangeaGame API ready.',
+                    'Use PangeaGame.skipToLevel(N) to jump to a track (1-based).',
+                    'Use PangeaGame.getProfilingData() to get timing data.');
 
         // Sync fence state
         _fenceEnabled = window.GameCheat.getFenceCollision() !== 0;
@@ -468,12 +485,19 @@
                   '– reload with ?levelOverride=' + encodeURIComponent(virtualPath));
     };
 
-    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
-      window.addEventListener(evt, function() {
+    // fullscreenchange fires on document; use document.addEventListener to be reliable.
+    // Call syncCanvasSize immediately (layout is settled at this point) PLUS deferred
+    // backups to handle browsers that lag slightly.
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      document.addEventListener(evt, function() {
+        syncCanvasSize();  // immediate — layout is settled after fullscreen commit
         requestAnimationFrame(syncCanvasSize);
-        // And another one for good measure (some browsers lag)
         requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
       });
+    });
+    window.addEventListener('resize', function() {
+      requestAnimationFrame(syncCanvasSize);
+      requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
     });
 
     // Use ResizeObserver for more reliable canvas sizing

@@ -196,7 +196,7 @@
     </div>
 
     <!-- WebGL canvas — always visible with real dimensions so SDL3 can size the window -->
-    <canvas class="emscripten" id="canvas" width="640" height="480"
+    <canvas id="canvas" width="1280" height="960"
             oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
     <!-- Toolbar shown after load -->
@@ -512,14 +512,19 @@
       });
     })();
 
-    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
-      window.addEventListener(evt, function() {
-        // Delay by one rAF so the browser can complete its layout/resize after
-        // the fullscreen transition before we read clientWidth/clientHeight.
+    // fullscreenchange fires on document; use document.addEventListener to be reliable.
+    // Call syncCanvasSize immediately (layout is settled after fullscreen commit) PLUS
+    // deferred backups to handle browsers that lag slightly.
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      document.addEventListener(evt, function() {
+        syncCanvasSize();  // immediate — layout is settled after fullscreen commit
         requestAnimationFrame(syncCanvasSize);
-        // And another one for good measure (some browsers lag)
         requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
       });
+    });
+    window.addEventListener('resize', function() {
+      requestAnimationFrame(syncCanvasSize);
+      requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
     });
   </script>
 </body>
