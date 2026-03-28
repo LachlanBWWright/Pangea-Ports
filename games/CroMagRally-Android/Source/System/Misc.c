@@ -398,27 +398,24 @@ static float	sampleList[8] = {DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS,
                                  DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS};
 int i;
 
-wait:
-	Microseconds(&currTime);
-	deltaTime = currTime.lo - time.lo;
+	do {
+		Microseconds(&currTime);
+		deltaTime = currTime.lo - time.lo;
 
-	if (deltaTime == 0)
-	{
-		fps = DEFAULT_FPS;
-	}
-	else
-	{
-		fps = 1000000.0f / (float)deltaTime;
-
-		if (fps < DEFAULT_FPS)			// (avoid divide by 0's later)
-			fps = DEFAULT_FPS;
-		else if (fps > MAX_FPS)			// cap to avoid precision issues at very high frame rates
+		if (deltaTime == 0)
 		{
-			if (fps - MAX_FPS > 1000)	// sleep briefly if we have >1ms to spare
-				SDL_Delay(1);
-			goto wait;
+			fps = DEFAULT_FPS;
 		}
-	}
+		else
+		{
+			fps = 1000000.0f / (float)deltaTime;
+
+			if (fps < DEFAULT_FPS)
+				fps = DEFAULT_FPS;
+			else if (fps > MAX_FPS && fps - MAX_FPS > 1000)
+				SDL_Delay(1);  // sleep briefly if we're way over the cap
+		}
+	} while (fps > MAX_FPS);
 
 #if _DEBUG
 	if (GetKeyState(SDL_SCANCODE_KP_PLUS))		// debug speed-up with KP_PLUS
