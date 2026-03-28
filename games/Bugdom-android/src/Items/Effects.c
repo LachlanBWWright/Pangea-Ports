@@ -231,6 +231,7 @@ void DeleteAllParticleGroups(void)
 			// Free mesh memory
 			if (gParticleGroups[i].mesh)
 			{
+				Render_DeleteMeshVBOs(gParticleGroups[i].mesh);
 				Q3TriMeshData_Dispose(gParticleGroups[i].mesh);
 				gParticleGroups[i].mesh = nil;
 			}
@@ -703,6 +704,7 @@ static const TQ3Vector3D up = {0,1,0};
 					/* DRAW IT */
 
 				Render_SubmitMesh(tm, nil, &kParticleGroupRenderingMods, nil, 0);
+				Render_InvalidateMesh(tm);	// points updated every frame
 	}
 }
 

@@ -129,6 +129,11 @@ void Free3DMFGroup(Byte groupNum)
 
 	if (gObjectGroupFile[groupNum] != nil)
 	{
+		// Delete per-mesh GPU buffers before freeing CPU-side mesh memory.
+		TQ3MetaFile* mf = gObjectGroupFile[groupNum];
+		for (int i = 0; i < mf->numMeshes; i++)
+			Render_DeleteMeshVBOs(mf->meshes[i]);
+
 		Q3MetaFile_Dispose(gObjectGroupFile[groupNum]);
 		gObjectGroupFile[groupNum] = nil;
 	}

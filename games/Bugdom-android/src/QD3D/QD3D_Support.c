@@ -199,6 +199,7 @@ QD3DSetupOutputType	*data;
 
 	if (gPillarboxMesh)
 	{
+		Render_DeleteMeshVBOs(gPillarboxMesh);
 		Q3TriMeshData_Dispose(gPillarboxMesh);
 		gPillarboxMesh = nil;
 	}
@@ -578,6 +579,7 @@ void QD3D_UpdateDebugTextMesh(const char* text)
 	{
 		if (gDebugTextMesh)
 		{
+			Render_DeleteMeshVBOs(gDebugTextMesh);
 			Q3TriMeshData_Dispose(gDebugTextMesh);
 			gDebugTextMesh = nil;
 		}
@@ -683,6 +685,7 @@ void QD3D_DrawPillarbox(void)
 		gPillarboxMesh->points[7] = (TQ3Point3D){ 0, wh, 0 };
 	}
 
+	Render_InvalidateMesh(gPillarboxMesh);	// positions updated every call
 
 	Render_SetViewport(0, 0, gWindowWidth, gWindowHeight);
 	Render_Enter2D_NativeResolution();

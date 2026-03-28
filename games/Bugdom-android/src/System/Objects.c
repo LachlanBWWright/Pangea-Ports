@@ -596,6 +596,7 @@ void DeleteObject(ObjNode	*theNode)
 		// If the node has ownership of this mesh's memory, dispose of it
 		if (theNode->OwnsMeshMemory[i])
 		{
+			Render_DeleteMeshVBOs(theNode->MeshList[i]);
 			Q3TriMeshData_Dispose(theNode->MeshList[i]);
 		}
 

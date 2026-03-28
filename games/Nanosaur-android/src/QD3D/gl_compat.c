@@ -179,6 +179,7 @@ static float   s_imm_cur_s0 = 0, s_imm_cur_t0 = 0;
 // ── GL objects ────────────────────────────────────────────────────────────────
 static GLuint  s_prog = 0;
 static GLuint  s_vbo  = 0;
+static GLuint  s_ibo  = 0;   // persistent index buffer (avoids per-draw glGenBuffers)
 
 // Attribute locations (bound at compile time to fixed slots)
 #define ATTRIB_POSITION  0
@@ -573,8 +574,9 @@ void COMPAT_GL_Init(void) {
     u_texenv1     = glGetUniformLocation(s_prog, "u_texenv1");
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
 
-    // VBO for interleaved vertex data
+    // VBO for interleaved vertex data, IBO for index data
     glGenBuffers(1, &s_vbo);
+    glGenBuffers(1, &s_ibo);
 
     SDL_Log("gl_compat: initialized (prog=%u)", s_prog);
 }
@@ -880,9 +882,8 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
     if (setup_vertex_attribs_from_arrays(vertex_count) < 0) return;
     upload_uniforms();
 
-    // Upload index buffer to an element VBO
-    GLuint ibo; glGenBuffers(1, &ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    // Reuse the persistent IBO — avoids a glGenBuffers/glDeleteBuffers pair per draw call.
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_ibo);
 
     // Convert GL_UNSIGNED_INT indices to GL_UNSIGNED_SHORT if needed
     // (WebGL1 only supports UNSIGNED_BYTE and UNSIGNED_SHORT unless OES_element_index_uint)
@@ -905,11 +906,9 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sz, indices, GL_STREAM_DRAW);
     }
 
-    typedef void (*real_draw_t)(GLenum,GLsizei,GLenum,const void*);
     REAL_glDrawElements(mode, count, type, 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDeleteBuffers(1, &ibo);
     disable_vertex_attribs();
 }
 

@@ -190,6 +190,7 @@ void DisposeLiquids(void)
 	{
 		if (gLiquidMeshPtrs[i] != nil)
 		{
+			Render_DeleteMeshVBOs(gLiquidMeshPtrs[i]);
 			Q3TriMeshData_Dispose(gLiquidMeshPtrs[i]);
 			gLiquidMeshPtrs[i] = nil;
 		}
@@ -599,6 +600,7 @@ TQ3Point3D		*p;
 			/* SUBMIT IT */
 			/*************/
 
+		Render_InvalidateMesh(tmd);	// points/UVs updated every frame
 		Render_SubmitMesh(tmd, nil, &theNode->RenderModifiers, &theNode->Coord, theNode->Slot);
 }
 
@@ -738,6 +740,7 @@ TQ3TriMeshTriangleData	*t;
 			/* SUBMIT IT */
 			/*************/
 
+		Render_InvalidateMesh(tmd);	// points/UVs/triangles updated every frame
 		Render_SubmitMesh(tmd, nil, &theNode->RenderModifiers, &theNode->Coord, theNode->Slot);
 }
 
@@ -1040,6 +1043,7 @@ TQ3TriMeshTriangleData	*t;
 			/* SUBMIT IT */
 			/*************/
 
+		Render_InvalidateMesh(tmd);	// points/UVs/triangles updated every frame
 		Render_SubmitMesh(tmd, nil, &theNode->RenderModifiers, &theNode->Coord, theNode->Slot);
 }
 

@@ -539,6 +539,7 @@ int		numLayers;
 
 				/* NUKE TRIMESH DATA */
 
+			Render_DeleteMeshVBOs(gSuperTileMemoryList[i].triMeshDataPtrs[layer]);
 			Q3TriMeshData_Dispose(gSuperTileMemoryList[i].triMeshDataPtrs[layer]);
 			gSuperTileMemoryList[i].triMeshDataPtrs[layer] = nil;
 		}

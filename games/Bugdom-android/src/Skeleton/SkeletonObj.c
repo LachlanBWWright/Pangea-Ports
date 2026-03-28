@@ -294,6 +294,10 @@ static void DisposeSkeletonDefinitionMemory(SkeletonDefType *skeleton)
 
 	if (skeleton->associated3DMF)
 	{
+		// Delete per-mesh GPU buffers before freeing CPU-side mesh memory.
+		TQ3MetaFile* mf = skeleton->associated3DMF;
+		for (int i = 0; i < mf->numMeshes; i++)
+			Render_DeleteMeshVBOs(mf->meshes[i]);
 		Q3MetaFile_Dispose(skeleton->associated3DMF);
 		skeleton->associated3DMF = nil;
 	}

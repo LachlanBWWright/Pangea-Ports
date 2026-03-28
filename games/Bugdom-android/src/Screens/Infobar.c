@@ -235,12 +235,14 @@ void DisposeInfobarTexture(void)
 
 	if (gInfobarTopMesh)
 	{
+		Render_DeleteMeshVBOs(gInfobarTopMesh);
 		Q3TriMeshData_Dispose(gInfobarTopMesh);
 		gInfobarTopMesh = nil;
 	}
 
 	if (gInfobarBottomMesh)
 	{
+		Render_DeleteMeshVBOs(gInfobarBottomMesh);
 		Q3TriMeshData_Dispose(gInfobarBottomMesh);
 		gInfobarBottomMesh = nil;
 	}

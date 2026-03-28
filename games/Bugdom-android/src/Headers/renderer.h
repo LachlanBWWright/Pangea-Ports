@@ -144,6 +144,17 @@ void Render_UpdateTexture(
 // outTextureNames is an array with enough capacity to hold `metaFile->numTextures` texture names.
 void Render_Load3DMFTextures(TQ3MetaFile* metaFile, GLuint* outTextureNames, bool forceClampUVs);
 
+// Delete all GPU vertex buffers (VBOs/EBO) owned by a mesh.
+// Must be called before Q3TriMeshData_Dispose() whenever the mesh has been submitted
+// for drawing at least once (the renderer may have created persistent GPU buffers for it).
+// No-op for meshes that were never submitted or whose VBOs are already gone.
+void Render_DeleteMeshVBOs(TQ3TriMeshData* mesh);
+
+// Mark a mesh's CPU-side data as modified so the renderer re-uploads it to the GPU
+// before the next draw.  Call this whenever you directly write into mesh->points,
+// mesh->vertexNormals, or mesh->vertexUVs.
+static inline void Render_InvalidateMesh(TQ3TriMeshData* mesh) { mesh->gpuDataDirty = true; }
+
 #pragma mark -
 
 // Instructs the renderer to get ready to draw a new frame.

@@ -189,6 +189,7 @@ void DisposeLensFlares(void)
 	{
 		if (gFlareMeshes[i])
 		{
+			Render_DeleteMeshVBOs(gFlareMeshes[i]);
 			Q3TriMeshData_Dispose(gFlareMeshes[i]);
 			gFlareMeshes[i] = nil;
 		}
@@ -684,6 +685,7 @@ const bool doMoon = gMoonFlareTextureName != 0;
 		mesh->points[1] = (TQ3Point3D) { x + extent, y - extent, 0 };
 		mesh->points[2] = (TQ3Point3D) { x + extent, y + extent, 0 };
 		mesh->points[3] = (TQ3Point3D) { x - extent, y + extent, 0 };
+		Render_InvalidateMesh(mesh);	// positions change every frame
 
 		if (doMoon && (i == 0))							// see if do moon
 			mesh->glTextureName = gMoonFlareTextureName;

@@ -181,6 +181,7 @@ void QD3D_DisposeShards(void)
 		ShardType* shard = &gShards[i];
 		if (shard->mesh)
 		{
+			Render_DeleteMeshVBOs(shard->mesh);
 			Q3TriMeshData_Dispose(shard->mesh);
 			shard->mesh = NULL;
 		}
@@ -513,6 +514,7 @@ void QD3D_ScrollUVs(TQ3TriMeshData* mesh, float du, float dv)
 		mesh->vertexUVs[j].u += du;
 		mesh->vertexUVs[j].v += dv;
 	}
+	Render_InvalidateMesh(mesh);	// UV data changed; flag for GPU re-upload
 }
 
 
