@@ -557,8 +557,7 @@ static void upload_uniforms(void) {
     glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
 }
 
-// Set up vertex attributes from client-side arrays, upload to VBO, return
-// vertex count (or -1 on error).  stride_out = per-vertex byte size.
+// Upload client-side arrays into an interleaved VBO.
 static int setup_vertex_attribs_from_arrays(GLuint vbo, int vertex_count) {
     // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
     const int STRIDE = (3+3+4+2+2) * sizeof(float);  // 56 bytes

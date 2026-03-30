@@ -412,8 +412,8 @@ int i;
 
 			if (fps < DEFAULT_FPS)
 				fps = DEFAULT_FPS;
-			else if (fps > MAX_FPS && fps - MAX_FPS > 1000)
-				SDL_Delay(1);  // sleep briefly if we're way over the cap
+			else if (fps > MAX_FPS * 2.0f)
+				SDL_Delay(1);  // sleep briefly if we're more than 2× over the cap
 		}
 	} while (fps > MAX_FPS);
 

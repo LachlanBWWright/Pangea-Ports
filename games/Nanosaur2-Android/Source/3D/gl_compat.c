@@ -568,7 +568,7 @@ static void upload_uniforms(void) {
     }
 }
 
-// Upload client-side arrays into an interleaved VBO and bind the attrib layout.
+// Upload client-side arrays into an interleaved VBO.
 static int setup_vertex_attribs_from_arrays(GLuint vbo, int vertex_count) {
     // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
     const int STRIDE_FLOATS = (3+3+4+2+2);
