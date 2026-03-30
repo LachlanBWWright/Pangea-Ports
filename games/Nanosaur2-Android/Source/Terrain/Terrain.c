@@ -158,14 +158,10 @@ void SetTerrainScale(int polygonSize)
 	gMapToUnitValue = 	gTerrainPolygonSize / OREOMAP_TILE_SIZE;				//value to xlate Oreo map pixel coords to 3-space unit coords
 	gMapToUnitValueFrac = 1.0f / gMapToUnitValue;
 
-#ifdef __EMSCRIPTEN__
-	gSuperTileActiveRange = 4;		// hard cap for WebAssembly performance; full range is too slow in browsers
-#else
 	if (gGamePrefs.lowRenderQuality)
 		gSuperTileActiveRange = 7;
 	else
 		gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
-#endif
 }
 
 
@@ -1720,7 +1716,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
 
 
 

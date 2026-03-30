@@ -190,6 +190,26 @@ static int     s_interleave_buf_capacity = 0;
 static GLushort *s_index_conv_buf = NULL;
 static int       s_index_conv_buf_capacity = 0;
 
+#define DRAW_CACHE_SIZE 128
+typedef struct {
+    int valid;
+    unsigned int last_used;
+    GLuint vbo;
+    GLuint ibo;
+    int vertex_count;
+    const void *indices;
+    GLsizei index_count;
+    GLenum index_input_type;
+    GLenum index_draw_type;
+    ClientArray vertex;
+    ClientArray normal;
+    ClientArray color;
+    ClientArray texcoord[2];
+    float current_color[4];
+} DrawCacheEntry;
+static DrawCacheEntry s_draw_cache[DRAW_CACHE_SIZE];
+static unsigned int s_draw_cache_use_counter = 0;
+
 // Attribute locations (bound at compile time to fixed slots)
 #define ATTRIB_POSITION  0
 #define ATTRIB_NORMAL    1
@@ -212,6 +232,123 @@ static GLint u_sampler0, u_sampler1;
 static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
 static GLint u_tex_matrix;
+
+static int client_array_equal(const ClientArray* a, const ClientArray* b)
+{
+    return a->enabled == b->enabled
+        && a->size == b->size
+        && a->type == b->type
+        && a->stride == b->stride
+        && a->ptr == b->ptr;
+}
+
+static int draw_cache_matches(const DrawCacheEntry* entry,
+                              int vertex_count,
+                              const void* indices,
+                              GLsizei index_count,
+                              GLenum index_input_type)
+{
+    return entry->valid
+        && entry->vertex_count == vertex_count
+        && entry->indices == indices
+        && entry->index_count == index_count
+        && entry->index_input_type == index_input_type
+        && client_array_equal(&entry->vertex, &s_ca_vertex)
+        && client_array_equal(&entry->normal, &s_ca_normal)
+        && client_array_equal(&entry->color, &s_ca_color)
+        && client_array_equal(&entry->texcoord[0], &s_ca_texcoord[0])
+        && client_array_equal(&entry->texcoord[1], &s_ca_texcoord[1])
+        && memcmp(entry->current_color, s_current_color, sizeof(s_current_color)) == 0;
+}
+
+static DrawCacheEntry* alloc_draw_cache_entry(void)
+{
+    DrawCacheEntry* lru = &s_draw_cache[0];
+
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++)
+    {
+        DrawCacheEntry* entry = &s_draw_cache[i];
+        if (!entry->valid)
+        {
+            lru = entry;
+            break;
+        }
+        if (entry->last_used < lru->last_used)
+            lru = entry;
+    }
+
+    if (lru->vbo == 0)
+        glGenBuffers(1, &lru->vbo);
+    if (lru->ibo == 0)
+        glGenBuffers(1, &lru->ibo);
+
+    lru->last_used = ++s_draw_cache_use_counter;
+    return lru;
+}
+
+static DrawCacheEntry* get_draw_cache_entry(int vertex_count,
+                                            const void* indices,
+                                            GLsizei index_count,
+                                            GLenum index_input_type,
+                                            int* cache_hit)
+{
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++)
+    {
+        DrawCacheEntry* entry = &s_draw_cache[i];
+        if (draw_cache_matches(entry, vertex_count, indices, index_count, index_input_type))
+        {
+            entry->last_used = ++s_draw_cache_use_counter;
+            *cache_hit = 1;
+            return entry;
+        }
+    }
+
+    *cache_hit = 0;
+    return alloc_draw_cache_entry();
+}
+
+static void bind_cached_vertex_attribs(GLuint vbo)
+{
+    const int STRIDE_BYTES = (3+3+4+2+2) * sizeof(float);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    glEnableVertexAttribArray(ATTRIB_POSITION);
+    glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(0*sizeof(float)));
+
+    glEnableVertexAttribArray(ATTRIB_NORMAL);
+    glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(3*sizeof(float)));
+
+    glEnableVertexAttribArray(ATTRIB_COLOR);
+    glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(6*sizeof(float)));
+
+    glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
+    glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(10*sizeof(float)));
+
+    glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
+    glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(12*sizeof(float)));
+}
+
+static void remember_draw_cache_entry(DrawCacheEntry* entry,
+                                      int vertex_count,
+                                      const void* indices,
+                                      GLsizei index_count,
+                                      GLenum index_input_type,
+                                      GLenum index_draw_type)
+{
+    entry->valid = 1;
+    entry->vertex_count = vertex_count;
+    entry->indices = indices;
+    entry->index_count = index_count;
+    entry->index_input_type = index_input_type;
+    entry->index_draw_type = index_draw_type;
+    entry->vertex = s_ca_vertex;
+    entry->normal = s_ca_normal;
+    entry->color = s_ca_color;
+    entry->texcoord[0] = s_ca_texcoord[0];
+    entry->texcoord[1] = s_ca_texcoord[1];
+    memcpy(entry->current_color, s_current_color, sizeof(s_current_color));
+}
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
@@ -431,9 +568,8 @@ static void upload_uniforms(void) {
     }
 }
 
-// Set up vertex attributes from client-side arrays, upload to VBO, return
-// vertex count (or -1 on error).  stride_out = per-vertex byte size.
-static int setup_vertex_attribs_from_arrays(int vertex_count) {
+// Upload client-side arrays into an interleaved VBO and bind the attrib layout.
+static int setup_vertex_attribs_from_arrays(GLuint vbo, int vertex_count) {
     // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
     const int STRIDE_FLOATS = (3+3+4+2+2);
     const int STRIDE_BYTES = STRIDE_FLOATS * sizeof(float);  // 56 bytes
@@ -499,8 +635,8 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
         } else { dst[12]=0; dst[13]=0; }
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
-    glBufferData(GL_ARRAY_BUFFER, buf_size, buf, GL_STREAM_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, buf_size, buf, GL_STATIC_DRAW);
 
     // Bind attributes
     glEnableVertexAttribArray(ATTRIB_POSITION);
@@ -946,42 +1082,52 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
 void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count) {
     if (!s_ca_vertex.ptr || count <= 0) return;
 
-    if (setup_vertex_attribs_from_arrays(vertex_count) < 0) return;
-    upload_uniforms();
+    int cache_hit = 0;
+    DrawCacheEntry* entry = get_draw_cache_entry(vertex_count, indices, count, type, &cache_hit);
+    GLenum draw_type = type;
 
-    // Upload index buffer to an element VBO
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_ibo);
-
-    // Convert GL_UNSIGNED_INT indices to GL_UNSIGNED_SHORT if needed
-    // (WebGL1 only supports UNSIGNED_BYTE and UNSIGNED_SHORT unless OES_element_index_uint)
-    if (type == GL_UNSIGNED_INT) {
-#if defined(USE_WEBGL2) || defined(__ANDROID__)
-        // WebGL2 and Android GLES typically support 32-bit indices directly.
-        // We only convert if we must (e.g. for WebGL1 compatibility if ever needed).
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STREAM_DRAW);
-#else
-        // For safety, convert to short if small enough
-        if (vertex_count <= 65535) {
-            int needed_size = count * sizeof(GLushort);
-            if (needed_size > s_index_conv_buf_capacity) {
-                s_index_conv_buf = (GLushort *)realloc(s_index_conv_buf, needed_size);
-                s_index_conv_buf_capacity = needed_size;
-            }
-            GLushort *short_idx = s_index_conv_buf;
-            const GLuint *uint_idx = (const GLuint *)indices;
-            for (int i = 0; i < count; i++) short_idx[i] = (GLushort)uint_idx[i];
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, needed_size, short_idx, GL_STREAM_DRAW);
-            type = GL_UNSIGNED_SHORT;
-        } else {
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STREAM_DRAW);
-        }
-#endif
+    if (cache_hit) {
+        bind_cached_vertex_attribs(entry->vbo);
+        draw_type = entry->index_draw_type;
     } else {
-        GLsizei sz = (type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sz, indices, GL_STREAM_DRAW);
+        if (setup_vertex_attribs_from_arrays(entry->vbo, vertex_count) < 0) return;
+
+        // Upload index buffer to this cache entry's element buffer
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ibo);
+
+        // Convert GL_UNSIGNED_INT indices to GL_UNSIGNED_SHORT if needed
+        // (WebGL1 only supports UNSIGNED_BYTE and UNSIGNED_SHORT unless OES_element_index_uint)
+        if (type == GL_UNSIGNED_INT) {
+#if defined(USE_WEBGL2) || defined(__ANDROID__)
+            // WebGL2 and Android GLES typically support 32-bit indices directly.
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STATIC_DRAW);
+#else
+            if (vertex_count <= 65535) {
+                int needed_size = count * sizeof(GLushort);
+                if (needed_size > s_index_conv_buf_capacity) {
+                    s_index_conv_buf = (GLushort *)realloc(s_index_conv_buf, needed_size);
+                    s_index_conv_buf_capacity = needed_size;
+                }
+                GLushort *short_idx = s_index_conv_buf;
+                const GLuint *uint_idx = (const GLuint *)indices;
+                for (int i = 0; i < count; i++) short_idx[i] = (GLushort)uint_idx[i];
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, needed_size, short_idx, GL_STATIC_DRAW);
+                draw_type = GL_UNSIGNED_SHORT;
+            } else {
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STATIC_DRAW);
+            }
+#endif
+        } else {
+            GLsizei sz = (type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sz, indices, GL_STATIC_DRAW);
+        }
+
+        remember_draw_cache_entry(entry, vertex_count, indices, count, type, draw_type);
     }
 
-    REAL_glDrawElements(mode, count, type, 0);
+    upload_uniforms();
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ibo);
+    REAL_glDrawElements(mode, count, draw_type, 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     disable_vertex_attribs();
@@ -998,9 +1144,17 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
         s_ca_vertex.ptr = (const char *)orig + first * vstride;
     }
 
-    if (setup_vertex_attribs_from_arrays(count) < 0) { s_ca_vertex.ptr = orig; return; }
-    upload_uniforms();
+    int cache_hit = 0;
+    DrawCacheEntry* entry = get_draw_cache_entry(count, NULL, 0, 0, &cache_hit);
 
+    if (cache_hit) {
+        bind_cached_vertex_attribs(entry->vbo);
+    } else {
+        if (setup_vertex_attribs_from_arrays(entry->vbo, count) < 0) { s_ca_vertex.ptr = orig; return; }
+        remember_draw_cache_entry(entry, count, NULL, 0, 0, 0);
+    }
+
+    upload_uniforms();
     s_ca_vertex.ptr = orig;
 
     REAL_glDrawArrays(mode, 0, count);

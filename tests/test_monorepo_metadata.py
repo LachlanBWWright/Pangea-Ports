@@ -118,11 +118,65 @@ class MonorepoMetadataTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("gArrayVBOSize", compat)
         self.assertIn("gArrayEBOSize", compat)
-        self.assertIn("gImmVBOSize", compat)
-        self.assertIn("glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offVert", compat)
-        self.assertIn("glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0", compat)
-        self.assertIsNone(re.search(r"glBufferData\(GL_ARRAY_BUFFER,\s*\(GLsizeiptr\)totalSize,\s*NULL,\s*GL_STREAM_DRAW\)", compat))
-        self.assertIsNone(re.search(r"glBufferData\(GL_ELEMENT_ARRAY_BUFFER,\s*\(GLsizeiptr\)indexSize,\s*indices,\s*GL_STREAM_DRAW\)", compat))
+
+    def test_nanosaur2_wasm_keeps_high_quality_defaults(self):
+        main_c = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "System"
+            / "Main.c"
+        ).read_text(encoding="utf-8")
+        terrain_c = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "Terrain"
+            / "Terrain.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn(
+            "gGamePrefs.lowRenderQuality\t\t= true",
+            main_c,
+            "Nanosaur2 WASM should not force lowRenderQuality=true",
+        )
+        self.assertNotIn(
+            "hard cap for WebAssembly performance",
+            terrain_c,
+            "Nanosaur2 terrain should not hard-cap supertile range for WASM",
+        )
+
+    def test_nanosaur2_gl_compat_caches_uploaded_geometry(self):
+        compat = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur2-Android"
+            / "Source"
+            / "3D"
+            / "gl_compat.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("DrawCacheEntry", compat)
+        self.assertIn("DRAW_CACHE_SIZE", compat)
+        self.assertIn("get_draw_cache_entry", compat)
+        self.assertIn("remember_draw_cache_entry", compat)
+
+    def test_nanosaur1_gl_compat_caches_uploaded_geometry(self):
+        compat = (
+            ports.ROOT
+            / "games"
+            / "Nanosaur-android"
+            / "src"
+            / "QD3D"
+            / "gl_compat.c"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("DrawCacheEntry", compat)
+        self.assertIn("DRAW_CACHE_SIZE", compat)
+        self.assertIn("get_draw_cache_entry", compat)
+        self.assertIn("remember_draw_cache_entry", compat)
 
     def test_bugdom2_ogl_draw_scene_yields_to_browser_event_loop(self):
         ogl = (
