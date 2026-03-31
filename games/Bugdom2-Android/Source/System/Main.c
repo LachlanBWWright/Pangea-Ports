@@ -70,15 +70,8 @@ static const int kLevelSoundBanks[NUM_LEVELS] =
 short	gPrefsFolderVRefNum;
 long	gPrefsFolderDirID;
 
-// For WebAssembly, cap rendering features to maintain acceptable frame rates.
-// gSlowCPU=true disables sphere-map reflections; gG4=false skips extra model sheen.
-#if defined(__EMSCRIPTEN__)
-Boolean				gG4 = false;
-Boolean				gSlowCPU = true;
-#else
 Boolean				gG4 = true;
 Boolean				gSlowCPU = false;
-#endif
 
 float				gGravity = NORMAL_GRAVITY;
 
@@ -568,8 +561,6 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_SIDEWALK:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
-#elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -602,8 +593,6 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_PLAYROOM:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
-#elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -630,8 +619,6 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_GARBAGE:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
-#elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -675,8 +662,6 @@ OGLSetupInputType	viewDef;
 		case	LEVEL_NUM_PARK:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
-#elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -692,8 +677,6 @@ OGLSetupInputType	viewDef;
 		default:
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
-#elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
 #else
 				if (gSlowCPU)
 					gSuperTileActiveRange = 3;
