@@ -178,6 +178,62 @@ class MonorepoMetadataTests(unittest.TestCase):
         self.assertIn("get_draw_cache_entry", compat)
         self.assertIn("remember_draw_cache_entry", compat)
 
+    def test_cromag_vertex_array_compat_caches_uploaded_geometry(self):
+        """CroMagRally vertex_array_compat.c must use a draw cache to avoid per-frame uploads."""
+        compat = (
+            ports.ROOT
+            / "games"
+            / "CroMagRally-Android"
+            / "Source"
+            / "3D"
+            / "vertex_array_compat.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("DrawCacheEntry", compat)
+        self.assertIn("DRAW_CACHE_SIZE", compat)
+        self.assertIn("GL_STATIC_DRAW", compat)
+
+    def test_ottomatic_vertex_array_compat_caches_uploaded_geometry(self):
+        """OttoMatic vertex_array_compat.c must use a draw cache to avoid per-frame uploads."""
+        compat = (
+            ports.ROOT
+            / "games"
+            / "OttoMatic-Android"
+            / "src"
+            / "3D"
+            / "vertex_array_compat.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("DrawCacheEntry", compat)
+        self.assertIn("DRAW_CACHE_SIZE", compat)
+        self.assertIn("GL_STATIC_DRAW", compat)
+
+    def test_billyfrontier_vertex_array_compat_caches_uploaded_geometry(self):
+        """BillyFrontier vertex_array_compat.c must use a draw cache to avoid per-frame uploads."""
+        compat = (
+            ports.ROOT
+            / "games"
+            / "BillyFrontier-Android"
+            / "Source"
+            / "3D"
+            / "vertex_array_compat.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("DrawCacheEntry", compat)
+        self.assertIn("DRAW_CACHE_SIZE", compat)
+        self.assertIn("GL_STATIC_DRAW", compat)
+
+    def test_bugdom2_gles3compat_caches_uploaded_geometry(self):
+        """Bugdom2 GLES3Compat.c must use a draw cache to avoid per-frame uploads."""
+        compat = (
+            ports.ROOT
+            / "games"
+            / "Bugdom2-Android"
+            / "Source"
+            / "3D"
+            / "GLES3Compat.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("DrawCacheEntry", compat)
+        self.assertIn("DRAW_CACHE_SIZE", compat)
+        self.assertIn("GL_STATIC_DRAW", compat)
+
     def test_bugdom2_ogl_draw_scene_yields_to_browser_event_loop(self):
         ogl = (
             ports.ROOT
@@ -418,8 +474,8 @@ class MonorepoMetadataTests(unittest.TestCase):
             "Player_Ball.c must set STATUS_BIT_KEEPBACKFACES on the ball object",
         )
 
-    def test_bugdom2_wasm_supertile_range_capped(self):
-        """Bugdom2 Main.c must cap gSuperTileActiveRange for Emscripten to avoid CPU geometry overload."""
+    def test_bugdom2_wasm_uses_high_quality_defaults(self):
+        """Bugdom2 Main.c must NOT cap gSuperTileActiveRange for Emscripten — performance comes from draw caching."""
         main_c = (
             ports.ROOT
             / "games"
@@ -428,16 +484,14 @@ class MonorepoMetadataTests(unittest.TestCase):
             / "System"
             / "Main.c"
         ).read_text(encoding="utf-8")
-        self.assertIn(
-            "defined(__EMSCRIPTEN__)",
-            main_c,
-            "Bugdom2 Main.c must have an __EMSCRIPTEN__ guard to cap gSuperTileActiveRange",
-        )
-        self.assertIn(
+        self.assertNotIn(
             "cap for WebAssembly performance",
             main_c,
-            "Bugdom2 Main.c must comment the WebAssembly supertile range cap",
+            "Bugdom2 Main.c must NOT cap gSuperTileActiveRange for WASM — draw cache handles performance",
         )
+        # gG4 and gSlowCPU should use high-quality defaults
+        self.assertIn("gG4 = true", main_c)
+        self.assertIn("gSlowCPU = false", main_c)
 
     def test_billy_and_bugdom2_shells_guard_fullscreen_canvas_resize(self):
         shell_paths = [
@@ -774,6 +828,15 @@ class MonorepoMetadataTests(unittest.TestCase):
                     asset.exists(),
                     f"{game_name}: {rel_path} must exist (referenced from docs/index.html)",
                 )
+
+
+    def test_build_local_site_supports_game_flag(self):
+        """build_local_site.sh must support --game flag for single-game compilation."""
+        script = (ports.ROOT / "build_local_site.sh").read_text(encoding="utf-8")
+        self.assertIn("--game", script)
+        self.assertIn("FILTER_GAME", script)
+        # Should print available games when filter doesn't match
+        self.assertIn("Available games", script)
 
 
 if __name__ == "__main__":
