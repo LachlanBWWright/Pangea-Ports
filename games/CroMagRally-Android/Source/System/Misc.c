@@ -20,6 +20,7 @@ extern	SDL_Window* 	gSDLWindow;
 /****************************/
 
 #define	DEFAULT_FPS			9
+#define	MAX_FPS				300		// cap to avoid precision loss and physics instability at very high frame rates
 #define	PTRCOOKIE_SIZE		16
 
 /**********************/
@@ -390,19 +391,51 @@ void CalcFramesPerSecond(void)
 static UnsignedWide time;
 UnsignedWide currTime;
 unsigned long deltaTime;
+float		fps;
 
-	Microseconds(&currTime);
-	deltaTime = currTime.lo - time.lo;
+static int		sampIndex = 0;
+static float	sampleList[8] = {DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS,
+                                 DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS,DEFAULT_FPS};
+int i;
 
-	gFramesPerSecond = 1000000.0f / deltaTime;
+	do {
+		Microseconds(&currTime);
+		deltaTime = currTime.lo - time.lo;
 
-	if (gFramesPerSecond < DEFAULT_FPS)			// (avoid divide by 0's later)
-		gFramesPerSecond = DEFAULT_FPS;
+		if (deltaTime == 0)
+		{
+			fps = DEFAULT_FPS;
+		}
+		else
+		{
+			fps = 1000000.0f / (float)deltaTime;
+
+			if (fps < DEFAULT_FPS)
+				fps = DEFAULT_FPS;
+			else if (fps > MAX_FPS * 2.0f)
+				SDL_Delay(1);  // sleep briefly if we're more than 2× over the cap
+		}
+	} while (fps > MAX_FPS);
 
 #if _DEBUG
 	if (GetKeyState(SDL_SCANCODE_KP_PLUS))		// debug speed-up with KP_PLUS
-		gFramesPerSecond = 10;
+		fps = DEFAULT_FPS;
 #endif
+
+		/* ADD TO SMOOTHING BUFFER */
+
+	sampleList[sampIndex] = fps;
+	sampIndex = (sampIndex + 1) & 0x7;
+
+		/* CALC SMOOTHED AVERAGE */
+
+	gFramesPerSecond = 0;
+	for (i = 0; i < 8; i++)
+		gFramesPerSecond += sampleList[i];
+	gFramesPerSecond *= (1.0f / 8.0f);
+
+	if (gFramesPerSecond < DEFAULT_FPS)			// (avoid divide by 0's later)
+		gFramesPerSecond = DEFAULT_FPS;
 
 	gFramesPerSecondFrac = 1.0f/gFramesPerSecond;		// calc fractional for multiplication
 

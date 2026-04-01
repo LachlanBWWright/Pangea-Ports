@@ -580,15 +580,20 @@
       reader.readAsArrayBuffer(file);
     }
 
-    // Keep canvas size in sync when the viewport or fullscreen state changes
-    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+    // Keep canvas size in sync when the viewport or fullscreen state changes.
+    // fullscreenchange fires on document; use document.addEventListener to be reliable.
+    // Call syncCanvasSize immediately (layout is settled after fullscreen commit) PLUS
+    // deferred backups to handle browsers that lag slightly.
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
       document.addEventListener(evt, function() {
-        // Delay by one rAF so the browser can complete its layout/resize after
-        // the fullscreen transition before we read clientWidth/clientHeight.
+        syncCanvasSize();  // immediate — layout is settled after fullscreen commit
         requestAnimationFrame(syncCanvasSize);
-        // And another one for good measure (some browsers lag)
         requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
       });
+    });
+    window.addEventListener('resize', function() {
+      requestAnimationFrame(syncCanvasSize);
+      requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
     });
   </script>
 

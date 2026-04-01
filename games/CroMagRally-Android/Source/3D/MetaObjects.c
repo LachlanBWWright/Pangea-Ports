@@ -828,6 +828,10 @@ uint32_t				matFlags;
 	else
 	    glDisable(GL_BLEND);
 
+	// Alpha-masked textures still need depth writes even when blend is on
+	if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))
+		glDepthMask(GL_FALSE);
+
 
 			/* SAVE THIS STUFF */
 

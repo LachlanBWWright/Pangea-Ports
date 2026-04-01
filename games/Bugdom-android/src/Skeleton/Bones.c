@@ -229,6 +229,7 @@ void UpdateSkinnedGeometry(ObjNode *theNode)
 	for (int i = 0; i < theNode->NumMeshes; i++)
 	{
 		theNode->MeshList[i]->bBox = gBBox;				// apply to local copy of trimesh
+		Render_InvalidateMesh(theNode->MeshList[i]);	// vertex data changed; flag for GPU re-upload
 	}
 }
 

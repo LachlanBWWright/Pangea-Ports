@@ -147,6 +147,8 @@ TQ3TriMeshData* TextMesh_SetMesh(const TextMeshDef* def, const char* text, TQ3Tr
 
 	GAME_ASSERT(p == mesh->numPoints);
 
+	Render_InvalidateMesh(mesh);	// points and UVs were just written; flag for GPU re-upload
+
 	return mesh;
 }
 

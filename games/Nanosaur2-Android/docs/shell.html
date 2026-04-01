@@ -211,7 +211,7 @@
     </div>
 
     <!-- SDL3 canvas — must be visible and sized when SDL creates the window -->
-    <canvas id="canvas" width="800" height="600"
+    <canvas id="canvas" width="1280" height="800"
             oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
     <!-- Controls (shown after game loads) -->
@@ -325,11 +325,14 @@
         if (tb) tb.style.display = 'flex';
 
         // ── Standard PangeaGame API ──────────────────────────────────────
-        // Exposes a consistent interface shared across all Pangea Ports WASM
-        // builds. Set on window inside onRuntimeInitialized so Module is ready.
+        // Exposes a consistent interface shared across all Pangea Ports WASM builds.
         window.PangeaGame = {
+          // skipToLevel: reload the page with ?level=N (parsed at startup).
+          // Nanosaur 2 supports ?level=0..4 for direct level launch.
           skipToLevel: function(n) {
-            return Module.ccall('Nanosaur2_SkipToLevel', null, ['number'], [n]);
+            var url = new URL(window.location.href);
+            url.searchParams.set('level', n);
+            window.location.href = url.toString();
           },
           getCurrentLevel: function() {
             return Module.ccall('Nanosaur2_GetCurrentLevel', 'number');
@@ -338,11 +341,9 @@
             return Module.ccall('Nanosaur2_SetFenceCollisionsEnabled', null, ['number'], [enabled ? 1 : 0]);
           },
         };
-        // Convenience aliases
-        window.Nanosaur2_SkipToLevel                  = function(n) { return window.PangeaGame.skipToLevel(n); };
-        window.Nanosaur2_GetCurrentLevel              = function()  { return window.PangeaGame.getCurrentLevel(); };
-        window.Nanosaur2_SetFenceCollisionsEnabled    = function(e) { return window.PangeaGame.setFenceCollisions(e); };
-        console.log('[Nanosaur2] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
+        window.Nanosaur2_GetCurrentLevel           = function()  { return window.PangeaGame.getCurrentLevel(); };
+        window.Nanosaur2_SetFenceCollisionsEnabled = function(e) { return window.PangeaGame.setFenceCollisions(e); };
+        console.log('[Nanosaur2] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level (reloads page).');
       },
 
       // Display fatal errors in the loading card instead of silently failing
@@ -416,12 +417,19 @@
       }
     }
 
-    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
-      window.addEventListener(evt, function() {
+    // fullscreenchange fires on document; use document.addEventListener to be reliable.
+    // Call syncCanvasSize immediately (layout is settled after fullscreen commit) PLUS
+    // deferred backups to handle browsers that lag slightly.
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      document.addEventListener(evt, function() {
+        syncCanvasSize();  // immediate — layout is settled after fullscreen commit
         requestAnimationFrame(syncCanvasSize);
-        // And another one for good measure (some browsers lag)
         requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
       });
+    });
+    window.addEventListener('resize', function() {
+      requestAnimationFrame(syncCanvasSize);
+      requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
     });
   </script>
 

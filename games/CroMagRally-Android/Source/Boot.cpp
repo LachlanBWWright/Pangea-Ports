@@ -43,6 +43,52 @@ extern "C"
 	{
 		return gDisableFenceCollision ? 0 : 1;
 	}
+
+	// Profiling / debug exports
+	#include "profiling.h"
+
+	// Returns profiling data as a JSON string. Call from JS:
+	//   Module.ccall('WASM_GetProfilingJSON', 'string', ['number','number'], [ptr, len])
+	EMSCRIPTEN_KEEPALIVE
+	void WASM_GetProfilingJSON(char* buf, int bufLen)
+	{
+		if (!buf || bufLen <= 0) return;
+		int offset = SDL_snprintf(buf, bufLen, "{");
+		for (int i = 0; i < NUM_PROFILE_PHASES && offset < bufLen - 2; i++)
+		{
+			const char* name = gProfilePhases[i].name ? gProfilePhases[i].name : "?";
+			float ms = GetProfilePhaseAvgMs((ProfilePhaseType)i);
+			offset += SDL_snprintf(buf + offset, bufLen - offset,
+				"%s\"%s\":%.3f",
+				(i == 0) ? "" : ",",
+				name, (double)ms);
+		}
+		offset += SDL_snprintf(buf + offset, bufLen - offset,
+			",\"fps\":%.1f", (double)gFramesPerSecond);
+		SDL_snprintf(buf + offset, bufLen - offset, "}");
+	}
+
+	// Toggle the in-game debug overlay (cycles 0→1→2→0).
+	EMSCRIPTEN_KEEPALIVE
+	void WASM_ToggleDebugMode(void)
+	{
+		if (++gDebugMode > 2)
+			gDebugMode = 0;
+	}
+
+	// Returns current debug mode level.
+	EMSCRIPTEN_KEEPALIVE
+	int WASM_GetDebugMode(void)
+	{
+		return (int)gDebugMode;
+	}
+
+	// Returns current FPS.
+	EMSCRIPTEN_KEEPALIVE
+	float WASM_GetFPS(void)
+	{
+		return gFramesPerSecond;
+	}
 #endif
 }
 

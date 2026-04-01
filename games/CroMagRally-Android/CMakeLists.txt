@@ -414,8 +414,8 @@ if(EMSCRIPTEN)
 		-sALLOW_MEMORY_GROWTH=1
 		# Preload entire Data directory into the virtual filesystem
 		"--preload-file=${GAME_DATADIR}@/Data"
-		# Export cheat-interface functions so JS can call them
-		"-sEXPORTED_FUNCTIONS=_main,_WASM_SetFenceCollision,_WASM_GetFenceCollision"
+		# Export cheat-interface and profiling functions so JS can call them
+		"-sEXPORTED_FUNCTIONS=_main,_WASM_SetFenceCollision,_WASM_GetFenceCollision,_WASM_GetProfilingJSON,_WASM_ToggleDebugMode,_WASM_GetDebugMode,_WASM_GetFPS"
 		-sEXPORTED_RUNTIME_METHODS=ccall,cwrap
 		# Custom HTML shell page
 		"--shell-file=${WASM_SHELL_FILE}"

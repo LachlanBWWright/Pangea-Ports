@@ -128,6 +128,7 @@ int curState = kPauseChoice_Resume;
 	gPauseQuad->points[1] = (TQ3Point3D) { +xs, -ys, 0 };
 	gPauseQuad->points[2] = (TQ3Point3D) { +xs, +ys, 0 };
 	gPauseQuad->points[3] = (TQ3Point3D) { -xs, +ys, 0 };
+	Render_InvalidateMesh(gPauseQuad);
 
 #if OSXPPC
 	gPauseQuad->vertexUVs[1].u = gPauseQuad->vertexUVs[2].u = 200.0f / POTCeil32(200);
@@ -251,6 +252,7 @@ int curState = kPauseChoice_Resume;
 			/* FREE MESH/TEXTURES */
 
 	glDeleteTextures(NUM_PAUSE_TEXTURES, textures);
+	Render_DeleteMeshVBOs(gPauseQuad);
 	Q3TriMeshData_Dispose(gPauseQuad);
 	gPauseQuad = nil;
 

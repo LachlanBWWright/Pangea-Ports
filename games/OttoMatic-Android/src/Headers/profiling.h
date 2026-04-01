@@ -15,10 +15,11 @@ typedef enum {
 
 // Struct to hold profiling data for a single phase
 typedef struct {
-    uint64_t start_tick;      // Start time of the current measurement
-    uint64_t total_ticks;     // Accumulated ticks for this phase
-    uint32_t samples;         // Number of samples taken
-    const char* name;         // Name of the phase
+    uint64_t start_tick;          // Start time of the current measurement
+    uint64_t total_ticks;         // Accumulated ticks for this phase (current frame)
+    uint32_t samples;             // Number of samples taken (current frame)
+    float    last_frame_ms;       // Snapshot of the previous completed frame's average ms
+    const char* name;             // Name of the phase
 } ProfilePhase;
 
 // Global array of profiling phases
@@ -33,10 +34,13 @@ void StartProfilePhase(ProfilePhaseType phase_type);
 // End timing a specific phase
 void EndProfilePhase(ProfilePhaseType phase_type);
 
-// Get the average millisecond cost of a phase
+// Get the average millisecond cost of a phase over the CURRENT partial frame.
+// NOTE: phases not yet completed in this frame return the previous frame's value.
 float GetProfilePhaseAvgMs(ProfilePhaseType phase_type);
 
-// Call this at the end of each frame to reset accumulated totals for average calculation
+// Call this at the end of each frame to snapshot and reset accumulated totals.
+// After this call, GetProfilePhaseAvgMs() returns the PREVIOUS frame's values
+// for phases not yet measured in the new frame.
 void ResetProfilingForFrame(void);
 
 #endif // PROFILING_H

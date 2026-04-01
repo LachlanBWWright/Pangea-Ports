@@ -154,6 +154,7 @@ void DisposeFences(void)
 		{
 			if (gFenceSegmentMeshes[f][s] != nil)
 			{
+				Render_DeleteMeshVBOs(gFenceSegmentMeshes[f][s]);
 				Q3TriMeshData_Dispose(gFenceSegmentMeshes[f][s]);
 				gFenceSegmentMeshes[f][s] = nil;
 			}
