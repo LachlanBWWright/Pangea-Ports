@@ -794,6 +794,14 @@ custom_draw:
 			glMatrixMode(GL_MODELVIEW);
 		}
 
+			/* RESTORE DEPTH WRITES */
+			//
+			// MO_DrawMaterial may have disabled depth writes when a
+			// transparent material was drawn.  Restore the correct state
+			// based on STATUS_BIT_NOZWRITES so the next node starts clean.
+		if (!noZWrites)
+			glDepthMask(GL_TRUE);
+
 
 
 				/* NEXT NODE */
