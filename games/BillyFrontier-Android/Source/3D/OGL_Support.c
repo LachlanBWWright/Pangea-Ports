@@ -66,6 +66,10 @@ static	float 					gMaxAnisotropy = 1.0;
 
 SDL_GLContext			gAGLContext = nil;
 
+extern int				gDrawCallsThisFrame;
+extern int				gVerticesThisFrame;
+extern int				gBufferUploadsThisFrame;
+
 
 OGLMatrix4x4	gViewToFrustumMatrix,gWorldToViewMatrix,gWorldToFrustumMatrix;
 OGLMatrix4x4	gWorldToWindowMatrix,gFrustumToWindowMatrix;

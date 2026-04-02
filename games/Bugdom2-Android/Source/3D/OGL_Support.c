@@ -719,11 +719,6 @@ do_anaglyph:
 		OGL_DrawInt(gPlayerInfo.numMiceRescued, 100,y);
 		y += 15;
 
-		OGL_DrawString("spark:", 20,y);
-		OGL_DrawInt(gNumSparkles, 100,y);
-		y += 15;
-
-
 		if (gPlayerInfo.objNode)
 		{
 			OGL_DrawString("ground?:", 20,y);
