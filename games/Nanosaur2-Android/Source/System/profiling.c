@@ -11,6 +11,7 @@ void InitProfiling(void) {
         gProfilePhases[i].start_tick = 0;
         gProfilePhases[i].total_ticks = 0;
         gProfilePhases[i].samples = 0;
+        gProfilePhases[i].last_frame_ms = 0.0f;
     }
     gProfilePhases[PROFILE_PHASE_INPUT].name = "Input";
     gProfilePhases[PROFILE_PHASE_GAME_LOGIC].name = "Game Logic";
@@ -55,16 +56,22 @@ void EndProfilePhase(ProfilePhaseType phase_type) {
 }
 
 float GetProfilePhaseAvgMs(ProfilePhaseType phase_type) {
-    if (phase_type >= 0 && phase_type < NUM_PROFILE_PHASES && gProfilePhases[phase_type].samples > 0) {
-        double total_ms = ((double)gProfilePhases[phase_type].total_ticks * 1000.0) / (double)gPerformanceFrequency;
-        return (float)(total_ms / (double)gProfilePhases[phase_type].samples);
+    if (phase_type >= 0 && phase_type < NUM_PROFILE_PHASES) {
+        if (gProfilePhases[phase_type].samples > 0) {
+            return (float)(((double)gProfilePhases[phase_type].total_ticks * 1000.0) / (double)gPerformanceFrequency);
+        }
+        return gProfilePhases[phase_type].last_frame_ms;
     }
     return 0.0f;
 }
 
 void ResetProfilingForFrame(void) {
     for (int i = 0; i < NUM_PROFILE_PHASES; ++i) {
+        gProfilePhases[i].last_frame_ms = gProfilePhases[i].samples > 0
+            ? (float)(((double)gProfilePhases[i].total_ticks * 1000.0) / (double)gPerformanceFrequency)
+            : 0.0f;
         gProfilePhases[i].total_ticks = 0;
         gProfilePhases[i].samples = 0;
+        gProfilePhases[i].start_tick = 0;
     }
 }

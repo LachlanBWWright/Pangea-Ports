@@ -605,29 +605,41 @@ do_anaglyph:
 	if (gDebugMode > 0)
 	{
 		int		y = 100;
+		float	totalMs = 0.0f;
 
 		OGL_DrawString("fps:", 20,y);
 		OGL_DrawInt(gFramesPerSecond+.5f, 100,y);
 		y += 15;
 
+		float inputMs = GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT);
+		float logicMs = GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC);
+		float renderMs = GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING);
+		float uiMs = GetProfilePhaseAvgMs(PROFILE_PHASE_UI);
+		float swapMs = GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS);
+		totalMs = inputMs + logicMs + renderMs + uiMs + swapMs;
+
 		OGL_DrawString("input:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT), 100,y);
+		OGL_DrawFloat(inputMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("logic:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC), 100,y);
+		OGL_DrawFloat(logicMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("render:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), 100,y);
+		OGL_DrawFloat(renderMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("ui:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_UI), 100,y);
+		OGL_DrawFloat(uiMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("swap:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS), 100,y);
+		OGL_DrawFloat(swapMs, 100,y);
+		y += 15;
+
+		OGL_DrawString("total:", 20,y);
+		OGL_DrawFloat(totalMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("tris:", 20,y);

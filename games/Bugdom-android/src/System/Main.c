@@ -23,6 +23,7 @@ static void PlayArea(void);
 static void DoDeathReset(void);
 static void PlayGame(void);
 static void CheckForCheats(void);
+static void StartLevelMusicForCurrentArea(void);
 
 
 /****************************/
@@ -295,10 +296,12 @@ static void PlayGame(void)
 		gAreaNum = gLevelTable[gRealLevel].areaNum;
 		
 
-			/* PLAY THIS AREA */
+		/* PLAY THIS AREA */
 		
 		if (!(gStartLevel >= 0 && gStartLevel < NUM_LEVELS && gRealLevel == gStartLevel))
 			ShowLevelIntroScreen();
+		else
+			StartLevelMusicForCurrentArea();
 		InitArea();
 
 		gRestoringSavedGame = false;				// we dont need this anymore
@@ -334,6 +337,36 @@ game_over:
 		DoLoseScreen();
 
 	ShowHighScoresScreen(gScore);
+}
+
+static void StartLevelMusicForCurrentArea(void)
+{
+	switch (gLevelType)
+	{
+		case LEVEL_TYPE_NIGHT:
+			PlaySong(SONG_NIGHT, true);
+			break;
+
+		case LEVEL_TYPE_FOREST:
+			PlaySong(SONG_FOREST, true);
+			break;
+
+		case LEVEL_TYPE_POND:
+			PlaySong(SONG_POND, true);
+			break;
+
+		case LEVEL_TYPE_ANTHILL:
+			PlaySong(SONG_ANTHILL, true);
+			break;
+
+		case LEVEL_TYPE_HIVE:
+			PlaySong(SONG_HIVE, true);
+			break;
+
+		default:
+			PlaySong(SONG_GARDEN, true);
+			break;
+	}
 }
 
 
@@ -881,5 +914,4 @@ unsigned long	someLong;
 	
 	return(0);
 }
-
 

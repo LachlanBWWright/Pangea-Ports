@@ -104,11 +104,14 @@ static void Boot(int argc, char** argv)
 
 #ifdef __EMSCRIPTEN__
 	// Read URL parameters for level editor features (e.g., ?level=3)
-	gStartLevel = EM_ASM_INT({
-		const urlParams = new URLSearchParams(window.location.search);
-		const level = urlParams.get('level');
-		return (level !== null) ? parseInt(level) : -1;
-	});
+	if (gStartLevel < 0)
+	{
+		gStartLevel = EM_ASM_INT({
+			const urlParams = new URLSearchParams(window.location.search);
+			const level = urlParams.get('level');
+			return (level !== null) ? parseInt(level) : -1;
+		});
+	}
 	if (gStartLevel < 0 || gStartLevel >= NUM_LEVELS)
 		gStartLevel = -1;
 #endif

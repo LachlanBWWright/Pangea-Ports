@@ -175,6 +175,26 @@ class SkipToLevelPlaywrightTests(unittest.TestCase):
 
             browser.close()
 
+    def test_hub_launch_keeps_launcher_visible_and_shows_fullscreen_toggle(self):
+        """Launching from the hub should keep the launcher accessible and show the fullscreen control."""
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            page.goto(f"{self._base_url}/docs/index.html", wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
+            page.click('[data-game="bugdom2"]')
+            page.click('#launch-normal')
+
+            launcher_classes = page.locator("#launcher-panel").get_attribute("class") or ""
+            self.assertNotIn("hidden", launcher_classes, "Launcher panel should remain accessible after launch")
+            self.assertEqual(page.locator("#game-area.active").count(), 1, "Launching should show the embedded game area")
+            self.assertTrue(page.locator("#game-stage").is_visible(), "Game stage should be visible")
+            self.assertIn("fullscreen", (page.locator("#toggle-fullscreen").text_content() or "").lower())
+
+            browser.close()
+
     def test_hub_page_has_no_per_game_docs_links(self):
         """The hub page should NOT contain per-game 'Docs' links (single-site model)."""
         from playwright.sync_api import sync_playwright
