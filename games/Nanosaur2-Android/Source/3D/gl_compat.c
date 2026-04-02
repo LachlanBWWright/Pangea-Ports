@@ -42,6 +42,8 @@ extern void emscripten_glGetFloatv(GLenum pname, GLfloat *data);
 extern void emscripten_glGetIntegerv(GLenum pname, GLint *data);
 extern void emscripten_glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices);
 extern void emscripten_glDrawArrays(GLenum mode, GLint first, GLsizei count);
+extern void emscripten_glActiveTexture(GLenum texture);
+extern void emscripten_glBindTexture(GLenum target, GLuint texture);
 extern void emscripten_glHint(GLenum target, GLenum mode);
 extern GLboolean emscripten_glIsEnabled(GLenum cap);
 #define REAL_glEnable           emscripten_glEnable
@@ -50,6 +52,8 @@ extern GLboolean emscripten_glIsEnabled(GLenum cap);
 #define REAL_glGetIntegerv      emscripten_glGetIntegerv
 #define REAL_glDrawElements     emscripten_glDrawElements
 #define REAL_glDrawArrays       emscripten_glDrawArrays
+#define REAL_glActiveTexture    emscripten_glActiveTexture
+#define REAL_glBindTexture      emscripten_glBindTexture
 #define REAL_glHint             emscripten_glHint
 #define REAL_glIsEnabled        emscripten_glIsEnabled
 #else // __ANDROID__
@@ -64,6 +68,8 @@ static void      (*real_glGetFloatv)   (GLenum, GLfloat*)                    = N
 static void      (*real_glGetIntegerv) (GLenum, GLint*)                      = NULL;
 static void      (*real_glDrawElements)(GLenum, GLsizei, GLenum, const void*)= NULL;
 static void      (*real_glDrawArrays)  (GLenum, GLint, GLsizei)              = NULL;
+static void      (*real_glActiveTexture)(GLenum)                             = NULL;
+static void      (*real_glBindTexture) (GLenum, GLuint)                      = NULL;
 static void      (*real_glHint)        (GLenum, GLenum)                      = NULL;
 static GLboolean (*real_glIsEnabled)   (GLenum)                              = NULL;
 #define REAL_glEnable           real_glEnable
@@ -72,6 +78,8 @@ static GLboolean (*real_glIsEnabled)   (GLenum)                              = N
 #define REAL_glGetIntegerv      real_glGetIntegerv
 #define REAL_glDrawElements     real_glDrawElements
 #define REAL_glDrawArrays       real_glDrawArrays
+#define REAL_glActiveTexture    real_glActiveTexture
+#define REAL_glBindTexture      real_glBindTexture
 #define REAL_glHint             real_glHint
 #define REAL_glIsEnabled        real_glIsEnabled
 #endif // __EMSCRIPTEN__ || __ANDROID__
@@ -145,6 +153,8 @@ static float s_alpha_ref   = 0.0f;
 static int s_texenv_mode[2] = {0, 0};
 static int s_texture_2d_enabled[2] = {0, 0};
 static int s_texgen_s = 0, s_texgen_t = 0;  // sphere mapping enabled
+static int s_active_texture_unit = 0;
+static GLuint s_bound_texture_2d[2] = {0, 0};
 
 // ── Current vertex color ──────────────────────────────────────────────────────
 static float s_current_color[4] = {1,1,1,1};
@@ -403,18 +413,8 @@ static void upload_uniforms(void) {
         glUniform1f(u_alpha_ref_u, s_alpha_ref);
     }
 
-    // Textures — query which texture units are active
-    GLint tex0 = 0, tex1 = 0;
-    glActiveTexture(GL_TEXTURE0);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex0);
-    glActiveTexture(GL_TEXTURE1);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex1);
-
-    // Restore active texture to 0 for default behaviour
-    glActiveTexture(GL_TEXTURE0);
-
-    int has_tex0 = s_texture_2d_enabled[0] && (tex0 != 0) && s_ca_texcoord[0].enabled;
-    int has_tex1 = s_texture_2d_enabled[1] && (tex1 != 0) && (s_ca_texcoord[1].enabled || s_texgen_s);
+    int has_tex0 = s_texture_2d_enabled[0] && (s_bound_texture_2d[0] != 0) && s_ca_texcoord[0].enabled;
+    int has_tex1 = s_texture_2d_enabled[1] && (s_bound_texture_2d[1] != 0) && (s_ca_texcoord[1].enabled || s_texgen_s);
 
     glUniform1i(u_texture0, has_tex0 ? 1 : 0);
     glUniform1i(u_texture1, has_tex1 ? 1 : 0);
@@ -542,6 +542,8 @@ void COMPAT_GL_Init(void) {
     real_glGetIntegerv  = (void(*)(GLenum,GLint*))   dlsym(RTLD_NEXT, "glGetIntegerv");
     real_glDrawElements = (void(*)(GLenum,GLsizei,GLenum,const void*)) dlsym(RTLD_NEXT, "glDrawElements");
     real_glDrawArrays   = (void(*)(GLenum,GLint,GLsizei)) dlsym(RTLD_NEXT, "glDrawArrays");
+    real_glActiveTexture= (void(*)(GLenum))          dlsym(RTLD_NEXT, "glActiveTexture");
+    real_glBindTexture  = (void(*)(GLenum,GLuint))   dlsym(RTLD_NEXT, "glBindTexture");
     real_glHint         = (void(*)(GLenum,GLenum)) dlsym(RTLD_NEXT, "glHint");
     real_glIsEnabled    = (GLboolean(*)(GLenum))  dlsym(RTLD_NEXT, "glIsEnabled");
 #endif // __ANDROID__
@@ -553,6 +555,9 @@ void COMPAT_GL_Init(void) {
     mat4_identity(&s_tex_matrix);
     s_tex_matrix_dirty = 1;
     memset(s_lights, 0, sizeof(s_lights));
+    s_active_texture_unit = 0;
+    s_bound_texture_2d[0] = 0;
+    s_bound_texture_2d[1] = 0;
 
     // Compile shader
     GLuint vs = compile_shader(GL_VERTEX_SHADER,   VERT_SRC);
@@ -745,9 +750,7 @@ void glEnable(GLenum cap) {
         case GL_COLOR_MATERIAL: break;  // silently ignore
         case GL_TEXTURE_2D:
         {
-            GLint unit = 0;
-            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
-            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
+            int tu = s_active_texture_unit;
             if (tu > 1) tu = 0;
             s_texture_2d_enabled[tu] = 1;
             break;
@@ -774,9 +777,7 @@ void glDisable(GLenum cap) {
         case GL_COLOR_MATERIAL: break;
         case GL_TEXTURE_2D:
         {
-            GLint unit = 0;
-            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
-            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
+            int tu = s_active_texture_unit;
             if (tu > 1) tu = 0;
             s_texture_2d_enabled[tu] = 0;
             break;
@@ -847,11 +848,7 @@ void glAlphaFunc(GLenum func, GLclampf ref) {
 // ── Texture env ───────────────────────────────────────────────────────────────
 void glTexEnvi(GLenum target, GLenum pname, GLint param) {
     if (target != GL_TEXTURE_ENV) return;
-    // Determine which texture unit
-    GLint unit = 0;
-    typedef void (*getiv_t)(GLenum, GLint*);
-    REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
-    int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
+    int tu = s_active_texture_unit;
     if (tu < 0 || tu > 1) tu = 0;
 
     if (pname == GL_TEXTURE_ENV_MODE) {
@@ -861,6 +858,29 @@ void glTexEnvi(GLenum target, GLenum pname, GLint param) {
         else if (param == GL_COMBINE)  s_texenv_mode[tu] = 3;  // COMBINE_ADD default
     } else if (pname == GL_COMBINE_RGB && param == GL_ADD) {
         s_texenv_mode[tu] = 3;  // COMBINE_ADD
+    }
+}
+
+void glActiveTexture(GLenum texture)
+{
+    REAL_glActiveTexture(texture);
+
+    int tu = (texture >= GL_TEXTURE0) ? (int)(texture - GL_TEXTURE0) : 0;
+    if (tu < 0 || tu > 1)
+        tu = 0;
+    s_active_texture_unit = tu;
+}
+
+void glBindTexture(GLenum target, GLuint texture)
+{
+    REAL_glBindTexture(target, texture);
+
+    if (target == GL_TEXTURE_2D)
+    {
+        int tu = s_active_texture_unit;
+        if (tu < 0 || tu > 1)
+            tu = 0;
+        s_bound_texture_2d[tu] = texture;
     }
 }
 
