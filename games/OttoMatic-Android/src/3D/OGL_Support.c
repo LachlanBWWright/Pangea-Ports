@@ -705,9 +705,15 @@ do_anaglyph:
 			"frame:\t\t%.2fms\n"
 			"input:\t\t%.2fms\n"
 			"logic:\t\t%.2fms\n"
-			"render:\t\t%.2fms\n"
+			"setup:\t\t%.2fms\n"
+			"cull:\t\t%.2fms\n"
+			"terrain:\t%.2fms\n"
+			"objects:\t%.2fms\n"
+			"skel:\t\t%.2fms\n"
 			"ui:\t\t%.2fms\n"
 			"swap:\t\t%.2fms\n"
+			"yield:\t\t%.2fms\n"
+			"total:\t\t%.2fms\n"
 			"tris:\t\t%d\n"
 			"draws:\t\t%d\n"
 			"verts:\t\t%d\n"
@@ -745,11 +751,26 @@ do_anaglyph:
 			,
 			(int)(gFramesPerSecond+.5f),
 			(gFramesPerSecond > 0.0f ? 1000.0f / gFramesPerSecond : 0.0f),
-			GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
-			GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
-			GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
-			GetProfilePhaseAvgMs(PROFILE_PHASE_UI),
-			GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
+			GetProfilePhaseMs(PROFILE_PHASE_INPUT),
+			GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC),
+			GetProfilePhaseMs(PROFILE_PHASE_RENDERING),
+			GetProfilePhaseMs(PROFILE_PHASE_CULLING),
+			GetProfilePhaseMs(PROFILE_PHASE_TERRAIN),
+			GetProfilePhaseMs(PROFILE_PHASE_OBJECTS),
+			GetProfilePhaseMs(PROFILE_PHASE_SKELETONS),
+			GetProfilePhaseMs(PROFILE_PHASE_UI),
+			GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS),
+			GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD),
+			GetProfilePhaseMs(PROFILE_PHASE_INPUT)
+				+ GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC)
+				+ GetProfilePhaseMs(PROFILE_PHASE_RENDERING)
+				+ GetProfilePhaseMs(PROFILE_PHASE_CULLING)
+				+ GetProfilePhaseMs(PROFILE_PHASE_TERRAIN)
+				+ GetProfilePhaseMs(PROFILE_PHASE_OBJECTS)
+				+ GetProfilePhaseMs(PROFILE_PHASE_SKELETONS)
+				+ GetProfilePhaseMs(PROFILE_PHASE_UI)
+				+ GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS)
+				+ GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD),
 			gPolysThisFrame,
 			gDrawCallsThisFrame,
 			gVerticesThisFrame,

@@ -897,7 +897,7 @@ do_anaglyph:
 		OGL_DrawFloat(logicMs, x2,y);
 		y += 15;
 
-		OGL_DrawString("render:", 10,y);
+		OGL_DrawString("setup:", 10,y);
 		OGL_DrawFloat(renderMs, x2,y);
 		y += 15;
 

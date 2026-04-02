@@ -11,6 +11,7 @@
 
 #include "game.h"
 #include "bones.h"
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -453,7 +454,9 @@ int				i;
 
 				/* FIRST DO OUR CULLING */
 				
+	StartProfilePhase(PROFILE_PHASE_CULLING);
 	CullTestAllObjects();
+	StartProfilePhase(PROFILE_PHASE_OBJECTS);
 	
 	theNode = gFirstNodePtr;
 
@@ -747,7 +750,9 @@ int				i;
 		{
 			
 			case	SKELETON_GENRE:		
+					StartProfilePhase(PROFILE_PHASE_SKELETONS);
 					DrawSkeleton(theNode);	
+					StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					break;
 			
 			case	DISPLAY_GROUP_GENRE:
@@ -800,6 +805,7 @@ int				i;
 					{
 custom_draw:			
 						theNode->CustomDrawFunction(theNode);
+						StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					}
 					break;
 		}
@@ -1796,8 +1802,6 @@ ObjNode	*node = theNode;
 		node = node->ChainNode;
 	}
 }
-
-
 
 
 

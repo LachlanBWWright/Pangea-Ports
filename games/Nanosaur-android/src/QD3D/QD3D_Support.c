@@ -388,6 +388,12 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(QD3DSetu
 		uint32_t now = SDL_GetTicks();
 		if (now - gDebugTextLastUpdatedAt > gDebugTextUpdateInterval)
 		{
+			float inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
+			float logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
+			float renderMs = GetProfilePhaseMs(PROFILE_PHASE_RENDERING);
+			float uiMs = GetProfilePhaseMs(PROFILE_PHASE_UI);
+			float swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
+			float totalMs = inputMs + logicMs + renderMs + uiMs + swapMs;
 			gDebugTextLastUpdatedAt = now;
 			SDL_snprintf(
 					gDebugTextBuffer, sizeof(gDebugTextBuffer),
@@ -397,13 +403,15 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(QD3DSetu
 					"render: %.2fms\n"
 					"ui: %.2fms\n"
 					"swap: %.2fms\n"
+					"total: %.2fms\n"
 					"tris: %d\nmeshes: %d+%d\nnodes: %d\n",
 					(int)roundf(gFramesPerSecond),
-					GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
-					GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
-					GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
-					GetProfilePhaseAvgMs(PROFILE_PHASE_UI),
-					GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
+					inputMs,
+					logicMs,
+					renderMs,
+					uiMs,
+					swapMs,
+					totalMs,
 					gRenderStats.triangles,
 					gRenderStats.meshesPass1,
 					gRenderStats.meshesPass2,
