@@ -1,7 +1,6 @@
 // render_stats_stub.c
-// Stub definitions for OttoMatic-derived render statistics counters.
-// modern_gl.c and vertex_array_compat.c increment these; BillyFrontier
-// doesn't use them.
+// Billy's GL compatibility layers increment the same render-stat counters that
+// Otto/CroMag expose, and the debug overlay now reads them too.
 int gDrawCallsThisFrame = 0;
 int gVerticesThisFrame = 0;
 int gBufferUploadsThisFrame = 0;
