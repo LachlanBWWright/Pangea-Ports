@@ -117,6 +117,7 @@ Boolean			gMyState_Fog;
 Boolean			gMyState_Texture2D;
 Boolean			gMyState_CullFace;
 uint32_t			gMyState_TextureUnit;
+static GLuint		gBoundTexture2D[2];
 OGLColorRGBA	gMyState_Color;
 GLenum			gMyState_BlendFuncS, gMyState_BlendFuncD;
 
@@ -1209,6 +1210,7 @@ GLuint	textureName;
 	OGL_CheckError();
 
 	glBindTexture(GL_TEXTURE_2D, textureName);				// this is now the currently active texture
+	gBoundTexture2D[gMyState_TextureUnit == GL_TEXTURE1 ? 1 : 0] = textureName;
 	OGL_CheckError();
 
 
@@ -1733,6 +1735,7 @@ uint32_t	a;
 void OGL_RAMTextureHasChanged(GLuint textureName, short width, short height, uint32_t *pixels)
 {
 	glBindTexture(GL_TEXTURE_2D, textureName);				// this is now the currently active texture
+	gBoundTexture2D[gMyState_TextureUnit == GL_TEXTURE1 ? 1 : 0] = textureName;
 
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
 }
@@ -1746,9 +1749,14 @@ void OGL_RAMTextureHasChanged(GLuint textureName, short width, short height, uin
 
 void OGL_Texture_SetOpenGLTexture(GLuint textureName)
 {
-	glBindTexture(GL_TEXTURE_2D, textureName);
-	if (OGL_CheckError())
-		DoFatalAlert("OGL_Texture_SetOpenGLTexture: glBindTexture failed!");
+	int texUnit = (gMyState_TextureUnit == GL_TEXTURE1) ? 1 : 0;
+	if (gBoundTexture2D[texUnit] != textureName)
+	{
+		glBindTexture(GL_TEXTURE_2D, textureName);
+		gBoundTexture2D[texUnit] = textureName;
+		if (OGL_CheckError())
+			DoFatalAlert("OGL_Texture_SetOpenGLTexture: glBindTexture failed!");
+	}
 
 	OGL_EnableTexture2D();
 }

@@ -949,7 +949,6 @@ void MO_DrawMaterial(MOMaterialObject *matObj)
 {
 MOMaterialData		*matData;
 OGLColorRGBA		*diffuseColor,diffColor2;
-Boolean				alreadySet;
 uint32_t				matFlags;
 
 
@@ -973,15 +972,7 @@ uint32_t				matFlags;
 
 				/* ACTIVATE MATERIAL */
 
-		alreadySet = (matObj == gMostRecentMaterial);
-		if (alreadySet)												// see if even need to bother resetting this
-		{
-			OGL_EnableTexture2D();									// just make sure textures are on
-		}
-		else
-		{
-			OGL_Texture_SetOpenGLTexture(matData->textureName[0]);	// set this texture active
-		}
+		OGL_Texture_SetOpenGLTexture(matData->textureName[0]);		// state-cached bind; also re-enables texturing if another draw turned it off
 
 				/*****************************/
 				/* SET TEXTURE WRAPPING MODE */

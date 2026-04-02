@@ -357,10 +357,9 @@ if(EMSCRIPTEN)
 		# Allow the heap to grow as needed (game allocates significant memory)
 		"-s ALLOW_MEMORY_GROWTH=1"
 		"-s MAXIMUM_MEMORY=512mb"
-		# Full OpenGL ES 2.0 emulation — provides clean GLES2 functions
-		# without the JS-side hooks that LEGACY_GL_EMULATION installs.
-		# Our custom compat layer (gl_compat.c) handles legacy GL translation.
-		"-s FULL_ES2=1"
+		# Our custom compat layer (gl_compat.c) owns the legacy GL translation,
+		# explicit VBO uploads, and immediate-mode emulation, so we can avoid the
+		# extra client-array emulation overhead from FULL_ES2 here.
 		# Require a WebGL 2.0 context so UNSIGNED_INT index buffers are available
 		# without emulation.  Falling back to WebGL 1.0 could leave the renderer
 		# stuck before the first frame.
