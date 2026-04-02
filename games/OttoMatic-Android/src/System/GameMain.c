@@ -193,7 +193,8 @@ static void PlayGame(void)
 
 				/* DO LEVEL INTRO */
 
-		DoLevelIntro();
+		if (!(gDirectLevelNum >= 0 && gLevelNum == gDirectLevelNum))
+			DoLevelIntro();
 
 		MyFlushEvents();
 
@@ -1114,7 +1115,6 @@ void GameMain(void)
 	}
 
 }
-
 
 
 
