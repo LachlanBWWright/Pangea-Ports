@@ -254,7 +254,7 @@ static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
 static GLint u_tex_matrix;
 
-static inline GLsizei gl_type_size(GLenum type)
+static inline GLsizei gl_type_byte_size(GLenum type)
 {
     switch (type)
     {
@@ -492,7 +492,7 @@ static int can_use_direct_upload(const ClientArray* array, GLint min_components,
     if (array->size < min_components || array->size > max_components)
         return 0;
 
-    GLsizei elemSize = gl_type_size(type);
+    GLsizei elemSize = gl_type_byte_size(type);
     if (elemSize == 0)
         return 0;
 
@@ -1296,7 +1296,7 @@ void glActiveTexture(GLenum texture)
     REAL_glActiveTexture(texture);
 
     int tu = (texture >= GL_TEXTURE0) ? (int)(texture - GL_TEXTURE0) : 0;
-    if (tu < 0 || tu > 1)
+    if (tu > 1)
         tu = 0;
     s_active_texture_unit = tu;
 }
