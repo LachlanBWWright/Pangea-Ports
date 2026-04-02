@@ -178,6 +178,8 @@ void InitDefaultPrefs(void)
 
 static void PlayGame(void)
 {
+	extern int gStartLevel;
+
 			/***********************/
 			/* GAME INITIALIZATION */
 			/***********************/
@@ -197,7 +199,10 @@ static void PlayGame(void)
 
 				/* DO LEVEL INTRO */
 
-		DoLevelIntro();
+		if (!(gStartLevel >= 0 && gStartLevel < NUM_LEVELS && gLevelNum == gStartLevel))
+		{
+			DoLevelIntro();
+		}
 
 		MyFlushEvents();
 

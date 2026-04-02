@@ -297,7 +297,8 @@ static void PlayGame(void)
 
 			/* PLAY THIS AREA */
 		
-		ShowLevelIntroScreen();
+		if (!(gStartLevel >= 0 && gStartLevel < NUM_LEVELS && gRealLevel == gStartLevel))
+			ShowLevelIntroScreen();
 		InitArea();
 
 		gRestoringSavedGame = false;				// we dont need this anymore
@@ -880,6 +881,5 @@ unsigned long	someLong;
 	
 	return(0);
 }
-
 
 

@@ -141,6 +141,7 @@ static void ParseEmscriptenURLParams(void)
 	if (terrainFileStr)
 	{
 		SDL_strlcpy(gCustomTerrainFile, terrainFileStr, sizeof(gCustomTerrainFile));
+		gSkipToLevel = true;
 		free(terrainFileStr);
 	}
 
@@ -151,8 +152,6 @@ static void ParseEmscriptenURLParams(void)
 	if (skipMenu)
 		gSkipToLevel = true;
 
-	// In WebAssembly we always skip to level for the game-editor use case
-	gSkipToLevel = true;
 }
 #endif
 

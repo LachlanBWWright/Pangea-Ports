@@ -147,6 +147,32 @@ class SkipToLevelPlaywrightTests(unittest.TestCase):
                                "Mighty Mike", "Nanosaur", "Nanosaur 2", "Otto Matic"]:
                 self.assertIn(game_name, content, f"Hub should mention {game_name}")
 
+            game_area_active = page.locator("#game-area.active").count()
+            self.assertEqual(game_area_active, 0, "Hub should not auto-launch a game on first load")
+
+            browser.close()
+
+    def test_hub_game_selection_shows_launcher_controls(self):
+        """Selecting a game on the hub should show launcher controls before booting the WASM build."""
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page = browser.new_page()
+            errors: list[str] = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+
+            page.goto(f"{self._base_url}/docs/index.html", wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
+            page.click('[data-game="nanosaur2"]')
+
+            launcher_classes = page.locator("#launcher-panel").get_attribute("class") or ""
+            self.assertNotIn("hidden", launcher_classes, "Launcher panel should be visible")
+            self.assertEqual(page.locator("#game-area.active").count(), 0, "Selecting a game should not boot it immediately")
+            self.assertIn("Nanosaur 2", page.locator("#launcher-title").text_content())
+            self.assertIn("Start normally", page.locator("#launch-normal").text_content())
+            self.assertEqual(page.locator("#upload-target-path").count(), 1, "Launcher should expose upload controls")
+            self.assertEqual(errors, [], f"Hub game selection JS errors: {errors}")
+
             browser.close()
 
     def test_hub_page_has_no_per_game_docs_links(self):
