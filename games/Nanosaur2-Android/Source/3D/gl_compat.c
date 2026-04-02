@@ -22,6 +22,14 @@
 #include <SDL3/SDL.h>
 #include "gl_compat.h"
 
+#ifdef __EMSCRIPTEN__
+// GLES3 declares glGenVertexArrays / glBindVertexArray / glDeleteVertexArrays,
+// which are WebGL2 core and always available in our Emscripten (-s USE_WEBGL2=1) builds.
+#include <GLES3/gl3.h>
+#elif defined(__ANDROID__)
+#include <GLES3/gl3.h>
+#endif
+
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
@@ -224,6 +232,11 @@ typedef struct
 static AttribPointerState s_attrib_state[5] = {0};
 static GLuint s_bound_array_buffer = 0;
 static GLuint s_bound_element_array_buffer = 0;
+static GLuint s_active_vao = 0;  // non-zero while a named VAO is bound
+
+// Sentinel that forces bind_element_array_buffer(0) to issue the actual GL call
+// even if the tracking variable happens to already hold 0.
+#define EBO_TRACKING_FORCE_REBIND ((GLuint)-1u)
 
 #define DRAW_CACHE_SIZE 128
 #define DIRECT_FLAG_NORMAL  (1u << 0)
@@ -249,6 +262,7 @@ typedef struct
     const void* indices_ptr;
     GLuint attr_vbo[5];
     GLuint ibo;
+    GLuint vao;   // pre-built VAO capturing all attribute state for fast bind on cache hits
 } DrawCacheEntry;
 
 static DrawCacheEntry s_draw_cache[DRAW_CACHE_SIZE];
@@ -699,6 +713,7 @@ static DrawCacheEntry* draw_cache_alloc(void)
     {
         glGenBuffers(5, entry->attr_vbo);
         glGenBuffers(1, &entry->ibo);
+        glGenVertexArrays(1, &entry->vao);
     }
 
     entry->valid = 1;
@@ -741,56 +756,25 @@ static void bind_direct_cache_entry(const DrawCacheEntry* entry)
     const float normalDefault[3] = {0.0f, 0.0f, 1.0f};
     const float texcoordDefault[2] = {0.0f, 0.0f};
 
-    bind_array_buffer(entry->attr_vbo[ATTRIB_POSITION]);
-    enable_vertex_attrib(ATTRIB_POSITION);
-    set_vertex_attrib_pointer_cached(ATTRIB_POSITION, entry->vertex_size, GL_FLOAT, GL_FALSE, 0, 0);
+    // Bind the pre-built VAO: restores all attribute enable/disable states,
+    // per-attribute VBO bindings, attribute pointer formats, and the element-
+    // array buffer binding in ONE GPU command.  On a typical cache hit this
+    // replaces ~10 individual glBindBuffer + glEnable/DisableVertexAttribArray
+    // + glVertexAttribPointer calls.
+    glBindVertexArray(entry->vao);
+    s_active_vao = entry->vao;
+    s_bound_element_array_buffer = entry->ibo;  // captured in the VAO
 
-    if (entry->flags & DIRECT_FLAG_NORMAL)
-    {
-        bind_array_buffer(entry->attr_vbo[ATTRIB_NORMAL]);
-        enable_vertex_attrib(ATTRIB_NORMAL);
-        set_vertex_attrib_pointer_cached(ATTRIB_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    }
-    else
-    {
-        set_disabled_attrib(ATTRIB_NORMAL, 3, normalDefault);
-    }
-
-    if (entry->flags & DIRECT_FLAG_COLOR)
-    {
-        bind_array_buffer(entry->attr_vbo[ATTRIB_COLOR]);
-        enable_vertex_attrib(ATTRIB_COLOR);
-        set_vertex_attrib_pointer_cached(ATTRIB_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    }
-    else
-    {
-        set_disabled_attrib(ATTRIB_COLOR, 4, s_current_color);
-    }
-
-    if (entry->flags & DIRECT_FLAG_TEX0)
-    {
-        bind_array_buffer(entry->attr_vbo[ATTRIB_TEXCOORD0]);
-        enable_vertex_attrib(ATTRIB_TEXCOORD0);
-        set_vertex_attrib_pointer_cached(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    }
-    else
-    {
-        set_disabled_attrib(ATTRIB_TEXCOORD0, 2, texcoordDefault);
-    }
-
-    if (entry->flags & DIRECT_FLAG_TEX1)
-    {
-        bind_array_buffer(entry->attr_vbo[ATTRIB_TEXCOORD1]);
-        enable_vertex_attrib(ATTRIB_TEXCOORD1);
-        set_vertex_attrib_pointer_cached(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    }
-    else
-    {
-        set_disabled_attrib(ATTRIB_TEXCOORD1, 2, texcoordDefault);
-    }
-
-    bind_array_buffer(0);
-    bind_element_array_buffer(entry->ibo);
+    // Constant (non-array) attribute values live in context state, NOT in the
+    // VAO, so they must be refreshed each draw for any disabled arrays.
+    if (!(entry->flags & DIRECT_FLAG_NORMAL))
+        glVertexAttrib3f(ATTRIB_NORMAL, normalDefault[0], normalDefault[1], normalDefault[2]);
+    if (!(entry->flags & DIRECT_FLAG_COLOR))
+        glVertexAttrib4f(ATTRIB_COLOR, s_current_color[0], s_current_color[1], s_current_color[2], s_current_color[3]);
+    if (!(entry->flags & DIRECT_FLAG_TEX0))
+        glVertexAttrib2f(ATTRIB_TEXCOORD0, texcoordDefault[0], texcoordDefault[1]);
+    if (!(entry->flags & DIRECT_FLAG_TEX1))
+        glVertexAttrib2f(ATTRIB_TEXCOORD1, texcoordDefault[0], texcoordDefault[1]);
 }
 
 static void upload_direct_cache_entry(
@@ -879,6 +863,76 @@ static void upload_direct_cache_entry(
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * index_size, indices, GL_STATIC_DRAW);
         entry->draw_index_type = type;
     }
+
+    // Build a VAO that captures all attribute-pointer state and the EBO binding.
+    // On every subsequent cache hit, bind_direct_cache_entry just calls
+    // glBindVertexArray — one call instead of the previous ~10 individual
+    // glBindBuffer / glEnableVertexAttribArray / glVertexAttribPointer calls.
+    // (Raw GL calls are used here so our tracking state is not invalidated inside
+    // the named VAO context; we restore tracking manually after glBindVertexArray(0).)
+    glBindVertexArray(entry->vao);
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_POSITION]);
+        glEnableVertexAttribArray(ATTRIB_POSITION);
+        glVertexAttribPointer(ATTRIB_POSITION, entry->vertex_size, GL_FLOAT, GL_FALSE, 0, 0);
+
+        if (flags & DIRECT_FLAG_NORMAL)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_NORMAL]);
+            glEnableVertexAttribArray(ATTRIB_NORMAL);
+            glVertexAttribPointer(ATTRIB_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        }
+        else
+        {
+            glDisableVertexAttribArray(ATTRIB_NORMAL);
+        }
+
+        if (flags & DIRECT_FLAG_COLOR)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_COLOR]);
+            glEnableVertexAttribArray(ATTRIB_COLOR);
+            glVertexAttribPointer(ATTRIB_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
+        }
+        else
+        {
+            glDisableVertexAttribArray(ATTRIB_COLOR);
+        }
+
+        if (flags & DIRECT_FLAG_TEX0)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_TEXCOORD0]);
+            glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
+            glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+        }
+        else
+        {
+            glDisableVertexAttribArray(ATTRIB_TEXCOORD0);
+        }
+
+        if (flags & DIRECT_FLAG_TEX1)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_TEXCOORD1]);
+            glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
+            glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+        }
+        else
+        {
+            glDisableVertexAttribArray(ATTRIB_TEXCOORD1);
+        }
+
+        // In WebGL2, the GL_ELEMENT_ARRAY_BUFFER binding IS captured in the VAO.
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ibo);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    glBindVertexArray(0);
+
+    // Fix up tracking after the raw calls inside the named VAO:
+    // ARRAY_BUFFER was last set to 0 (raw call above, global state).
+    // ELEMENT_ARRAY_BUFFER reverts to VAO 0's EBO (= entry->ibo, set earlier
+    //   by bind_element_array_buffer before this block) — tracking unchanged.
+    // s_attrib_state: raw calls inside named VAO do NOT affect VAO 0's state,
+    //   so the tracking remains valid for VAO 0's context.
+    s_bound_array_buffer = 0;
 }
 
 static DrawCacheEntry* setup_direct_cache_entry(int vertex_count, GLsizei count, GLenum type, const void* indices)
@@ -1070,6 +1124,17 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
 }
 
 static void disable_vertex_attribs(void) {
+    if (s_active_vao != 0) {
+        // Unbind the named VAO *before* touching the EBO, otherwise
+        // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0) would corrupt the VAO's
+        // captured EBO binding, destroying the cache.
+        glBindVertexArray(0);
+        s_active_vao = 0;
+        // After glBindVertexArray(0), the GPU EBO reverts to VAO 0's state.
+        // Force bind_element_array_buffer(0) below to unconditionally issue the
+        // GL call by setting the tracking to the force-rebind sentinel.
+        s_bound_element_array_buffer = EBO_TRACKING_FORCE_REBIND;
+    }
     bind_array_buffer(0);
     bind_element_array_buffer(0);
 }
@@ -1558,7 +1623,9 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
 
     REAL_glDrawElements(mode, count, type, 0);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    // NOTE: do NOT call glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0) here — that
+    // raw call would corrupt the named VAO's captured EBO binding.  The EBO
+    // unbind is handled safely (after glBindVertexArray(0)) in disable_vertex_attribs().
     disable_vertex_attribs();
 }
 

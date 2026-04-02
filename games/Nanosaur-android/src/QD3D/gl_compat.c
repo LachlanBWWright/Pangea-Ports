@@ -179,6 +179,21 @@ static float   s_imm_cur_s0 = 0, s_imm_cur_t0 = 0;
 // ── GL objects ────────────────────────────────────────────────────────────────
 static GLuint  s_prog = 0;
 static GLuint  s_vbo  = 0;
+static GLuint  s_ibo  = 0;  // persistent element-array buffer
+static GLsizeiptr s_vbo_capacity = 0;  // allocated GPU capacity of s_vbo
+static GLsizeiptr s_ibo_capacity = 0;  // allocated GPU capacity of s_ibo
+
+static float    *s_interleave_buf          = NULL;
+static int       s_interleave_buf_capacity = 0;
+static float    *s_imm_upload_buf          = NULL;
+static int       s_imm_upload_buf_capacity = 0;
+static GLushort *s_index_conv_buf          = NULL;
+static int       s_index_conv_buf_capacity = 0;
+
+// Per-attribute enable state cache (0 = disabled, 1 = enabled in current draw setup)
+static int s_attrib_enabled[5] = {0};
+static GLuint s_bound_array_buffer = 0;
+static GLuint s_bound_element_array_buffer = 0;
 
 // Attribute locations (bound at compile time to fixed slots)
 #define ATTRIB_POSITION  0
@@ -413,17 +428,66 @@ static void upload_uniforms(void) {
     glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
 }
 
+static void* ensure_cpu_buffer(void* buf, int* cap, int needed)
+{
+    if (needed > *cap) {
+        int newcap = *cap > 0 ? *cap : 4096;
+        while (newcap < needed) newcap *= 2;
+        void* nb = realloc(buf, newcap);
+        if (nb) { buf = nb; *cap = newcap; }
+    }
+    return buf;
+}
+
+static void upload_stream_vbo(GLsizeiptr size, const void* data)
+{
+    if (s_bound_array_buffer != s_vbo) {
+        glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
+        s_bound_array_buffer = s_vbo;
+    }
+    if (size > s_vbo_capacity) {
+        GLsizeiptr newcap = s_vbo_capacity > 0 ? s_vbo_capacity : 65536;
+        while (newcap < size) newcap *= 2;
+        glBufferData(GL_ARRAY_BUFFER, newcap, NULL, GL_STREAM_DRAW);
+        s_vbo_capacity = newcap;
+    }
+    glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
+}
+
+static void upload_stream_ibo(GLsizeiptr size, const void* data)
+{
+    if (s_bound_element_array_buffer != s_ibo) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_ibo);
+        s_bound_element_array_buffer = s_ibo;
+    }
+    if (size > s_ibo_capacity) {
+        GLsizeiptr newcap = s_ibo_capacity > 0 ? s_ibo_capacity : 16384;
+        while (newcap < size) newcap *= 2;
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, newcap, NULL, GL_STREAM_DRAW);
+        s_ibo_capacity = newcap;
+    }
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, size, data);
+}
+
+static void enable_vertex_attrib_cached(GLuint attrib)
+{
+    if (!s_attrib_enabled[attrib]) {
+        glEnableVertexAttribArray(attrib);
+        s_attrib_enabled[attrib] = 1;
+    }
+}
+
 // Set up vertex attributes from client-side arrays, upload to VBO, return
 // vertex count (or -1 on error).  stride_out = per-vertex byte size.
 static int setup_vertex_attribs_from_arrays(int vertex_count) {
     // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
     const int STRIDE = (3+3+4+2+2) * sizeof(float);  // 56 bytes
     int buf_size = vertex_count * STRIDE;
-    float *buf = (float *)malloc(buf_size);
-    if (!buf) return -1;
+    s_interleave_buf = ensure_cpu_buffer(s_interleave_buf, &s_interleave_buf_capacity, buf_size);
+    if (!s_interleave_buf) return -1;
 
     for (int i = 0; i < vertex_count; i++) {
-        float *dst = buf + i * (3+3+4+2+2);
+        float *dst = s_interleave_buf + i * (3+3+4+2+2);
 
         // Position
         if (s_ca_vertex.ptr) {
@@ -467,36 +531,36 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
         } else { dst[12]=0; dst[13]=0; }
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
-    glBufferData(GL_ARRAY_BUFFER, buf_size, buf, GL_STREAM_DRAW);
-    free(buf);
+    upload_stream_vbo(buf_size, s_interleave_buf);
 
     // Bind attributes
-    glEnableVertexAttribArray(ATTRIB_POSITION);
+    enable_vertex_attrib_cached(ATTRIB_POSITION);
     glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(0*sizeof(float)));
 
-    glEnableVertexAttribArray(ATTRIB_NORMAL);
+    enable_vertex_attrib_cached(ATTRIB_NORMAL);
     glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(3*sizeof(float)));
 
-    glEnableVertexAttribArray(ATTRIB_COLOR);
+    enable_vertex_attrib_cached(ATTRIB_COLOR);
     glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE, (void*)(6*sizeof(float)));
 
-    glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
+    enable_vertex_attrib_cached(ATTRIB_TEXCOORD0);
     glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(10*sizeof(float)));
 
-    glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
+    enable_vertex_attrib_cached(ATTRIB_TEXCOORD1);
     glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(12*sizeof(float)));
 
     return vertex_count;
 }
 
 static void disable_vertex_attribs(void) {
-    glDisableVertexAttribArray(ATTRIB_POSITION);
-    glDisableVertexAttribArray(ATTRIB_NORMAL);
-    glDisableVertexAttribArray(ATTRIB_COLOR);
-    glDisableVertexAttribArray(ATTRIB_TEXCOORD0);
-    glDisableVertexAttribArray(ATTRIB_TEXCOORD1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    if (s_bound_array_buffer != 0) {
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        s_bound_array_buffer = 0;
+    }
+    if (s_bound_element_array_buffer != 0) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        s_bound_element_array_buffer = 0;
+    }
 }
 
 // ── Public: init ──────────────────────────────────────────────────────────────
@@ -575,6 +639,7 @@ void COMPAT_GL_Init(void) {
 
     // VBO for interleaved vertex data
     glGenBuffers(1, &s_vbo);
+    glGenBuffers(1, &s_ibo);
 
     SDL_Log("gl_compat: initialized (prog=%u)", s_prog);
 }
@@ -880,36 +945,30 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
     if (setup_vertex_attribs_from_arrays(vertex_count) < 0) return;
     upload_uniforms();
 
-    // Upload index buffer to an element VBO
-    GLuint ibo; glGenBuffers(1, &ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-
-    // Convert GL_UNSIGNED_INT indices to GL_UNSIGNED_SHORT if needed
-    // (WebGL1 only supports UNSIGNED_BYTE and UNSIGNED_SHORT unless OES_element_index_uint)
+    // Upload index buffer to persistent element VBO
+    // Convert GL_UNSIGNED_INT indices if needed
     if (type == GL_UNSIGNED_INT) {
-        // Check if OES_element_index_uint is available (most WebGL2 contexts support it)
-        // For safety, try to use the extension or convert to short if small enough
         if (vertex_count <= 65535) {
-            GLushort *short_idx = (GLushort *)malloc(count * sizeof(GLushort));
-            const GLuint *uint_idx = (const GLuint *)indices;
-            for (int i = 0; i < count; i++) short_idx[i] = (GLushort)uint_idx[i];
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLushort), short_idx, GL_STREAM_DRAW);
-            free(short_idx);
-            type = GL_UNSIGNED_SHORT;
+            int needed = count * sizeof(GLushort);
+            s_index_conv_buf = ensure_cpu_buffer(s_index_conv_buf, &s_index_conv_buf_capacity, needed);
+            if (s_index_conv_buf) {
+                const GLuint *uint_idx = (const GLuint *)indices;
+                for (int i = 0; i < count; i++) s_index_conv_buf[i] = (GLushort)uint_idx[i];
+                upload_stream_ibo(needed, s_index_conv_buf);
+                type = GL_UNSIGNED_SHORT;
+            }
         } else {
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STREAM_DRAW);
-            // GL_UNSIGNED_INT requires OES_element_index_uint; keep type as is
+            upload_stream_ibo(count * sizeof(GLuint), indices);
         }
     } else {
         GLsizei sz = (type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sz, indices, GL_STREAM_DRAW);
+        upload_stream_ibo(count * sz, indices);
     }
 
-    typedef void (*real_draw_t)(GLenum,GLsizei,GLenum,const void*);
     REAL_glDrawElements(mode, count, type, 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glDeleteBuffers(1, &ibo);
+    s_bound_element_array_buffer = 0;
     disable_vertex_attribs();
 }
 
@@ -1002,10 +1061,11 @@ void glEnd(void) {
 
     // Build interleaved VBO from the immediate-mode buffer
     const int STRIDE = (3+3+4+2+2) * sizeof(float);
-    float *vbo_data = (float *)malloc(draw_cnt * STRIDE);
-    if (!vbo_data) { free(tmp); return; }
+    int imm_buf_size = draw_cnt * STRIDE;
+    s_imm_upload_buf = ensure_cpu_buffer(s_imm_upload_buf, &s_imm_upload_buf_capacity, imm_buf_size);
+    if (!s_imm_upload_buf) { free(tmp); return; }
     for (int i = 0; i < draw_cnt; i++) {
-        float *d = vbo_data + i*(3+3+4+2+2);
+        float *d = s_imm_upload_buf + i*(3+3+4+2+2);
         ImmVert *v = &draw_buf[i];
         d[0]=v->x; d[1]=v->y; d[2]=v->z;
         d[3]=v->nx; d[4]=v->ny; d[5]=v->nz;
@@ -1015,19 +1075,17 @@ void glEnd(void) {
     }
     free(tmp);
 
-    glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
-    glBufferData(GL_ARRAY_BUFFER, draw_cnt * STRIDE, vbo_data, GL_STREAM_DRAW);
-    free(vbo_data);
+    upload_stream_vbo(imm_buf_size, s_imm_upload_buf);
 
-    glEnableVertexAttribArray(ATTRIB_POSITION);
+    enable_vertex_attrib_cached(ATTRIB_POSITION);
     glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(0*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_NORMAL);
+    enable_vertex_attrib_cached(ATTRIB_NORMAL);
     glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(3*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_COLOR);
+    enable_vertex_attrib_cached(ATTRIB_COLOR);
     glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE, (void*)(6*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
+    enable_vertex_attrib_cached(ATTRIB_TEXCOORD0);
     glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(10*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
+    enable_vertex_attrib_cached(ATTRIB_TEXCOORD1);
     glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE, (void*)(12*sizeof(float)));
 
     // Force use_color_array = true for immediate mode (we baked per-vertex color).
