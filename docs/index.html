@@ -15,6 +15,8 @@
       --muted: #c2d4e7;
       --border: #27456f;
       --nav-h: 52px;
+      --danger: #ff9e9e;
+      --success: #a6ffb0;
     }
     * { box-sizing: border-box; }
     body {
@@ -22,13 +24,11 @@
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: var(--bg);
       color: var(--text);
-      height: 100dvh;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
-
-    /* ── Top navbar ──────────────────────────────────────────── */
     nav {
       flex: 0 0 var(--nav-h);
       background: linear-gradient(180deg, #0e1b33 0%, #0b1528 100%);
@@ -53,48 +53,55 @@
       border-right: 1px solid var(--border);
       flex-shrink: 0;
     }
+    .nav-btn,
+    .game-chip,
+    .primary-btn,
+    .secondary-btn,
+    .preset-btn {
+      border-radius: 10px;
+      cursor: pointer;
+      font: inherit;
+      transition: background .15s, border-color .15s, color .15s, transform .15s;
+    }
     .nav-btn {
       flex-shrink: 0;
       background: transparent;
       border: 1px solid transparent;
-      border-radius: 8px;
       color: var(--muted);
-      cursor: pointer;
-      font: inherit;
       font-size: .88rem;
       padding: .35rem .7rem;
-      transition: background .15s, border-color .15s, color .15s;
       white-space: nowrap;
     }
-    .nav-btn:hover {
-      background: rgba(255,255,255,.06);
-      border-color: var(--border);
-      color: var(--text);
-    }
+    .nav-btn:hover,
     .nav-btn.active {
       background: rgba(140,208,255,.14);
       border-color: var(--accent);
       color: var(--accent);
     }
-
-    /* ── Content area ────────────────────────────────────────── */
     #content {
       flex: 1 1 0;
       position: relative;
       overflow: hidden;
     }
-
-    /* Welcome screen shown before any game is selected */
+    #welcome,
+    #launcher-panel {
+      position: absolute;
+      inset: 0;
+      overflow: auto;
+      padding: 2rem;
+    }
     #welcome {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
       gap: 1rem;
       background: radial-gradient(circle at 50% 40%, #122446 0%, #0b1528 50%, #09111f 100%);
       text-align: center;
-      padding: 2rem;
+    }
+    #welcome.hidden,
+    #launcher-panel.hidden {
+      display: none;
     }
     #welcome h1 {
       margin: 0;
@@ -104,37 +111,148 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    #welcome p {
+    #welcome p,
+    .launcher-copy,
+    .launcher-note,
+    .launcher-hint {
       color: var(--muted);
-      font-size: 1.05rem;
-      max-width: 520px;
       line-height: 1.7;
-      margin: 0;
     }
-    .game-grid {
+    .game-grid,
+    .preset-grid,
+    .action-row {
       display: flex;
       flex-wrap: wrap;
-      gap: .6rem;
+      gap: .75rem;
+    }
+    .game-grid {
       justify-content: center;
       margin-top: .5rem;
     }
     .game-chip {
       background: rgba(140,208,255,.08);
       border: 1px solid var(--border);
-      border-radius: 8px;
       color: var(--text);
-      cursor: pointer;
-      font: inherit;
       font-size: .9rem;
-      padding: .5rem 1rem;
-      transition: background .15s, border-color .15s;
+      padding: .55rem 1rem;
     }
-    .game-chip:hover {
+    .game-chip:hover,
+    .game-chip.active,
+    .preset-btn:hover,
+    .primary-btn:hover,
+    .secondary-btn:hover {
+      transform: translateY(-1px);
+    }
+    .game-chip:hover,
+    .game-chip.active {
       background: rgba(140,208,255,.18);
       border-color: var(--accent);
     }
-
-    /* ── Game area: directly hosts the WebGL canvas ──────────── */
+    #launcher-panel {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background: linear-gradient(180deg, rgba(9,17,31,.96), rgba(9,17,31,.98));
+    }
+    .launcher-card {
+      width: min(1100px, 100%);
+      background: rgba(19,32,58,.95);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: 0 22px 64px rgba(0,0,0,.35);
+      display: grid;
+      gap: 1.25rem;
+    }
+    .launcher-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .eyebrow {
+      margin: 0 0 .35rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .launcher-header h2 {
+      margin: 0;
+      font-size: clamp(1.5rem, 4vw, 2.25rem);
+    }
+    .launcher-section {
+      background: rgba(9,17,31,.35);
+      border: 1px solid rgba(140,208,255,.12);
+      border-radius: 14px;
+      padding: 1rem;
+      display: grid;
+      gap: .9rem;
+    }
+    .launcher-section h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+    .primary-btn,
+    .secondary-btn,
+    .preset-btn {
+      border: 1px solid var(--border);
+      padding: .72rem 1rem;
+      color: var(--text);
+      background: rgba(255,255,255,.04);
+    }
+    .primary-btn {
+      background: linear-gradient(135deg, rgba(140,208,255,.18), rgba(255,210,128,.16));
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    .secondary-btn { color: var(--muted); }
+    .preset-btn {
+      min-width: 160px;
+      text-align: left;
+      display: grid;
+      gap: .25rem;
+    }
+    .preset-btn small {
+      color: var(--muted);
+      font-size: .74rem;
+    }
+    .field-grid {
+      display: grid;
+      gap: .85rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    label {
+      display: grid;
+      gap: .4rem;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    input[type="text"],
+    input[type="file"] {
+      width: 100%;
+      background: rgba(9,17,31,.82);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: .72rem .85rem;
+      font: inherit;
+    }
+    input[type="file"] { padding: .5rem .65rem; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .45rem .75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      font-size: .84rem;
+    }
+    .pill.ready { color: var(--success); border-color: rgba(166,255,176,.4); }
+    .pill.error { color: var(--danger); border-color: rgba(255,158,158,.35); }
     #game-area {
       display: none;
       position: absolute;
@@ -142,8 +260,6 @@
       background: #000;
     }
     #game-area.active { display: block; }
-
-    /* WebGL canvas fills the game area */
     #canvas {
       display: block;
       width: 100%;
@@ -151,8 +267,6 @@
       outline: none;
       background: #000;
     }
-
-    /* Loading card overlays the canvas until the game starts */
     #loading-card {
       position: absolute;
       top: 50%;
@@ -185,6 +299,13 @@
       font-size: .78rem;
       color: var(--muted);
     }
+    @media (max-width: 720px) {
+      #welcome,
+      #launcher-panel { padding: 1rem; }
+      .launcher-card { padding: 1rem; }
+      .launcher-header { flex-direction: column; }
+      .preset-btn { min-width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -201,10 +322,9 @@
   </nav>
 
   <div id="content">
-    <!-- Welcome splash shown until a game is selected -->
     <div id="welcome">
       <h1>Pangea Ports</h1>
-      <p>Select a game from the navbar above to play it directly in your browser. All games run as WebAssembly builds embedded on this page.</p>
+      <p>Select a game to open its browser launcher. From there you can start normally, jump straight into a level, or inject a custom level file before the WebAssembly build boots.</p>
       <div class="game-grid">
         <button class="game-chip" data-game="billy">Billy Frontier</button>
         <button class="game-chip" data-game="bugdom">Bugdom</button>
@@ -217,97 +337,521 @@
       </div>
     </div>
 
-    <!-- Directly-embedded game canvas (no iframe; WASM runs in this page's context) -->
+    <div id="launcher-panel" class="hidden">
+      <div class="launcher-card">
+        <div class="launcher-header">
+          <div>
+            <p class="eyebrow">Launcher</p>
+            <h2 id="launcher-title">Choose a game</h2>
+            <p id="launcher-description" class="launcher-copy">Pick a game above to configure a browser launch.</p>
+          </div>
+          <button id="reset-selection" class="secondary-btn" type="button">All games</button>
+        </div>
+
+        <section class="launcher-section">
+          <div>
+            <h3>Launch options</h3>
+            <p id="launcher-note" class="launcher-note"></p>
+          </div>
+          <div class="action-row">
+            <button id="launch-normal" class="primary-btn" type="button">Start normally</button>
+          </div>
+          <div id="preset-grid" class="preset-grid"></div>
+        </section>
+
+        <section class="launcher-section">
+          <div>
+            <h3>Optional file injection</h3>
+            <p id="upload-help" class="launcher-copy"></p>
+          </div>
+          <div class="field-grid">
+            <label>
+              Level file
+              <input id="upload-file" type="file">
+            </label>
+            <label>
+              Virtual FS target path
+              <input id="upload-target-path" type="text" spellcheck="false">
+            </label>
+            <label>
+              Launch override path
+              <input id="upload-arg-path" type="text" spellcheck="false">
+            </label>
+          </div>
+          <p id="upload-arg-hint" class="launcher-hint"></p>
+          <div class="action-row">
+            <button id="clear-upload" class="secondary-btn" type="button">Clear upload</button>
+            <span id="upload-status" class="pill">No file armed</span>
+          </div>
+        </section>
+      </div>
+    </div>
+
     <div id="game-area">
-      <!-- Loading overlay: shown until the game runtime is ready -->
       <div id="loading-card">
         <p id="status-text">Loading…</p>
         <progress id="progress-bar" value="0" max="100"></progress>
         <p id="progress-label">Downloading game data…</p>
       </div>
-      <!-- WebGL canvas — always in DOM so SDL3 can read clientWidth/clientHeight -->
-      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"
-              width="1280" height="720"></canvas>
+      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()" width="1280" height="720"></canvas>
     </div>
   </div>
 
   <script>
-    // GAME_SCRIPTS: game-id → JS loader path (loaded directly into this page, no iframe wrapper)
-    var GAME_SCRIPTS = {
-      billy:     './BillyFrontier-Android/game/billyfrontier.js',
-      bugdom:    './Bugdom-android/Bugdom.js',
-      bugdom2:   './Bugdom2-Android/Bugdom2.js',
-      cromag:    './CroMagRally-Android/game/CroMagRally.js',
-      mighty:    './MightyMike-Android/MightyMike.js',
-      nanosaur:  './Nanosaur-android/game/Nanosaur.js',
-      nanosaur2: './Nanosaur2-Android/Nanosaur2.js',
-      otto:      './OttoMatic-Android/OttoMatic.js'
-    };
-
-    var GAME_NAMES = {
-      billy: 'Billy Frontier', bugdom: 'Bugdom', bugdom2: 'Bugdom 2',
-      cromag: 'Cro-Mag Rally', mighty: 'Mighty Mike', nanosaur: 'Nanosaur',
-      nanosaur2: 'Nanosaur 2', otto: 'Otto Matic'
-    };
-
-    var activeGame = null;
-
-    function selectGame(id) {
-      if (!GAME_SCRIPTS[id]) return;
-
-      // If a different game is already running, reload the page to switch
-      // (Emscripten modules cannot be unloaded; we update the hash then force a reload)
-      if (activeGame && activeGame !== id) {
-        location.hash = '#' + id;   // update hash so the reload resumes the new game
-        location.reload();           // full reload needed to clear the running Emscripten module
-        return;
+    var GAME_CONFIGS = {
+      billy: {
+        name: 'Billy Frontier',
+        script: './BillyFrontier-Android/game/billyfrontier.js',
+        canvas: { width: 1280, height: 960 },
+        note: 'Launch the campaign normally or jump directly into any duel/shootout arena.',
+        upload: {
+          argFlag: '--terrain-file',
+          argMode: 'colon-terrain',
+          defaultWritePath: '/Data/Terrain/custom_level.ter',
+          help: 'Upload a terrain file before boot. The launcher mounts it in the virtual filesystem, then passes the colon-style terrain override path to the game.',
+          hint: 'For Billy Frontier, the game reads a colon path such as :Terrain:custom_level.ter while the upload is written to /Data/Terrain/custom_level.ter.'
+        },
+        presets: [
+          { label: 'Town Duel 1', args: ['--level', '0'] },
+          { label: 'Town Shootout', args: ['--level', '1'] },
+          { label: 'Town Duel 2', args: ['--level', '2'] },
+          { label: 'Town Stampede', args: ['--level', '3'] },
+          { label: 'Town Duel 3', args: ['--level', '4'] },
+          { label: 'Target Practice 1', args: ['--level', '5'] },
+          { label: 'Swamp Duel 1', args: ['--level', '6'] },
+          { label: 'Swamp Shootout', args: ['--level', '7'] },
+          { label: 'Swamp Duel 2', args: ['--level', '8'] },
+          { label: 'Swamp Stampede', args: ['--level', '9'] },
+          { label: 'Swamp Duel 3', args: ['--level', '10'] },
+          { label: 'Target Practice 2', args: ['--level', '11'] }
+        ]
+      },
+      bugdom: {
+        name: 'Bugdom',
+        script: './Bugdom-android/Bugdom.js',
+        canvas: { width: 1280, height: 720 },
+        note: 'Use direct level launch for editor testing, or boot to the normal front-end first.',
+        upload: {
+          argFlag: '--terrain-file',
+          argMode: 'colon-terrain',
+          defaultWritePath: '/Data/Terrain/Custom.ter',
+          help: 'Upload a replacement .ter file and the launcher will pass it to Bugdom as a terrain override.',
+          hint: 'Bugdom expects override arguments like :Terrain:Custom.ter. The upload still needs a real virtual filesystem target such as /Data/Terrain/Custom.ter.'
+        },
+        presets: [
+          { label: 'Training', args: ['--level', '0'] },
+          { label: 'Lawn', args: ['--level', '1'] },
+          { label: 'Pond', args: ['--level', '2'] },
+          { label: 'Forest', args: ['--level', '3'] },
+          { label: 'Hive Attack', args: ['--level', '4'] },
+          { label: 'Bee Hive', args: ['--level', '5'] },
+          { label: 'Queen Bee', args: ['--level', '6'] },
+          { label: 'Night Attack', args: ['--level', '7'] },
+          { label: 'Ant Hill', args: ['--level', '8'] },
+          { label: 'Ant King', args: ['--level', '9'] }
+        ]
+      },
+      bugdom2: {
+        name: 'Bugdom 2',
+        script: './Bugdom2-Android/Bugdom2.js',
+        canvas: { width: 1280, height: 720 },
+        note: 'Bugdom 2 can launch straight into a selected level. For custom terrain, mount your upload over the exact file the level already loads.',
+        upload: {
+          argFlag: null,
+          argMode: null,
+          defaultWritePath: '/Data/Terrain/Level1_Garden.ter',
+          help: 'Bugdom 2 does not use a separate terrain override argument here. The file is injected directly over the target path before the game starts.',
+          hint: 'Choose the exact VFS path for the level you want to replace. The Launch override path field is unused for Bugdom 2.'
+        },
+        presets: [
+          { label: 'Gnome Garden', args: ['--level', '0'], suggestedWritePath: '/Data/Terrain/Level1_Garden.ter' },
+          { label: 'Sidewalk', args: ['--level', '1'], suggestedWritePath: '/Data/Terrain/Level2_SideWalk.ter' },
+          { label: 'Fido', args: ['--level', '2'], suggestedWritePath: '/Data/Terrain/Level3_DogHair.ter' },
+          { label: 'Plumbing', args: ['--level', '3'] },
+          { label: 'Playroom', args: ['--level', '4'], suggestedWritePath: '/Data/Terrain/Level5_Playroom.ter' },
+          { label: 'Closet', args: ['--level', '5'], suggestedWritePath: '/Data/Terrain/Level6_Closet.ter' },
+          { label: 'Gutter', args: ['--level', '6'] },
+          { label: 'Garbage', args: ['--level', '7'], suggestedWritePath: '/Data/Terrain/Level8_Garbage.ter' },
+          { label: 'Balsa Plane', args: ['--level', '8'], suggestedWritePath: '/Data/Terrain/Level9_Balsa.ter' },
+          { label: 'Park', args: ['--level', '9'], suggestedWritePath: '/Data/Terrain/Level10_Park.ter' }
+        ]
+      },
+      cromag: {
+        name: 'Cro-Mag Rally',
+        script: './CroMagRally-Android/game/CroMagRally.js',
+        canvas: { width: 1280, height: 720 },
+        note: 'Cro-Mag Rally boots by track and car. The battle tracks cover the special multiplayer-style arenas.',
+        upload: {
+          argFlag: '--level-override',
+          argMode: 'colon-terrain',
+          defaultWritePath: '/Data/Terrain/MyLevel.ter',
+          help: 'Upload a custom track terrain, then launch one of the 17 track presets. The override is passed with Cro-Mag Rally\'s level-override argument.',
+          hint: 'By default the launcher uses car 0 (random). Battle tracks are 10–17.'
+        },
+        presets: [
+          { label: 'Stone Age Desert', args: ['--track', '1', '--car', '0'], meta: 'Track 1' },
+          { label: 'Stone Age Jungle', args: ['--track', '2', '--car', '0'], meta: 'Track 2' },
+          { label: 'Stone Age Ice', args: ['--track', '3', '--car', '0'], meta: 'Track 3' },
+          { label: 'Bronze Age Crete', args: ['--track', '4', '--car', '0'], meta: 'Track 4' },
+          { label: 'Bronze Age China', args: ['--track', '5', '--car', '0'], meta: 'Track 5' },
+          { label: 'Bronze Age Egypt', args: ['--track', '6', '--car', '0'], meta: 'Track 6' },
+          { label: 'Iron Age Europe', args: ['--track', '7', '--car', '0'], meta: 'Track 7' },
+          { label: 'Iron Age Scandinavia', args: ['--track', '8', '--car', '0'], meta: 'Track 8' },
+          { label: 'Iron Age Atlantis', args: ['--track', '9', '--car', '0'], meta: 'Track 9' },
+          { label: 'Battle Stonehenge', args: ['--track', '10', '--car', '0'], meta: 'Battle' },
+          { label: 'Battle Aztec', args: ['--track', '11', '--car', '0'], meta: 'Battle' },
+          { label: 'Battle Coliseum', args: ['--track', '12', '--car', '0'], meta: 'Battle' },
+          { label: 'Battle Maze', args: ['--track', '13', '--car', '0'], meta: 'Battle' },
+          { label: 'Battle Celtic', args: ['--track', '14', '--car', '0'], meta: 'Battle' },
+          { label: 'Battle Tar Pits', args: ['--track', '15', '--car', '0'], meta: 'Battle' },
+          { label: 'Battle Spiral', args: ['--track', '16', '--car', '0'], meta: 'Battle' },
+          { label: 'Battle Ramps', args: ['--track', '17', '--car', '0'], meta: 'Battle' }
+        ]
+      },
+      mighty: {
+        name: 'Mighty Mike',
+        script: './MightyMike-Android/MightyMike.js',
+        canvas: { width: 1280, height: 720 },
+        note: 'Mighty Mike uses scene:area direct-boot identifiers instead of a single level number.',
+        upload: {
+          argFlag: '--map-override',
+          argMode: 'colon-maps',
+          defaultWritePath: '/Data/Maps/custom.map-1',
+          help: 'Upload a map override and pair it with one of the scene/area launch presets.',
+          hint: 'The override argument uses :Maps:... while the uploaded file lives under /Data/Maps/....'
+        },
+        presets: [
+          { label: 'Scene 0 / Area 0', args: ['--level', '0:0'] },
+          { label: 'Scene 0 / Area 1', args: ['--level', '0:1'] },
+          { label: 'Scene 0 / Area 2', args: ['--level', '0:2'] },
+          { label: 'Scene 1 / Area 0', args: ['--level', '1:0'] },
+          { label: 'Scene 1 / Area 1', args: ['--level', '1:1'] },
+          { label: 'Scene 1 / Area 2', args: ['--level', '1:2'] },
+          { label: 'Scene 2 / Area 0', args: ['--level', '2:0'] },
+          { label: 'Scene 2 / Area 1', args: ['--level', '2:1'] },
+          { label: 'Scene 2 / Area 2', args: ['--level', '2:2'] },
+          { label: 'Scene 3 / Area 0', args: ['--level', '3:0'] },
+          { label: 'Scene 3 / Area 1', args: ['--level', '3:1'] },
+          { label: 'Scene 3 / Area 2', args: ['--level', '3:2'] },
+          { label: 'Scene 4 / Area 0', args: ['--level', '4:0'] },
+          { label: 'Scene 4 / Area 1', args: ['--level', '4:1'] },
+          { label: 'Scene 4 / Area 2', args: ['--level', '4:2'] }
+        ]
+      },
+      nanosaur: {
+        name: 'Nanosaur',
+        script: './Nanosaur-android/game/Nanosaur.js',
+        canvas: { width: 1280, height: 720 },
+        note: 'Nanosaur now supports both a normal start and a direct skip-to-level launch from the shared launcher.',
+        upload: {
+          argFlag: '--terrain-file',
+          argMode: 'identity',
+          defaultWritePath: '/Data/Terrain/custom.ter',
+          help: 'Upload a terrain override and the launcher will pass its virtual filesystem path directly to Nanosaur.',
+          hint: 'Nanosaur consumes host-style paths, so /Data/Terrain/custom.ter can be used for both the upload target and the launch override path.'
+        },
+        presets: [
+          { label: 'Adventure Level', args: ['--level', '0', '--skip-menu'], meta: 'Skips title cards' }
+        ]
+      },
+      nanosaur2: {
+        name: 'Nanosaur 2',
+        script: './Nanosaur2-Android/Nanosaur2.js',
+        canvas: { width: 1280, height: 800 },
+        note: 'Nanosaur 2 mixes adventure, race, battle, and capture-the-flag levels, all exposed here as direct launch buttons.',
+        upload: {
+          argFlag: '--terrain-override',
+          argMode: 'identity',
+          defaultWritePath: '/Data/Terrain/custom.ter',
+          help: 'Upload a terrain override and the launcher passes its virtual filesystem path to the WebAssembly build before boot.',
+          hint: 'The capture-the-flag presets are flag1 and flag2 (levels 7 and 8 in the direct-launch range).'
+        },
+        presets: [
+          { label: 'Adventure 1', args: ['--level', '0'], meta: 'level1' },
+          { label: 'Adventure 2', args: ['--level', '1'], meta: 'level2' },
+          { label: 'Adventure 3', args: ['--level', '2'], meta: 'level3' },
+          { label: 'Race 1', args: ['--level', '3'], meta: 'race1' },
+          { label: 'Race 2', args: ['--level', '4'], meta: 'race2' },
+          { label: 'Battle 1', args: ['--level', '5'], meta: 'battle1' },
+          { label: 'Battle 2', args: ['--level', '6'], meta: 'battle2' },
+          { label: 'Capture the Flag 1', args: ['--level', '7'], meta: 'flag1' },
+          { label: 'Capture the Flag 2', args: ['--level', '8'], meta: 'flag2' }
+        ]
+      },
+      otto: {
+        name: 'Otto Matic',
+        script: './OttoMatic-Android/OttoMatic.js',
+        canvas: { width: 1280, height: 720 },
+        note: 'Otto Matic can boot directly into any campaign level, or you can override the terrain file path before startup.',
+        upload: {
+          argFlag: '--terrain',
+          argMode: 'identity',
+          defaultWritePath: '/Data/Terrain/Custom.ter',
+          help: 'Upload a terrain file and the launcher passes the mounted path directly with Otto Matic\'s terrain override argument.',
+          hint: 'Otto Matic reads direct virtual filesystem paths like /Data/Terrain/Custom.ter.'
+        },
+        presets: [
+          { label: 'Earth Farm', args: ['--level', '0'], suggestedWritePath: '/Data/Terrain/EarthFarm.ter' },
+          { label: 'Blob World', args: ['--level', '1'], suggestedWritePath: '/Data/Terrain/BlobWorld.ter' },
+          { label: 'Blob Boss', args: ['--level', '2'], suggestedWritePath: '/Data/Terrain/BlobBoss.ter' },
+          { label: 'Apocalypse', args: ['--level', '3'], suggestedWritePath: '/Data/Terrain/Apocalypse.ter' },
+          { label: 'Cloud', args: ['--level', '4'], suggestedWritePath: '/Data/Terrain/Cloud.ter' },
+          { label: 'Jungle', args: ['--level', '5'], suggestedWritePath: '/Data/Terrain/Jungle.ter' },
+          { label: 'Jungle Boss', args: ['--level', '6'], suggestedWritePath: '/Data/Terrain/JungleBoss.ter' },
+          { label: 'Fire & Ice', args: ['--level', '7'], suggestedWritePath: '/Data/Terrain/FireIce.ter' },
+          { label: 'Saucer', args: ['--level', '8'], suggestedWritePath: '/Data/Terrain/Saucer.ter' },
+          { label: 'Brain Boss', args: ['--level', '9'], suggestedWritePath: '/Data/Terrain/BrainBoss.ter' }
+        ]
       }
+    };
 
-      // Mark button active
-      document.querySelectorAll('.nav-btn').forEach(function(btn) {
+    var selectedGame = null;
+    var activeGame = null;
+    var resizeObserver = null;
+
+    function getGameConfig(id) {
+      return GAME_CONFIGS[id] || null;
+    }
+
+    function normalizeFsPath(path) {
+      var trimmed = (path || '').trim();
+      if (!trimmed) return '';
+      if (trimmed[0] !== '/') trimmed = '/' + trimmed;
+      return trimmed.replace(/\/+/g, '/');
+    }
+
+    function buildColonPath(writePath, folder) {
+      var normalized = normalizeFsPath(writePath);
+      if (!normalized) return '';
+      var parts = normalized.split('/').filter(Boolean);
+      var folderIndex = parts.lastIndexOf(folder);
+      var tail = folderIndex >= 0 ? parts.slice(folderIndex + 1) : parts.slice(-1);
+      return ':' + folder + ':' + tail.join(':');
+    }
+
+    function getDefaultArgPath(config, writePath) {
+      if (!config || !config.upload || !config.upload.argFlag) return '';
+      if (config.upload.argMode === 'colon-terrain') return buildColonPath(writePath, 'Terrain');
+      if (config.upload.argMode === 'colon-maps') return buildColonPath(writePath, 'Maps');
+      return normalizeFsPath(writePath);
+    }
+
+    function setNavSelection(id) {
+      document.querySelectorAll('[data-game]').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.game === id);
       });
+    }
 
-      // Swap welcome → game area
-      document.getElementById('welcome').style.display = 'none';
-      document.getElementById('game-area').classList.add('active');
-
-      if (!activeGame) {
-        activeGame = id;
-        document.title = GAME_NAMES[id] + ' – Pangea Ports';
-        loadGame(id);
+    function resetSelection() {
+      if (activeGame) {
+        location.hash = '';
+        location.reload();
+        return;
       }
+      selectedGame = null;
+      setNavSelection(null);
+      document.getElementById('welcome').classList.remove('hidden');
+      document.getElementById('launcher-panel').classList.add('hidden');
+      history.replaceState(null, '', window.location.pathname);
+      document.title = 'Pangea Ports';
+    }
 
+    function renderPresetButtons(gameId) {
+      var config = getGameConfig(gameId);
+      var presetGrid = document.getElementById('preset-grid');
+      presetGrid.innerHTML = '';
+      config.presets.forEach(function(preset, index) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'preset-btn';
+        btn.innerHTML = preset.meta ? ('<span>' + preset.label + '</span><small>' + preset.meta + '</small>') : ('<span>' + preset.label + '</span>');
+        btn.addEventListener('click', function() { launchPreset(gameId, index); });
+        presetGrid.appendChild(btn);
+      });
+    }
+
+    function updateUploadDefaults(gameId) {
+      var config = getGameConfig(gameId);
+      var targetInput = document.getElementById('upload-target-path');
+      var argInput = document.getElementById('upload-arg-path');
+      targetInput.value = config.upload.defaultWritePath || '';
+      argInput.value = getDefaultArgPath(config, targetInput.value);
+      argInput.disabled = !config.upload.argFlag;
+      document.getElementById('upload-help').textContent = config.upload.help;
+      document.getElementById('upload-arg-hint').textContent = config.upload.hint;
+      updateUploadStatus();
+    }
+
+    function selectGame(id) {
+      var config = getGameConfig(id);
+      if (!config) return;
+      if (activeGame === id) return;
+      if (activeGame && activeGame !== id) {
+        location.hash = '#' + id;
+        location.reload();
+        return;
+      }
+      selectedGame = id;
+      setNavSelection(id);
+      document.title = config.name + ' – Pangea Ports';
+      document.getElementById('welcome').classList.add('hidden');
+      document.getElementById('launcher-panel').classList.remove('hidden');
+      document.getElementById('launcher-title').textContent = config.name;
+      document.getElementById('launcher-description').textContent = 'Choose how to boot ' + config.name + ' directly in this page.';
+      document.getElementById('launcher-note').textContent = config.note;
+      renderPresetButtons(id);
+      updateUploadDefaults(id);
       history.replaceState(null, '', '#' + id);
     }
 
-    function loadGame(id) {
-      var statusEl   = document.getElementById('status-text');
+    function getSelectedUploadSummary() {
+      var input = document.getElementById('upload-file');
+      if (!input.files || !input.files.length) return null;
+      return {
+        file: input.files[0],
+        targetPath: normalizeFsPath(document.getElementById('upload-target-path').value),
+        overridePath: document.getElementById('upload-arg-path').value.trim()
+      };
+    }
+
+    function updateUploadStatus(message, state) {
+      var status = document.getElementById('upload-status');
+      status.classList.remove('ready', 'error');
+      if (state) status.classList.add(state);
+      if (message) {
+        status.textContent = message;
+        return;
+      }
+      var summary = getSelectedUploadSummary();
+      if (!summary) {
+        status.textContent = 'No file armed';
+        return;
+      }
+      if (!summary.targetPath) {
+        status.textContent = 'Choose a virtual FS target path';
+        status.classList.add('error');
+        return;
+      }
+      status.textContent = 'Ready: ' + summary.file.name + ' → ' + summary.targetPath;
+      status.classList.add('ready');
+    }
+
+    function ensureDir(FS, filePath) {
+      var parts = normalizeFsPath(filePath).split('/').filter(Boolean);
+      var current = '';
+      for (var i = 0; i < parts.length - 1; i++) {
+        current += '/' + parts[i];
+        try {
+          FS.mkdir(current);
+        } catch (err) {
+          if (!err || !/exist|ErrnoError/.test(String(err))) throw err;
+        }
+      }
+    }
+
+    function readFileAsUint8Array(file) {
+      return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function() { reject(reader.error || new Error('Failed to read file.')); };
+        reader.onload = function(e) { resolve(new Uint8Array(e.target.result)); };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function buildLaunchArgs(config, baseArgs, upload) {
+      var args = baseArgs.slice();
+      if (upload && config.upload && config.upload.argFlag) {
+        var argPath = upload.overridePath || getDefaultArgPath(config, upload.targetPath);
+        if (argPath) {
+          args.push(config.upload.argFlag, argPath);
+        }
+      }
+      return args;
+    }
+
+    function prepareUpload(config, preset) {
+      var summary = getSelectedUploadSummary();
+      if (!summary) return Promise.resolve(null);
+      var writePath = summary.targetPath || normalizeFsPath((preset && preset.suggestedWritePath) || config.upload.defaultWritePath || '');
+      if (!writePath) {
+        updateUploadStatus('Choose a virtual FS target path', 'error');
+        return Promise.reject(new Error('Missing upload target path.'));
+      }
+      return readFileAsUint8Array(summary.file).then(function(bytes) {
+        updateUploadStatus('Armed: ' + summary.file.name + ' (' + bytes.length + ' bytes)', 'ready');
+        return {
+          bytes: bytes,
+          targetPath: writePath,
+          overridePath: summary.overridePath || getDefaultArgPath(config, writePath)
+        };
+      });
+    }
+
+    async function launchConfiguredGame(gameId, baseArgs, preset) {
+      var config = getGameConfig(gameId);
+      if (!config || activeGame) return;
+      var upload = await prepareUpload(config, preset);
+      var args = buildLaunchArgs(config, baseArgs, upload);
+      await loadGame(gameId, args, upload);
+    }
+
+    function launchPreset(gameId, presetIndex) {
+      var config = getGameConfig(gameId);
+      var preset = config && config.presets[presetIndex];
+      if (!preset) return;
+      var targetInput = document.getElementById('upload-target-path');
+      if (preset.suggestedWritePath && targetInput) {
+        if (!targetInput.value || targetInput.value === config.upload.defaultWritePath) {
+          targetInput.value = preset.suggestedWritePath;
+          if (config.upload.argFlag) {
+            document.getElementById('upload-arg-path').value = getDefaultArgPath(config, preset.suggestedWritePath);
+          }
+        }
+      }
+      launchConfiguredGame(gameId, preset.args, preset).catch(function(err) {
+        console.error(err);
+        updateUploadStatus(err.message || 'Failed to prepare upload', 'error');
+      });
+    }
+
+    async function loadGame(id, args, upload) {
+      var config = getGameConfig(id);
+      if (!config) return;
+      selectedGame = id;
+      activeGame = id;
+      document.getElementById('launcher-panel').classList.add('hidden');
+      document.getElementById('welcome').classList.add('hidden');
+      document.getElementById('game-area').classList.add('active');
+
+      var canvas = document.getElementById('canvas');
+      canvas.width = config.canvas.width;
+      canvas.height = config.canvas.height;
+
+      var statusEl = document.getElementById('status-text');
       var progressEl = document.getElementById('progress-bar');
-      var labelEl    = document.getElementById('progress-label');
-      var card       = document.getElementById('loading-card');
-      var scriptSrc  = GAME_SCRIPTS[id];
-      var scriptUrl  = new URL(scriptSrc, document.baseURI);
-      var assetBase  = scriptUrl.href.substring(0, scriptUrl.href.lastIndexOf('/') + 1);
+      var labelEl = document.getElementById('progress-label');
+      var card = document.getElementById('loading-card');
+      var scriptSrc = config.script;
+      var scriptUrl = new URL(scriptSrc, document.baseURI);
+      var assetBase = scriptUrl.href.substring(0, scriptUrl.href.lastIndexOf('/') + 1);
 
-      statusEl.textContent = 'Loading ' + GAME_NAMES[id] + '…';
-
-      // Sync canvas to its actual CSS size before the game initialises
+      statusEl.textContent = 'Loading ' + config.name + '…';
+      labelEl.textContent = 'Downloading game data…';
+      card.classList.remove('hidden');
+      progressEl.removeAttribute('value');
       syncCanvasSize();
 
-      // Configure Emscripten Module before the script is evaluated
       window.Module = {
-        canvas: document.getElementById('canvas'),
-        // Resolve all runtime assets from the selected game's deployment directory.
-        locateFile: function(path, prefix) {
-          return assetBase + path;
-        },
-        // Some Emscripten file-packager loaders pass an empty prefix for .data files.
-        locateFilePackage: function(path) {
-          return assetBase + path;
-        },
+        canvas: canvas,
+        arguments: args,
+        preRun: upload ? [function() {
+          ensureDir(Module.FS, upload.targetPath);
+          Module.FS.writeFile(upload.targetPath, upload.bytes);
+          console.log('[Launcher] Injected ' + upload.targetPath + ' (' + upload.bytes.length + ' bytes)');
+        }] : [],
+        locateFile: function(path) { return assetBase + path; },
+        locateFilePackage: function(path) { return assetBase + path; },
         mainScriptUrlOrBlob: scriptUrl.href,
-
         setStatus: function(text) {
           if (!text) {
             card.classList.add('hidden');
@@ -317,10 +861,9 @@
           var m = text.match(/(\d+)\/(\d+)/);
           if (m) {
             progressEl.value = parseInt(m[1], 10);
-            progressEl.max   = parseInt(m[2], 10);
+            progressEl.max = parseInt(m[2], 10);
           }
         },
-
         monitorRunDependencies: function(n) {
           if (n === 0) {
             card.classList.add('hidden');
@@ -328,59 +871,99 @@
             labelEl.textContent = 'Loading assets (' + n + ' remaining)…';
           }
         },
-
         onRuntimeInitialized: function() {
           card.classList.add('hidden');
+          syncCanvasSize();
         },
-
-        print:    function(t) { console.log(t);   },
+        print: function(t) { console.log(t); },
         printErr: function(t) { console.error(t); }
       };
 
-      // Inject the game script – Emscripten resolves .wasm/.data relative to this JS URL
-      var script  = document.createElement('script');
-      script.src  = scriptSrc;
+      var script = document.createElement('script');
+      script.src = scriptSrc;
       script.onerror = function() {
-        statusEl.textContent = 'Failed to load ' + GAME_NAMES[id] + '.';
-        labelEl.textContent  = 'Build artifacts may be missing from the deployment.';
+        statusEl.textContent = 'Failed to load ' + config.name + '.';
+        labelEl.textContent = 'Build artifacts may be missing from the deployment.';
       };
       document.body.appendChild(script);
     }
 
-    // Keep canvas physical-pixel size in sync with its CSS size + device pixel ratio
     function syncCanvasSize() {
       var canvas = document.getElementById('canvas');
       if (!canvas) return;
       var cssW = canvas.clientWidth;
       var cssH = canvas.clientHeight;
-      if (!cssW || !cssH) {
-        console.warn('syncCanvasSize: canvas has no CSS dimensions (cssW=' + cssW + ', cssH=' + cssH + ')');
-        return;
-      }
+      if (!cssW || !cssH) return;
       var dpr = window.devicePixelRatio || 1;
-      var w = Math.round(cssW * dpr);
-      var h = Math.round(cssH * dpr);
-      if (w && h && (canvas.width !== w || canvas.height !== h)) {
-        canvas.width  = w;
+      var w = Math.max(1, Math.round(cssW * dpr));
+      var h = Math.max(1, Math.round(cssH * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
         canvas.height = h;
-        if (window.Module && Module.setCanvasSize) {
-          Module.setCanvasSize(w, h);
+        if (window.Module && typeof window.Module.setCanvasSize === 'function') {
+          window.Module.setCanvasSize(w, h);
         }
       }
     }
 
-    ['resize', 'fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'].forEach(
-      function(e) { window.addEventListener(e, function() { requestAnimationFrame(syncCanvasSize); }); }
-    );
+    function scheduleCanvasSync() {
+      syncCanvasSize();
+      requestAnimationFrame(syncCanvasSize);
+      requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
+    }
 
-    // Wire all data-game buttons (navbar + welcome chips)
+    function installResizeObservers() {
+      if (typeof ResizeObserver !== 'undefined' && !resizeObserver) {
+        resizeObserver = new ResizeObserver(function() {
+          requestAnimationFrame(syncCanvasSize);
+        });
+        resizeObserver.observe(document.getElementById('content'));
+        resizeObserver.observe(document.getElementById('game-area'));
+        resizeObserver.observe(document.getElementById('canvas'));
+      }
+      ['resize', 'orientationchange', 'fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'].forEach(function(evt) {
+        window.addEventListener(evt, scheduleCanvasSync);
+      });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', scheduleCanvasSync);
+      }
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) scheduleCanvasSync();
+      });
+    }
+
+    document.getElementById('launch-normal').addEventListener('click', function() {
+      if (!selectedGame) return;
+      launchConfiguredGame(selectedGame, [], null).catch(function(err) {
+        console.error(err);
+        updateUploadStatus(err.message || 'Launch failed', 'error');
+      });
+    });
+
+    document.getElementById('reset-selection').addEventListener('click', resetSelection);
+    document.getElementById('clear-upload').addEventListener('click', function() {
+      document.getElementById('upload-file').value = '';
+      updateUploadStatus();
+    });
+    document.getElementById('upload-file').addEventListener('change', updateUploadStatus);
+    document.getElementById('upload-target-path').addEventListener('input', function() {
+      var config = getGameConfig(selectedGame);
+      var argInput = document.getElementById('upload-arg-path');
+      if (config && config.upload && config.upload.argFlag) {
+        argInput.value = getDefaultArgPath(config, this.value);
+      }
+      updateUploadStatus();
+    });
+    document.getElementById('upload-arg-path').addEventListener('input', updateUploadStatus);
+
     document.querySelectorAll('[data-game]').forEach(function(btn) {
       btn.addEventListener('click', function() { selectGame(btn.dataset.game); });
     });
 
-    // Restore from URL hash (e.g. after a game-switch reload)
+    installResizeObservers();
+
     var hash = window.location.hash.replace('#', '');
-    if (hash && GAME_SCRIPTS[hash]) {
+    if (hash && getGameConfig(hash)) {
       selectGame(hash);
     }
   </script>
