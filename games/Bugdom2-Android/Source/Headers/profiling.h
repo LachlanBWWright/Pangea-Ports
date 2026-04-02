@@ -35,7 +35,7 @@ void StartProfilePhase(ProfilePhaseType phase_type);
 void EndProfilePhase(ProfilePhaseType phase_type);
 
 // Get the measured millisecond cost of a phase for this frame (or the previous frame if not measured yet)
-float GetProfilePhaseAvgMs(ProfilePhaseType phase_type);
+float GetProfilePhaseMs(ProfilePhaseType phase_type);
 
 // Call this at the end of each frame to snapshot totals for debug display and reset accumulators
 void ResetProfilingForFrame(void);

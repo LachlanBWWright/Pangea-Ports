@@ -611,11 +611,11 @@ do_anaglyph:
 		OGL_DrawInt(gFramesPerSecond+.5f, 100,y);
 		y += 15;
 
-		float inputMs = GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT);
-		float logicMs = GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC);
-		float renderMs = GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING);
-		float uiMs = GetProfilePhaseAvgMs(PROFILE_PHASE_UI);
-		float swapMs = GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS);
+		float inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
+		float logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
+		float renderMs = GetProfilePhaseMs(PROFILE_PHASE_RENDERING);
+		float uiMs = GetProfilePhaseMs(PROFILE_PHASE_UI);
+		float swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
 		totalMs = inputMs + logicMs + renderMs + uiMs + swapMs;
 
 		OGL_DrawString("input:", 20,y);

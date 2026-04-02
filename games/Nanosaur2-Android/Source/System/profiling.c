@@ -55,7 +55,7 @@ void EndProfilePhase(ProfilePhaseType phase_type) {
     }
 }
 
-float GetProfilePhaseAvgMs(ProfilePhaseType phase_type) {
+float GetProfilePhaseMs(ProfilePhaseType phase_type) {
     if (phase_type >= 0 && phase_type < NUM_PROFILE_PHASES) {
         if (gProfilePhases[phase_type].samples > 0) {
             return (float)(((double)gProfilePhases[phase_type].total_ticks * 1000.0) / (double)gPerformanceFrequency);

@@ -873,16 +873,16 @@ do_anaglyph:
 		int		y = 100;
 
 		int		x2 = 60;
-		float	inputMs = GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT);
-		float	logicMs = GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC);
-		float	renderMs = GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING);
-		float	cullMs = GetProfilePhaseAvgMs(PROFILE_PHASE_CULLING);
-		float	terrainMs = GetProfilePhaseAvgMs(PROFILE_PHASE_TERRAIN);
-		float	objectMs = GetProfilePhaseAvgMs(PROFILE_PHASE_OBJECTS);
-		float	skeletonMs = GetProfilePhaseAvgMs(PROFILE_PHASE_SKELETONS);
-		float	uiMs = GetProfilePhaseAvgMs(PROFILE_PHASE_UI);
-		float	swapMs = GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS);
-		float	yieldMs = GetProfilePhaseAvgMs(PROFILE_PHASE_ASYNC_YIELD);
+		float	inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
+		float	logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
+		float	renderMs = GetProfilePhaseMs(PROFILE_PHASE_RENDERING);
+		float	cullMs = GetProfilePhaseMs(PROFILE_PHASE_CULLING);
+		float	terrainMs = GetProfilePhaseMs(PROFILE_PHASE_TERRAIN);
+		float	objectMs = GetProfilePhaseMs(PROFILE_PHASE_OBJECTS);
+		float	skeletonMs = GetProfilePhaseMs(PROFILE_PHASE_SKELETONS);
+		float	uiMs = GetProfilePhaseMs(PROFILE_PHASE_UI);
+		float	swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
+		float	yieldMs = GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD);
 		float	totalMs = inputMs + logicMs + renderMs + cullMs + terrainMs + objectMs + skeletonMs + uiMs + swapMs + yieldMs;
 
 		OGL_DrawString("fps:", 10,y);
