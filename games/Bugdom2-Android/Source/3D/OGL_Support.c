@@ -605,18 +605,25 @@ do_anaglyph:
 	if (gDebugMode > 0)
 	{
 		int		y = 100;
-		float	totalMs = 0.0f;
+		float	inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
+		float	logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
+		float	renderMs = GetProfilePhaseMs(PROFILE_PHASE_RENDERING);
+		float	cullMs = GetProfilePhaseMs(PROFILE_PHASE_CULLING);
+		float	terrainMs = GetProfilePhaseMs(PROFILE_PHASE_TERRAIN);
+		float	objectMs = GetProfilePhaseMs(PROFILE_PHASE_OBJECTS);
+		float	skeletonMs = GetProfilePhaseMs(PROFILE_PHASE_SKELETONS);
+		float	uiMs = GetProfilePhaseMs(PROFILE_PHASE_UI);
+		float	swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
+		float	yieldMs = GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD);
+		float	totalMs = inputMs + logicMs + renderMs + cullMs + terrainMs + objectMs + skeletonMs + uiMs + swapMs + yieldMs;
 
 		OGL_DrawString("fps:", 20,y);
 		OGL_DrawInt(gFramesPerSecond+.5f, 100,y);
 		y += 15;
 
-		float inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
-		float logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
-		float renderMs = GetProfilePhaseMs(PROFILE_PHASE_RENDERING);
-		float uiMs = GetProfilePhaseMs(PROFILE_PHASE_UI);
-		float swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
-		totalMs = inputMs + logicMs + renderMs + uiMs + swapMs;
+		OGL_DrawString("frame:", 20,y);
+		OGL_DrawFloat(gFramesPerSecond > 0.0f ? 1000.0f / gFramesPerSecond : 0.0f, 100,y);
+		y += 15;
 
 		OGL_DrawString("input:", 20,y);
 		OGL_DrawFloat(inputMs, 100,y);
@@ -626,8 +633,24 @@ do_anaglyph:
 		OGL_DrawFloat(logicMs, 100,y);
 		y += 15;
 
-		OGL_DrawString("render:", 20,y);
+		OGL_DrawString("setup:", 20,y);
 		OGL_DrawFloat(renderMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" cull:", 20,y);
+		OGL_DrawFloat(cullMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" terr:", 20,y);
+		OGL_DrawFloat(terrainMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" obj:", 20,y);
+		OGL_DrawFloat(objectMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" skel:", 20,y);
+		OGL_DrawFloat(skeletonMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("ui:", 20,y);
@@ -636,6 +659,10 @@ do_anaglyph:
 
 		OGL_DrawString("swap:", 20,y);
 		OGL_DrawFloat(swapMs, 100,y);
+		y += 15;
+
+		OGL_DrawString("yield:", 20,y);
+		OGL_DrawFloat(yieldMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("total:", 20,y);
@@ -648,51 +675,51 @@ do_anaglyph:
 
 
 
-#if 0
-
-		OGL_DrawString("#scratch:", 20,y);
-		OGL_DrawInt(gScratch, 100,y);
-		y += 15;
-
-
 		OGL_DrawString("input x:", 20,y);
 		OGL_DrawFloat(gPlayerInfo.analogControlX, 100,y);
 		y += 15;
+
 		OGL_DrawString("input y:", 20,y);
 		OGL_DrawFloat(gPlayerInfo.analogControlZ, 100,y);
 		y += 15;
 
-
-		OGL_DrawString("#scratchF:", 20,y);
-		OGL_DrawFloat(gScratchF, 100,y);
+		OGL_DrawString("player x:", 20,y);
+		OGL_DrawInt((int) gPlayerInfo.coord.x, 100,y);
 		y += 15;
 
-		OGL_DrawString("ter Y:", 20,y);
-		OGL_DrawInt(GetTerrainY(gPlayerInfo.coord.x, gPlayerInfo.coord.z), 100,y);
+		OGL_DrawString("player z:", 20,y);
+		OGL_DrawInt((int) gPlayerInfo.coord.z, 100,y);
 		y += 15;
 
-		OGL_DrawString("#loopsfx:", 20,y);
-		OGL_DrawInt(gNumLoopingEffects, 100,y);
+		OGL_DrawString("player y:", 20,y);
+		OGL_DrawFloat(gPlayerInfo.coord.y, 100,y);
 		y += 15;
 
-		OGL_DrawString("#free RAM:", 20,y);
-		OGL_DrawInt(mem, 100,y);
+		OGL_DrawString("ter y:", 20,y);
+		OGL_DrawInt((int) GetTerrainY(gPlayerInfo.coord.x, gPlayerInfo.coord.z), 100,y);
 		y += 15;
 
-		OGL_DrawString("min RAM:", 20,y);
-		OGL_DrawInt(gMinRAM, 100,y);
+		OGL_DrawString("health:", 20,y);
+		OGL_DrawFloat(gPlayerInfo.health, 100,y);
 		y += 15;
 
-		OGL_DrawString("used VRAM:", 20,y);
-		OGL_DrawInt(gVRAMUsedThisFrame, 100,y);
+		OGL_DrawString("lives:", 20,y);
+		OGL_DrawInt(gPlayerInfo.lives, 100,y);
 		y += 15;
 
-		OGL_DrawString("OGL Mem:", 20,y);
-		OGL_DrawInt(glmGetInteger(GLM_CURRENT_MEMORY), 100,y);
+		OGL_DrawString("buddy:", 20,y);
+		OGL_DrawInt(gPlayerInfo.numBuddyBugs, 100,y);
 		y += 15;
 
+		OGL_DrawString("clovrs:", 20,y);
+		OGL_DrawInt(gPlayerInfo.numGreenClovers + gPlayerInfo.numBlueClovers + gPlayerInfo.numGoldClovers, 100,y);
+		y += 15;
 
-		OGL_DrawString("#sparkles:", 20,y);
+		OGL_DrawString("mice:", 20,y);
+		OGL_DrawInt(gPlayerInfo.numMiceRescued, 100,y);
+		y += 15;
+
+		OGL_DrawString("spark:", 20,y);
 		OGL_DrawInt(gNumSparkles, 100,y);
 		y += 15;
 
@@ -707,14 +734,13 @@ do_anaglyph:
 			y += 15;
 		}
 
-		OGL_DrawString("#H2O:", 20,y);
+		OGL_DrawString("water:", 20,y);
 		OGL_DrawInt(gNumWaterDrawn, 100,y);
 		y += 15;
 
-		OGL_DrawString("#scratchI:", 20,y);
-		OGL_DrawInt(gScratch, 100,y);
+		OGL_DrawString("tiles:", 20,y);
+		OGL_DrawInt(gNumSuperTilesDrawn, 100,y);
 		y += 15;
-#endif
 
 		OGL_DrawString("objs:", 20,y);
 		OGL_DrawInt(gNumObjectNodes, 100,y);
@@ -730,6 +756,18 @@ do_anaglyph:
 		OGL_DrawString("ptrs:", 20,y);
 		OGL_DrawInt(gNumPointers, 100,y);
 		y += 15;
+
+		OGL_DrawString("vram kb:", 20,y);
+		OGL_DrawInt(gVRAMUsedThisFrame / 1024, 100,y);
+		y += 15;
+
+		OGL_DrawString("heap kb:", 20,y);
+		OGL_DrawInt((int) (Pomme_GetHeapSize() / 1024), 100,y);
+		y += 15;
+
+		OGL_DrawString("allocs:", 20,y);
+		OGL_DrawInt((int) Pomme_GetNumAllocs(), 100,y);
+		y += 15;
 	}
 
 
@@ -744,7 +782,9 @@ do_anaglyph:
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 #ifdef __EMSCRIPTEN__
+	StartProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
 	emscripten_sleep(0);									// yield to browser event loop (ASYNCIFY)
+	EndProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
 #endif
 
 

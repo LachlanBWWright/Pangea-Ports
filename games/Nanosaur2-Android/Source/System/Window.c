@@ -394,5 +394,6 @@ void SetFullscreenMode(bool enforceDisplayPref)
 		SDL_SyncWindow(gSDLWindow);
 	}
 
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
 	SDL_GL_SetSwapInterval(gGamePrefs.vsync);
 }

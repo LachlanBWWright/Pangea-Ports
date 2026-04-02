@@ -411,7 +411,9 @@ float			cameraX, cameraZ;
 
 				/* FIRST DO OUR CULLING */
 
+	StartProfilePhase(PROFILE_PHASE_CULLING);
 	CullTestAllObjects();
+	StartProfilePhase(PROFILE_PHASE_OBJECTS);
 
 	theNode = gFirstNodePtr;
 
@@ -727,7 +729,9 @@ float			cameraX, cameraZ;
 		{
 
 			case	SKELETON_GENRE:
+					StartProfilePhase(PROFILE_PHASE_SKELETONS);
 					DrawSkeleton(theNode);
+					StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					break;
 
 			case	DISPLAY_GROUP_GENRE:
@@ -778,6 +782,7 @@ custom_draw:
 					if (theNode->CustomDrawFunction)
 					{
 						theNode->CustomDrawFunction(theNode);
+						StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					}
 					break;
 		}

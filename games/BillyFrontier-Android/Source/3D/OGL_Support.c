@@ -640,6 +640,10 @@ do_anaglyph:
 		OGL_DrawInt(gFramesPerSecond+.5f, 100,y);
 		y += 15;
 
+		OGL_DrawString("frame:", 20,y);
+		OGL_DrawFloat(gFramesPerSecond > 0.0f ? 1000.0f / gFramesPerSecond : 0.0f, 100,y);
+		y += 15;
+
 		OGL_DrawString("input:", 20,y);
 		OGL_DrawFloat(inputMs, 100,y);
 		y += 15;
@@ -688,8 +692,38 @@ do_anaglyph:
 		OGL_DrawInt(gPolysThisFrame, 100,y);
 		y += 15;
 
+		OGL_DrawString("draws:", 20,y);
+		OGL_DrawInt(gDrawCallsThisFrame, 100,y);
+		y += 15;
+
+		OGL_DrawString("verts:", 20,y);
+		OGL_DrawInt(gVerticesThisFrame, 100,y);
+		y += 15;
+
+		OGL_DrawString("upload:", 20,y);
+		OGL_DrawInt(gBufferUploadsThisFrame, 100,y);
+		y += 15;
+
+		OGL_DrawString("objs:", 20,y);
+		OGL_DrawInt(gNumObjectNodes, 100,y);
+		y += 15;
+
+		OGL_DrawString("enemy:", 20,y);
+		OGL_DrawInt(gNumEnemies, 100,y);
+		y += 15;
+
+		OGL_DrawString("fence:", 20,y);
+		OGL_DrawInt(gNumFencesDrawn, 100,y);
+		OGL_DrawString("/", 130,y);
+		OGL_DrawInt(gNumFences, 140,y);
+		y += 15;
+
+		OGL_DrawString("tiles:", 20,y);
+		OGL_DrawInt(gNumSuperTilesDrawn, 100,y);
+		y += 15;
 
 #if 1							// show supertile status grid
+		if (gDebugMode >= 2)
 		{
 			int	row, col;
 			float	x = 20;
@@ -712,8 +746,24 @@ do_anaglyph:
 		}
 #endif
 
+		OGL_DrawString("area:", 20,y);
+		OGL_DrawInt(gCurrentArea, 100,y);
+		y += 15;
+
 		OGL_DrawString("ter y:", 20,y);
 		OGL_DrawInt((int) GetTerrainY(gPlayerInfo.coord.x, gPlayerInfo.coord.z), 100,y);
+		y += 15;
+
+		OGL_DrawString("player x:", 20,y);
+		OGL_DrawInt((int) gPlayerInfo.coord.x, 100,y);
+		y += 15;
+
+		OGL_DrawString("player z:", 20,y);
+		OGL_DrawInt((int) gPlayerInfo.coord.z, 100,y);
+		y += 15;
+
+		OGL_DrawString("player y:", 20,y);
+		OGL_DrawFloat(gPlayerInfo.coord.y, 100,y);
 		y += 15;
 
 		OGL_DrawString("vram kb:", 20,y);
@@ -738,8 +788,32 @@ do_anaglyph:
 		OGL_DrawInt(gNumWaterDrawn, 100,y);
 		y += 15;
 
+		OGL_DrawString("lives:", 20,y);
+		OGL_DrawInt(gPlayerInfo.lives, 100,y);
+		y += 15;
+
+		OGL_DrawString("shield:", 20,y);
+		OGL_DrawFloat(gPlayerInfo.shieldPower, 100,y);
+		y += 15;
+
+		OGL_DrawString("ammo:", 20,y);
+		OGL_DrawInt(gPlayerInfo.ammoCount, 100,y);
+		y += 15;
+
+		OGL_DrawString("pesos:", 20,y);
+		OGL_DrawInt(gPlayerInfo.pesos, 100,y);
+		y += 15;
+
+		OGL_DrawString("heap kb:", 20,y);
+		OGL_DrawInt((int) (Pomme_GetHeapSize() / 1024), 100,y);
+		y += 15;
+
 		OGL_DrawString("pointers:", 20,y);
 		OGL_DrawInt(gNumPointers, 100,y);
+		y += 15;
+
+		OGL_DrawString("allocs:", 20,y);
+		OGL_DrawInt((int) Pomme_GetNumAllocs(), 100,y);
 		y += 15;
 	}
 

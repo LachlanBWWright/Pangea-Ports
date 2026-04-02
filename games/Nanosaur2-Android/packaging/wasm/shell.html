@@ -252,7 +252,7 @@
     </div>
 
     <!-- SDL3 canvas — must be visible and sized when SDL creates the window -->
-    <canvas id="canvas" width="800" height="600"
+    <canvas id="canvas" width="1280" height="800"
             oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
     <!-- Controls (shown after game loads) -->
@@ -445,12 +445,16 @@
       }
     }
 
-    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
-      window.addEventListener(evt, function() {
-        requestAnimationFrame(syncCanvasSize);
-        // And another one for good measure (some browsers lag)
-        requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
-      });
+    function handleCanvasResize() {
+      syncCanvasSize();
+      requestAnimationFrame(syncCanvasSize);
+      // And another one for good measure (some browsers lag)
+      requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
+    }
+
+    window.addEventListener('resize', handleCanvasResize);
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      document.addEventListener(evt, handleCanvasResize);
     });
 
     // Use ResizeObserver for more reliable canvas sizing

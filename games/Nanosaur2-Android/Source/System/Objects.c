@@ -524,11 +524,14 @@ void DrawObjects(void)
 {
 ObjNode		*theNode;
 unsigned long	statusBits;
-Boolean			noLighting;
-Boolean			noZBuffer;
-Boolean			noZWrites;
-Boolean			texWrap;
-Boolean			clipAlpha;
+	Boolean			noLighting;
+	Boolean			noZBuffer;
+	Boolean			noZWrites;
+	Boolean			glow;
+	Boolean			noCullFaces;
+	Boolean			texWrap;
+	Boolean			noFog;
+	Boolean			clipAlpha;
 float			cameraX, cameraZ;
 Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw context is being drawn
 
@@ -567,7 +570,10 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 	noLighting = false;
 	noZBuffer = false;
 	noZWrites = false;
+	glow = false;
+	noCullFaces = false;
 	texWrap = false;
+	noFog = false;
 	clipAlpha = false;
 
 	theNode = gFirstNodePtr;
@@ -649,9 +655,19 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 			/*******************/
 
 		if (statusBits & STATUS_BIT_DOUBLESIDED)
-			OGL_DisableCullFace();
+		{
+			if (!noCullFaces)
+			{
+				OGL_DisableCullFace();
+				noCullFaces = true;
+			}
+		}
 		else
+		if (noCullFaces)
+		{
 			OGL_EnableCullFace();
+			noCullFaces = false;
+		}
 
 
 			/*********************/
@@ -680,9 +696,19 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 		if (gGameViewInfoPtr->useFog)
 		{
 			if (statusBits & STATUS_BIT_NOFOG)
-				OGL_DisableFog();
+			{
+				if (!noFog)
+				{
+					OGL_DisableFog();
+					noFog = true;
+				}
+			}
 			else
+			if (noFog)
+			{
 				OGL_EnableFog();
+				noFog = false;
+			}
 		}
 
 			/********************/
@@ -691,13 +717,21 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 		if (statusBits & STATUS_BIT_GLOW)
 		{
-			gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;			// this will make sure blending is on for the glow
-			OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE);
+			if (!glow)
+			{
+				gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;			// this will make sure blending is on for the glow
+				OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE);
+				glow = true;
+			}
 		}
 		else
 		{
-			gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_ALWAYSBLEND;
-			OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			if (glow)
+			{
+				gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_ALWAYSBLEND;
+				OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				glow = false;
+			}
 		}
 
 			/**********************/
@@ -975,8 +1009,17 @@ next:
 	if (noZWrites)
 		glDepthMask(GL_TRUE);
 
-	OGL_EnableCullFace();
-	OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	if (noCullFaces)
+		OGL_EnableCullFace();
+
+	if (glow)
+	{
+		gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_ALWAYSBLEND;
+		OGL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+
+	if (gGameViewInfoPtr->useFog && noFog)
+		OGL_EnableFog();
 
 
 	if (texWrap)

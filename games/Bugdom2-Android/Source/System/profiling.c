@@ -16,8 +16,13 @@ void InitProfiling(void) {
     gProfilePhases[PROFILE_PHASE_INPUT].name = "Input";
     gProfilePhases[PROFILE_PHASE_GAME_LOGIC].name = "Game Logic";
     gProfilePhases[PROFILE_PHASE_RENDERING].name = "Rendering";
+    gProfilePhases[PROFILE_PHASE_CULLING].name = "Culling";
+    gProfilePhases[PROFILE_PHASE_TERRAIN].name = "Terrain";
+    gProfilePhases[PROFILE_PHASE_OBJECTS].name = "Objects";
+    gProfilePhases[PROFILE_PHASE_SKELETONS].name = "Skeletons";
     gProfilePhases[PROFILE_PHASE_UI].name = "UI";
     gProfilePhases[PROFILE_PHASE_SWAP_BUFFERS].name = "Swap Buffers";
+    gProfilePhases[PROFILE_PHASE_ASYNC_YIELD].name = "Async Yield";
     
     gCurrentPhase = -1;
 }

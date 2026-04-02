@@ -911,6 +911,8 @@ Boolean			superTileVisible;
 				/* DRAW STUFF */
 				/**************/
 
+	StartProfilePhase(PROFILE_PHASE_TERRAIN);
+
 		/* SET A NICE STATE FOR TERRAIN DRAWING */
 
 	OGL_PushState();
@@ -1806,7 +1808,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
 
 
 

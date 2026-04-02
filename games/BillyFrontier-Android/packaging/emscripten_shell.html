@@ -196,7 +196,7 @@
     </div>
 
     <!-- WebGL canvas — always visible with real dimensions so SDL3 can size the window -->
-    <canvas class="emscripten" id="canvas" width="640" height="480"
+    <canvas class="emscripten" id="canvas" width="1280" height="960"
             oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
     <!-- Toolbar shown after load -->
@@ -263,6 +263,8 @@
     });
 
     var _isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+    var _nativeCanvasWidth = 1280;
+    var _nativeCanvasHeight = 960;
     if (_isEmbedded) {
       document.body.classList.add('embedded-shell');
     }
@@ -275,6 +277,10 @@
       if (!cssW || !cssH) return;  // layout not settled yet (e.g. mid-fullscreen transition)
       var w = Math.floor(cssW * dpr);
       var h = Math.floor(cssH * dpr);
+      if (!document.fullscreenElement) {
+        w = Math.min(w, _nativeCanvasWidth);
+        h = Math.min(h, _nativeCanvasHeight);
+      }
       if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
         if (Module.setCanvasSize) Module.setCanvasSize(w, h);
         else { Module.canvas.width = w; Module.canvas.height = h; }
@@ -512,14 +518,18 @@
       });
     })();
 
-    ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
-      window.addEventListener(evt, function() {
-        // Delay by one rAF so the browser can complete its layout/resize after
-        // the fullscreen transition before we read clientWidth/clientHeight.
-        requestAnimationFrame(syncCanvasSize);
-        // And another one for good measure (some browsers lag)
-        requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
-      });
+    function handleCanvasResize() {
+      syncCanvasSize();
+      // Delay by one rAF so the browser can complete its layout/resize after
+      // the fullscreen transition before we read clientWidth/clientHeight.
+      requestAnimationFrame(syncCanvasSize);
+      // And another one for good measure (some browsers lag)
+      requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
+    }
+
+    window.addEventListener('resize', handleCanvasResize);
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
+      document.addEventListener(evt, handleCanvasResize);
     });
   </script>
 </body>
