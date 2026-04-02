@@ -628,6 +628,11 @@ uint32_t 		materialFlags;
 short		i;
 Boolean		needNormals;
 
+	// Most geometry is single-textured and relies on unit 0 being the implicit
+	// target for both glBindTexture and glTexCoordPointer before any optional
+	// multi-texture setup below.
+	OGL_ActiveTextureUnit(GL_TEXTURE0);
+
 
 			/**********************/
 			/* SETUP VERTEX ARRAY */

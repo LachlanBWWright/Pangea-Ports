@@ -103,6 +103,7 @@ Boolean		gStateStack_CullFace[STATE_STACK_SIZE];
 Boolean		gStateStack_DepthTest[STATE_STACK_SIZE];
 Boolean		gStateStack_Normalize[STATE_STACK_SIZE];
 Boolean		gStateStack_Texture2D[STATE_STACK_SIZE];
+uint32_t	gStateStack_TextureUnit[STATE_STACK_SIZE];
 Boolean		gStateStack_Blend[STATE_STACK_SIZE];
 Boolean		gStateStack_Fog[STATE_STACK_SIZE];
 GLboolean	gStateStack_DepthMask[STATE_STACK_SIZE];
@@ -2001,6 +2002,7 @@ int	i;
 	gStateStack_DepthTest[i] = glIsEnabled(GL_DEPTH_TEST);
 	gStateStack_Normalize[i] = glIsEnabled(GL_NORMALIZE);
 	gStateStack_Texture2D[i] = gMyState_Texture2D;
+	gStateStack_TextureUnit[i] = gMyState_TextureUnit;
 	gStateStack_Fog[i] 		= glIsEnabled(GL_FOG);
 	gStateStack_Blend[i] 	= gMyState_Blend;
 	gStateStack_Color[i] 	= gMyState_Color;
@@ -2053,6 +2055,8 @@ int		i;
 		glEnable(GL_NORMALIZE);
 	else
 		glDisable(GL_NORMALIZE);
+
+	OGL_ActiveTextureUnit(gStateStack_TextureUnit[i]);
 
 	if (gStateStack_Texture2D[i])
 		OGL_EnableTexture2D();
