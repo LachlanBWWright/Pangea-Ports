@@ -10,7 +10,8 @@
 //   • Software matrix stacks (modelview, projection) mirror the OpenGL state.
 //   • glVertexPointer / glNormalPointer / glColorPointer / glTexCoordPointer
 //     record client-side array state; on glDrawElements or glDrawArrays the
-//     data is uploaded to a temporary VBO and drawn with proper attrib bindings.
+//     common MetaObjects path uploads those arrays directly into per-attribute
+//     VBOs, while rarer legacy layouts fall back to a temporary interleaved VBO.
 //   • glBegin / glEnd buffers vertices in a small CPU array and flushes via
 //     glDrawArrays when glEnd is called; GL_QUADS is split into triangles.
 //   • glGetFloatv for GL_MODELVIEW_MATRIX / GL_PROJECTION_MATRIX returns our
@@ -191,7 +192,8 @@ static float   s_imm_cur_s0 = 0, s_imm_cur_t0 = 0;
 
 // ── GL objects ────────────────────────────────────────────────────────────────
 static GLuint  s_prog = 0;
-static GLuint  s_vbo  = 0;
+static GLuint  s_vbo  = 0;                 // fallback/immediate-mode interleaved path
+static GLuint  s_attr_vbo[5] = {0};        // direct per-attribute upload path
 static GLuint  s_ibo  = 0;
 
 static float  *s_interleave_buf = NULL;
@@ -222,6 +224,18 @@ static GLint u_sampler0, u_sampler1;
 static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
 static GLint u_tex_matrix;
+
+static inline GLsizei gl_type_size(GLenum type)
+{
+    switch (type)
+    {
+        case GL_FLOAT:          return (GLsizei) sizeof(GLfloat);
+        case GL_UNSIGNED_BYTE:  return (GLsizei) sizeof(GLubyte);
+        case GL_UNSIGNED_SHORT: return (GLsizei) sizeof(GLushort);
+        case GL_UNSIGNED_INT:   return (GLsizei) sizeof(GLuint);
+        default:                return 0;
+    }
+}
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
@@ -424,6 +438,10 @@ static void upload_uniforms(void) {
     glUniform1i(u_texenv1,  s_texenv_mode[1]);
     glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
 
+    // Preserve the legacy side effect from the old GL query path: callers
+    // outside MetaObjects still assume unit 0 is active after draw setup.
+    glActiveTexture(GL_TEXTURE0);
+
     // Texture matrix (for UV animation via glMatrixMode(GL_TEXTURE))
     if (s_tex_matrix_dirty) {
         glUniformMatrix4fv(u_tex_matrix, 1, GL_FALSE, s_tex_matrix.m);
@@ -431,9 +449,131 @@ static void upload_uniforms(void) {
     }
 }
 
-// Set up vertex attributes from client-side arrays, upload to VBO, return
-// vertex count (or -1 on error).  stride_out = per-vertex byte size.
+static int array_is_direct_compatible(const ClientArray* array, GLint min_components, GLint max_components, GLenum type)
+{
+    if (!array->enabled || !array->ptr)
+        return 1;
+
+    if (array->type != type)
+        return 0;
+
+    if (array->size < min_components || array->size > max_components)
+        return 0;
+
+    GLsizei elemSize = gl_type_size(type);
+    if (elemSize == 0)
+        return 0;
+
+    GLsizei packedStride = array->size * elemSize;
+    return array->stride == 0 || array->stride == packedStride;
+}
+
+static void set_disabled_attrib(GLuint attrib, int components, const float* value)
+{
+    glDisableVertexAttribArray(attrib);
+
+    switch (components)
+    {
+        case 2:
+            glVertexAttrib2f(attrib, value[0], value[1]);
+            break;
+
+        case 3:
+            glVertexAttrib3f(attrib, value[0], value[1], value[2]);
+            break;
+
+        default:
+            glVertexAttrib4f(attrib, value[0], value[1], value[2], value[3]);
+            break;
+    }
+}
+
+static int setup_vertex_attribs_direct(int vertex_count)
+{
+    if (!array_is_direct_compatible(&s_ca_vertex, 2, 4, GL_FLOAT)
+        || !array_is_direct_compatible(&s_ca_normal, 3, 3, GL_FLOAT)
+        || !array_is_direct_compatible(&s_ca_color, 4, 4, GL_FLOAT)
+        || !array_is_direct_compatible(&s_ca_texcoord[0], 2, 2, GL_FLOAT)
+        || !array_is_direct_compatible(&s_ca_texcoord[1], 2, 2, GL_FLOAT))
+    {
+        return 0;
+    }
+
+    if (!s_ca_vertex.enabled || !s_ca_vertex.ptr)
+        return -1;
+
+    const float normalDefault[3] = {0.0f, 0.0f, 1.0f};
+    const float texcoordDefault[2] = {0.0f, 0.0f};
+
+    glBindBuffer(GL_ARRAY_BUFFER, s_attr_vbo[ATTRIB_POSITION]);
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        vertex_count * s_ca_vertex.size * (GLsizeiptr) sizeof(GLfloat),
+        s_ca_vertex.ptr,
+        GL_STREAM_DRAW);
+    glEnableVertexAttribArray(ATTRIB_POSITION);
+    glVertexAttribPointer(ATTRIB_POSITION, s_ca_vertex.size, GL_FLOAT, GL_FALSE, 0, 0);
+
+    if (s_ca_normal.enabled && s_ca_normal.ptr)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, s_attr_vbo[ATTRIB_NORMAL]);
+        glBufferData(GL_ARRAY_BUFFER, vertex_count * 3 * (GLsizeiptr) sizeof(GLfloat), s_ca_normal.ptr, GL_STREAM_DRAW);
+        glEnableVertexAttribArray(ATTRIB_NORMAL);
+        glVertexAttribPointer(ATTRIB_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    }
+    else
+    {
+        set_disabled_attrib(ATTRIB_NORMAL, 3, normalDefault);
+    }
+
+    if (s_ca_color.enabled && s_ca_color.ptr)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, s_attr_vbo[ATTRIB_COLOR]);
+        glBufferData(GL_ARRAY_BUFFER, vertex_count * 4 * (GLsizeiptr) sizeof(GLfloat), s_ca_color.ptr, GL_STREAM_DRAW);
+        glEnableVertexAttribArray(ATTRIB_COLOR);
+        glVertexAttribPointer(ATTRIB_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    }
+    else
+    {
+        set_disabled_attrib(ATTRIB_COLOR, 4, s_current_color);
+    }
+
+    if (s_ca_texcoord[0].enabled && s_ca_texcoord[0].ptr)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, s_attr_vbo[ATTRIB_TEXCOORD0]);
+        glBufferData(GL_ARRAY_BUFFER, vertex_count * 2 * (GLsizeiptr) sizeof(GLfloat), s_ca_texcoord[0].ptr, GL_STREAM_DRAW);
+        glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
+        glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    }
+    else
+    {
+        set_disabled_attrib(ATTRIB_TEXCOORD0, 2, texcoordDefault);
+    }
+
+    if (s_ca_texcoord[1].enabled && s_ca_texcoord[1].ptr)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, s_attr_vbo[ATTRIB_TEXCOORD1]);
+        glBufferData(GL_ARRAY_BUFFER, vertex_count * 2 * (GLsizeiptr) sizeof(GLfloat), s_ca_texcoord[1].ptr, GL_STREAM_DRAW);
+        glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
+        glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    }
+    else
+    {
+        set_disabled_attrib(ATTRIB_TEXCOORD1, 2, texcoordDefault);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    return 1;
+}
+
+// Set up vertex attributes from client-side arrays.  Use the direct-upload fast
+// path for the tightly packed float arrays used by MetaObjects; fall back to the
+// older CPU interleaving path for unusual legacy layouts so behaviour stays safe.
 static int setup_vertex_attribs_from_arrays(int vertex_count) {
+    int direct_result = setup_vertex_attribs_direct(vertex_count);
+    if (direct_result != 0)
+        return direct_result > 0 ? vertex_count : -1;
+
     // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
     const int STRIDE_FLOATS = (3+3+4+2+2);
     const int STRIDE_BYTES = STRIDE_FLOATS * sizeof(float);  // 56 bytes
@@ -612,7 +752,8 @@ void COMPAT_GL_Init(void) {
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
     u_tex_matrix  = glGetUniformLocation(s_prog, "u_tex_matrix");
 
-    // VBO/IBO for interleaved vertex data and indices
+    // VBOs for the direct-upload fast path plus the fallback/immediate-mode path.
+    glGenBuffers(5, s_attr_vbo);
     glGenBuffers(1, &s_vbo);
     glGenBuffers(1, &s_ibo);
 
