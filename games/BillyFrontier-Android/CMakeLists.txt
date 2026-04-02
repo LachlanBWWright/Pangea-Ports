@@ -397,7 +397,7 @@ if(EMSCRIPTEN)
 		# Full OpenGL ES 2.0 emulation via our custom compat layer (modern_gl.c,
 		# vertex_array_compat.c, state_compat.c) instead of LEGACY_GL_EMULATION.
 		# LEGACY_GL_EMULATION crashes in Emscripten 3.x headless (TypeError reading '1').
-		-sFULL_ES2=1
+		# FULL_ES2 not needed: vertex_array_compat.c manages explicit VBOs/IBOs.
 
 		# Memory configuration
 		-sINITIAL_MEMORY=134217728		# 128 MB initial heap

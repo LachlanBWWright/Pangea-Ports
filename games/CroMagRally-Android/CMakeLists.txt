@@ -400,7 +400,7 @@ if(EMSCRIPTEN)
 		# Full OpenGL ES 2.0 emulation via our custom compat layer (modern_gl.c,
 		# vertex_array_compat.c, state_compat.c) instead of LEGACY_GL_EMULATION.
 		# LEGACY_GL_EMULATION has vertex-positioning bugs in Emscripten 3.x.
-		-sFULL_ES2=1
+		# FULL_ES2 not needed: vertex_array_compat.c manages explicit VBOs/IBOs.
 		# WebGL 2 for better compatibility; UNSIGNED_INT index buffers are natively
 		# supported in WebGL 2 (no OES_element_index_uint extension needed).
 		-sMAX_WEBGL_VERSION=2

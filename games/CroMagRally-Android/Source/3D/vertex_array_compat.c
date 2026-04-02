@@ -36,7 +36,7 @@ extern int gBufferUploadsThisFrame;
 VertexArrayState gVertexArrayState;
 static int gCurrentClientTexture = 0; // 0 or 1 for GL_TEXTURE0 or GL_TEXTURE1
 
-// ── Persistent GPU buffers ──────────────────────────────────────────────
+// ── Persistent GPU buffers (DrawArrays / immediate path) ────────────────
 // One VBO per vertex attribute (non-interleaved layout).
 // Created on first use, never deleted — avoids per-draw-call
 // glGenBuffers/glDeleteBuffers which stall the GPU pipeline.
@@ -50,6 +50,70 @@ static uint8_t sEnabledAttribMask = 0x1F;  // all 5 enabled by ModernGL_Init
 // Persistent scratch buffer for ushort→uint index conversion
 static GLuint* sIdxConvertBuf = NULL;
 static int sIdxConvertBufCap = 0;
+
+// ── Static-geometry draw cache ───────────────────────────────────────────
+// BG3D model data lives at stable C pointers across frames. A pointer-keyed
+// LRU cache lets CompatGL_DrawElements skip all glBufferData calls when the
+// same geometry is redrawn (cache hit). Each entry owns its own per-attribute
+// VBOs and IBO so it never aliases with other entries.
+#define DRAW_CACHE_SIZE 128
+
+typedef struct {
+    int       valid;
+    uint32_t  last_used;
+    const void* vptr;
+    const void* nptr;
+    const void* cptr;
+    const void* tc0ptr;
+    const void* tc1ptr;
+    const void* idxptr;
+    int       vertex_count;
+    GLsizei   index_count;
+    GLenum    color_type;
+    uint8_t   attrib_mask;
+    GLuint    attr_vbo[5];
+    GLuint    ibo;
+} DrawCacheEntry;
+
+static DrawCacheEntry sDC[DRAW_CACHE_SIZE];
+static uint32_t sDC_clock = 1;
+
+static DrawCacheEntry* DC_Find(const void* vptr, const void* nptr,
+    const void* cptr, const void* tc0ptr, const void* tc1ptr,
+    const void* idxptr, int vertexCount, GLsizei indexCount,
+    uint8_t attribMask)
+{
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
+        DrawCacheEntry* e = &sDC[i];
+        if (!e->valid) continue;
+        if (e->vptr   != vptr   || e->nptr    != nptr   || e->cptr  != cptr  ||
+            e->tc0ptr != tc0ptr || e->tc1ptr  != tc1ptr || e->idxptr != idxptr ||
+            e->vertex_count != vertexCount || e->index_count != indexCount ||
+            e->attrib_mask != attribMask)
+            continue;
+        e->last_used = sDC_clock++;
+        return e;
+    }
+    return NULL;
+}
+
+static DrawCacheEntry* DC_Alloc(void)
+{
+    DrawCacheEntry* e = NULL;
+    uint32_t oldest = 0xFFFFFFFFu;
+    int oldest_i = 0;
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
+        if (!sDC[i].valid) { e = &sDC[i]; break; }
+        if (sDC[i].last_used < oldest) { oldest = sDC[i].last_used; oldest_i = i; }
+    }
+    if (!e) e = &sDC[oldest_i];
+    if (!e->ibo) {
+        glGenBuffers(5, e->attr_vbo);
+        glGenBuffers(1, &e->ibo);
+    }
+    e->valid = 1;
+    return e;
+}
 
 // ── Attribute enable/disable helpers ────────────────────────────────────
 
@@ -197,10 +261,6 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         return; // Unsupported index type
 
     // ── Find maximum index to determine vertex count ──────────────────
-    // This scan is still needed because the client-side vertex array
-    // functions (glVertexPointer, glNormalPointer, etc.) do not receive
-    // a count parameter.  The loop is ~0.01ms for typical index counts
-    // (~600) which is a small fraction of the total savings.
     GLuint maxIdx = 0;
     if (type == GL_UNSIGNED_INT)
     {
@@ -217,21 +277,13 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
 
     int vertexCount = (int)maxIdx + 1;
 
-    // ── Create persistent VBOs on first use ──────────────────────────
-    if (!sAttrVBO[0])
-    {
-        glGenBuffers(5, sAttrVBO);
-        glGenBuffers(1, &sIndexIBO);
-    }
-
-    // ── Determine which attributes are provided ──────────────────────
     Boolean hasPos   = gVertexArrayState.vertexArrayEnabled && gVertexArrayState.vertexPointer;
     Boolean hasNorm  = gVertexArrayState.normalArrayEnabled && gVertexArrayState.normalPointer;
     Boolean hasColor = gVertexArrayState.colorArrayEnabled  && gVertexArrayState.colorPointer;
     Boolean hasTC0   = gVertexArrayState.texCoordArrayEnabled[0] && gVertexArrayState.texCoordPointers[0];
     Boolean hasTC1   = gVertexArrayState.texCoordArrayEnabled[1] && gVertexArrayState.texCoordPointers[1];
 
-    uint8_t attribMask = (1u << ATTRIB_LOCATION_POSITION);  // always need position
+    uint8_t attribMask = (1u << ATTRIB_LOCATION_POSITION);
     if (hasNorm)  attribMask |= (1u << ATTRIB_LOCATION_NORMAL);
     if (hasColor) attribMask |= (1u << ATTRIB_LOCATION_COLOR);
     if (hasTC0)   attribMask |= (1u << ATTRIB_LOCATION_TEXCOORD0);
@@ -239,96 +291,128 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
 
     SyncAttribEnables(attribMask);
 
+    // ── Draw cache lookup ─────────────────────────────────────────────
+    DrawCacheEntry* entry = DC_Find(
+        gVertexArrayState.vertexPointer, gVertexArrayState.normalPointer,
+        gVertexArrayState.colorPointer, gVertexArrayState.texCoordPointers[0],
+        gVertexArrayState.texCoordPointers[1], indices,
+        vertexCount, count, attribMask);
+
     int uploads = 0;
 
-    // ── POSITIONS: direct upload from client array (zero CPU copy) ───
+    if (!entry)
+    {
+        // Cache miss — upload data with GL_STATIC_DRAW and store in cache.
+        entry = DC_Alloc();
+        entry->vptr   = gVertexArrayState.vertexPointer;
+        entry->nptr   = gVertexArrayState.normalPointer;
+        entry->cptr   = gVertexArrayState.colorPointer;
+        entry->tc0ptr = gVertexArrayState.texCoordPointers[0];
+        entry->tc1ptr = gVertexArrayState.texCoordPointers[1];
+        entry->idxptr = indices;
+        entry->vertex_count = vertexCount;
+        entry->index_count  = count;
+        entry->color_type   = gVertexArrayState.colorType;
+        entry->attrib_mask  = attribMask;
+        entry->last_used    = sDC_clock++;
+
+        if (hasPos)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_POSITION]);
+            glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (GLsizeiptr)sizeof(GLfloat),
+                         gVertexArrayState.vertexPointer, GL_STATIC_DRAW);
+            uploads++;
+        }
+        if (hasNorm)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_NORMAL]);
+            glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (GLsizeiptr)sizeof(GLfloat),
+                         gVertexArrayState.normalPointer, GL_STATIC_DRAW);
+            uploads++;
+        }
+        if (hasColor)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_COLOR]);
+            if (gVertexArrayState.colorType == GL_FLOAT)
+                glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (GLsizeiptr)sizeof(GLfloat),
+                             gVertexArrayState.colorPointer, GL_STATIC_DRAW);
+            else
+                glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (GLsizeiptr)sizeof(GLubyte),
+                             gVertexArrayState.colorPointer, GL_STATIC_DRAW);
+            uploads++;
+        }
+        if (hasTC0)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_TEXCOORD0]);
+            glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (GLsizeiptr)sizeof(GLfloat),
+                         gVertexArrayState.texCoordPointers[0], GL_STATIC_DRAW);
+            uploads++;
+        }
+        if (hasTC1)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_TEXCOORD1]);
+            glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (GLsizeiptr)sizeof(GLfloat),
+                         gVertexArrayState.texCoordPointers[1], GL_STATIC_DRAW);
+            uploads++;
+        }
+
+        // Index buffer: always use GL_UNSIGNED_INT for simplicity
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ibo);
+        if (type == GL_UNSIGNED_INT)
+        {
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (GLsizeiptr)sizeof(GLuint),
+                         indices, GL_STATIC_DRAW);
+        }
+        else
+        {
+            if (count > sIdxConvertBufCap)
+            {
+                int newCap = count > sIdxConvertBufCap * 2 ? count : sIdxConvertBufCap * 2;
+                if (newCap < 256) newCap = 256;
+                free(sIdxConvertBuf);
+                sIdxConvertBuf = (GLuint*)malloc(newCap * sizeof(GLuint));
+                sIdxConvertBufCap = newCap;
+            }
+            const GLushort* src = (const GLushort*)indices;
+            for (GLsizei i = 0; i < count; i++)
+                sIdxConvertBuf[i] = (GLuint)src[i];
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (GLsizeiptr)sizeof(GLuint),
+                         sIdxConvertBuf, GL_STATIC_DRAW);
+        }
+        uploads++;
+    }
+
+    // Bind attribute VBOs (cache hit: free; cache miss: just re-bound above)
     if (hasPos)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[0]);
-        glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (GLsizeiptr)sizeof(GLfloat),
-                     gVertexArrayState.vertexPointer, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_POSITION]);
         glVertexAttribPointer(ATTRIB_LOCATION_POSITION, 3, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
     }
-
-    // ── NORMALS: direct upload from client array (zero CPU copy) ─────
     if (hasNorm)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[1]);
-        glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (GLsizeiptr)sizeof(GLfloat),
-                     gVertexArrayState.normalPointer, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_NORMAL]);
         glVertexAttribPointer(ATTRIB_LOCATION_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
     }
-
-    // ── COLORS: direct upload; GPU handles byte→float normalization ──
     if (hasColor)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[2]);
-        if (gVertexArrayState.colorType == GL_FLOAT)
-        {
-            glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (GLsizeiptr)sizeof(GLfloat),
-                         gVertexArrayState.colorPointer, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_COLOR]);
+        if (entry->color_type == GL_FLOAT)
             glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
-        }
-        else if (gVertexArrayState.colorType == GL_UNSIGNED_BYTE)
-        {
-            // GL_TRUE = normalized: GPU converts 0–255 to 0.0–1.0
-            glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (GLsizeiptr)sizeof(GLubyte),
-                         gVertexArrayState.colorPointer, GL_DYNAMIC_DRAW);
+        else
             glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
-        }
-        uploads++;
     }
-
-    // ── TEXCOORD0: direct upload (zero CPU copy) ─────────────────────
     if (hasTC0)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[3]);
-        glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (GLsizeiptr)sizeof(GLfloat),
-                     gVertexArrayState.texCoordPointers[0], GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_TEXCOORD0]);
         glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
     }
-
-    // ── TEXCOORD1: direct upload (zero CPU copy) ─────────────────────
     if (hasTC1)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[4]);
-        glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (GLsizeiptr)sizeof(GLfloat),
-                     gVertexArrayState.texCoordPointers[1], GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attr_vbo[ATTRIB_LOCATION_TEXCOORD1]);
         glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
     }
 
-    // ── INDEX BUFFER ─────────────────────────────────────────────────
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sIndexIBO);
-    if (type == GL_UNSIGNED_INT)
-    {
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (GLsizeiptr)sizeof(GLuint),
-                     indices, GL_DYNAMIC_DRAW);
-    }
-    else
-    {
-        // Convert ushort indices to uint (required for OES_element_index_uint)
-        if (count > sIdxConvertBufCap)
-        {
-            int newCap = count > sIdxConvertBufCap * 2 ? count : sIdxConvertBufCap * 2;
-            if (newCap < 256) newCap = 256;
-            free(sIdxConvertBuf);
-            sIdxConvertBuf = (GLuint*)malloc(newCap * sizeof(GLuint));
-            sIdxConvertBufCap = newCap;
-        }
-        const GLushort* src = (const GLushort*)indices;
-        for (GLsizei i = 0; i < count; i++)
-            sIdxConvertBuf[i] = (GLuint)src[i];
-
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (GLsizeiptr)sizeof(GLuint),
-                     sIdxConvertBuf, GL_DYNAMIC_DRAW);
-    }
-    uploads++;
-
-    // ── DRAW ─────────────────────────────────────────────────────────
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ibo);
     glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
