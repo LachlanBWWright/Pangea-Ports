@@ -752,6 +752,10 @@ do_anaglyph:
            /* SWAP THE BUFFS */
 
 	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
+
+	if (gGamePrefs.anaglyph)
+		RestoreCamerasFromAnaglyph();
+
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 #ifdef __EMSCRIPTEN__
@@ -759,10 +763,6 @@ do_anaglyph:
 	emscripten_sleep(0);							// yield to browser (required for ASYNCIFY)
 	EndProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
 #endif
-
-
-	if (gGamePrefs.anaglyph)
-		RestoreCamerasFromAnaglyph();
 
 }
 
