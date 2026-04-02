@@ -608,6 +608,7 @@
     var selectedGame = null;
     var activeGame = null;
     var resizeObserver = null;
+    var warnedAboutZeroCanvasSize = false;
 
     function getGameConfig(id) {
       return GAME_CONFIGS[id] || null;
@@ -670,12 +671,19 @@
       });
     }
 
-    function updateUploadDefaults(gameId) {
-      var config = getGameConfig(gameId);
+    function setUploadPaths(config, targetPath) {
+      var normalizedTarget = normalizeFsPath(targetPath || config.upload.defaultWritePath || '');
       var targetInput = document.getElementById('upload-target-path');
       var argInput = document.getElementById('upload-arg-path');
-      targetInput.value = config.upload.defaultWritePath || '';
-      argInput.value = getDefaultArgPath(config, targetInput.value);
+      targetInput.value = normalizedTarget;
+      targetInput.dataset.autoManaged = 'true';
+      argInput.value = getDefaultArgPath(config, normalizedTarget);
+    }
+
+    function updateUploadDefaults(gameId) {
+      var config = getGameConfig(gameId);
+      var argInput = document.getElementById('upload-arg-path');
+      setUploadPaths(config, config.upload.defaultWritePath || '');
       argInput.disabled = !config.upload.argFlag;
       document.getElementById('upload-help').textContent = config.upload.help;
       document.getElementById('upload-arg-hint').textContent = config.upload.hint;
@@ -741,10 +749,8 @@
       var current = '';
       for (var i = 0; i < parts.length - 1; i++) {
         current += '/' + parts[i];
-        try {
+        if (!FS.analyzePath(current).exists) {
           FS.mkdir(current);
-        } catch (err) {
-          if (!err || !/exist|ErrnoError/.test(String(err))) throw err;
         }
       }
     }
@@ -752,7 +758,9 @@
     function readFileAsUint8Array(file) {
       return new Promise(function(resolve, reject) {
         var reader = new FileReader();
-        reader.onerror = function() { reject(reader.error || new Error('Failed to read file.')); };
+        reader.onerror = function() {
+          reject(reader.error || new Error('Failed to read file: ' + file.name));
+        };
         reader.onload = function(e) { resolve(new Uint8Array(e.target.result)); };
         reader.readAsArrayBuffer(file);
       });
@@ -801,11 +809,8 @@
       if (!preset) return;
       var targetInput = document.getElementById('upload-target-path');
       if (preset.suggestedWritePath && targetInput) {
-        if (!targetInput.value || targetInput.value === config.upload.defaultWritePath) {
-          targetInput.value = preset.suggestedWritePath;
-          if (config.upload.argFlag) {
-            document.getElementById('upload-arg-path').value = getDefaultArgPath(config, preset.suggestedWritePath);
-          }
+        if (targetInput.dataset.autoManaged !== 'false') {
+          setUploadPaths(config, preset.suggestedWritePath);
         }
       }
       launchConfiguredGame(gameId, preset.args, preset).catch(function(err) {
@@ -893,7 +898,14 @@
       if (!canvas) return;
       var cssW = canvas.clientWidth;
       var cssH = canvas.clientHeight;
-      if (!cssW || !cssH) return;
+      if (!cssW || !cssH) {
+        if (activeGame && !warnedAboutZeroCanvasSize) {
+          console.warn('syncCanvasSize: canvas has no CSS dimensions (cssW=' + cssW + ', cssH=' + cssH + ')');
+          warnedAboutZeroCanvasSize = true;
+        }
+        return;
+      }
+      warnedAboutZeroCanvasSize = false;
       var dpr = window.devicePixelRatio || 1;
       var w = Math.max(1, Math.round(cssW * dpr));
       var h = Math.max(1, Math.round(cssH * dpr));
@@ -949,6 +961,7 @@
     document.getElementById('upload-target-path').addEventListener('input', function() {
       var config = getGameConfig(selectedGame);
       var argInput = document.getElementById('upload-arg-path');
+      this.dataset.autoManaged = 'false';
       if (config && config.upload && config.upload.argFlag) {
         argInput.value = getDefaultArgPath(config, this.value);
       }

@@ -165,7 +165,8 @@ class SkipToLevelPlaywrightTests(unittest.TestCase):
             page.goto(f"{self._base_url}/docs/index.html", wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
             page.click('[data-game="nanosaur2"]')
 
-            self.assertEqual(page.locator("#launcher-panel.hidden").count(), 0, "Launcher panel should be visible")
+            launcher_classes = page.locator("#launcher-panel").get_attribute("class") or ""
+            self.assertNotIn("hidden", launcher_classes, "Launcher panel should be visible")
             self.assertEqual(page.locator("#game-area.active").count(), 0, "Selecting a game should not boot it immediately")
             self.assertIn("Nanosaur 2", page.locator("#launcher-title").text_content())
             self.assertIn("Start normally", page.locator("#launch-normal").text_content())

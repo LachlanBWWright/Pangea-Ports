@@ -19,5 +19,5 @@ This is the current launcher-oriented mapping used by `/docs/index.html`.
 2. Choose a preset level/track or use **Start normally**.
 3. If the editor has a custom level file, upload it before launch.
 4. Set the virtual filesystem path that should be replaced.
-5. If the game supports explicit override arguments, keep or adjust the suggested launch override path.
+5. If the game supports explicit override arguments, keep the suggested launch override path or adjust it as needed.
 6. Launch the game directly in the shared canvas.
