@@ -8,6 +8,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 extern	Byte					**gMapSplitMode;
 extern	SuperTileItemIndexType	**gSuperTileItemIndexGrid;
@@ -727,6 +728,8 @@ uint16_t			i,unique;
 uint32_t			textureName;
 OGLPoint3D		cameraCoord;
 
+	StartProfilePhase(PROFILE_PHASE_TERRAIN);
+
 
 
 #if TERRAIN_DEBUG_GWORLD
@@ -885,9 +888,10 @@ uint32_t			pictRowBytes;
 	OGL_PopState();
 
 
-		/* DRAW OBJECTS */
+	/* DRAW OBJECTS */
 
 	DrawSkidMarks();
+	StartProfilePhase(PROFILE_PHASE_OBJECTS);
 	DrawObjects();														// draw objNodes & fences
 
 		/*********************************************/
@@ -1429,8 +1433,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
-
 
 
 

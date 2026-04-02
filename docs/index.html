@@ -80,15 +80,16 @@
     }
     #content {
       flex: 1 1 0;
-      position: relative;
-      overflow: hidden;
+      overflow: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
     }
     #welcome,
     #launcher-panel {
-      position: absolute;
-      inset: 0;
-      overflow: auto;
-      padding: 2rem;
+      width: min(1100px, 100%);
     }
     #welcome {
       display: flex;
@@ -96,6 +97,12 @@
       align-items: center;
       justify-content: center;
       gap: 1rem;
+      min-height: min(720px, calc(100dvh - var(--nav-h) - 3rem));
+      width: min(1100px, 100%);
+      padding: 2rem;
+      border: 1px solid rgba(140,208,255,.12);
+      border-radius: 18px;
+      box-shadow: 0 22px 64px rgba(0,0,0,.25);
       background: radial-gradient(circle at 50% 40%, #122446 0%, #0b1528 50%, #09111f 100%);
       text-align: center;
     }
@@ -152,7 +159,7 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      background: linear-gradient(180deg, rgba(9,17,31,.96), rgba(9,17,31,.98));
+      background: none;
     }
     .launcher-card {
       width: min(1100px, 100%);
@@ -255,17 +262,32 @@
     .pill.error { color: var(--danger); border-color: rgba(255,158,158,.35); }
     #game-area {
       display: none;
+      width: min(100%, 1300px);
+    }
+    #game-area.active {
+      display: grid;
+      gap: .85rem;
+    }
+    #game-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 22px 64px rgba(0,0,0,.35);
+    }
+    #canvas {
       position: absolute;
       inset: 0;
-      background: #000;
-    }
-    #game-area.active { display: block; }
-    #canvas {
-      display: block;
       width: 100%;
       height: 100%;
       outline: none;
       background: #000;
+    }
+    .game-actions {
+      justify-content: flex-end;
     }
     #loading-card {
       position: absolute;
@@ -301,10 +323,13 @@
     }
     @media (max-width: 720px) {
       #welcome,
-      #launcher-panel { padding: 1rem; }
+      #content { padding: 1rem; }
+      #welcome { padding: 1rem; }
       .launcher-card { padding: 1rem; }
       .launcher-header { flex-direction: column; }
       .preset-btn { min-width: 100%; }
+      .game-actions { justify-content: stretch; }
+      .game-actions > * { width: 100%; }
     }
   </style>
 </head>
@@ -388,12 +413,17 @@
     </div>
 
     <div id="game-area">
-      <div id="loading-card">
-        <p id="status-text">Loading…</p>
-        <progress id="progress-bar" value="0" max="100"></progress>
-        <p id="progress-label">Downloading game data…</p>
+      <div id="game-stage">
+        <div id="loading-card">
+          <p id="status-text">Loading…</p>
+          <progress id="progress-bar" value="0" max="100"></progress>
+          <p id="progress-label">Downloading game data…</p>
+        </div>
+        <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()" width="1280" height="720"></canvas>
       </div>
-      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()" width="1280" height="720"></canvas>
+      <div class="action-row game-actions">
+        <button id="toggle-fullscreen" class="secondary-btn" type="button">Enter fullscreen</button>
+      </div>
     </div>
   </div>
 
@@ -607,8 +637,10 @@
 
     var selectedGame = null;
     var activeGame = null;
+    var activeGameConfig = null;
     var resizeObserver = null;
     var warnedAboutZeroCanvasSize = false;
+    var pendingLaunchKey = 'pangeaPorts.pendingLaunch.v1';
 
     function getGameConfig(id) {
       return GAME_CONFIGS[id] || null;
@@ -643,7 +675,56 @@
       });
     }
 
+    function getGameStage() {
+      return document.getElementById('game-stage');
+    }
+
+    function isGameStageFullscreen() {
+      var stage = getGameStage();
+      return !!stage && (
+        document.fullscreenElement === stage
+        || document.webkitFullscreenElement === stage
+        || document.mozFullScreenElement === stage
+      );
+    }
+
+    function updateFullscreenButton() {
+      var button = document.getElementById('toggle-fullscreen');
+      button.disabled = !activeGame;
+      button.textContent = isGameStageFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen';
+    }
+
+    function savePendingLaunch(gameId, args) {
+      try {
+        sessionStorage.setItem(pendingLaunchKey, JSON.stringify({
+          gameId: gameId,
+          args: Array.isArray(args) ? args.slice() : []
+        }));
+      } catch (err) {
+        console.warn('Failed to save pending launch', err);
+      }
+    }
+
+    function consumePendingLaunch() {
+      try {
+        var raw = sessionStorage.getItem(pendingLaunchKey);
+        if (!raw) return null;
+        sessionStorage.removeItem(pendingLaunchKey);
+        var parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.gameId !== 'string' || !Array.isArray(parsed.args)) return null;
+        return {
+          gameId: parsed.gameId,
+          args: parsed.args.map(function(arg) { return String(arg); })
+        };
+      } catch (err) {
+        sessionStorage.removeItem(pendingLaunchKey);
+        console.warn('Ignoring invalid pending launch payload', err);
+        return null;
+      }
+    }
+
     function resetSelection() {
+      sessionStorage.removeItem(pendingLaunchKey);
       if (activeGame) {
         location.hash = '';
         location.reload();
@@ -797,7 +878,17 @@
 
     async function launchConfiguredGame(gameId, baseArgs, preset) {
       var config = getGameConfig(gameId);
-      if (!config || activeGame) return;
+      if (!config) return;
+      if (activeGame) {
+        if (getSelectedUploadSummary()) {
+          updateUploadStatus('Reload before re-launching with a new injected file.', 'error');
+          return;
+        }
+        savePendingLaunch(gameId, baseArgs);
+        location.hash = '#' + gameId;
+        location.reload();
+        return;
+      }
       var upload = await prepareUpload(config, preset);
       var args = buildLaunchArgs(config, baseArgs, upload);
       await loadGame(gameId, args, upload);
@@ -824,11 +915,14 @@
       if (!config) return;
       selectedGame = id;
       activeGame = id;
-      document.getElementById('launcher-panel').classList.add('hidden');
+      activeGameConfig = config;
       document.getElementById('welcome').classList.add('hidden');
       document.getElementById('game-area').classList.add('active');
 
       var canvas = document.getElementById('canvas');
+      var stage = getGameStage();
+      stage.style.maxWidth = config.canvas.width + 'px';
+      stage.style.aspectRatio = config.canvas.width + ' / ' + config.canvas.height;
       canvas.width = config.canvas.width;
       canvas.height = config.canvas.height;
 
@@ -844,6 +938,7 @@
       labelEl.textContent = 'Downloading game data…';
       card.classList.remove('hidden');
       progressEl.removeAttribute('value');
+      updateFullscreenButton();
       syncCanvasSize();
 
       window.Module = {
@@ -896,6 +991,7 @@
     function syncCanvasSize() {
       var canvas = document.getElementById('canvas');
       if (!canvas) return;
+      var config = activeGameConfig;
       var cssW = canvas.clientWidth;
       var cssH = canvas.clientHeight;
       if (!cssW || !cssH) {
@@ -909,6 +1005,10 @@
       var dpr = window.devicePixelRatio || 1;
       var w = Math.max(1, Math.round(cssW * dpr));
       var h = Math.max(1, Math.round(cssH * dpr));
+      if (config && !isGameStageFullscreen()) {
+        w = Math.min(w, config.canvas.width);
+        h = Math.min(h, config.canvas.height);
+      }
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
@@ -934,7 +1034,10 @@
         resizeObserver.observe(document.getElementById('canvas'));
       }
       ['resize', 'orientationchange', 'fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'].forEach(function(evt) {
-        window.addEventListener(evt, scheduleCanvasSync);
+        window.addEventListener(evt, function() {
+          updateFullscreenButton();
+          scheduleCanvasSync();
+        });
       });
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', scheduleCanvasSync);
@@ -942,6 +1045,20 @@
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden) scheduleCanvasSync();
       });
+    }
+
+    async function toggleGameFullscreen() {
+      var stage = getGameStage();
+      if (!stage || !activeGame) return;
+      if (isGameStageFullscreen()) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else {
+        if (stage.requestFullscreen) await stage.requestFullscreen();
+        else if (stage.webkitRequestFullscreen) stage.webkitRequestFullscreen();
+      }
+      updateFullscreenButton();
+      scheduleCanvasSync();
     }
 
     document.getElementById('launch-normal').addEventListener('click', function() {
@@ -956,6 +1073,11 @@
     document.getElementById('clear-upload').addEventListener('click', function() {
       document.getElementById('upload-file').value = '';
       updateUploadStatus();
+    });
+    document.getElementById('toggle-fullscreen').addEventListener('click', function() {
+      toggleGameFullscreen().catch(function(err) {
+        console.error(err);
+      });
     });
     document.getElementById('upload-file').addEventListener('change', updateUploadStatus);
     document.getElementById('upload-target-path').addEventListener('input', function() {
@@ -974,10 +1096,24 @@
     });
 
     installResizeObservers();
+    updateFullscreenButton();
 
+    var pendingLaunch = consumePendingLaunch();
     var hash = window.location.hash.replace('#', '');
     if (hash && getGameConfig(hash)) {
       selectGame(hash);
+      if (pendingLaunch && pendingLaunch.gameId === hash) {
+        launchConfiguredGame(hash, pendingLaunch.args, null).catch(function(err) {
+          console.error(err);
+          updateUploadStatus(err.message || 'Launch failed', 'error');
+        });
+      }
+    } else if (pendingLaunch && getGameConfig(pendingLaunch.gameId)) {
+      selectGame(pendingLaunch.gameId);
+      launchConfiguredGame(pendingLaunch.gameId, pendingLaunch.args, null).catch(function(err) {
+        console.error(err);
+        updateUploadStatus(err.message || 'Launch failed', 'error');
+      });
     }
   </script>
 </body>

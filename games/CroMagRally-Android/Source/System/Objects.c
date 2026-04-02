@@ -11,6 +11,7 @@
 
 #include "game.h"
 #include "bones.h"
+#include "profiling.h"
 #include <stddef.h>
 
 extern int gMyState_ProjectionType;
@@ -472,7 +473,9 @@ short			skelType, playerNum;
 
 				/* FIRST DO OUR CULLING */
 
+	StartProfilePhase(PROFILE_PHASE_CULLING);
 	CullTestAllObjects();
+	StartProfilePhase(PROFILE_PHASE_OBJECTS);
 
 	theNode = gFirstNodePtr;
 
@@ -829,6 +832,7 @@ short			skelType, playerNum;
 			MOMaterialObject	*overrideTexture;
 
 			case	SKELETON_GENRE:
+					StartProfilePhase(PROFILE_PHASE_SKELETONS);
 					UpdateSkinnedGeometry(theNode);													// update skeleton geometry
 					numTriMeshes = theNode->Skeleton->skeletonDefinition->numDecomposedTriMeshes;
 					skelType = theNode->Type;
@@ -848,6 +852,7 @@ short			skelType, playerNum;
 
 						MO_DrawGeometry_VertexArray(&gLocalTriMeshesOfSkelType[skelType][i]);
 					}
+					StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					break;
 
 			case	DISPLAY_GROUP_GENRE:

@@ -307,6 +307,8 @@
     var _muted = false;
     var _fenceEnabled = true;
     var _isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+    var _nativeCanvasWidth = 1280;
+    var _nativeCanvasHeight = 800;
 
     if (_isEmbedded) {
       document.body.classList.add('embedded-shell');
@@ -320,6 +322,10 @@
       if (!cssW || !cssH) return;  // layout not settled yet (e.g. mid-fullscreen transition)
       var w = Math.floor(cssW * dpr);
       var h = Math.floor(cssH * dpr);
+      if (!document.fullscreenElement) {
+        w = Math.min(w, _nativeCanvasWidth);
+        h = Math.min(h, _nativeCanvasHeight);
+      }
       if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
         if (Module.setCanvasSize) Module.setCanvasSize(w, h);
         else { Module.canvas.width = w; Module.canvas.height = h; }

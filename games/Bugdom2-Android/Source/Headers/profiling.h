@@ -18,6 +18,7 @@ typedef struct {
     uint64_t start_tick;      // Start time of the current measurement
     uint64_t total_ticks;     // Accumulated ticks for this phase
     uint32_t samples;         // Number of samples taken
+    float last_frame_ms;      // Total milliseconds measured in the previous frame
     const char* name;         // Name of the phase
 } ProfilePhase;
 
@@ -33,10 +34,10 @@ void StartProfilePhase(ProfilePhaseType phase_type);
 // End timing a specific phase
 void EndProfilePhase(ProfilePhaseType phase_type);
 
-// Get the average millisecond cost of a phase
-float GetProfilePhaseAvgMs(ProfilePhaseType phase_type);
+// Get the measured millisecond cost of a phase for this frame (or the previous frame if not measured yet)
+float GetProfilePhaseMs(ProfilePhaseType phase_type);
 
-// Call this at the end of each frame to reset accumulated totals for average calculation
+// Call this at the end of each frame to snapshot totals for debug display and reset accumulators
 void ResetProfilingForFrame(void);
 
 #endif // PROFILING_H

@@ -1221,6 +1221,7 @@ unsigned long	someLong;
 		gPlayingFromSavedGame = false;
 		gSkipLevelIntro = true;
 		InitPlayerInfo_Game();
+		PlaySong(gLevelSongs[gLevelNum], true);
 		InitLevel();
 		PlayLevel();
 		CleanupLevel();

@@ -696,10 +696,13 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 
            /* SWAP THE BUFFS */
 
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 #ifdef __EMSCRIPTEN__
+	StartProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
 	emscripten_sleep(0);							// yield to browser event loop (ASYNCIFY)
+	EndProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
 #endif
 }
 
@@ -1527,9 +1530,15 @@ static char* UpdateDebugText(void)
 		"FPS:\t%d"
 		"\nIN:\t%.2f"
 		"\nLOG:\t%.2f"
-		"\nREN:\t%.2f"
+		"\nSET:\t%.2f"
+		"\nCUL:\t%.2f"
+		"\nTER:\t%.2f"
+		"\nOBJ:\t%.2f"
+		"\nSKL:\t%.2f"
 		"\nUI:\t%.2f"
 		"\nSWP:\t%.2f"
+		"\nYLD:\t%.2f"
+		"\nTOT:\t%.2f"
 		"\nTRIS:\t%d"
 		"\nOBJS:\t%d"
 		"\nVRAM:\t%d\vK"
@@ -1545,11 +1554,26 @@ static char* UpdateDebugText(void)
 		"\nZ:\t\t%d"
 		,
 		(int)(gFramesPerSecond + .5f),
-		GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT),
-		GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC),
-		GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING),
-		GetProfilePhaseAvgMs(PROFILE_PHASE_UI),
-		GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS),
+		GetProfilePhaseMs(PROFILE_PHASE_INPUT),
+		GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC),
+		GetProfilePhaseMs(PROFILE_PHASE_RENDERING),
+		GetProfilePhaseMs(PROFILE_PHASE_CULLING),
+		GetProfilePhaseMs(PROFILE_PHASE_TERRAIN),
+		GetProfilePhaseMs(PROFILE_PHASE_OBJECTS),
+		GetProfilePhaseMs(PROFILE_PHASE_SKELETONS),
+		GetProfilePhaseMs(PROFILE_PHASE_UI),
+		GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS),
+		GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD),
+		GetProfilePhaseMs(PROFILE_PHASE_INPUT)
+			+ GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC)
+			+ GetProfilePhaseMs(PROFILE_PHASE_RENDERING)
+			+ GetProfilePhaseMs(PROFILE_PHASE_CULLING)
+			+ GetProfilePhaseMs(PROFILE_PHASE_TERRAIN)
+			+ GetProfilePhaseMs(PROFILE_PHASE_OBJECTS)
+			+ GetProfilePhaseMs(PROFILE_PHASE_SKELETONS)
+			+ GetProfilePhaseMs(PROFILE_PHASE_UI)
+			+ GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS)
+			+ GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD),
 		gPolysThisFrame,
 		gNumObjectNodes,
 		gVRAMUsedThisFrame / 1024,
@@ -1729,4 +1753,3 @@ void OGL_SetProjection(int projectionType)
 
 	gMyState_ProjectionType = projectionType;
 }
-

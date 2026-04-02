@@ -9,6 +9,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 /****************************/
 /*  PROTOTYPES             */
@@ -903,6 +904,8 @@ uint16_t			i,unique;
 Boolean			superTileVisible;
 
 #pragma unused(theNode)
+
+	StartProfilePhase(PROFILE_PHASE_TERRAIN);
 
 				/**************/
 				/* DRAW STUFF */
@@ -1976,8 +1979,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
-
 
 
 

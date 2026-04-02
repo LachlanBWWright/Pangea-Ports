@@ -873,49 +873,64 @@ do_anaglyph:
 		int		y = 100;
 
 		int		x2 = 60;
+		float	inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
+		float	logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
+		float	renderMs = GetProfilePhaseMs(PROFILE_PHASE_RENDERING);
+		float	cullMs = GetProfilePhaseMs(PROFILE_PHASE_CULLING);
+		float	terrainMs = GetProfilePhaseMs(PROFILE_PHASE_TERRAIN);
+		float	objectMs = GetProfilePhaseMs(PROFILE_PHASE_OBJECTS);
+		float	skeletonMs = GetProfilePhaseMs(PROFILE_PHASE_SKELETONS);
+		float	uiMs = GetProfilePhaseMs(PROFILE_PHASE_UI);
+		float	swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
+		float	yieldMs = GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD);
+		float	totalMs = inputMs + logicMs + renderMs + cullMs + terrainMs + objectMs + skeletonMs + uiMs + swapMs + yieldMs;
 
 		OGL_DrawString("fps:", 10,y);
 		OGL_DrawInt(gFramesPerSecond+.5f, x2,y);
 		y += 15;
 
 		OGL_DrawString("input:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT), x2,y);
+		OGL_DrawFloat(inputMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("logic:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC), x2,y);
+		OGL_DrawFloat(logicMs, x2,y);
 		y += 15;
 
-		OGL_DrawString("render:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), x2,y);
+		OGL_DrawString("setup:", 10,y);
+		OGL_DrawFloat(renderMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("  cull:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_CULLING), x2,y);
+		OGL_DrawFloat(cullMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("  terr:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_TERRAIN), x2,y);
+		OGL_DrawFloat(terrainMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("  obj:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_OBJECTS), x2,y);
+		OGL_DrawFloat(objectMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("  skel:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_SKELETONS), x2,y);
+		OGL_DrawFloat(skeletonMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("ui:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_UI), x2,y);
+		OGL_DrawFloat(uiMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("swap:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS), x2,y);
+		OGL_DrawFloat(swapMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("yield:", 10,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_ASYNC_YIELD), x2,y);
+		OGL_DrawFloat(yieldMs, x2,y);
+		y += 15;
+
+		OGL_DrawString("total:", 10,y);
+		OGL_DrawFloat(totalMs, x2,y);
 		y += 15;
 
 		OGL_DrawString("tri:", 10,y);
@@ -2831,4 +2846,3 @@ static long OGL_MaxMemForVARType(Byte varType)
 				return(1000000);
 	}
 }
-

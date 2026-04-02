@@ -11,6 +11,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -446,7 +447,9 @@ short			skelType;
 
 				/* FIRST DO OUR CULLING */
 
+	StartProfilePhase(PROFILE_PHASE_CULLING);
 	CullTestAllObjects();
+	StartProfilePhase(PROFILE_PHASE_OBJECTS);
 
 	theNode = gFirstNodePtr;
 
@@ -736,6 +739,7 @@ short			skelType;
 		switch(theNode->Genre)
 		{
 			case	SKELETON_GENRE:
+					StartProfilePhase(PROFILE_PHASE_SKELETONS);
 					UpdateSkinnedGeometry(theNode);													// update skeleton geometry
 
 					if (theNode == gPlayerInfo.objNode)
@@ -762,6 +766,7 @@ short			skelType;
 						if (overrideTexture && oldTexture)											// see if need to set texture back to normal
 							gLocalTriMeshesOfSkelType[skelType][i].materials[0] = oldTexture;
 					}
+					StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					break;
 
 			case	DISPLAY_GROUP_GENRE:
@@ -808,6 +813,7 @@ custom_draw:
 					if (theNode->CustomDrawFunction)
 					{
 						theNode->CustomDrawFunction(theNode);
+						StartProfilePhase(PROFILE_PHASE_OBJECTS);
 					}
 					break;
 		}
@@ -1697,4 +1703,3 @@ float		minDist = 10000000;
 
 	return(best);
 }
-

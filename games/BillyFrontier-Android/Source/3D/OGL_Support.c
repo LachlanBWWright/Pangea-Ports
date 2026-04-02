@@ -624,29 +624,64 @@ do_anaglyph:
 	if (gDebugMode > 0)
 	{
 		int		y = 100;
+		float	inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
+		float	logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
+		float	setupMs = GetProfilePhaseMs(PROFILE_PHASE_RENDERING);
+		float	cullMs = GetProfilePhaseMs(PROFILE_PHASE_CULLING);
+		float	terrainMs = GetProfilePhaseMs(PROFILE_PHASE_TERRAIN);
+		float	objectMs = GetProfilePhaseMs(PROFILE_PHASE_OBJECTS);
+		float	skeletonMs = GetProfilePhaseMs(PROFILE_PHASE_SKELETONS);
+		float	uiMs = GetProfilePhaseMs(PROFILE_PHASE_UI);
+		float	swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
+		float	yieldMs = GetProfilePhaseMs(PROFILE_PHASE_ASYNC_YIELD);
+		float	totalMs = inputMs + logicMs + setupMs + cullMs + terrainMs + objectMs + skeletonMs + uiMs + swapMs + yieldMs;
 
 		OGL_DrawString("fps:", 20,y);
 		OGL_DrawInt(gFramesPerSecond+.5f, 100,y);
 		y += 15;
 
 		OGL_DrawString("input:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_INPUT), 100,y);
+		OGL_DrawFloat(inputMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("logic:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_GAME_LOGIC), 100,y);
+		OGL_DrawFloat(logicMs, 100,y);
 		y += 15;
 
-		OGL_DrawString("render:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_RENDERING), 100,y);
+		OGL_DrawString("setup:", 20,y);
+		OGL_DrawFloat(setupMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" cull:", 20,y);
+		OGL_DrawFloat(cullMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" terr:", 20,y);
+		OGL_DrawFloat(terrainMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" obj:", 20,y);
+		OGL_DrawFloat(objectMs, 100,y);
+		y += 15;
+
+		OGL_DrawString(" skel:", 20,y);
+		OGL_DrawFloat(skeletonMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("ui:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_UI), 100,y);
+		OGL_DrawFloat(uiMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("swap:", 20,y);
-		OGL_DrawFloat(GetProfilePhaseAvgMs(PROFILE_PHASE_SWAP_BUFFERS), 100,y);
+		OGL_DrawFloat(swapMs, 100,y);
+		y += 15;
+
+		OGL_DrawString("yield:", 20,y);
+		OGL_DrawFloat(yieldMs, 100,y);
+		y += 15;
+
+		OGL_DrawString("total:", 20,y);
+		OGL_DrawFloat(totalMs, 100,y);
 		y += 15;
 
 		OGL_DrawString("tris:", 20,y);
@@ -718,15 +753,17 @@ do_anaglyph:
 
 	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
 
-#ifdef __EMSCRIPTEN__
-	emscripten_sleep(0);							// yield to browser (required for ASYNCIFY)
-#endif
-
-
 	if (gGamePrefs.anaglyph)
 		RestoreCamerasFromAnaglyph();
 
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+
+#ifdef __EMSCRIPTEN__
+	StartProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
+	emscripten_sleep(0);							// yield to browser (required for ASYNCIFY)
+	EndProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
+#endif
+
 }
 
 
