@@ -271,8 +271,7 @@ if(EMSCRIPTEN)
 		-sALLOW_MEMORY_GROWTH=1
 		-sMAXIMUM_MEMORY=1073741824
 		# WebGL/OpenGL ES support
-		-sFULL_ES2=1
-		-sFULL_ES3=1
+		# FULL_ES2/FULL_ES3 not needed: GLES3Compat.c manages explicit VBOs/IBOs.
 		-sUSE_WEBGL2=1
 		# Bundle game data into a .data file served alongside the .wasm
 		--preload-file "${CMAKE_SOURCE_DIR}/Data@/Data"

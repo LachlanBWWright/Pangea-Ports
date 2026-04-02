@@ -327,7 +327,7 @@ if(EMSCRIPTEN)
 		-sDISABLE_EXCEPTION_CATCHING=0
 		-sALLOW_MEMORY_GROWTH=1
 		-sMAXIMUM_MEMORY=512MB
-		-sFULL_ES2=1
+		# FULL_ES2 not needed: Renderer.c manages explicit VBOs for all attributes.
 		-sMAX_WEBGL_VERSION=2
 		-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,FS
 		-sEXPORTED_FUNCTIONS=_main,_BugdomSetFenceCollision,_BugdomGetFenceCollision,_BugdomGetCurrentLevel,_BugdomSetTerrainOverride

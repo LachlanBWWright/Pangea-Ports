@@ -116,6 +116,48 @@ static float                gBackupVertexColors[4*65536];
 enum { VBO_ATTRIB_POS=0, VBO_ATTRIB_NORM=1, VBO_ATTRIB_COLOR=2, VBO_ATTRIB_TC=3, VBO_ATTRIB_COUNT=4 };
 static GLuint               s_attrVBO[VBO_ATTRIB_COUNT] = {0,0,0,0};
 static GLuint               s_streamEBO = 0;
+
+// ── Static-mesh draw cache ────────────────────────────────────────────
+// Game models live at stable C pointers across frames. A 128-entry LRU
+// cache of per-attribute VBOs+EBO avoids re-uploading the same mesh data.
+#define MESH_DC_SIZE 128
+typedef struct {
+    const void* pts;    // mesh->points
+    const void* nrm;    // mesh->vertexNormals
+    const void* col;    // mesh->vertexColors
+    const void* uv;     // mesh->vertexUVs
+    const void* tri;    // mesh->triangles
+    int     numPts;
+    int     numTris;
+    uint32_t last_used;
+    GLuint  attrVBO[VBO_ATTRIB_COUNT];
+    GLuint  ebo;
+} MeshDCEntry;
+static MeshDCEntry s_meshDC[MESH_DC_SIZE];
+static uint32_t s_meshDC_clock = 1;
+
+static MeshDCEntry* MeshDC_Find(const void* pts, int numPts, const void* tri, int numTris)
+{
+    for (int i = 0; i < MESH_DC_SIZE; i++) {
+        MeshDCEntry* e = &s_meshDC[i];
+        if (!e->ebo) continue;
+        if (e->pts == pts && e->numPts == numPts && e->tri == tri && e->numTris == numTris) {
+            e->last_used = s_meshDC_clock++;
+            return e;
+        }
+    }
+    return NULL;
+}
+static MeshDCEntry* MeshDC_Alloc(void)
+{
+    uint32_t oldest = 0xFFFFFFFFu;
+    int oldest_i = 0;
+    for (int i = 0; i < MESH_DC_SIZE; i++) {
+        if (!s_meshDC[i].ebo) return &s_meshDC[i]; // uninitialized — will be initted at scene start
+        if (s_meshDC[i].last_used < oldest) { oldest = s_meshDC[i].last_used; oldest_i = i; }
+    }
+    return &s_meshDC[oldest_i];
+}
 #endif
 
 static int DrawOrderComparator(void const* a_void, void const* b_void);
@@ -131,6 +173,10 @@ static void SendGeometry(const MeshQueueEntry* entry);
 // VertexAttribVBO uploads a flat array of floats to the per-attribute VBO and sets up
 // the vertex attribute pointer.  Each attribute has its own VBO so uploads for different
 // attributes do not overwrite each other.
+//
+// MeshDC_UploadAttrib / MeshDC_DrawElements are cache-aware variants used by
+// ATTRIB_VBO_CACHED / DRAW_ELEMENTS_CACHED macros when the full mesh pointer is known.
+
 static void VertexAttribVBO(GLint attribLoc, GLint attrIdx, GLint components, GLsizei numVerts, const GLfloat* data)
 {
 	glBindBuffer(GL_ARRAY_BUFFER, s_attrVBO[attrIdx]);
@@ -145,6 +191,35 @@ static void DrawElementsVBO(GLenum mode, GLsizei count, const TQ3TriMeshTriangle
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(GLuint)), triangles, GL_STREAM_DRAW);
 	glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+// Cache-aware upload: looks up existing per-mesh VBO; only calls glBufferData on miss.
+static void MeshDC_UploadAttrib(GLint attribLoc, GLint attrIdx, GLint components,
+                                 MeshDCEntry* entry, const GLfloat* data, GLsizei numVerts,
+                                 bool* isNew)
+{
+    if (*isNew) {
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attrVBO[attrIdx]);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(numVerts * components * sizeof(GLfloat)),
+                     data, GL_STATIC_DRAW);
+    } else {
+        glBindBuffer(GL_ARRAY_BUFFER, entry->attrVBO[attrIdx]);
+    }
+    glVertexAttribPointer(attribLoc, components, GL_FLOAT, GL_FALSE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+static void MeshDC_DrawElements(MeshDCEntry* entry, const TQ3TriMeshData* mesh, bool isNew)
+{
+    if (isNew) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                     (GLsizeiptr)(mesh->numTriangles * 3 * sizeof(GLuint)),
+                     mesh->triangles, GL_STATIC_DRAW);
+    } else {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ebo);
+    }
+    glDrawElements(GL_TRIANGLES, mesh->numTriangles * 3, GL_UNSIGNED_INT, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 #define ATTRIB_VBO(loc, vboIdx, components, mesh, field) VertexAttribVBO((loc), (vboIdx), (components), (mesh)->numPoints, (const GLfloat*)(mesh)->field)
 #define DRAW_ELEMENTS_VBO(mesh) DrawElementsVBO(GL_TRIANGLES, (mesh)->numTriangles * 3, (mesh)->triangles)
@@ -628,6 +703,14 @@ gFullscreenQuad = MakeQuadMesh_UI(0, 0, GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT, 0, 0,
 // WebGL requires all vertex data in GPU buffers — create streaming VBO/EBO.
 if (!s_attrVBO[0]) { glGenBuffers(VBO_ATTRIB_COUNT, s_attrVBO); }
 if (!s_streamEBO) { glGenBuffers(1, &s_streamEBO); }
+
+// Allocate mesh GPU cache entries if not yet done
+for (int _i = 0; _i < MESH_DC_SIZE; _i++) {
+    if (!s_meshDC[_i].ebo) {
+        glGenBuffers(VBO_ATTRIB_COUNT, s_meshDC[_i].attrVBO);
+        glGenBuffers(1, &s_meshDC[_i].ebo);
+    }
+}
 #endif
 
 CHECK_GL_ERROR();
@@ -1328,10 +1411,50 @@ SetState(GL_CULL_FACE, !(statusBits & STATUS_BIT_KEEPBACKFACES));
 if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 glCullFace(GL_FRONT);       // pass 1: draw backfaces
 
-// Submit vertex positions
-ATTRIB_VBO(gState.loc_a_Position, VBO_ATTRIB_POS, 3, mesh, points);
-
+// Submit vertex positions (and indices) via draw cache when possible
+#ifdef __EMSCRIPTEN__
+{
+    MeshDCEntry* dc = MeshDC_Find(mesh->points, mesh->numPoints, mesh->triangles, mesh->numTriangles);
+    bool isNew = (dc == NULL);
+    if (isNew) {
+        dc = MeshDC_Alloc();
+        dc->pts = mesh->points; dc->nrm = mesh->vertexNormals;
+        dc->col = mesh->vertexColors; dc->uv = mesh->vertexUVs;
+        dc->tri = mesh->triangles;
+        dc->numPts = mesh->numPoints; dc->numTris = mesh->numTriangles;
+        dc->last_used = s_meshDC_clock++;
+    }
+    MeshDC_UploadAttrib(gState.loc_a_Position, VBO_ATTRIB_POS, 3,
+                        dc, (const GLfloat*)mesh->points, mesh->numPoints, &isNew);
+    // Upload camera transform if needed
+    if (gState.currentTransform != entry->transform)
+    {
+        if (entry->transform)
+        {
+            TQ3Matrix4x4 combined;
+            Q3Matrix4x4_Multiply(entry->transform, &gCurrentModelView, &combined);
+            UploadMatrix4x4(gState.loc_u_ModelView, &combined);
+            UploadMatrix3x3NormalFromMV(&combined);
+        }
+        else
+        {
+            UploadMatrix4x4(gState.loc_u_ModelView, &gCurrentModelView);
+            UploadMatrix3x3NormalFromMV(&gCurrentModelView);
+        }
+        gState.currentTransform = entry->transform;
+    }
+    MeshDC_DrawElements(dc, mesh, isNew);
+    CHECK_GL_ERROR();
+    if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
+    {
+        glCullFace(GL_BACK);
+        MeshDC_DrawElements(dc, mesh, false);  // second pass: always cache hit
+        CHECK_GL_ERROR();
+    }
+}
+#else
 // Upload combined modelview if the per-object transform changed
+ATTRIB_VBO(gState.loc_a_Position, VBO_ATTRIB_POS, 3, mesh, points);
 if (gState.currentTransform != entry->transform)
 {
 if (entry->transform)
@@ -1359,6 +1482,7 @@ glCullFace(GL_BACK);        // pass 2: draw frontfaces
 DRAW_ELEMENTS_VBO(mesh);
 CHECK_GL_ERROR();
 }
+#endif
 }
 
 static void BeginDepthPass(const MeshQueueEntry* entry)
