@@ -449,7 +449,7 @@ static void upload_uniforms(void) {
     }
 }
 
-static int array_is_direct_compatible(const ClientArray* array, GLint min_components, GLint max_components, GLenum type)
+static int can_use_direct_upload(const ClientArray* array, GLint min_components, GLint max_components, GLenum type)
 {
     if (!array->enabled || !array->ptr)
         return 1;
@@ -490,11 +490,11 @@ static void set_disabled_attrib(GLuint attrib, int components, const float* valu
 
 static int setup_vertex_attribs_direct(int vertex_count)
 {
-    if (!array_is_direct_compatible(&s_ca_vertex, 2, 4, GL_FLOAT)
-        || !array_is_direct_compatible(&s_ca_normal, 3, 3, GL_FLOAT)
-        || !array_is_direct_compatible(&s_ca_color, 4, 4, GL_FLOAT)
-        || !array_is_direct_compatible(&s_ca_texcoord[0], 2, 2, GL_FLOAT)
-        || !array_is_direct_compatible(&s_ca_texcoord[1], 2, 2, GL_FLOAT))
+    if (!can_use_direct_upload(&s_ca_vertex, 2, 4, GL_FLOAT)
+        || !can_use_direct_upload(&s_ca_normal, 3, 3, GL_FLOAT)
+        || !can_use_direct_upload(&s_ca_color, 4, 4, GL_FLOAT)
+        || !can_use_direct_upload(&s_ca_texcoord[0], 2, 2, GL_FLOAT)
+        || !can_use_direct_upload(&s_ca_texcoord[1], 2, 2, GL_FLOAT))
     {
         return 0;
     }
