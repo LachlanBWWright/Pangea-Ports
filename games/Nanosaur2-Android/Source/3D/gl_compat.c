@@ -44,6 +44,8 @@ extern void emscripten_glDrawElements(GLenum mode, GLsizei count, GLenum type, c
 extern void emscripten_glDrawArrays(GLenum mode, GLint first, GLsizei count);
 extern void emscripten_glHint(GLenum target, GLenum mode);
 extern GLboolean emscripten_glIsEnabled(GLenum cap);
+extern void emscripten_glDepthMask(GLboolean flag);
+extern void emscripten_glGetBooleanv(GLenum pname, GLboolean *data);
 #define REAL_glEnable           emscripten_glEnable
 #define REAL_glDisable          emscripten_glDisable
 #define REAL_glGetFloatv        emscripten_glGetFloatv
@@ -52,6 +54,8 @@ extern GLboolean emscripten_glIsEnabled(GLenum cap);
 #define REAL_glDrawArrays       emscripten_glDrawArrays
 #define REAL_glHint             emscripten_glHint
 #define REAL_glIsEnabled        emscripten_glIsEnabled
+#define REAL_glDepthMask        emscripten_glDepthMask
+#define REAL_glGetBooleanv      emscripten_glGetBooleanv
 #else // __ANDROID__
 // On Android, we define our own gl wrappers with the same names as GLES2 functions.
 // To call the REAL GLES2 implementation from within those wrappers (without recursion),
@@ -66,6 +70,8 @@ static void      (*real_glDrawElements)(GLenum, GLsizei, GLenum, const void*)= N
 static void      (*real_glDrawArrays)  (GLenum, GLint, GLsizei)              = NULL;
 static void      (*real_glHint)        (GLenum, GLenum)                      = NULL;
 static GLboolean (*real_glIsEnabled)   (GLenum)                              = NULL;
+static void      (*real_glDepthMask)   (GLboolean)                           = NULL;
+static void      (*real_glGetBooleanv) (GLenum, GLboolean*)                  = NULL;
 #define REAL_glEnable           real_glEnable
 #define REAL_glDisable          real_glDisable
 #define REAL_glGetFloatv        real_glGetFloatv
@@ -74,6 +80,8 @@ static GLboolean (*real_glIsEnabled)   (GLenum)                              = N
 #define REAL_glDrawArrays       real_glDrawArrays
 #define REAL_glHint             real_glHint
 #define REAL_glIsEnabled        real_glIsEnabled
+#define REAL_glDepthMask        real_glDepthMask
+#define REAL_glGetBooleanv      real_glGetBooleanv
 #endif // __EMSCRIPTEN__ || __ANDROID__
 
 // ── 4×4 float matrix ─────────────────────────────────────────────────────────
@@ -139,6 +147,12 @@ static float s_fog_color[4] = {0,0,0,1};
 static int   s_alpha_test_enabled = 0;
 static int   s_alpha_func  = GL_ALWAYS;  // GL_ALWAYS … GL_NEVER
 static float s_alpha_ref   = 0.0f;
+
+// ── Depth-test and depth-write state ─────────────────────────────────────────
+// Tracked in software so OGL_PushState() can read current state without a
+// synchronous GPU round-trip (glIsEnabled/glGetBooleanv stall the pipeline on WASM).
+static int         s_depth_test_enabled = 1;   // GL_DEPTH_TEST on by default
+static GLboolean   s_depth_mask         = GL_TRUE;  // depth writes on by default
 
 // ── Texture-env state ─────────────────────────────────────────────────────────
 // 0=MODULATE 1=ADD 2=REPLACE 3=COMBINE_ADD
@@ -544,6 +558,8 @@ void COMPAT_GL_Init(void) {
     real_glDrawArrays   = (void(*)(GLenum,GLint,GLsizei)) dlsym(RTLD_NEXT, "glDrawArrays");
     real_glHint         = (void(*)(GLenum,GLenum)) dlsym(RTLD_NEXT, "glHint");
     real_glIsEnabled    = (GLboolean(*)(GLenum))  dlsym(RTLD_NEXT, "glIsEnabled");
+    real_glDepthMask    = (void(*)(GLboolean))    dlsym(RTLD_NEXT, "glDepthMask");
+    real_glGetBooleanv  = (void(*)(GLenum,GLboolean*)) dlsym(RTLD_NEXT, "glGetBooleanv");
 #endif // __ANDROID__
     // Init matrix stacks
     for (int i = 0; i < MATRIX_STACK_DEPTH; i++) {
@@ -743,6 +759,7 @@ void glEnable(GLenum cap) {
         case GL_NORMALIZE:   break;  // handled by per-vertex normalize in shader
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL; normalize handled in shader
         case GL_COLOR_MATERIAL: break;  // silently ignore
+        case GL_DEPTH_TEST:  s_depth_test_enabled = 1; REAL_glEnable(cap); break;
         case GL_TEXTURE_2D:
         {
             GLint unit = 0;
@@ -772,6 +789,7 @@ void glDisable(GLenum cap) {
         case GL_NORMALIZE:   break;
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL
         case GL_COLOR_MATERIAL: break;
+        case GL_DEPTH_TEST:  s_depth_test_enabled = 0; REAL_glDisable(cap); break;
         case GL_TEXTURE_2D:
         {
             GLint unit = 0;
@@ -1140,9 +1158,10 @@ void glHint(GLenum target, GLenum mode) {
 // Without this, OGL_PushState() gets wrong values for GL_FOG and GL_NORMALIZE.
 GLboolean glIsEnabled(GLenum cap) {
     switch (cap) {
-        case GL_LIGHTING:       return s_lighting_enabled ? GL_TRUE : GL_FALSE;
-        case GL_FOG:            return s_fog_enabled      ? GL_TRUE : GL_FALSE;
+        case GL_LIGHTING:       return s_lighting_enabled   ? GL_TRUE : GL_FALSE;
+        case GL_FOG:            return s_fog_enabled        ? GL_TRUE : GL_FALSE;
         case GL_ALPHA_TEST:     return s_alpha_test_enabled ? GL_TRUE : GL_FALSE;
+        case GL_DEPTH_TEST:     return s_depth_test_enabled ? GL_TRUE : GL_FALSE;
         case GL_NORMALIZE:      return GL_FALSE;  // normalize is always handled in shader
         case GL_RESCALE_NORMAL: return GL_FALSE;
         case GL_COLOR_MATERIAL: return GL_FALSE;
@@ -1159,6 +1178,24 @@ GLboolean glIsEnabled(GLenum cap) {
         default:
             return REAL_glIsEnabled(cap);
     }
+}
+
+// glDepthMask — track depth-write state in software so glGetBooleanv(GL_DEPTH_WRITEMASK)
+// can answer without a synchronous GPU round-trip in OGL_PushState().
+void glDepthMask(GLboolean flag) {
+    s_depth_mask = flag;
+    REAL_glDepthMask(flag);
+}
+
+// glGetBooleanv — intercept GL_DEPTH_WRITEMASK to return tracked state; pass through
+// all other queries.  On WASM, each glGetBooleanv crosses the WASM→JS boundary and
+// stalls the GPU pipeline; returning from a software variable avoids that stall.
+void glGetBooleanv(GLenum pname, GLboolean *data) {
+    if (pname == GL_DEPTH_WRITEMASK) {
+        *data = s_depth_mask;
+        return;
+    }
+    REAL_glGetBooleanv(pname, data);
 }
 
 // Apple extension stubs

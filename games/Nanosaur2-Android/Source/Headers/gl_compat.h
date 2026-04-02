@@ -147,6 +147,8 @@ extern "C" {
 #undef glDrawArrays
 #undef glHint
 #undef glIsEnabled
+#undef glDepthMask
+#undef glGetBooleanv
 
 // ── Compatibility function declarations ──────────────────────────────────────
 
@@ -220,6 +222,11 @@ void glDisable(GLenum cap);
 // GetFloatv intercepted for GL_MODELVIEW_MATRIX / GL_PROJECTION_MATRIX
 void glGetFloatv(GLenum pname, GLfloat *data);
 void glGetDoublev(GLenum pname, GLdouble *data);
+
+// glDepthMask intercepted to track depth-write state without GPU round-trips.
+// glGetBooleanv intercepted to return GL_DEPTH_WRITEMASK from tracked state.
+void glDepthMask(GLboolean flag);
+void glGetBooleanv(GLenum pname, GLboolean *data);
 
 // Stubs (no-ops or handled specially)
 void glPolygonMode(GLenum face, GLenum mode);

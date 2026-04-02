@@ -150,7 +150,14 @@ void SetTerrainScale(float polygonSize)
 	
 	gMapToUnitValue = 	gTerrainPolygonSize / OREOMAP_TILE_SIZE;				//value to xlate Oreo map pixel coords to 3-space unit coords
 
+	// For WebAssembly, cap terrain range for acceptable frame rates.
+	// BillyFrontier has Stampede and other areas that set high range values;
+	// capping here ensures the default init never uses full range on WASM.
+#if defined(__EMSCRIPTEN__)
+	gSuperTileActiveRange = 4;
+#else
 	gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
+#endif
 }
 
 

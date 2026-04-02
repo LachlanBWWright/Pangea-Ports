@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pangea Ports — Alternative WASM (LEGACY_GL_EMULATION)</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #061208;
+      --panel: #0d1f12;
+      --accent: #7ed6a0;
+      --accent-2: #d2ff80;
+      --text: #d8f0e0;
+      --muted: #8db89a;
+      --border: #1a3a22;
+      --nav-h: 52px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Top navbar ── */
+    nav {
+      flex: 0 0 var(--nav-h);
+      background: linear-gradient(180deg, #0a1d0e 0%, #071509 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: 0 .75rem;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    nav::-webkit-scrollbar { height: 4px; }
+    nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .nav-brand {
+      font-weight: 700;
+      font-size: .95rem;
+      white-space: nowrap;
+      color: var(--accent);
+      margin-right: .5rem;
+      padding-right: .75rem;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .nav-brand span {
+      font-size: .68rem;
+      font-weight: 400;
+      display: block;
+      color: var(--muted);
+      letter-spacing: .03em;
+    }
+    .nav-btn {
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: .88rem;
+      padding: .35rem .7rem;
+      transition: background .15s, border-color .15s, color .15s;
+      white-space: nowrap;
+    }
+    .nav-btn:hover {
+      background: rgba(255,255,255,.05);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    .nav-btn.active {
+      background: rgba(126,214,160,.14);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Contrast badge (shows which site we're on) ── */
+    .nav-site-badge {
+      margin-left: auto;
+      flex-shrink: 0;
+      font-size: .72rem;
+      background: rgba(126,214,160,.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: .15rem .65rem;
+      white-space: nowrap;
+    }
+
+    /* ── Content area ── */
+    main {
+      flex: 1 1 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Welcome screen */
+    #welcome {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 2rem 1rem 1rem;
+      overflow-y: auto;
+    }
+    #welcome h2 {
+      font-size: 1.7rem;
+      color: var(--accent);
+      margin-bottom: .5rem;
+      text-align: center;
+    }
+    #welcome .subtitle {
+      color: var(--muted);
+      font-size: .93rem;
+      margin-bottom: 1.25rem;
+      text-align: center;
+      max-width: 600px;
+    }
+
+    /* Renderer info card */
+    .renderer-card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.3rem;
+      margin-bottom: 1.5rem;
+      font-size: .88rem;
+    }
+    .renderer-card h3 {
+      font-size: 1rem;
+      color: var(--accent-2);
+      margin-bottom: .4rem;
+    }
+    .renderer-card table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: .7rem;
+    }
+    .renderer-card td, .renderer-card th {
+      padding: .3rem .5rem;
+      font-size: .83rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .renderer-card th { color: var(--muted); font-weight: 600; }
+    .renderer-card td:first-child { color: var(--accent); white-space: nowrap; }
+    .renderer-card a { color: var(--accent); }
+
+    /* Game chip grid */
+    .game-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+      justify-content: center;
+      max-width: 680px;
+      margin-bottom: 1.25rem;
+    }
+    .game-chip {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+      font-size: .9rem;
+      padding: .45rem 1rem;
+      transition: background .12s, border-color .12s, color .12s;
+    }
+    .game-chip:hover {
+      background: #0e2915;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Switch-site link */
+    .switch-site {
+      margin-top: .75rem;
+      font-size: .82rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    .switch-site a { color: var(--accent); }
+
+    /* Canvas / game frame */
+    #game-frame {
+      display: none;
+      position: absolute;
+      inset: 0;
+    }
+    #game-frame canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    /* Loading overlay (shown while JS loads) */
+    #loading-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: var(--bg);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+      z-index: 20;
+    }
+    #loading-overlay p {
+      color: var(--accent);
+      font-size: 1.05rem;
+    }
+
+    @media (max-width: 600px) {
+      #welcome h2 { font-size: 1.3rem; }
+      .renderer-card { padding: .8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-brand">
+      Pangea Ports
+      <span>LEGACY_GL_EMULATION</span>
+    </div>
+    <button class="nav-btn" data-game="bugdom">Bugdom</button>
+    <button class="nav-btn" data-game="bugdom2">Bugdom 2</button>
+    <button class="nav-btn" data-game="nanosaur">Nanosaur</button>
+    <button class="nav-btn" data-game="nanosaur2">Nanosaur 2</button>
+    <button class="nav-btn" data-game="otto">Otto Matic</button>
+    <button class="nav-btn" data-game="billy">Billy Frontier</button>
+    <button class="nav-btn" data-game="cromag">Cro-Mag Rally</button>
+    <button class="nav-btn" data-game="mighty">Mighty Mike</button>
+    <span class="nav-site-badge">Alternative renderer</span>
+  </nav>
+
+  <main>
+    <div id="welcome">
+      <h2>Pangea Ports — Alternative WASM Builds</h2>
+      <p class="subtitle">
+        All 8 games built from
+        <a href="https://github.com/jorio" target="_blank" style="color:var(--accent)">jorio's upstream source</a>
+        using Emscripten's <code>LEGACY_GL_EMULATION</code> fixed-function translation layer.
+      </p>
+
+      <div class="renderer-card">
+        <h3>⚙️ Renderer approach</h3>
+        <p>
+          Instead of rewriting the games' OpenGL rendering code to use GLES2, these builds
+          use Emscripten's built-in <strong>fixed-function translation layer</strong>
+          (<code>-sLEGACY_GL_EMULATION=1</code>). This is the same concept as
+          <a href="https://github.com/LostMyCode/d3d9-webgl" target="_blank">LostMyCode/d3d9-webgl</a>
+          — a fixed-function graphics API translated automatically to WebGL shaders —
+          but for <em>OpenGL</em> rather than Direct3D 9.
+        </p>
+        <table>
+          <tr>
+            <th>Site</th>
+            <th>Source</th>
+            <th>Renderer</th>
+            <th>Emscripten flag</th>
+          </tr>
+          <tr>
+            <td><a href="../" target="_blank">Primary site</a></td>
+            <td><code>games/</code> (modified)</td>
+            <td>Custom hand-ported GLES2 shaders</td>
+            <td><code>-sFULL_ES2=1</code></td>
+          </tr>
+          <tr>
+            <td>This site</td>
+            <td><code>jorio-ports/</code> (upstream)</td>
+            <td>Emscripten LEGACY_GL_EMULATION</td>
+            <td><code>-sLEGACY_GL_EMULATION=1</code></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="game-chips">
+        <button class="game-chip" data-game="bugdom">Bugdom</button>
+        <button class="game-chip" data-game="bugdom2">Bugdom 2</button>
+        <button class="game-chip" data-game="nanosaur">Nanosaur</button>
+        <button class="game-chip" data-game="nanosaur2">Nanosaur 2</button>
+        <button class="game-chip" data-game="otto">Otto Matic</button>
+        <button class="game-chip" data-game="billy">Billy Frontier</button>
+        <button class="game-chip" data-game="cromag">Cro-Mag Rally</button>
+        <button class="game-chip" data-game="mighty">Mighty Mike</button>
+      </div>
+
+      <p class="switch-site">
+        Looking for the primary site?
+        <a href="../">← Pangea Ports (FULL_ES2 renderer)</a>
+      </p>
+    </div>
+
+    <div id="loading-overlay">
+      <p id="loading-text">Loading…</p>
+    </div>
+
+    <div id="game-frame">
+      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    </div>
+  </main>
+
+  <script>
+    // Game-id → JS loader path (relative to this index.html)
+    var GAME_SCRIPTS = {
+      bugdom:    './Bugdom/Bugdom.js',
+      bugdom2:   './Bugdom2/Bugdom2.js',
+      nanosaur:  './Nanosaur/Nanosaur.js',
+      nanosaur2: './Nanosaur2/Nanosaur2.js',
+      otto:      './OttoMatic/OttoMatic.js',
+      billy:     './BillyFrontier/BillyFrontier.js',
+      cromag:    './CroMagRally/CroMagRally.js',
+      mighty:    './MightyMike/MightyMike.js',
+    };
+
+    var GAME_NAMES = {
+      bugdom: 'Bugdom', bugdom2: 'Bugdom 2', nanosaur: 'Nanosaur',
+      nanosaur2: 'Nanosaur 2', otto: 'Otto Matic', billy: 'Billy Frontier',
+      cromag: 'Cro-Mag Rally', mighty: 'Mighty Mike',
+    };
+
+    var activeGame = null;
+
+    function syncCanvasSize() {
+      var c = document.getElementById('canvas');
+      var w = c.clientWidth, h = c.clientHeight;
+      if (w > 0 && h > 0) { c.width = w; c.height = h; }
+    }
+
+    var resizeRAF = null;
+    window.addEventListener('resize', function() {
+      if (resizeRAF) cancelAnimationFrame(resizeRAF);
+      resizeRAF = requestAnimationFrame(function() { syncCanvasSize(); resizeRAF = null; });
+    });
+    document.addEventListener('fullscreenchange', function() {
+      requestAnimationFrame(syncCanvasSize);
+    });
+
+    function selectGame(id) {
+      if (!GAME_SCRIPTS[id]) return;
+
+      if (activeGame && activeGame !== id) {
+        var newHash = '#' + id;
+        history.pushState(null, '', newHash);
+        location.reload();
+        return;
+      }
+
+      if (activeGame === id) return;
+      activeGame = id;
+
+      document.title = GAME_NAMES[id] + ' — Pangea Ports (LEGACY_GL)';
+
+      document.getElementById('welcome').style.display = 'none';
+
+      var overlay = document.getElementById('loading-overlay');
+      overlay.style.display = 'flex';
+      document.getElementById('loading-text').textContent = 'Loading ' + GAME_NAMES[id] + '…';
+
+      // Update nav buttons
+      document.querySelectorAll('[data-game]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.game === id);
+      });
+
+      // Configure the Emscripten Module before loading the JS
+      var canvas = document.getElementById('canvas');
+      window.Module = {
+        canvas: canvas,
+        print:    function(t) { console.log('[game]', t); },
+        printErr: function(t) { console.warn('[game:err]', t); },
+
+        setStatus: function(text) {
+          if (!text) {
+            overlay.style.display = 'none';
+            document.getElementById('game-frame').style.display = 'block';
+            syncCanvasSize();
+            canvas.focus();
+          } else {
+            document.getElementById('loading-text').textContent = text;
+          }
+        },
+
+        monitorRunDependencies: function(left) {
+          if (left === 0) Module.setStatus('');
+        },
+
+        onRuntimeInitialized: function() {
+          canvas.focus();
+        },
+
+        onAbort: function(what) {
+          document.getElementById('loading-text').textContent = 'Fatal error: ' + what;
+          console.error('Game aborted:', what);
+        },
+      };
+
+      // Dynamically load the game's JS
+      var script = document.createElement('script');
+      script.src  = GAME_SCRIPTS[id];
+      script.async = true;
+      script.onerror = function() {
+        document.getElementById('loading-text').textContent =
+          'Failed to load ' + GAME_NAMES[id] + '. Has it been built yet?';
+      };
+      document.body.appendChild(script);
+    }
+
+    // Wire all data-game buttons (navbar + welcome chips)
+    document.querySelectorAll('[data-game]').forEach(function(btn) {
+      btn.addEventListener('click', function() { selectGame(btn.dataset.game); });
+    });
+
+    // Auto-select from URL hash on load
+    var hash = location.hash.replace('#', '');
+    if (hash && GAME_SCRIPTS[hash]) {
+      selectGame(hash);
+    }
+  </script>
+</body>
+</html>

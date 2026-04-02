@@ -158,10 +158,20 @@ void SetTerrainScale(int polygonSize)
 	gMapToUnitValue = 	gTerrainPolygonSize / OREOMAP_TILE_SIZE;				//value to xlate Oreo map pixel coords to 3-space unit coords
 	gMapToUnitValueFrac = 1.0f / gMapToUnitValue;
 
+	// For WebAssembly, cap terrain range for acceptable frame rates.
+	// Nanosaur 2 supports split-screen play (2 viewports), which doubles
+	// terrain draw calls per frame.  A range of 4 (≈ 36 drawn supertiles per
+	// player) matches Bugdom 2's EMSCRIPTEN tuning and keeps terrain triangles
+	// below ~9K per frame.  On native, the full range or the low-quality range
+	// applies as before.
+#if defined(__EMSCRIPTEN__)
+	gSuperTileActiveRange = 4;
+#else
 	if (gGamePrefs.lowRenderQuality)
 		gSuperTileActiveRange = 7;
 	else
 		gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
+#endif
 }
 
 

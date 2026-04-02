@@ -1,0 +1,211 @@
+name: Build Jorio-Ports WASM & Deploy Alternative Site
+
+# Alternative CI workflow that builds all 8 Pangea games from jorio's upstream
+# source repos using Emscripten's LEGACY_GL_EMULATION fixed-function
+# translation layer (inspired by https://github.com/LostMyCode/d3d9-webgl).
+#
+# This is an independent parallel build path to build-wasm.yml:
+#   build-wasm.yml       → games/ (hand-ported GLES2 renderers, -sFULL_ES2=1)
+#   build-jorio-wasm.yml → jorio-ports/ (upstream GL code, -sLEGACY_GL_EMULATION=1)
+#
+# The alternative site is deployed to the 'jorio-alt' path under GitHub Pages.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'jorio-ports/**'
+      - 'scripts/jorio_ports.py'
+      - 'docs-jorio/**'
+      - '.github/workflows/build-jorio-wasm.yml'
+    tags:
+      - 'jorio-v*'
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish WASM artifacts as a GitHub release
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: Release tag to create/update when publishing manually
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: jorio-wasm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      wasm: ${{ steps.wasm.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: wasm
+        run: echo "matrix=$(python3 scripts/jorio_ports.py matrix wasm)" >> "$GITHUB_OUTPUT"
+
+  build-jorio-wasm:
+    needs: prepare-matrix
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.wasm) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The jorio-ports build scripts clone the upstream jorio repos at build
+      # time, so we do NOT need recursive submodules here.
+
+      - name: Cache Emscripten SDK
+        uses: actions/cache@v4
+        with:
+          path: .emsdk
+          key: emsdk-jorio-${{ runner.os }}-${{ runner.arch }}-v1
+          restore-keys: emsdk-jorio-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install Emscripten SDK
+        run: |
+          if [ ! -f .emsdk/emsdk ]; then
+            git clone --depth=1 https://github.com/emscripten-core/emsdk.git .emsdk
+            .emsdk/emsdk install latest
+          fi
+          .emsdk/emsdk activate latest
+          source .emsdk/emsdk_env.sh
+          echo "$EMSDK" >> "$GITHUB_PATH"
+          echo "$EMSDK/upstream/emscripten" >> "$GITHUB_PATH"
+          echo "$EMSDK/upstream/bin" >> "$GITHUB_PATH"
+          for d in "$EMSDK/node/"*/bin; do [ -d "$d" ] && echo "$d" >> "$GITHUB_PATH"; done
+          echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
+
+      - name: Cache SDL3 source tarball
+        uses: actions/cache@v4
+        with:
+          path: /tmp/pangea-games-build-cache
+          key: sdl3-jorio-${{ runner.os }}-${{ runner.arch }}-v3.2.4
+
+      - name: Build WASM port (jorio upstream + LEGACY_GL_EMULATION)
+        run: python3 scripts/jorio_ports.py run --game "${{ matrix.name }}" --task wasm-build
+
+      - name: Stage WASM site files
+        run: python3 scripts/jorio_ports.py run --game "${{ matrix.name }}" --task stage-wasm --dest "$RUNNER_TEMP/jorio-site/${{ matrix.name }}"
+
+      - name: Create archive
+        run: |
+          cd "$RUNNER_TEMP/jorio-site/${{ matrix.name }}"
+          zip -r "$RUNNER_TEMP/${{ matrix.name }}-jorio-wasm.zip" .
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-jorio-wasm
+          path: ${{ runner.temp }}/${{ matrix.name }}-jorio-wasm.zip
+          compression-level: 0
+
+      - name: Upload site fragment
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-jorio-site
+          path: ${{ runner.temp }}/jorio-site/${{ matrix.name }}
+          compression-level: 0
+
+  # Deploy to GitHub Pages under jorio-alt/ subdirectory when all builds pass.
+  deploy-jorio-pages:
+    needs: build-jorio-wasm
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}jorio-alt/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - uses: actions/download-artifact@v4.1.3
+        with:
+          path: jorio-site-artifacts
+
+      - name: Assemble alternative site
+        run: |
+          mkdir -p site/jorio-alt
+          cp docs-jorio/index.html site/jorio-alt/index.html
+          touch site/.nojekyll
+
+          # Place each game in its own subdirectory
+          find jorio-site-artifacts -mindepth 1 -maxdepth 1 -type d -name '*-jorio-site' | \
+          while read -r dir; do
+            game_dir=$(basename "$dir" | sed 's/-jorio-site$//')
+            mkdir -p "site/jorio-alt/$game_dir"
+            cp -r "$dir"/. "site/jorio-alt/$game_dir/"
+          done
+
+          echo "=== Alternative site layout ==="
+          find site/jorio-alt -maxdepth 2 | sort
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+  # Publish WASM artifacts as a release on tags or manual trigger
+  publish-jorio-release:
+    needs: build-jorio-wasm
+    if: startsWith(github.ref, 'refs/tags/jorio-') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4.1.3
+        with:
+          path: release-artifacts
+
+      - name: Choose release metadata
+        id: release_meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "name=Pangea Ports — Jorio Alternative WASM ${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+            echo "name=Pangea Ports — Jorio Alternative WASM build" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate release tag
+        run: test -n "${{ steps.release_meta.outputs.tag }}"
+
+      - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.name }}
+          body: |
+            Automated WASM build from jorio upstream sources using LEGACY_GL_EMULATION.
+
+            Commit: `${{ github.sha }}`
+
+            **Renderer approach:** Emscripten `LEGACY_GL_EMULATION` flag — translates
+            the original OpenGL fixed-function pipeline (used in all jorio Pangea ports)
+            to WebGL shaders automatically. Inspired by
+            [d3d9-webgl](https://github.com/LostMyCode/d3d9-webgl).
+
+            Included artifacts (all 8 games):
+            - Bugdom, Bugdom2, Nanosaur, Nanosaur2, OttoMatic
+            - BillyFrontier, CroMagRally, MightyMike
+          files: |
+            release-artifacts/**/*-jorio-wasm.zip

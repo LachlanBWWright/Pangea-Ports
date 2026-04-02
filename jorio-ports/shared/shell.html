@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{{ GAME_FULL_NAME }}} — WebAssembly (LEGACY_GL)</title>
+  <style>
+    :root {
+      --accent: #7ed6a0;
+      --bg:     #061208;
+      --panel:  #0d1f12;
+      --border: #1a3a22;
+      --text:   #d0e8d8;
+      --dim:    #6a8a72;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+    }
+
+    /* ── Header ──────────────────────────────────────────── */
+    #header {
+      text-align: center;
+      padding: 1.25rem 1rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    #header h1 {
+      font-size: 2rem;
+      color: var(--accent);
+      letter-spacing: 2px;
+    }
+    #header p { color: var(--dim); font-size: 0.85rem; margin-top: 0.25rem; }
+    #header .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      background: rgba(126,214,160,0.15);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 0.1rem 0.6rem;
+      margin-top: 0.35rem;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Game area ───────────────────────────────────────── */
+    #game-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+      position: relative;
+    }
+
+    /* Loading card */
+    #loading-card {
+      position: absolute;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      width: 100%;
+      max-width: 800px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+    #loading-card:hover { border-color: var(--accent); }
+    #status-text {
+      font-size: 1.05rem;
+      color: var(--accent);
+      min-height: 1.6rem;
+    }
+    #progress-bar {
+      width: 100%;
+      max-width: 420px;
+      height: 6px;
+      margin: 0.75rem auto 0.35rem;
+      accent-color: var(--accent);
+    }
+    #progress-label { font-size: 0.78rem; color: var(--dim); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    #loading-card #status-text { animation: pulse 2s ease-in-out infinite; }
+
+    /* Canvas */
+    #canvas {
+      max-width: 100%;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      outline: none;
+    }
+
+    /* Toolbar */
+    #toolbar {
+      display: none;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.35rem 0.8rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .btn:hover  { background: #132318; border-color: var(--accent); }
+    .btn.on     { background: #0f2a18; border-color: var(--accent); color: var(--accent); }
+    .btn.danger { border-color: #c04040; color: #e06060; }
+    .btn.danger:hover { background: #2a0d0d; }
+
+    /* ── Notice ──────────────────────────────────────────── */
+    #renderer-note {
+      width: 100%;
+      max-width: 800px;
+      margin: 0.5rem auto 1rem;
+      background: rgba(126,214,160,0.07);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      color: var(--dim);
+    }
+    #renderer-note strong { color: var(--accent); }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    #footer {
+      text-align: center;
+      padding: 1rem;
+      color: var(--dim);
+      font-size: 0.78rem;
+      border-top: 1px solid var(--border);
+    }
+    #footer a { color: var(--dim); }
+
+    /* ── Mobile ───────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      #header h1 { font-size: 1.4rem; }
+      #header p { font-size: 0.75rem; }
+      #loading-card { padding: 1rem; }
+    }
+
+    /* ── Embedded mode (embed=1 query param) ─────────────── */
+    body.embedded-shell {
+      height: 100dvh;
+      overflow: hidden;
+    }
+    body.embedded-shell #header,
+    body.embedded-shell #renderer-note,
+    body.embedded-shell #footer {
+      display: none !important;
+    }
+    body.embedded-shell #game-wrap {
+      padding: 0;
+      height: 100dvh;
+      align-items: stretch;
+    }
+    body.embedded-shell #canvas {
+      display: block;
+      width: 100%;
+      height: 100dvh;
+      max-width: none;
+      border-radius: 0;
+    }
+    body.embedded-shell #loading-card {
+      inset: 0;
+      transform: none;
+      max-width: none;
+      border: none;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    body.embedded-shell #toolbar {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      z-index: 11;
+      padding: 0.75rem;
+      background: linear-gradient(180deg, rgba(6,18,8,0) 0%, rgba(6,18,8,0.92) 100%);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Embedded mode detection ───────────────────── -->
+  <script>
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('embed') === '1') {
+        document.body.classList.add('embedded-shell');
+      }
+    })();
+  </script>
+
+  <!-- ── Header ────────────────────────────────────────── -->
+  <div id="header">
+    <h1>{{{ GAME_FULL_NAME }}}</h1>
+    <p>Running via WebAssembly — Emscripten fixed-function GL translation layer</p>
+    <span class="badge">LEGACY_GL_EMULATION build</span>
+  </div>
+
+  <!-- ── Game area ─────────────────────────────────────── -->
+  <div id="game-wrap">
+    <div id="loading-card">
+      <p id="status-text">Loading…</p>
+      <progress id="progress-bar" value="0" max="100"></progress>
+      <p id="progress-label"></p>
+    </div>
+
+    <canvas
+      id="canvas"
+      oncontextmenu="event.preventDefault()"
+      tabindex="-1"
+      width="640"
+      height="480">
+    </canvas>
+
+    <div id="toolbar">
+      <button class="btn" id="btn-fullscreen" title="Toggle fullscreen">⛶ Fullscreen</button>
+      <button class="btn" id="btn-mute">🔇 Mute</button>
+    </div>
+  </div>
+
+  <!-- ── Renderer notice ──────────────────────────────── -->
+  <div id="renderer-note">
+    <strong>Alternative renderer:</strong> This build uses Emscripten's
+    <code>LEGACY_GL_EMULATION</code> flag — the same fixed-function-to-WebGL
+    translation layer concept as
+    <a href="https://github.com/LostMyCode/d3d9-webgl" target="_blank">d3d9-webgl</a>,
+    applied to the original unmodified OpenGL 1.x source code from
+    <a href="https://github.com/jorio" target="_blank">jorio's upstream repos</a>.
+    The game's rendering code is <em>unchanged</em>; Emscripten auto-generates
+    WebGL shaders at build time.
+  </div>
+
+  <!-- ── Footer ────────────────────────────────────────── -->
+  <div id="footer">
+    <p>
+      {{{ GAME_FULL_NAME }}} — originally by Pangea Software, Inc.
+      — source port by <a href="https://github.com/jorio" target="_blank">Iliyas Jorio</a>
+      — WASM alternative port by <a href="https://github.com/LachlanBWWright/Pangea-Ports" target="_blank">Pangea-Ports</a>
+    </p>
+  </div>
+
+  <!-- ── Emscripten runtime ────────────────────────────── -->
+  <script type='text/javascript'>
+    // ── Canvas sync helpers ──────────────────────────────
+    function getCanvasSize() {
+      var c = document.getElementById('canvas');
+      var w = c.clientWidth;
+      var h = c.clientHeight;
+      return (w > 0 && h > 0) ? { w: w, h: h } : null;
+    }
+
+    function syncCanvasSize() {
+      var size = getCanvasSize();
+      if (!size) return;
+      var c = document.getElementById('canvas');
+      c.width  = size.w;
+      c.height = size.h;
+    }
+
+    // Defer canvas sync to avoid reading zero dimensions on resize start
+    var resizeRAF = null;
+    window.addEventListener('resize', function() {
+      if (resizeRAF) cancelAnimationFrame(resizeRAF);
+      resizeRAF = requestAnimationFrame(function() { syncCanvasSize(); resizeRAF = null; });
+    });
+    document.addEventListener('fullscreenchange', function() {
+      requestAnimationFrame(syncCanvasSize);
+    });
+
+    // ── Fullscreen button ────────────────────────────────
+    document.getElementById('btn-fullscreen').addEventListener('click', function() {
+      var c = document.getElementById('canvas');
+      if (!document.fullscreenElement) {
+        c.requestFullscreen().catch(function(err) {
+          console.warn('Fullscreen request failed:', err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    // ── Mute button ──────────────────────────────────────
+    var muted = false;
+    document.getElementById('btn-mute').addEventListener('click', function() {
+      muted = !muted;
+      this.textContent = muted ? '🔊 Unmute' : '🔇 Mute';
+      this.classList.toggle('on', muted);
+      try {
+        if (typeof Module !== 'undefined' && Module.setAudioEnabled) {
+          Module.setAudioEnabled(!muted);
+        }
+      } catch(e) {}
+    });
+
+    // ── Emscripten Module config ─────────────────────────
+    var Module = {
+      canvas: (function() { return document.getElementById('canvas'); })(),
+
+      print: function(text) {
+        console.log('[game]', text);
+      },
+
+      printErr: function(text) {
+        console.warn('[game:err]', text);
+      },
+
+      setStatus: function(text) {
+        var statusEl = document.getElementById('status-text');
+        var progressEl = document.getElementById('progress-bar');
+        var labelEl = document.getElementById('progress-label');
+
+        if (!text) {
+          // Emscripten signals "done" with an empty string
+          var card = document.getElementById('loading-card');
+          if (card) {
+            card.style.opacity = '0';
+            card.style.transition = 'opacity 0.4s';
+            setTimeout(function() { if(card) card.style.display = 'none'; }, 420);
+          }
+          var toolbar = document.getElementById('toolbar');
+          if (toolbar) toolbar.style.display = 'flex';
+          return;
+        }
+
+        var match = text.match(/([^(]+)\((\d+(?:\.\d+)?)\/(\d+)\)/);
+        if (match) {
+          statusEl.textContent = match[1].trim();
+          var pct = Math.round(100 * parseFloat(match[2]) / parseFloat(match[3]));
+          progressEl.value = pct;
+          labelEl.textContent = pct + '%';
+        } else {
+          statusEl.textContent = text;
+          progressEl.removeAttribute('value');
+          labelEl.textContent = '';
+        }
+      },
+
+      monitorRunDependencies: function(left) {
+        if (left === 0) {
+          Module.setStatus('');
+        }
+      },
+
+      onRuntimeInitialized: function() {
+        // Canvas is now ready
+        var c = document.getElementById('canvas');
+        if (c) {
+          c.focus();
+          if (!c.getContext('webgl') && !c.getContext('experimental-webgl')) {
+            document.getElementById('status-text').textContent =
+              'WebGL is not available in your browser.';
+          }
+        }
+      },
+
+      onAbort: function(what) {
+        var statusEl = document.getElementById('status-text');
+        if (statusEl) statusEl.textContent = 'Fatal error: ' + what;
+        console.error('Game aborted:', what);
+      }
+    };
+
+    window.onerror = function(message, url, line, col, err) {
+      var statusEl = document.getElementById('status-text');
+      if (statusEl) {
+        statusEl.textContent = 'Error: ' + message;
+      }
+    };
+
+    // Handle WebGL context lost
+    document.getElementById('canvas').addEventListener('webglcontextlost', function(e) {
+      e.preventDefault();
+      var statusEl = document.getElementById('status-text');
+      if (statusEl) statusEl.textContent = 'WebGL context lost — please reload the page.';
+      console.error('WebGL context lost');
+    });
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

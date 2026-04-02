@@ -1188,7 +1188,7 @@ if (centerCoord)
 return WorldPointToDepth(*centerCoord);
 
 // Average centers of all bounding boxes
-float mult = (float) numMeshes / 2.0f;
+float mult = 1.0f / (2.0f * (float) numMeshes);
 TQ3Point3D center = {0, 0, 0};
 for (int i = 0; i < numMeshes; i++)
 {
@@ -1515,7 +1515,11 @@ for (int v = 0; v < mesh->numPoints; v++)
 gBackupVertexColors[j++] = mesh->vertexColors[v].r;
 gBackupVertexColors[j++] = mesh->vertexColors[v].g;
 gBackupVertexColors[j++] = mesh->vertexColors[v].b;
-gBackupVertexColors[j++] = mesh->vertexColors[v].a * entry->mods->autoFadeFactor;
+gBackupVertexColors[j++] =
+mesh->vertexColors[v].a
+* mesh->diffuseColor.a
+* entry->mods->diffuseColor.a
+* entry->mods->autoFadeFactor;
 }
 #ifdef __EMSCRIPTEN__
 VertexAttribVBO(gState.loc_a_Color, VBO_ATTRIB_COLOR, 4, mesh->numPoints, gBackupVertexColors);
