@@ -762,6 +762,9 @@ static void upload_direct_cache_entry(
 
 static DrawCacheEntry* setup_direct_cache_entry(int vertex_count, GLsizei count, GLenum type, const void* indices)
 {
+    // glDrawElements_WithVertexCount is only used by MetaObjects in this port.
+    // Those meshes point at stable BG3D geometry buffers, so a pointer-keyed
+    // cache can safely reuse the uploaded VBO/IBO contents across frames.
     if (!s_ca_vertex.enabled || !s_ca_vertex.ptr || !can_use_direct_draw_cache(type))
         return NULL;
 
