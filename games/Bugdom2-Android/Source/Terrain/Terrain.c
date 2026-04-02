@@ -1012,6 +1012,8 @@ Boolean			superTileVisible;
 
 		}
 	}
+
+	EndProfilePhase(PROFILE_PHASE_TERRAIN);
 }
 
 #pragma mark -
@@ -1809,7 +1811,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
 
 
 

@@ -727,6 +727,8 @@ do_anaglyph:
 		y += 15;
 
 #if 1							// show supertile status grid
+		// Keep the dense occupancy grid on mode 2+ so mode 1 stays readable now
+		// that it includes the rest of the profiling counters.
 		if (gDebugMode >= 2)
 		{
 			int	row, col;

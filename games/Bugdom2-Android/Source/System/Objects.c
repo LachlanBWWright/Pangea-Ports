@@ -732,7 +732,7 @@ float			cameraX, cameraZ;
 			case	SKELETON_GENRE:
 					StartProfilePhase(PROFILE_PHASE_SKELETONS);
 					DrawSkeleton(theNode);
-					StartProfilePhase(PROFILE_PHASE_OBJECTS);
+					StartProfilePhase(PROFILE_PHASE_OBJECTS);		// auto-ends skeleton timing and resumes object timing
 					break;
 
 			case	DISPLAY_GROUP_GENRE:
@@ -783,7 +783,7 @@ custom_draw:
 					if (theNode->CustomDrawFunction)
 					{
 						theNode->CustomDrawFunction(theNode);
-						StartProfilePhase(PROFILE_PHASE_OBJECTS);
+						StartProfilePhase(PROFILE_PHASE_OBJECTS);	// auto-ends terrain/custom timing and resumes object timing
 					}
 					break;
 		}

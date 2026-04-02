@@ -633,7 +633,7 @@ do_anaglyph:
 		OGL_DrawFloat(logicMs, 100,y);
 		y += 15;
 
-		OGL_DrawString("setup:", 20,y);
+		OGL_DrawString("render:", 20,y);
 		OGL_DrawFloat(renderMs, 100,y);
 		y += 15;
 
@@ -711,7 +711,7 @@ do_anaglyph:
 		OGL_DrawInt(gPlayerInfo.numBuddyBugs, 100,y);
 		y += 15;
 
-		OGL_DrawString("clovrs:", 20,y);
+		OGL_DrawString("clovers:", 20,y);
 		OGL_DrawInt(gPlayerInfo.numGreenClovers + gPlayerInfo.numBlueClovers + gPlayerInfo.numGoldClovers, 100,y);
 		y += 15;
 
