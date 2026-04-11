@@ -148,6 +148,8 @@ extern "C" {
 #undef glHint
 #undef glIsEnabled
 #undef glBindTexture
+#undef glGetBooleanv
+#undef glDepthMask
 
 // ── Compatibility function declarations ──────────────────────────────────────
 
@@ -220,6 +222,11 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count);
 // next draw call.
 void COMPAT_GL_InvalidateCachePtr(const void *ptr);
 
+// Advance the frame counter; call once per rendered frame from OGL_DrawScene.
+// This enables age-based expiry of entries for double-buffered dynamic geometry
+// (particles, DustDevil, contrails) so stale VBO data is never served.
+void COMPAT_GL_AdvanceFrame(void);
+
 // glBindTexture intercept: tracks bound texture per unit for software state.
 void glBindTexture(GLenum target, GLuint texture);
 
@@ -235,6 +242,8 @@ void glGetDoublev(GLenum pname, GLdouble *data);
 void glPolygonMode(GLenum face, GLenum mode);
 void glHint(GLenum target, GLenum mode);
 GLboolean glIsEnabled(GLenum cap);
+void glGetBooleanv(GLenum pname, GLboolean *data);  // intercepts GL_DEPTH_WRITEMASK
+void glDepthMask(GLboolean flag);                   // tracks s_depth_mask for glGetBooleanv
 void glPushAttrib(GLbitfield mask);
 void glPopAttrib(void);
 void glDrawBuffer(GLenum buf);

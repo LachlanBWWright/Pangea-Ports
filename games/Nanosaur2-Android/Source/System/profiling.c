@@ -90,8 +90,12 @@ void ResetProfilingForFrame(void) {
         gProfilePhases[i].samples = 0;
         gProfilePhases[i].start_tick = 0;
     }
+    // GL counters are reset separately by ResetGLCounters() in OGL_DrawScene.
+}
 
-    // Snapshot and reset per-frame GL counters
+// Called at the START of each frame (from OGL_DrawScene) to snapshot the
+// previous frame's GL counters into gGL*LastFrame and zero the current counters.
+void ResetGLCounters(void) {
     gDrawCallsLastFrame        = gDrawCallsThisFrame;
     gCacheHitsLastFrame        = gCacheHitsThisFrame;
     gCacheMissesLastFrame      = gCacheMissesThisFrame;

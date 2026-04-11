@@ -34,8 +34,8 @@ typedef struct {
 extern ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 
 // ── Per-frame GL counters ────────────────────────────────────────────────────
-// These are reset by ResetProfilingForFrame() each frame.
-// Previous-frame snapshots are kept in gGL*LastFrame variables.
+// These are reset by ResetGLCounters() at the START of each frame in OGL_DrawScene.
+// Previous-frame snapshots are kept in gGL*LastFrame variables for display.
 extern int gDrawCallsThisFrame;         // total glDrawElements/glDrawArrays calls
 extern int gCacheHitsThisFrame;         // draw cache hits (geometry reused from VBO cache)
 extern int gCacheMissesThisFrame;       // draw cache misses (geometry re-uploaded)
@@ -61,7 +61,11 @@ void EndProfilePhase(ProfilePhaseType phase_type);
 // Get the measured millisecond cost of a phase for this frame (or the previous frame if not measured yet)
 float GetProfilePhaseMs(ProfilePhaseType phase_type);
 
-// Call this at the end of each frame to snapshot totals for debug display and reset accumulators
+// Call this at the end of each frame to snapshot profiling totals and reset accumulators.
 void ResetProfilingForFrame(void);
+
+// Reset per-frame GL counters (call at the START of each frame, before drawing).
+// Also snapshots current values → gGL*LastFrame for the debug overlay.
+void ResetGLCounters(void);
 
 #endif // PROFILING_H

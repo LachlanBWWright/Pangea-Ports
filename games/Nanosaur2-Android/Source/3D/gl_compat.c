@@ -27,6 +27,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// Include GLES3 header for VAO functions (glGenVertexArrays, glBindVertexArray).
+// On Emscripten these map to WebGL2 built-ins; on Android they're in libGLESv3.
+#ifdef __ANDROID__
+#include <GLES3/gl3.h>
+#endif
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 #define MAX_FILL_LIGHTS   4
 #define MATRIX_STACK_DEPTH 32
@@ -159,6 +165,11 @@ static int s_texenv_mode[2] = {0, 0};
 static int s_texture_2d_enabled[2] = {0, 0};
 static int s_texgen_s = 0, s_texgen_t = 0;  // sphere mapping enabled
 
+// ── Miscellaneous pass-through GL state (tracked to avoid glIsEnabled/glGetBooleanv
+//    sync points in OGL_PushState / OGL_PopState every frame) ─────────────────
+static int        s_depth_test_enabled = 1;  // matches initial glEnable(GL_DEPTH_TEST) in OGL
+static GLboolean  s_depth_mask_enabled = GL_TRUE;  // default: writes enabled
+
 // ── Current vertex color ──────────────────────────────────────────────────────
 static float s_current_color[4] = {1,1,1,1};
 
@@ -212,6 +223,20 @@ static GLuint s_bound_texture[2] = {0, 0};   // texture name bound to each unit
 // ── Draw cache (LRU, DRAW_CACHE_SIZE entries) ─────────────────────────────────
 // Key fields identify the client-side array layout; on a hit the cached VBO
 // and IBO are bound directly, skipping the per-draw interleave + glBufferData.
+//
+// IMPORTANT: The cache uses CLIENT-SIDE POINTER ADDRESSES as key fields.
+// For dynamic (double-buffered) geometry that modifies data at the same address
+// (e.g., particles, DustDevil, contrails), a stale hit could serve old VBO data.
+// To prevent this, each entry records the frame it was last UPLOADED (not hit).
+// An entry is only treated as a valid hit if:
+//   (a) the key matches, AND
+//   (b) it was uploaded within the last DRAW_CACHE_MAX_AGE frames
+// Static terrain/model geometry gets uploaded once and hits every frame
+// (age stays <= 1 between upload and hit on frame N+0).
+// Double-buffered dynamic geometry alternates pointers, so within
+// DRAW_CACHE_MAX_AGE frames the entry is always fresh.
+#define DRAW_CACHE_MAX_AGE  2u   // entries older than 2 frames are considered stale
+
 typedef struct {
     // Key
     const void *v_ptr;       // vertex array pointer
@@ -225,13 +250,16 @@ typedef struct {
     int         idx_type;    // GL_UNSIGNED_SHORT or GL_UNSIGNED_INT
     uint8_t     valid;       // 0 = evicted / invalidated
     // Value
+    GLuint      vao;         // VAO that records attribute layout + VBO/IBO binding
     GLuint      vbo;         // GPU vertex buffer (interleaved)
     GLuint      ibo;         // GPU index buffer
     uint64_t    lru_tick;    // monotonically increasing tick for LRU eviction
+    uint64_t    upload_frame;// frame number when VBO/IBO was last uploaded
 } DrawCacheEntry;
 
 static DrawCacheEntry s_draw_cache[DRAW_CACHE_SIZE];
 static uint64_t       s_cache_lru_tick = 0;
+static uint64_t       s_draw_cache_frame = 0;  // incremented once per frame
 
 // ── Dirty flags for uniform uploading ────────────────────────────────────────
 // Avoid calling ~30 glUniform* functions per draw when nothing has changed.
@@ -519,6 +547,7 @@ static void upload_uniforms(void) {
 // ── Draw cache helpers ────────────────────────────────────────────────────────
 
 // Find cache entry matching the current draw state or return -1.
+// Also rejects entries whose upload_frame is too old (stale dynamic geometry).
 static int dc_find(const void *v_ptr, int v_count, const void *n_ptr,
                    const void *c_ptr, const void *t0_ptr, const void *t1_ptr,
                    const void *idx_ptr, int idx_count, int idx_type)
@@ -526,6 +555,10 @@ static int dc_find(const void *v_ptr, int v_count, const void *n_ptr,
     for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
         DrawCacheEntry *e = &s_draw_cache[i];
         if (!e->valid) continue;
+        // Reject entries that haven't been re-uploaded recently (stale dynamic geometry).
+        // Double-buffered geometry writes to the same pointer address every 2 frames;
+        // this check ensures we never serve VBO data older than DRAW_CACHE_MAX_AGE frames.
+        if (s_draw_cache_frame - e->upload_frame > DRAW_CACHE_MAX_AGE) continue;
         if (e->v_ptr    == v_ptr   && e->v_count  == v_count  &&
             e->n_ptr    == n_ptr   && e->c_ptr    == c_ptr    &&
             e->t0_ptr   == t0_ptr  && e->t1_ptr   == t1_ptr   &&
@@ -553,43 +586,42 @@ static int dc_find_lru(void)
     return best;
 }
 
-// Invalidate any cache entries that reference `ptr` as their vertex pointer.
-// Call after writing new data to a CPU-side vertex array (e.g. skeleton deformation).
+// Invalidate any cache entries that reference `ptr` in any pointer field.
+// Call after writing new data to a CPU-side vertex/normal/texcoord array.
 void COMPAT_GL_InvalidateCachePtr(const void *ptr)
 {
     for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
-        if (s_draw_cache[i].v_ptr == ptr ||
-            s_draw_cache[i].n_ptr == ptr)
+        if (s_draw_cache[i].v_ptr   == ptr ||
+            s_draw_cache[i].n_ptr   == ptr ||
+            s_draw_cache[i].c_ptr   == ptr ||
+            s_draw_cache[i].t0_ptr  == ptr ||
+            s_draw_cache[i].t1_ptr  == ptr ||
+            s_draw_cache[i].idx_ptr == ptr)
         {
             s_draw_cache[i].valid = 0;
         }
     }
 }
 
-// Bind a cached entry's VBO/IBO and set up vertex attribute pointers.
-static void dc_bind_entry(DrawCacheEntry *e)
+// Advance the frame counter; call once per rendered frame (e.g. from OGL_DrawScene).
+// This triggers age-based expiry of cache entries for double-buffered dynamic geometry.
+void COMPAT_GL_AdvanceFrame(void)
 {
-    const int STRIDE_BYTES = (3+3+4+2+2) * (int)sizeof(float);
-
-    glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ibo);
-
-    glEnableVertexAttribArray(ATTRIB_POSITION);
-    glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(0*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_NORMAL);
-    glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(3*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_COLOR);
-    glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(6*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
-    glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(10*sizeof(float)));
-    glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
-    glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(12*sizeof(float)));
+    s_draw_cache_frame++;
 }
 
-// Set up vertex attributes from client-side arrays, upload to VBO, return
-// vertex count (or -1 on error).  stride_out = per-vertex byte size.
-static int setup_vertex_attribs_from_arrays(int vertex_count) {
-    // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
+// Bind a cached entry's VAO and draw. The VAO was set up at store time and
+// encapsulates all VBO/IBO bindings + vertex attribute pointers in one call.
+static void dc_bind_and_draw(DrawCacheEntry *e, GLenum mode, GLsizei count, int effective_type) {
+    glBindVertexArray(e->vao);
+    REAL_glDrawElements(mode, count, (GLenum)effective_type, 0);
+    glBindVertexArray(0);
+}
+
+// Build interleaved vertex buffer (CPU-side only) into s_interleave_buf.
+// Returns the buffer size in bytes, or -1 on allocation failure.
+// Does NOT upload to GPU.
+static int build_interleave_buffer(int vertex_count) {
     const int STRIDE_FLOATS = (3+3+4+2+2);
     const int STRIDE_BYTES = STRIDE_FLOATS * sizeof(float);  // 56 bytes
     int buf_size = vertex_count * STRIDE_BYTES;
@@ -653,10 +685,20 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
             dst[12] = src[0]; dst[13] = src[1];
         } else { dst[12]=0; dst[13]=0; }
     }
+    return buf_size;
+}
+
+// Set up vertex attributes from client-side arrays, upload to s_vbo, set
+// vertex attribute pointers.  Used by glDrawArrays and immediate-mode paths.
+// Returns vertex count (or -1 on error).
+static int setup_vertex_attribs_from_arrays(int vertex_count) {
+    const int STRIDE_BYTES = (3+3+4+2+2) * sizeof(float);  // 56 bytes
+    int buf_size = build_interleave_buffer(vertex_count);
+    if (buf_size < 0) return -1;
 
     StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
-    glBufferData(GL_ARRAY_BUFFER, buf_size, buf, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, buf_size, s_interleave_buf, GL_STREAM_DRAW);
     EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
 
     gVerticesUploadedThisFrame += vertex_count;
@@ -923,6 +965,7 @@ void glEnable(GLenum cap) {
         case GL_NORMALIZE:   break;  // handled by per-vertex normalize in shader
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL; normalize handled in shader
         case GL_COLOR_MATERIAL: break;  // silently ignore
+        case GL_DEPTH_TEST:  s_depth_test_enabled = 1; REAL_glEnable(cap); break;
         case GL_TEXTURE_2D:
             // Use s_active_texcoord_unit as proxy for the server-side active texture
             // unit.  OGL_ActiveTextureUnit() always calls both glActiveTexture and
@@ -950,6 +993,7 @@ void glDisable(GLenum cap) {
         case GL_NORMALIZE:   break;
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL
         case GL_COLOR_MATERIAL: break;
+        case GL_DEPTH_TEST:  s_depth_test_enabled = 0; REAL_glDisable(cap); break;
         case GL_TEXTURE_2D:
             s_texture_2d_enabled[s_active_texcoord_unit] = 0;
             s_uniform_dirty |= UDIRTY_TEXTURE;
@@ -1162,30 +1206,24 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
         e->lru_tick = ++s_cache_lru_tick;
         gCacheHitsThisFrame++;
 
-        dc_bind_entry(e);
-        REAL_glDrawElements(mode, count, (GLenum)effective_type, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        disable_vertex_attribs();
+        dc_bind_and_draw(e, mode, count, effective_type);
         return;
     }
 
-    // ── Cache MISS: build interleaved vertex buffer and upload to GPU ─────────
+    // ── Cache MISS: build interleaved vertex buffer (CPU only) ───────────────
     gCacheMissesThisFrame++;
 
-    if (setup_vertex_attribs_from_arrays(vertex_count) < 0) return;
+    // Step 1: build the CPU-side interleaved buffer (no GPU upload yet)
+    int vbo_bytes = build_interleave_buffer(vertex_count);
+    if (vbo_bytes < 0) return;
 
-    // Upload index buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_ibo);
-
+    // Step 2: convert / prepare the index buffer into s_index_conv_buf if needed
     int ibo_bytes = 0;
     if (type == GL_UNSIGNED_INT) {
 #if defined(USE_WEBGL2) || defined(__ANDROID__)
         ibo_bytes = count * (int)sizeof(GLuint);
-        StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, indices, GL_STATIC_DRAW);
-        EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-        gBytesUploadedThisFrame += ibo_bytes;
         effective_type = GL_UNSIGNED_INT;
+        // indices already usable as-is
 #else
         if (vertex_count <= 65535) {
             int needed_size = count * (int)sizeof(GLushort);
@@ -1196,60 +1234,69 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
             const GLuint *uint_idx = (const GLuint *)indices;
             for (int i = 0; i < count; i++) s_index_conv_buf[i] = (GLushort)uint_idx[i];
             ibo_bytes = needed_size;
-            StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, s_index_conv_buf, GL_STATIC_DRAW);
-            EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-            gBytesUploadedThisFrame += ibo_bytes;
             effective_type = GL_UNSIGNED_SHORT;
         } else {
             ibo_bytes = count * (int)sizeof(GLuint);
-            StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, indices, GL_STATIC_DRAW);
-            EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-            gBytesUploadedThisFrame += ibo_bytes;
             effective_type = GL_UNSIGNED_INT;
         }
 #endif
     } else {
         GLsizei sz = (type == GL_UNSIGNED_SHORT) ? (GLsizei)sizeof(GLushort) : (GLsizei)sizeof(GLubyte);
         ibo_bytes = count * (int)sz;
-        StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, indices, GL_STATIC_DRAW);
-        EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
-        gBytesUploadedThisFrame += ibo_bytes;
     }
 
-    REAL_glDrawElements(mode, count, (GLenum)effective_type, 0);
-
-    // ── Store in cache ────────────────────────────────────────────────────────
-    // Allocate new VBO/IBO for the cached copy and populate from s_vbo/s_ibo
-    // (which hold the interleaved data we just uploaded).
+    // Step 3: claim a cache slot and upload directly into it.
+    // Never call glDeleteBuffers at render time — it stalls the pipeline.
     int slot = dc_find_lru();
     DrawCacheEntry *e = &s_draw_cache[slot];
 
-    // Free old GPU buffers for the evicted entry
-    if (e->valid) {
-        glDeleteBuffers(1, &e->vbo);
-        glDeleteBuffers(1, &e->ibo);
-    }
+    const int STRIDE_BYTES = (3+3+4+2+2) * (int)sizeof(float);
+    const void *ibo_src = (effective_type == GL_UNSIGNED_SHORT) ? (const void *)s_index_conv_buf : indices;
 
-    glGenBuffers(1, &e->vbo);
-    glGenBuffers(1, &e->ibo);
+    StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+    if (!e->vao) {
+        // First use of this slot: allocate persistent GPU objects once and record
+        // the vertex attribute layout in the VAO.
+        glGenVertexArrays(1, &e->vao);
+        glGenBuffers(1, &e->vbo);
+        glGenBuffers(1, &e->ibo);
 
-    // Copy vertex data from the stream VBO into the static cache VBO
-    int vbo_bytes = vertex_count * (3+3+4+2+2) * (int)sizeof(float);
-    glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
-    glBufferData(GL_ARRAY_BUFFER, vbo_bytes, s_interleave_buf, GL_STATIC_DRAW);
+        glBindVertexArray(e->vao);
+        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
+        glBufferData(GL_ARRAY_BUFFER, vbo_bytes, s_interleave_buf, GL_DYNAMIC_DRAW);
 
-    // Copy index data from s_index_conv_buf / original indices into cache IBO
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ibo);
-    if (effective_type == GL_UNSIGNED_SHORT) {
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (int)sizeof(GLushort), s_index_conv_buf, GL_STATIC_DRAW);
-    } else if (effective_type == GL_UNSIGNED_INT) {
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (int)sizeof(GLuint), indices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(ATTRIB_POSITION);
+        glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(0*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_NORMAL);
+        glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(3*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_COLOR);
+        glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(6*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
+        glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(10*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
+        glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(12*sizeof(float)));
+
+        // Bind IBO inside VAO scope — WebGL2 stores the IBO binding in the VAO.
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ibo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, ibo_src, GL_DYNAMIC_DRAW);
+
+        glBindVertexArray(0);
     } else {
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (int)sizeof(GLubyte), indices, GL_STATIC_DRAW);
+        // Reuse existing VAO/VBO/IBO — re-upload data only, NO delete/gen.
+        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
+        glBufferData(GL_ARRAY_BUFFER, vbo_bytes, s_interleave_buf, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // IBO must be updated inside the VAO scope so it stays recorded there.
+        glBindVertexArray(e->vao);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ibo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, ibo_src, GL_DYNAMIC_DRAW);
+        glBindVertexArray(0);
     }
+    EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+
+    gVerticesUploadedThisFrame += vertex_count;
+    gBytesUploadedThisFrame    += vbo_bytes + ibo_bytes;
 
     e->v_ptr    = s_ca_vertex.ptr;
     e->n_ptr    = n_ptr;
@@ -1261,11 +1308,13 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
     e->idx_count= count;
     e->idx_type = effective_type;
     e->valid    = 1;
-    e->lru_tick = ++s_cache_lru_tick;
+    e->lru_tick    = ++s_cache_lru_tick;
+    e->upload_frame = s_draw_cache_frame;
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    disable_vertex_attribs();
+    // Step 4: draw from the cached VAO (single bind instead of N attrib calls).
+    dc_bind_and_draw(e, mode, count, effective_type);
 }
+
 
 void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     if (!s_ca_vertex.ptr || count <= 0) return;
@@ -1454,6 +1503,7 @@ GLboolean glIsEnabled(GLenum cap) {
         case GL_NORMALIZE:      return GL_FALSE;  // normalize is always handled in shader
         case GL_RESCALE_NORMAL: return GL_FALSE;
         case GL_COLOR_MATERIAL: return GL_FALSE;
+        case GL_DEPTH_TEST:     return s_depth_test_enabled ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_2D:
             // Use s_active_texcoord_unit as proxy — no GL state query needed.
             return s_texture_2d_enabled[s_active_texcoord_unit] ? GL_TRUE : GL_FALSE;
@@ -1462,6 +1512,31 @@ GLboolean glIsEnabled(GLenum cap) {
         default:
             return REAL_glIsEnabled(cap);
     }
+}
+
+// glGetBooleanv — intercept GL_DEPTH_WRITEMASK to avoid GPU sync in OGL_PushState.
+void glGetBooleanv(GLenum pname, GLboolean *data) {
+    if (pname == GL_DEPTH_WRITEMASK) {
+        *data = s_depth_mask_enabled;
+    } else {
+        // Fall through to real GL for anything else
+        REAL_glGetIntegerv(pname, (GLint *)data);  // piggyback via getIntegerv
+    }
+}
+
+// glDepthMask — track software state to avoid glGetBooleanv sync in OGL_PushState.
+void glDepthMask(GLboolean flag) {
+    s_depth_mask_enabled = flag;
+    // Pass through to real GL immediately — this is a pipeline state change.
+    typedef void (*pfn_t)(GLboolean);
+#ifdef __EMSCRIPTEN__
+    extern void emscripten_glDepthMask(GLboolean);
+    emscripten_glDepthMask(flag);
+#else
+    static pfn_t real_fn = NULL;
+    if (!real_fn) real_fn = (pfn_t)dlsym(RTLD_NEXT, "glDepthMask");
+    if (real_fn) real_fn(flag);
+#endif
 }
 
 // Apple extension stubs
