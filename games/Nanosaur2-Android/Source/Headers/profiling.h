@@ -15,6 +15,9 @@ typedef enum {
     PROFILE_PHASE_UI,
     PROFILE_PHASE_SWAP_BUFFERS,
     PROFILE_PHASE_ASYNC_YIELD,
+    // Fine-grained GL phases (measured within the rendering phase)
+    PROFILE_PHASE_GL_GEOMETRY_UPLOAD,   // time spent in glBufferData (vertex+index upload)
+    PROFILE_PHASE_GL_UNIFORMS,          // time spent uploading uniforms to the shader
     NUM_PROFILE_PHASES
 } ProfilePhaseType;
 
@@ -29,6 +32,22 @@ typedef struct {
 
 // Global array of profiling phases
 extern ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
+
+// ── Per-frame GL counters ────────────────────────────────────────────────────
+// These are reset by ResetProfilingForFrame() each frame.
+// Previous-frame snapshots are kept in gGL*LastFrame variables.
+extern int gDrawCallsThisFrame;         // total glDrawElements/glDrawArrays calls
+extern int gCacheHitsThisFrame;         // draw cache hits (geometry reused from VBO cache)
+extern int gCacheMissesThisFrame;       // draw cache misses (geometry re-uploaded)
+extern int gVerticesUploadedThisFrame;  // total vertex count uploaded to GPU
+extern int gBytesUploadedThisFrame;     // total bytes sent via glBufferData
+
+// Previous-frame snapshots (stable values for display)
+extern int gDrawCallsLastFrame;
+extern int gCacheHitsLastFrame;
+extern int gCacheMissesLastFrame;
+extern int gVerticesUploadedLastFrame;
+extern int gBytesUploadedLastFrame;
 
 // Initialize all profiling phases
 void InitProfiling(void);

@@ -147,6 +147,7 @@ extern "C" {
 #undef glDrawArrays
 #undef glHint
 #undef glIsEnabled
+#undef glBindTexture
 
 // ── Compatibility function declarations ──────────────────────────────────────
 
@@ -212,6 +213,15 @@ void glTexCoord2fv(const GLfloat *v);
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices);
 void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count);
 void glDrawArrays(GLenum mode, GLint first, GLsizei count);
+
+// Draw cache management
+// Call this when CPU-side vertex data at `ptr` has been modified (e.g., after
+// animating a skeleton mesh) so the cached GPU buffer is re-uploaded on the
+// next draw call.
+void COMPAT_GL_InvalidateCachePtr(const void *ptr);
+
+// glBindTexture intercept: tracks bound texture per unit for software state.
+void glBindTexture(GLenum target, GLuint texture);
 
 // Enable/Disable intercepted for lighting/fog/alpha-test/texgen state tracking
 void glEnable(GLenum cap);

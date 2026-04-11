@@ -950,6 +950,40 @@ do_anaglyph:
 		OGL_DrawInt(gNumObjectNodes, x2,y);
 		y += 15;
 
+		// Fine-grained GL performance metrics
+		{
+			float glUploadMs  = GetProfilePhaseMs(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+			float glUniformMs = GetProfilePhaseMs(PROFILE_PHASE_GL_UNIFORMS);
+
+			OGL_DrawString("glUpld:", 10,y);
+			OGL_DrawFloat(glUploadMs, x2,y);
+			y += 15;
+
+			OGL_DrawString("glUnif:", 10,y);
+			OGL_DrawFloat(glUniformMs, x2,y);
+			y += 15;
+
+			OGL_DrawString("dc:", 10,y);
+			OGL_DrawInt(gDrawCallsLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("c$hit:", 10,y);
+			OGL_DrawInt(gCacheHitsLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("c$mis:", 10,y);
+			OGL_DrawInt(gCacheMissesLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("vup:", 10,y);
+			OGL_DrawInt(gVerticesUploadedLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("BupK:", 10,y);
+			OGL_DrawInt(gBytesUploadedLastFrame / 1024, x2,y);
+			y += 15;
+		}
+
 #if 0
 
 		OGL_DrawString("#scratchF:", 20,y);
