@@ -700,6 +700,11 @@ OGLPoint3D			worldHitCoord;
 
 		OGL_SetVertexArrayRangeDirty(VERTEX_ARRAY_RANGE_TYPE_ZAPS1 + gZapBuffer);
 
+		/* Invalidate draw cache: zap vertex Y-coords are randomized each frame. */
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		COMPAT_GL_InvalidateCachePtr(triMesh->points);
+#endif
+
 
 				/*********************/
 				/* SEE IF HIT PLAYER */
