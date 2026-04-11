@@ -686,6 +686,11 @@ OGLVector3D			vertexNormalList[NUM_VERTICES_IN_SUPERTILE];
 		gHiccupTimer &= 0x3;							// spread over 4 frames
 	}
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	/* Supertile slot was just (re)built with new geometry; evict any stale cache entry for this pointer. */
+	CompatGL_InvalidateCachePtr(meshData->points);
+#endif
+
 	return(superTileNum);
 }
 

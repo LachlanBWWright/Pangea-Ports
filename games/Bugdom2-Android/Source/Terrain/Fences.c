@@ -689,6 +689,11 @@ Boolean					overrideAlphaFunc = false;
 
 			/* SUBMIT GEO */
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	/* Fence vertex colors (alpha fade) are modified per-frame in this function; evict stale cache entry.
+	   colorsByte is shared between front and back face meshes, so one invalidation covers both. */
+	GLES3_InvalidateCachePtr(gFenceMeshes[f].colorsByte);
+#endif
 	MO_DrawGeometry_VertexArray(&gFenceMeshes[f]);
 
 	gGlobalMaterialFlags = oldMaterialFlags;

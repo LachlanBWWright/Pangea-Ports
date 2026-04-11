@@ -784,6 +784,12 @@ OGLVector3D			*vertexNormals;
 		gHiccupTimer &= 0x1;							// spread over 2 frames
 	}
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	/* Supertile slot was just (re)built with new geometry; evict any stale cache entry for these pointers. */
+	GLES3_InvalidateCachePtr(meshData->points);
+	GLES3_InvalidateCachePtr(meshData->normals);
+#endif
+
 	return(superTileNum);
 }
 
@@ -1196,6 +1202,11 @@ float	oneOverWaveLength,r,rw,dampenRatio;
 
 	CalculateSupertileVertexNormals(superTile->meshData, startRow, startCol);
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	/* Terrain vertex positions and normals were modified by deformation; evict stale cache entries. */
+	GLES3_InvalidateCachePtr(superTile->meshData->points);
+	GLES3_InvalidateCachePtr(superTile->meshData->normals);
+#endif
 
 }
 
