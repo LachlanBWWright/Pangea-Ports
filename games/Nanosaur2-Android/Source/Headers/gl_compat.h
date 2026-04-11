@@ -12,8 +12,6 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include <SDL3/SDL_opengles2.h>   // GLES2 types and real function declarations
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -254,6 +252,13 @@ void glSetFenceAPPLE(GLuint fence);
 void glFinishFenceAPPLE(GLuint fence);
 GLboolean glTestFenceAPPLE(GLuint fence);
 GLboolean glIsFenceNV(GLuint fence);
+
+// Vertex array object support
+void glGenVertexArrays(GLsizei n, GLuint *arrays);
+void glBindVertexArray(GLuint array);
+void glDeleteVertexArrays(GLsizei n, const GLuint *arrays);
+GLboolean glIsVertexArray(GLuint array);
+
 void glGenVertexArraysAPPLE(GLsizei n, GLuint *arrays);
 void glBindVertexArrayAPPLE(GLuint array);
 void glFlushVertexArrayRangeAPPLE(GLsizei length, void *ptr);
@@ -264,5 +269,3 @@ void glGetDoublev_stub(GLenum pname, GLdouble *params);
 #ifdef __cplusplus
 } // extern "C"
 #endif
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

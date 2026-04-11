@@ -73,6 +73,7 @@ extern  float	gAccelerationCurve[CURVE_SIZE];
 extern	ObjNode	*MakeNewSkeletonObject(NewObjectDefinitionType *newObjDef);
 extern	void AllocSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 extern	void InitSkeletonManager(void);
+extern	short	gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
 void LoadASkeleton(Byte num);
 extern	void FreeSkeletonFile(Byte skeletonType);
 extern	void FreeAllSkeletonFiles(short skipMe);

@@ -16,11 +16,11 @@
 //   • glGetFloatv for GL_MODELVIEW_MATRIX / GL_PROJECTION_MATRIX returns our
 //     software stack top.
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include <SDL3/SDL.h>
 #include "gl_compat.h"
 #include "../Headers/profiling.h"
+
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include <string.h>
 #include <math.h>

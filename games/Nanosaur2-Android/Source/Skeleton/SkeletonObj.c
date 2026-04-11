@@ -32,7 +32,7 @@ static void DisposeSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 
 static SkeletonDefType		*gLoadedSkeletonsList[MAX_SKELETON_TYPES];
 
-static short	    gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
+short	    gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
 
 
 /**************** INIT SKELETON MANAGER *********************/
