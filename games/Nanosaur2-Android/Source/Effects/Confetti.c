@@ -533,6 +533,11 @@ OGLBoundingBox	bbox;
 			if (OGL_IsBBoxVisible(&bbox, nil))						// do cull test on it
 			{
 drawme:
+				/* Invalidate draw cache: confetti geometry is modified every frame (single buffer). */
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+				COMPAT_GL_InvalidateCachePtr(geoData->points);
+				COMPAT_GL_InvalidateCachePtr(geoData->colorsFloat);
+#endif
 					/* DRAW IT */
 
 				MO_DrawObject(gConfettiGroups[g]->geometryObj);						// draw geometry

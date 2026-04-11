@@ -718,9 +718,6 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	OGL_SetColor4f(1,1,1,1);
 
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-	// Advance the draw-cache frame counter so age-based expiry works correctly
-	// for double-buffered dynamic geometry (particles, DustDevil, contrails).
-	COMPAT_GL_AdvanceFrame();
 	// Reset per-frame GL counters (draw calls, cache hits/misses, bytes uploaded)
 	ResetGLCounters();
 #endif

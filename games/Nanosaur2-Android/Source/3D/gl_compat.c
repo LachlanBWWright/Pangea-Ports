@@ -42,8 +42,18 @@
 // Keyed by (vertex pointer, vertex count, normal/color/texcoord pointers,
 // index pointer, index count, and attrib-enabled mask) so that static meshes
 // (terrain tiles, model geometry) are uploaded to the GPU only once and then
-// reused across frames.  Dynamic geometry (skeleton-animated meshes) can be
-// invalidated explicitly via COMPAT_GL_InvalidateCachePtr().
+// reused across frames.
+//
+// INVALIDATION POLICY:
+//   Static geometry (terrain tiles, model meshes): cache entries never expire.
+//   Dynamic geometry (skeleton animation, particles, contrails, DustDevil, confetti):
+//   the caller MUST call COMPAT_GL_InvalidateCachePtr() on the affected pointer(s)
+//   AFTER writing new data and BEFORE drawing.  Bones.c does this for skeleton
+//   deformation; Particles.c, Contrails.c, DustDevil.c, and Confetti.c must also
+//   call it after their per-frame geometry updates.
+//
+// DO NOT use frame-age expiry — it causes both static geometry re-uploads every
+// few frames (regression) and stale double-buffered data being served (bug).
 #define DRAW_CACHE_SIZE   256
 
 // ── Forward declarations for Emscripten's real GL functions ───────────────────
@@ -225,18 +235,10 @@ static GLuint s_bound_texture[2] = {0, 0};   // texture name bound to each unit
 // and IBO are bound directly, skipping the per-draw interleave + glBufferData.
 //
 // IMPORTANT: The cache uses CLIENT-SIDE POINTER ADDRESSES as key fields.
-// For dynamic (double-buffered) geometry that modifies data at the same address
-// (e.g., particles, DustDevil, contrails), a stale hit could serve old VBO data.
-// To prevent this, each entry records the frame it was last UPLOADED (not hit).
-// An entry is only treated as a valid hit if:
-//   (a) the key matches, AND
-//   (b) it was uploaded within the last DRAW_CACHE_MAX_AGE frames
-// Static terrain/model geometry gets uploaded once and hits every frame
-// (age stays <= 1 between upload and hit on frame N+0).
-// Double-buffered dynamic geometry alternates pointers, so within
-// DRAW_CACHE_MAX_AGE frames the entry is always fresh.
-#define DRAW_CACHE_MAX_AGE  2u   // entries older than 2 frames are considered stale
-
+// For geometry that is modified in-place (particles, contrails, DustDevil,
+// confetti, skeleton animation), the caller MUST call COMPAT_GL_InvalidateCachePtr()
+// AFTER writing new vertex data and BEFORE the next draw call.
+// This evicts the stale cache entry so the next draw re-uploads fresh data.
 typedef struct {
     // Key
     const void *v_ptr;       // vertex array pointer
@@ -254,12 +256,10 @@ typedef struct {
     GLuint      vbo;         // GPU vertex buffer (interleaved)
     GLuint      ibo;         // GPU index buffer
     uint64_t    lru_tick;    // monotonically increasing tick for LRU eviction
-    uint64_t    upload_frame;// frame number when VBO/IBO was last uploaded
 } DrawCacheEntry;
 
 static DrawCacheEntry s_draw_cache[DRAW_CACHE_SIZE];
 static uint64_t       s_cache_lru_tick = 0;
-static uint64_t       s_draw_cache_frame = 0;  // incremented once per frame
 
 // ── Dirty flags for uniform uploading ────────────────────────────────────────
 // Avoid calling ~30 glUniform* functions per draw when nothing has changed.
@@ -547,7 +547,6 @@ static void upload_uniforms(void) {
 // ── Draw cache helpers ────────────────────────────────────────────────────────
 
 // Find cache entry matching the current draw state or return -1.
-// Also rejects entries whose upload_frame is too old (stale dynamic geometry).
 static int dc_find(const void *v_ptr, int v_count, const void *n_ptr,
                    const void *c_ptr, const void *t0_ptr, const void *t1_ptr,
                    const void *idx_ptr, int idx_count, int idx_type)
@@ -555,10 +554,6 @@ static int dc_find(const void *v_ptr, int v_count, const void *n_ptr,
     for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
         DrawCacheEntry *e = &s_draw_cache[i];
         if (!e->valid) continue;
-        // Reject entries that haven't been re-uploaded recently (stale dynamic geometry).
-        // Double-buffered geometry writes to the same pointer address every 2 frames;
-        // this check ensures we never serve VBO data older than DRAW_CACHE_MAX_AGE frames.
-        if (s_draw_cache_frame - e->upload_frame > DRAW_CACHE_MAX_AGE) continue;
         if (e->v_ptr    == v_ptr   && e->v_count  == v_count  &&
             e->n_ptr    == n_ptr   && e->c_ptr    == c_ptr    &&
             e->t0_ptr   == t0_ptr  && e->t1_ptr   == t1_ptr   &&
@@ -587,7 +582,10 @@ static int dc_find_lru(void)
 }
 
 // Invalidate any cache entries that reference `ptr` in any pointer field.
-// Call after writing new data to a CPU-side vertex/normal/texcoord array.
+// Call after writing new data to a CPU-side vertex/normal/texcoord array,
+// and before the next draw call that uses that array.
+// Bones.c calls this after skeleton deformation; Particles.c, Contrails.c,
+// DustDevil.c, and Confetti.c call this after per-frame geometry updates.
 void COMPAT_GL_InvalidateCachePtr(const void *ptr)
 {
     for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
@@ -601,13 +599,6 @@ void COMPAT_GL_InvalidateCachePtr(const void *ptr)
             s_draw_cache[i].valid = 0;
         }
     }
-}
-
-// Advance the frame counter; call once per rendered frame (e.g. from OGL_DrawScene).
-// This triggers age-based expiry of cache entries for double-buffered dynamic geometry.
-void COMPAT_GL_AdvanceFrame(void)
-{
-    s_draw_cache_frame++;
 }
 
 // Bind a cached entry's VAO and draw. The VAO was set up at store time and
@@ -1309,7 +1300,6 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
     e->idx_type = effective_type;
     e->valid    = 1;
     e->lru_tick    = ++s_cache_lru_tick;
-    e->upload_frame = s_draw_cache_frame;
 
     // Step 4: draw from the cached VAO (single bind instead of N attrib calls).
     dc_bind_and_draw(e, mode, count, effective_type);

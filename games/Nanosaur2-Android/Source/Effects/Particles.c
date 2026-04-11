@@ -777,6 +777,12 @@ short				paneNum;
 				gParticleGroups[g]->bbox.max.y = maxY;
 				gParticleGroups[g]->bbox.max.z = maxZ;
 
+				/* Invalidate draw cache: particle vertex data is modified every frame. */
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+				COMPAT_GL_InvalidateCachePtr(geoData->points);
+				COMPAT_GL_InvalidateCachePtr(geoData->colorsFloat);
+#endif
+
 //				gParticleGroups[g]->isCulled[paneNum] = !OGL_IsBBoxVisible(&bbox, nil);
 			}
 		}

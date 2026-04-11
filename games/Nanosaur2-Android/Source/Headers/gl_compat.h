@@ -218,14 +218,12 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count);
 
 // Draw cache management
 // Call this when CPU-side vertex data at `ptr` has been modified (e.g., after
-// animating a skeleton mesh) so the cached GPU buffer is re-uploaded on the
-// next draw call.
+// animating a skeleton mesh, updating particles, building contrail/DustDevil geometry)
+// so the cached GPU buffer is re-uploaded on the next draw call.
+// This MUST be called after ANY per-frame geometry write to a pointer that was
+// previously registered in the draw cache.  Failure to call this will cause
+// the draw cache to serve stale VBO data from a previous frame.
 void COMPAT_GL_InvalidateCachePtr(const void *ptr);
-
-// Advance the frame counter; call once per rendered frame from OGL_DrawScene.
-// This enables age-based expiry of entries for double-buffered dynamic geometry
-// (particles, DustDevil, contrails) so stale VBO data is never served.
-void COMPAT_GL_AdvanceFrame(void);
 
 // glBindTexture intercept: tracks bound texture per unit for software state.
 void glBindTexture(GLenum target, GLuint texture);
