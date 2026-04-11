@@ -326,18 +326,25 @@ void CompatGL_Light(GLenum light, GLenum pname, const GLfloat* params)
 
     if (pname == GL_POSITION)
     {
-        // Position is a direction for directional lights
-        gModernGLState.lightDirection[lightIndex][0] = params[0];
-        gModernGLState.lightDirection[lightIndex][1] = params[1];
-        gModernGLState.lightDirection[lightIndex][2] = params[2];
+        // Per OpenGL spec, GL_POSITION is transformed by the current modelview matrix.
+        // Transform the direction into eye space so it matches the eye-space normals
+        // computed in the vertex shader (uNormalMatrix = mat3(MV)).
+        const float* mv = gModelViewStack.matrices[gModelViewStack.depth];
+        float dx = params[0], dy = params[1], dz = params[2];
+        float ex = mv[0]*dx + mv[4]*dy + mv[8]*dz;
+        float ey = mv[1]*dx + mv[5]*dy + mv[9]*dz;
+        float ez = mv[2]*dx + mv[6]*dy + mv[10]*dz;
         // Normalize
-        float len = sqrtf(params[0]*params[0] + params[1]*params[1] + params[2]*params[2]);
+        float len = sqrtf(ex*ex + ey*ey + ez*ez);
         if (len > 0.0001f)
         {
-            gModernGLState.lightDirection[lightIndex][0] /= len;
-            gModernGLState.lightDirection[lightIndex][1] /= len;
-            gModernGLState.lightDirection[lightIndex][2] /= len;
+            ex /= len;
+            ey /= len;
+            ez /= len;
         }
+        gModernGLState.lightDirection[lightIndex][0] = ex;
+        gModernGLState.lightDirection[lightIndex][1] = ey;
+        gModernGLState.lightDirection[lightIndex][2] = ez;
         gModernGLState.dirtyFlags |= MODERNGL_DIRTY_LIGHTING;
     }
     else if (pname == GL_DIFFUSE)
