@@ -423,6 +423,10 @@ Byte				buffNum;
 
 					/* SUBMIT IT */
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		COMPAT_GL_InvalidateCachePtr(triMesh->points);
+		COMPAT_GL_InvalidateCachePtr(triMesh->normals);
+#endif
 		MO_DrawGeometry_VertexArray(triMesh);
 
 
