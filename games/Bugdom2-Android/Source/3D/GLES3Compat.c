@@ -945,6 +945,16 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     UploadUniforms();
 
     glDrawElements(mode, count, type, 0);
+
+    // Reset the client active texture unit to 0 after every draw.
+    // Multi-texture (sphere-map) objects activate unit 1 at the end of their
+    // setup loop and never restore unit 0 before returning.  If the next draw
+    // call is a single-texture object it calls glTexCoordPointer without
+    // first calling glClientActiveTexture(unit 0), so our override silently
+    // ignores the UV pointer update – leaving gTexcArrayPtr pointing at the
+    // previous object's UV array and causing garbled terrain / fence UVs.
+    // Resetting here ensures every object's UV setup starts with unit 0 active.
+    gClientActiveUnit = 0;
 }
 
 //=============================================================

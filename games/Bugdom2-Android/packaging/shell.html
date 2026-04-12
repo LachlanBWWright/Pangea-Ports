@@ -117,6 +117,17 @@
       outline: none;
     }
 
+    /* In fullscreen the canvas must fill the entire screen regardless of
+       the usual max-width constraint and border-radius styling. */
+    #canvas:fullscreen,
+    #canvas:-webkit-full-screen,
+    #canvas:-moz-full-screen {
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: none !important;
+      border-radius: 0 !important;
+    }
+
     /* Toolbar below canvas */
     #toolbar {
       display: none;
@@ -355,9 +366,21 @@
     function syncCanvasSize() {
       if (!Module || !Module.canvas) return;
       var dpr = window.devicePixelRatio || 1;
-      var cssW = Module.canvas.clientWidth;
-      var cssH = Module.canvas.clientHeight;
-      if (!cssW || !cssH) return;  // layout not settled yet (e.g. mid-fullscreen transition)
+      var cssW, cssH;
+      // In fullscreen the browser may not have finished reflecting the new CSS
+      // dimensions in clientWidth/clientHeight when our rAF fires.  Use
+      // window.innerWidth/innerHeight instead – they always equal the viewport
+      // (which IS the screen in fullscreen).
+      if (document.fullscreenElement === Module.canvas ||
+          document.webkitFullscreenElement === Module.canvas ||
+          document.mozFullScreenElement === Module.canvas) {
+        cssW = window.innerWidth;
+        cssH = window.innerHeight;
+      } else {
+        cssW = Module.canvas.clientWidth;
+        cssH = Module.canvas.clientHeight;
+      }
+      if (!cssW || !cssH) return;  // layout not settled yet
       var w = Math.floor(cssW * dpr);
       var h = Math.floor(cssH * dpr);
       if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
