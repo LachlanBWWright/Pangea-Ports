@@ -18,6 +18,7 @@
 // Matrix modes
 #define GL_MODELVIEW              0x1700
 #define GL_PROJECTION             0x1701
+#define GL_TEXTURE                0x1702
 
 // Legacy primitive types
 #define GL_QUADS                  0x0007

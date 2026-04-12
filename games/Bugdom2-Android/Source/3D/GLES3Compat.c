@@ -82,6 +82,7 @@ static const char* kVertSrc =
 "#version 300 es\n"
 "uniform mat4 u_proj;\n"
 "uniform mat4 u_mv;\n"
+"uniform mat4 u_texMatrix;\n"
 "uniform bool u_lighting;\n"
 "uniform vec4 u_ambient;\n"
 "uniform int  u_nLights;\n"
@@ -116,7 +117,7 @@ static const char* kVertSrc =
 "  } else {\n"
 "    v_color=base;\n"
 "  }\n"
-"  v_uv=a_uv;\n"
+"  v_uv=(u_texMatrix*vec4(a_uv,0.0,1.0)).xy;\n"
 "  if(u_fog){\n"
 "    float dist=abs(ep.z);\n"
 "    if(u_fogMode==1){\n"   // GL_LINEAR
@@ -183,7 +184,7 @@ static size_t gArrayVBOSize = 0;
 static size_t gArrayEBOSize = 0;
 
 // Uniform locations
-static GLint uProj, uMV, uLighting, uAmbient, uNLights;
+static GLint uProj, uMV, uTexMatrix, uLighting, uAmbient, uNLights;
 static GLint uLightDir[4], uLightDiff[4];
 static GLint uFog, uFogMode, uFogDensity, uFogStart, uFogEnd, uFogColor;
 static GLint uUseTex, uTex;
@@ -201,10 +202,14 @@ static Mat4  gMVStack[MATRIX_STACK_DEPTH];
 static int   gMVTop          = 0;
 static Mat4  gProjStack[MATRIX_STACK_DEPTH];
 static int   gProjTop        = 0;
+static Mat4  gTexStack[MATRIX_STACK_DEPTH];
+static int   gTexTop         = 0;
 
 static inline Mat4* CurMat(void)
 {
-    return (gMatMode == GL_PROJECTION) ? &gProjStack[gProjTop] : &gMVStack[gMVTop];
+    if (gMatMode == GL_PROJECTION) return &gProjStack[gProjTop];
+    if (gMatMode == GL_TEXTURE)    return &gTexStack[gTexTop];
+    return &gMVStack[gMVTop];
 }
 
 static void MatIdentity(float* m)
@@ -355,8 +360,9 @@ static GLenum  gIMMode   = 0;
 
 static void UploadUniforms(void)
 {
-    glUniformMatrix4fv(uMV,   1, GL_FALSE, gMVStack[gMVTop]);
-    glUniformMatrix4fv(uProj, 1, GL_FALSE, gProjStack[gProjTop]);
+    glUniformMatrix4fv(uMV,        1, GL_FALSE, gMVStack[gMVTop]);
+    glUniformMatrix4fv(uProj,      1, GL_FALSE, gProjStack[gProjTop]);
+    glUniformMatrix4fv(uTexMatrix, 1, GL_FALSE, gTexStack[gTexTop]);
 
     // Lighting
     glUniform1i(uLighting, gLightingEnabled ? 1 : 0);
@@ -462,6 +468,7 @@ void GLES3Compat_Init(void)
     // Fetch uniform locations
     uProj        = glGetUniformLocation(gProgram, "u_proj");
     uMV          = glGetUniformLocation(gProgram, "u_mv");
+    uTexMatrix   = glGetUniformLocation(gProgram, "u_texMatrix");
     uLighting    = glGetUniformLocation(gProgram, "u_lighting");
     uAmbient     = glGetUniformLocation(gProgram, "u_ambient");
     uNLights     = glGetUniformLocation(gProgram, "u_nLights");
@@ -494,6 +501,7 @@ void GLES3Compat_Init(void)
     // Initialise matrix stacks to identity
     MatIdentity(gMVStack[0]);
     MatIdentity(gProjStack[0]);
+    MatIdentity(gTexStack[0]);
 
     // Bind our program so the game can start calling legacy GL immediately
     glUseProgram(gProgram);
@@ -972,6 +980,10 @@ void glPushMatrix(void)
         if (gProjTop + 1 >= MATRIX_STACK_DEPTH) return;
         memcpy(gProjStack[gProjTop+1], gProjStack[gProjTop], 16*sizeof(float));
         gProjTop++;
+    } else if (gMatMode == GL_TEXTURE) {
+        if (gTexTop + 1 >= MATRIX_STACK_DEPTH) return;
+        memcpy(gTexStack[gTexTop+1], gTexStack[gTexTop], 16*sizeof(float));
+        gTexTop++;
     } else {
         if (gMVTop + 1 >= MATRIX_STACK_DEPTH) return;
         memcpy(gMVStack[gMVTop+1], gMVStack[gMVTop], 16*sizeof(float));
@@ -983,6 +995,8 @@ void glPopMatrix(void)
 {
     if (gMatMode == GL_PROJECTION) {
         if (gProjTop > 0) gProjTop--;
+    } else if (gMatMode == GL_TEXTURE) {
+        if (gTexTop > 0) gTexTop--;
     } else {
         if (gMVTop > 0) gMVTop--;
     }
