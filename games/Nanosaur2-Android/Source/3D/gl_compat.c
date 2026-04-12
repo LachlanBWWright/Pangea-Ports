@@ -134,13 +134,13 @@ static Mat4 s_modelview_stack[MATRIX_STACK_DEPTH];
 static int  s_modelview_top = 0;
 static Mat4 s_projection_stack[MATRIX_STACK_DEPTH];
 static int  s_projection_top = 0;
-static Mat4 s_tex_matrix;   // GL_TEXTURE matrix (single level, no stack needed)
-static int  s_tex_matrix_dirty = 1;
+static Mat4 s_tex_matrix[2];        // GL_TEXTURE matrix per-unit (units 0 and 1)
+static int  s_tex_matrix_dirty = 1; // dirty flag covers both units
 static int  s_matrix_mode = GL_MODELVIEW;
 
 static Mat4 *current_matrix(void) {
     if (s_matrix_mode == GL_PROJECTION) return &s_projection_stack[s_projection_top];
-    if (s_matrix_mode == GL_TEXTURE)    return &s_tex_matrix;
+    if (s_matrix_mode == GL_TEXTURE)    return &s_tex_matrix[s_active_gl_texture_unit & 1];
     return &s_modelview_stack[s_modelview_top];
 }
 
@@ -301,6 +301,7 @@ static GLint u_sampler0, u_sampler1;
 static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
 static GLint u_tex_matrix;
+static GLint u_tex_matrix2;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
@@ -314,6 +315,7 @@ static const char *VERT_SRC =
     "uniform mat4 u_proj;\n"
     "uniform mat3 u_normal_mat;\n"
     "uniform mat4 u_tex_matrix;\n"
+    "uniform mat4 u_tex_matrix2;\n"
     "uniform vec4 u_current_color;\n"
     // Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
     "uniform int  u_use_color_array;\n"
@@ -360,8 +362,8 @@ static const char *VERT_SRC =
     "    v_tc1 = vec2(r.x/m + 0.5, r.y/m + 0.5);\n"
     "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
     "  } else {\n"
-    "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
-    "    v_tc1 = a_texcoord1;\n"
+    "    v_tc0 = (u_tex_matrix  * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
+    "    v_tc1 = (u_tex_matrix2 * vec4(a_texcoord1, 0.0, 1.0)).xy;\n"
     "  }\n"
     "  v_fog_depth = (u_fog != 0) ? abs(eye_pos.z) : 0.0;\n"
     "}\n";
@@ -537,7 +539,8 @@ static void upload_uniforms(void) {
 
     // ── Texture matrix (only when modified) ──
     if (s_tex_matrix_dirty) {
-        glUniformMatrix4fv(u_tex_matrix, 1, GL_FALSE, s_tex_matrix.m);
+        glUniformMatrix4fv(u_tex_matrix,  1, GL_FALSE, s_tex_matrix[0].m);
+        glUniformMatrix4fv(u_tex_matrix2, 1, GL_FALSE, s_tex_matrix[1].m);
         s_tex_matrix_dirty = 0;
     }
 
@@ -744,7 +747,8 @@ void COMPAT_GL_Init(void) {
         mat4_identity(&s_modelview_stack[i]);
         mat4_identity(&s_projection_stack[i]);
     }
-    mat4_identity(&s_tex_matrix);
+    mat4_identity(&s_tex_matrix[0]);
+    mat4_identity(&s_tex_matrix[1]);
     s_tex_matrix_dirty = 1;
     memset(s_lights, 0, sizeof(s_lights));
 
@@ -811,6 +815,7 @@ void COMPAT_GL_Init(void) {
     u_texenv1     = glGetUniformLocation(s_prog, "u_texenv1");
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
     u_tex_matrix  = glGetUniformLocation(s_prog, "u_tex_matrix");
+    u_tex_matrix2 = glGetUniformLocation(s_prog, "u_tex_matrix2");
 
     // VBO/IBO for interleaved vertex data and indices
     glGenBuffers(1, &s_vbo);
