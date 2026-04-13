@@ -887,6 +887,18 @@ int					ro,co;
 
 static inline void ReleaseSuperTileObject(short superTileNum)
 {
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	/* Evict any draw-cache entry for this slot so the freed VBO data is
+	   not mistakenly re-used if the slot is recycled by the allocator. */
+	MOVertexArrayData *meshData = gSuperTileMemoryList[superTileNum].meshData;
+	if (meshData)
+	{
+		GLES3_InvalidateCachePtr(meshData->points);
+		GLES3_InvalidateCachePtr(meshData->normals);
+		GLES3_InvalidateCachePtr(meshData->colorsByte);
+		GLES3_InvalidateCachePtr(meshData->triangles);
+	}
+#endif
 	gSuperTileMemoryList[superTileNum].mode = SUPERTILE_MODE_FREE;		// it's free!
 	gNumFreeSupertiles++;
 }
