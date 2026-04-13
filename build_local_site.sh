@@ -11,6 +11,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown argument: $1" >&2
+            echo "Usage: build_local_site.sh [--game GAME_NAME]" >&2
             exit 1
             ;;
     esac
