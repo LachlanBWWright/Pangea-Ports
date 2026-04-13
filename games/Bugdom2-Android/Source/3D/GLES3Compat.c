@@ -858,7 +858,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         if (hasVert) {
             glBindBuffer(GL_ARRAY_BUFFER, e->vbo[0]);
             glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)nVerts * 3 * sizeof(float)),
-                         posPtr, GL_STATIC_DRAW);
+                         posPtr, GL_DYNAMIC_DRAW);
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
@@ -868,7 +868,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         if (hasNorm) {
             glBindBuffer(GL_ARRAY_BUFFER, e->vbo[1]);
             glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)nVerts * 3 * sizeof(float)),
-                         normPtr, GL_STATIC_DRAW);
+                         normPtr, GL_DYNAMIC_DRAW);
             glEnableVertexAttribArray(1);
             glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
@@ -880,7 +880,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
             size_t colorBytes = (colorTypeKey == GL_UNSIGNED_BYTE)
                 ? (size_t)nVerts * (size_t)gColorArraySize * sizeof(GLubyte)
                 : (size_t)nVerts * (size_t)gColorArraySize * sizeof(float);
-            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)colorBytes, colorPtr, GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)colorBytes, colorPtr, GL_DYNAMIC_DRAW);
             glEnableVertexAttribArray(2);
             if (colorTypeKey == GL_UNSIGNED_BYTE)
                 glVertexAttribPointer(2, gColorArraySize, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
@@ -893,7 +893,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         if (hasTexc) {
             glBindBuffer(GL_ARRAY_BUFFER, e->vbo[3]);
             glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)nVerts * 2 * sizeof(float)),
-                         tcPtr, GL_STATIC_DRAW);
+                         tcPtr, GL_DYNAMIC_DRAW);
             glEnableVertexAttribArray(3);
             glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
@@ -904,7 +904,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         // Upload index buffer
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_DYNAMIC_DRAW);
 
         // Store entry in cache
         e->pos_ptr    = posPtr;   e->norm_ptr  = normPtr;

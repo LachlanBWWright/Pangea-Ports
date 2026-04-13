@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+# Optional --game filter: build_local_site.sh --game Bugdom2-Android
+GAME_FILTER=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --game)
+            GAME_FILTER="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
 echo "========================================="
 echo "1. Setting up Emscripten SDK"
 echo "========================================="
@@ -33,6 +48,10 @@ rm -rf site
 mkdir -p site
 
 for GAME in $GAMES; do
+    if [ -n "$GAME_FILTER" ] && [ "$GAME" != "$GAME_FILTER" ]; then
+        echo "Skipping $GAME (--game filter active)"
+        continue
+    fi
     echo "-----------------------------------------"
     echo " Building $GAME..."
     echo "-----------------------------------------"
