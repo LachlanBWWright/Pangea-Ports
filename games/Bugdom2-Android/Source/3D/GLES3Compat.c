@@ -307,7 +307,9 @@ static GLsizei      gVertexCountHint    = 0;
 
 // ── Draw cache for GLES3_DrawElements ───────────────────────────────────
 // 128-entry LRU cache keyed by client-array pointers, vertex/index counts,
-// and attribute mask.  On a cache hit all glBufferSubData uploads are skipped.
+// and attribute mask.  On a cache hit all glBufferData uploads are skipped.
+// Uses separate per-attribute VBOs (pos/norm/color/texc) so each
+// glVertexAttribPointer call uses offset=0, avoiding packed-buffer offset issues.
 //
 // IMPORTANT: For geometry modified in-place each frame (particles, animated
 // objects, etc.) call GLES3_InvalidateCachePtr() AFTER writing new data
@@ -325,12 +327,9 @@ typedef struct {
     int         idx_type;  // GL_UNSIGNED_SHORT or GL_UNSIGNED_INT
     uint8_t     attrib_mask;  // bit 0=pos,1=norm,2=color,3=texc
     uint8_t     color_type;   // GL_FLOAT or GL_UNSIGNED_BYTE; 0 = no color
-    int         color_size;   // gColorArraySize (3 or 4)
     uint8_t     valid;
-    GLuint      vbo;       // packed VBO (vert+norm+color+texc)
+    GLuint      vbo[4];    // per-attribute VBOs: [0]=pos [1]=norm [2]=color [3]=texc
     GLuint      ebo;       // per-entry EBO
-    size_t      vbo_size;  // current allocated vbo size in bytes
-    size_t      ebo_size;  // current allocated ebo size in bytes
     uint64_t    lru_tick;
 } B2DrawCacheEntry;
 
@@ -775,7 +774,6 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     const void *colorPtr = hasColor ? gColorArrayPtr : NULL;
     const void *tcPtr    = hasTexc  ? gTexcArrayPtr  : NULL;
     uint8_t colorTypeKey = hasColor ? (uint8_t)gColorArrayType : 0;
-    int colorSize        = hasColor ? (int)gColorArraySize     : 0;
 
     // ── Draw-cache lookup ─────────────────────────────────────────────
     int cacheIdx = -1;
@@ -789,7 +787,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
             e->vtx_count  == nVerts    && e->idx_count  == (int)count &&
             e->idx_type   == (int)type &&
             e->attrib_mask == attribMask &&
-            e->color_type  == colorTypeKey && e->color_size == colorSize)
+            e->color_type  == colorTypeKey)
         {
             cacheIdx = ci;
             break;
@@ -798,53 +796,41 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
 
     if (cacheIdx >= 0)
     {
-        // ── Cache HIT: rebind cached buffers, skip all uploads ────────
+        // ── Cache HIT: rebind per-attribute cached VBOs, skip all uploads ──
         B2DrawCacheEntry *e = &gDC[cacheIdx];
         e->lru_tick = ++gDCTick;
 
-        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
-
-        // Recompute offsets (same layout as stored)
-        size_t vertBytes  = hasVert  ? (size_t)nVerts * 3 * sizeof(float) : 0;
-        size_t normBytes  = hasNorm  ? (size_t)nVerts * 3 * sizeof(float) : 0;
-        size_t colorBytes = 0;
-        if (hasColor) {
-            colorBytes = (colorTypeKey == GL_UNSIGNED_BYTE)
-                ? (size_t)nVerts * (size_t)colorSize * sizeof(GLubyte)
-                : (size_t)nVerts * (size_t)colorSize * sizeof(float);
-        }
-        size_t offVert  = 0;
-        size_t offNorm  = offVert  + vertBytes;
-        size_t offColor = offNorm  + normBytes;
-        size_t offTexc  = offColor + colorBytes;
-
         if (hasVert) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[0]);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offVert);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(0);
             glVertexAttrib3f(0, 0, 0, 0);
         }
         if (hasNorm) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[1]);
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offNorm);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(1);
             glVertexAttrib3f(1, gCurrentNormal[0], gCurrentNormal[1], gCurrentNormal[2]);
         }
         if (hasColor) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[2]);
             glEnableVertexAttribArray(2);
             if (colorTypeKey == GL_UNSIGNED_BYTE)
-                glVertexAttribPointer(2, colorSize, GL_UNSIGNED_BYTE, GL_TRUE, 0, (const void*)offColor);
+                glVertexAttribPointer(2, gColorArraySize, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
             else
-                glVertexAttribPointer(2, colorSize, GL_FLOAT, GL_FALSE, 0, (const void*)offColor);
+                glVertexAttribPointer(2, gColorArraySize, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(2);
             glVertexAttrib4f(2, gCurrentColor[0], gCurrentColor[1], gCurrentColor[2], gCurrentColor[3]);
         }
         if (hasTexc) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[3]);
             glEnableVertexAttribArray(3);
-            glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, (const void*)offTexc);
+            glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(3);
             glVertexAttrib2f(3, gCurrentTexCoord[0], gCurrentTexCoord[1]);
@@ -854,7 +840,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     }
     else
     {
-        // ── Cache MISS: find LRU slot, upload data, store entry ───────
+        // ── Cache MISS: find LRU slot, upload data to per-attribute VBOs ──
         int evict = 0;
         uint64_t oldest = UINT64_MAX;
         for (int ci = 0; ci < B2_DRAW_CACHE_SIZE; ci++)
@@ -865,63 +851,51 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         B2DrawCacheEntry *e = &gDC[evict];
 
         // Allocate per-entry GPU buffers on first use of this slot
-        if (!e->vbo) glGenBuffers(1, &e->vbo);
-        if (!e->ebo) glGenBuffers(1, &e->ebo);
+        if (!e->vbo[0]) glGenBuffers(4, e->vbo);
+        if (!e->ebo)    glGenBuffers(1, &e->ebo);
 
-        // Calculate packed VBO layout
-        size_t vertBytes  = hasVert  ? (size_t)nVerts * 3 * sizeof(float) : 0;
-        size_t normBytes  = hasNorm  ? (size_t)nVerts * 3 * sizeof(float) : 0;
-        size_t colorBytes = 0;
-        if (hasColor) {
-            colorBytes = (colorTypeKey == GL_UNSIGNED_BYTE)
-                ? (size_t)nVerts * (size_t)colorSize * sizeof(GLubyte)
-                : (size_t)nVerts * (size_t)colorSize * sizeof(float);
-        }
-        size_t texcBytes  = hasTexc  ? (size_t)nVerts * 2 * sizeof(float) : 0;
-        size_t offVert    = 0;
-        size_t offNorm    = offVert  + vertBytes;
-        size_t offColor   = offNorm  + normBytes;
-        size_t offTexc    = offColor + colorBytes;
-        size_t totalSize  = offTexc  + texcBytes;
-
-        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
-        if (totalSize > e->vbo_size) {
-            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_STATIC_DRAW);
-            e->vbo_size = totalSize;
-        }
-        if (vertBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offVert,  (GLsizeiptr)vertBytes,  posPtr);
-        if (normBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offNorm,  (GLsizeiptr)normBytes,  normPtr);
-        if (colorBytes) glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offColor, (GLsizeiptr)colorBytes, colorPtr);
-        if (texcBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offTexc,  (GLsizeiptr)texcBytes,  tcPtr);
-
-        // Bind vertex attributes
+        // Upload each enabled attribute to its own VBO (offset=0 in each)
         if (hasVert) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[0]);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)nVerts * 3 * sizeof(float)),
+                         posPtr, GL_STATIC_DRAW);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offVert);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(0);
             glVertexAttrib3f(0, 0, 0, 0);
         }
         if (hasNorm) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[1]);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)nVerts * 3 * sizeof(float)),
+                         normPtr, GL_STATIC_DRAW);
             glEnableVertexAttribArray(1);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offNorm);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(1);
             glVertexAttrib3f(1, gCurrentNormal[0], gCurrentNormal[1], gCurrentNormal[2]);
         }
         if (hasColor) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[2]);
+            size_t colorBytes = (colorTypeKey == GL_UNSIGNED_BYTE)
+                ? (size_t)nVerts * (size_t)gColorArraySize * sizeof(GLubyte)
+                : (size_t)nVerts * (size_t)gColorArraySize * sizeof(float);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)colorBytes, colorPtr, GL_STATIC_DRAW);
             glEnableVertexAttribArray(2);
             if (colorTypeKey == GL_UNSIGNED_BYTE)
-                glVertexAttribPointer(2, colorSize, GL_UNSIGNED_BYTE, GL_TRUE, 0, (const void*)offColor);
+                glVertexAttribPointer(2, gColorArraySize, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
             else
-                glVertexAttribPointer(2, colorSize, GL_FLOAT, GL_FALSE, 0, (const void*)offColor);
+                glVertexAttribPointer(2, gColorArraySize, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(2);
             glVertexAttrib4f(2, gCurrentColor[0], gCurrentColor[1], gCurrentColor[2], gCurrentColor[3]);
         }
         if (hasTexc) {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[3]);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size_t)nVerts * 2 * sizeof(float)),
+                         tcPtr, GL_STATIC_DRAW);
             glEnableVertexAttribArray(3);
-            glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, (const void*)offTexc);
+            glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
         } else {
             glDisableVertexAttribArray(3);
             glVertexAttrib2f(3, gCurrentTexCoord[0], gCurrentTexCoord[1]);
@@ -930,11 +904,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         // Upload index buffer
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
-        if (indexSize > e->ebo_size) {
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, NULL, GL_STATIC_DRAW);
-            e->ebo_size = indexSize;
-        }
-        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)indexSize, indices);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
 
         // Store entry in cache
         e->pos_ptr    = posPtr;   e->norm_ptr  = normPtr;
@@ -945,7 +915,6 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         e->idx_type   = (int)type;
         e->attrib_mask = attribMask;
         e->color_type  = colorTypeKey;
-        e->color_size  = colorSize;
         e->lru_tick    = ++gDCTick;
         e->valid       = 1;
     }
