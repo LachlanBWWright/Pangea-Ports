@@ -137,6 +137,7 @@ static int  s_projection_top = 0;
 static Mat4 s_tex_matrix[2];        // GL_TEXTURE matrix per-unit (units 0 and 1)
 static int  s_tex_matrix_dirty = 1; // dirty flag covers both units
 static int  s_matrix_mode = GL_MODELVIEW;
+static int  s_active_gl_texture_unit = 0;  // 0..1 (offset from GL_TEXTURE0)
 
 static Mat4 *current_matrix(void) {
     if (s_matrix_mode == GL_PROJECTION) return &s_projection_stack[s_projection_top];
@@ -227,7 +228,6 @@ static int       s_index_conv_buf_capacity = 0;
 // ── Software texture-unit tracking ───────────────────────────────────────────
 // Replaces expensive glGetIntegerv(GL_ACTIVE_TEXTURE) and
 // glGetIntegerv(GL_TEXTURE_BINDING_2D) round-trips per draw call.
-static int    s_active_gl_texture_unit = 0;  // 0..1 (offset from GL_TEXTURE0)
 static GLuint s_bound_texture[2] = {0, 0};   // texture name bound to each unit
 
 // ── Draw cache (LRU, DRAW_CACHE_SIZE entries) ─────────────────────────────────
