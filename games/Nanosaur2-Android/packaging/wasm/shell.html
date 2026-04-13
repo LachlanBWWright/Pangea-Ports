@@ -92,6 +92,17 @@
       outline: none;
     }
 
+    /* Fullscreen: letterbox the canvas */
+    #canvas:fullscreen,
+    #canvas:-webkit-full-screen,
+    #canvas:-moz-full-screen {
+      width: auto !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      border-radius: 0 !important;
+    }
+
     /* Toolbar below canvas */
     #toolbar {
       display: none;
@@ -316,16 +327,14 @@
 
     function syncCanvasSize() {
       if (typeof Module === 'undefined' || !Module.canvas) return;
-      var dpr = window.devicePixelRatio || 1;
+      // Skip canvas resize while in fullscreen: let CSS scale the content,
+      // preventing zoom glitches when toggling.
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
       var cssW = Module.canvas.clientWidth;
       var cssH = Module.canvas.clientHeight;
       if (!cssW || !cssH) return;  // layout not settled yet (e.g. mid-fullscreen transition)
-      var w = Math.floor(cssW * dpr);
-      var h = Math.floor(cssH * dpr);
-      if (!document.fullscreenElement) {
-        w = Math.min(w, _nativeCanvasWidth);
-        h = Math.min(h, _nativeCanvasHeight);
-      }
+      var w = Math.round(cssW);
+      var h = Math.round(cssH);
       if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
         if (Module.setCanvasSize) Module.setCanvasSize(w, h);
         else { Module.canvas.width = w; Module.canvas.height = h; }

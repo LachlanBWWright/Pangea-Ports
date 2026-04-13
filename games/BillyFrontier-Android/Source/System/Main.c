@@ -341,6 +341,10 @@ unsigned long	someLong;
 	ToolBoxInit();
 
 	LoadPrefs();
+#ifdef __EMSCRIPTEN__
+	// Fullscreen on the web requires user interaction; run windowed by default.
+	gGamePrefs.fullscreen = false;
+#endif
 	MoveToPreferredDisplay();
 	SetFullscreenMode(true);
 

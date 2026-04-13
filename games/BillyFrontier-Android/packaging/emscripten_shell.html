@@ -78,6 +78,18 @@
       outline: none;
     }
 
+    /* Fullscreen: letterbox the canvas rather than stretching it.
+       width:auto preserves the canvas pixel aspect ratio. */
+    canvas.emscripten:fullscreen,
+    canvas.emscripten:-webkit-full-screen,
+    canvas.emscripten:-moz-full-screen {
+      width: auto !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      border-radius: 0 !important;
+    }
+
     /* Toolbar shown after load */
     #toolbar {
       display: none;
@@ -269,12 +281,14 @@
 
     function syncCanvasSize() {
       if (typeof Module === 'undefined' || !Module.canvas) return;
-      var dpr = window.devicePixelRatio || 1;
+      // Skip canvas resize while in fullscreen: the browser CSS-scales the
+      // canvas content to fill the screen, preventing zoom glitches on toggle.
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
       var cssW = Module.canvas.clientWidth;
       var cssH = Module.canvas.clientHeight;
-      if (!cssW || !cssH) return;  // layout not settled yet (e.g. mid-fullscreen transition)
-      var w = Math.floor(cssW * dpr);
-      var h = Math.floor(cssH * dpr);
+      if (!cssW || !cssH) return;  // layout not settled yet
+      var w = Math.round(cssW);
+      var h = Math.round(cssH);
       if (w && h && (Module.canvas.width !== w || Module.canvas.height !== h)) {
         if (Module.setCanvasSize) Module.setCanvasSize(w, h);
         else { Module.canvas.width = w; Module.canvas.height = h; }
