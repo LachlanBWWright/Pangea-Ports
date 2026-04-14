@@ -587,6 +587,12 @@ Boolean			runAway = gPlayerInfo.ridingBall || (!gEnableSnakes);						// see if s
 				/* SUBMIT VERTEX ARRAY */
 				/***********************/
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		/* Snake mesh geometry (points, normals, UVs) is rebuilt from scratch each frame; evict stale cache entries. */
+		GLES3_InvalidateCachePtr(gSnakeMesh.points);
+		GLES3_InvalidateCachePtr(gSnakeMesh.normals);
+		GLES3_InvalidateCachePtr(gSnakeMesh.uvs[0]);
+#endif
 		MO_DrawGeometry_VertexArray(&gSnakeMesh);
 
 

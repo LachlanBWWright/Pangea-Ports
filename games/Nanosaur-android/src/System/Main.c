@@ -120,6 +120,10 @@ OSErr		iErr;
 
 	LoadPrefs();
 
+#ifdef __EMSCRIPTEN__
+	// Fullscreen on the web requires user interaction; run windowed by default.
+	gGamePrefs.fullscreen = false;
+#endif
 	SetFullscreenMode(true);
 	SetProModeSettings(gGamePrefs.extreme);
 

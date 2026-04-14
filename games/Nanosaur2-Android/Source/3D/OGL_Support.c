@@ -717,6 +717,11 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	gGlobalTransparency = 1.0f;
 	OGL_SetColor4f(1,1,1,1);
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	// Reset per-frame GL counters (draw calls, cache hits/misses, bytes uploaded)
+	ResetGLCounters();
+#endif
+
 #if VERTEXARRAYRANGES
 				/* MAKE SURE VERTEX ARRAY RANGE INFO IS UP-TO-DATE */
 
@@ -949,6 +954,40 @@ do_anaglyph:
 		OGL_DrawString("OBJ:", 10,y);
 		OGL_DrawInt(gNumObjectNodes, x2,y);
 		y += 15;
+
+		// Fine-grained GL performance metrics
+		{
+			float glUploadMs  = GetProfilePhaseMs(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+			float glUniformMs = GetProfilePhaseMs(PROFILE_PHASE_GL_UNIFORMS);
+
+			OGL_DrawString("glUpld:", 10,y);
+			OGL_DrawFloat(glUploadMs, x2,y);
+			y += 15;
+
+			OGL_DrawString("glUnif:", 10,y);
+			OGL_DrawFloat(glUniformMs, x2,y);
+			y += 15;
+
+			OGL_DrawString("dc:", 10,y);
+			OGL_DrawInt(gDrawCallsLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("c$hit:", 10,y);
+			OGL_DrawInt(gCacheHitsLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("c$mis:", 10,y);
+			OGL_DrawInt(gCacheMissesLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("vup:", 10,y);
+			OGL_DrawInt(gVerticesUploadedLastFrame, x2,y);
+			y += 15;
+
+			OGL_DrawString("BupK:", 10,y);
+			OGL_DrawInt(gBytesUploadedLastFrame / 1024, x2,y);
+			y += 15;
+		}
 
 #if 0
 

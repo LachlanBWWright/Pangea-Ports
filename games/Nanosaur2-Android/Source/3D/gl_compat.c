@@ -16,20 +16,45 @@
 //   • glGetFloatv for GL_MODELVIEW_MATRIX / GL_PROJECTION_MATRIX returns our
 //     software stack top.
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include <SDL3/SDL.h>
 #include "gl_compat.h"
+#include "../Headers/profiling.h"
+
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+// Include GLES3 header for VAO functions (glGenVertexArrays, glBindVertexArray).
+// On Emscripten these map to WebGL2 built-ins; on Android they're in libGLESv3.
+#ifdef __ANDROID__
+#include <GLES3/gl3.h>
+#endif
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 #define MAX_FILL_LIGHTS   4
 #define MATRIX_STACK_DEPTH 32
 #define IMMED_MAX_VERTS   16384
+
+// Draw cache: LRU cache of interleaved VBO + IBO for static geometry.
+// Keyed by (vertex pointer, vertex count, normal/color/texcoord pointers,
+// index pointer, index count, and attrib-enabled mask) so that static meshes
+// (terrain tiles, model geometry) are uploaded to the GPU only once and then
+// reused across frames.
+//
+// INVALIDATION POLICY:
+//   Static geometry (terrain tiles, model meshes): cache entries never expire.
+//   Dynamic geometry (skeleton animation, particles, contrails, DustDevil, confetti):
+//   the caller MUST call COMPAT_GL_InvalidateCachePtr() on the affected pointer(s)
+//   AFTER writing new data and BEFORE drawing.  Bones.c does this for skeleton
+//   deformation; Particles.c, Contrails.c, DustDevil.c, and Confetti.c must also
+//   call it after their per-frame geometry updates.
+//
+// DO NOT use frame-age expiry — it causes both static geometry re-uploads every
+// few frames (regression) and stale double-buffered data being served (bug).
+#define DRAW_CACHE_SIZE   256
 
 // ── Forward declarations for Emscripten's real GL functions ───────────────────
 // These are provided by Emscripten's WebGL library and bypass our wrappers.
@@ -44,6 +69,7 @@ extern void emscripten_glDrawElements(GLenum mode, GLsizei count, GLenum type, c
 extern void emscripten_glDrawArrays(GLenum mode, GLint first, GLsizei count);
 extern void emscripten_glHint(GLenum target, GLenum mode);
 extern GLboolean emscripten_glIsEnabled(GLenum cap);
+extern void emscripten_glBindTexture(GLenum target, GLuint texture);
 #define REAL_glEnable           emscripten_glEnable
 #define REAL_glDisable          emscripten_glDisable
 #define REAL_glGetFloatv        emscripten_glGetFloatv
@@ -52,6 +78,7 @@ extern GLboolean emscripten_glIsEnabled(GLenum cap);
 #define REAL_glDrawArrays       emscripten_glDrawArrays
 #define REAL_glHint             emscripten_glHint
 #define REAL_glIsEnabled        emscripten_glIsEnabled
+#define REAL_glBindTexture      emscripten_glBindTexture
 #else // __ANDROID__
 // On Android, we define our own gl wrappers with the same names as GLES2 functions.
 // To call the REAL GLES2 implementation from within those wrappers (without recursion),
@@ -66,6 +93,7 @@ static void      (*real_glDrawElements)(GLenum, GLsizei, GLenum, const void*)= N
 static void      (*real_glDrawArrays)  (GLenum, GLint, GLsizei)              = NULL;
 static void      (*real_glHint)        (GLenum, GLenum)                      = NULL;
 static GLboolean (*real_glIsEnabled)   (GLenum)                              = NULL;
+static void      (*real_glBindTexture) (GLenum, GLuint)                      = NULL;
 #define REAL_glEnable           real_glEnable
 #define REAL_glDisable          real_glDisable
 #define REAL_glGetFloatv        real_glGetFloatv
@@ -74,6 +102,7 @@ static GLboolean (*real_glIsEnabled)   (GLenum)                              = N
 #define REAL_glDrawArrays       real_glDrawArrays
 #define REAL_glHint             real_glHint
 #define REAL_glIsEnabled        real_glIsEnabled
+#define REAL_glBindTexture      real_glBindTexture
 #endif // __EMSCRIPTEN__ || __ANDROID__
 
 // ── 4×4 float matrix ─────────────────────────────────────────────────────────
@@ -105,13 +134,14 @@ static Mat4 s_modelview_stack[MATRIX_STACK_DEPTH];
 static int  s_modelview_top = 0;
 static Mat4 s_projection_stack[MATRIX_STACK_DEPTH];
 static int  s_projection_top = 0;
-static Mat4 s_tex_matrix;   // GL_TEXTURE matrix (single level, no stack needed)
-static int  s_tex_matrix_dirty = 1;
+static Mat4 s_tex_matrix[2];        // GL_TEXTURE matrix per-unit (units 0 and 1)
+static int  s_tex_matrix_dirty = 1; // dirty flag covers both units
 static int  s_matrix_mode = GL_MODELVIEW;
+static int  s_active_gl_texture_unit = 0;  // 0..1 (offset from GL_TEXTURE0)
 
 static Mat4 *current_matrix(void) {
     if (s_matrix_mode == GL_PROJECTION) return &s_projection_stack[s_projection_top];
-    if (s_matrix_mode == GL_TEXTURE)    return &s_tex_matrix;
+    if (s_matrix_mode == GL_TEXTURE)    return &s_tex_matrix[s_active_gl_texture_unit & 1];
     return &s_modelview_stack[s_modelview_top];
 }
 
@@ -145,6 +175,11 @@ static float s_alpha_ref   = 0.0f;
 static int s_texenv_mode[2] = {0, 0};
 static int s_texture_2d_enabled[2] = {0, 0};
 static int s_texgen_s = 0, s_texgen_t = 0;  // sphere mapping enabled
+
+// ── Miscellaneous pass-through GL state (tracked to avoid glIsEnabled/glGetBooleanv
+//    sync points in OGL_PushState / OGL_PopState every frame) ─────────────────
+static int        s_depth_test_enabled = 1;  // matches initial glEnable(GL_DEPTH_TEST) in OGL
+static GLboolean  s_depth_mask_enabled = GL_TRUE;  // default: writes enabled
 
 // ── Current vertex color ──────────────────────────────────────────────────────
 static float s_current_color[4] = {1,1,1,1};
@@ -190,6 +225,60 @@ static int     s_interleave_buf_capacity = 0;
 static GLushort *s_index_conv_buf = NULL;
 static int       s_index_conv_buf_capacity = 0;
 
+// ── Software texture-unit tracking ───────────────────────────────────────────
+// Replaces expensive glGetIntegerv(GL_ACTIVE_TEXTURE) and
+// glGetIntegerv(GL_TEXTURE_BINDING_2D) round-trips per draw call.
+static GLuint s_bound_texture[2] = {0, 0};   // texture name bound to each unit
+
+// ── Draw cache (LRU, DRAW_CACHE_SIZE entries) ─────────────────────────────────
+// Key fields identify the client-side array layout; on a hit the cached VBO
+// and IBO are bound directly, skipping the per-draw interleave + glBufferData.
+//
+// IMPORTANT: The cache uses CLIENT-SIDE POINTER ADDRESSES as key fields.
+// For geometry that is modified in-place (particles, contrails, DustDevil,
+// confetti, skeleton animation), the caller MUST call COMPAT_GL_InvalidateCachePtr()
+// AFTER writing new vertex data and BEFORE the next draw call.
+// This evicts the stale cache entry so the next draw re-uploads fresh data.
+typedef struct {
+    // Key
+    const void *v_ptr;       // vertex array pointer
+    const void *n_ptr;       // normal array pointer (NULL if disabled)
+    const void *c_ptr;       // color array pointer  (NULL if disabled)
+    const void *t0_ptr;      // texcoord0 pointer    (NULL if disabled)
+    const void *t1_ptr;      // texcoord1 pointer    (NULL if disabled)
+    const void *idx_ptr;     // index buffer pointer
+    int         v_count;     // number of vertices
+    int         idx_count;   // number of index elements
+    int         idx_type;    // GL_UNSIGNED_SHORT or GL_UNSIGNED_INT
+    uint8_t     valid;       // 0 = evicted / invalidated
+    // Value
+    GLuint      vao;         // VAO that records attribute layout + VBO/IBO binding
+    GLuint      vbo;         // GPU vertex buffer (interleaved)
+    GLuint      ibo;         // GPU index buffer
+    uint64_t    lru_tick;    // monotonically increasing tick for LRU eviction
+} DrawCacheEntry;
+
+static DrawCacheEntry s_draw_cache[DRAW_CACHE_SIZE];
+static uint64_t       s_cache_lru_tick = 0;
+
+// ── Dirty flags for uniform uploading ────────────────────────────────────────
+// Avoid calling ~30 glUniform* functions per draw when nothing has changed.
+#define UDIRTY_MATRIX    (1u << 0)   // modelview/projection/normal_mat changed
+#define UDIRTY_COLOR     (1u << 1)   // current color or use_color_array changed
+#define UDIRTY_LIGHTING  (1u << 2)   // lighting/lights changed
+#define UDIRTY_FOG       (1u << 3)   // fog state changed
+#define UDIRTY_ALPHATEST (1u << 4)   // alpha test state changed
+#define UDIRTY_TEXTURE   (1u << 5)   // texture unit bindings/enable changed
+#define UDIRTY_TEXENV    (1u << 6)   // texenv mode changed
+#define UDIRTY_ALL       (0xFFu)
+
+static unsigned int s_uniform_dirty = UDIRTY_ALL;  // all dirty at init
+
+// ── Static pre-allocated buffer for glEnd() quad→triangle conversion ──────────
+// Avoids malloc/free per glEnd() call for GL_QUADS primitives.
+// Worst case: IMMED_MAX_VERTS / 4 quads * 6 triangles = 1.5× raw count.
+static ImmVert s_imm_quad_buf[IMMED_MAX_VERTS * 3 / 2];
+
 // Attribute locations (bound at compile time to fixed slots)
 #define ATTRIB_POSITION  0
 #define ATTRIB_NORMAL    1
@@ -212,6 +301,7 @@ static GLint u_sampler0, u_sampler1;
 static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
 static GLint u_tex_matrix;
+static GLint u_tex_matrix2;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
@@ -225,6 +315,7 @@ static const char *VERT_SRC =
     "uniform mat4 u_proj;\n"
     "uniform mat3 u_normal_mat;\n"
     "uniform mat4 u_tex_matrix;\n"
+    "uniform mat4 u_tex_matrix2;\n"
     "uniform vec4 u_current_color;\n"
     // Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
     "uniform int  u_use_color_array;\n"
@@ -271,8 +362,8 @@ static const char *VERT_SRC =
     "    v_tc1 = vec2(r.x/m + 0.5, r.y/m + 0.5);\n"
     "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
     "  } else {\n"
-    "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
-    "    v_tc1 = a_texcoord1;\n"
+    "    v_tc0 = (u_tex_matrix  * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
+    "    v_tc1 = (u_tex_matrix2 * vec4(a_texcoord1, 0.0, 1.0)).xy;\n"
     "  }\n"
     "  v_fog_depth = (u_fog != 0) ? abs(eye_pos.z) : 0.0;\n"
     "}\n";
@@ -351,90 +442,180 @@ static GLuint compile_shader(GLenum type, const char *src) {
 
 // Upload matrices and lighting uniforms before a draw call
 static void upload_uniforms(void) {
+    StartProfilePhase(PROFILE_PHASE_GL_UNIFORMS);
+
     glUseProgram(s_prog);
 
-    // Matrices
-    glUniformMatrix4fv(u_mv,   1, GL_FALSE, s_modelview_stack[s_modelview_top].m);
-    glUniformMatrix4fv(u_proj, 1, GL_FALSE, s_projection_stack[s_projection_top].m);
-    float nm[9]; mat3_from_mat4(nm, &s_modelview_stack[s_modelview_top]);
-    glUniformMatrix3fv(u_normal_mat, 1, GL_FALSE, nm);
+    // ── Matrices (dirty when any matrix-stack op happens) ──
+    if (s_uniform_dirty & UDIRTY_MATRIX) {
+        glUniformMatrix4fv(u_mv,   1, GL_FALSE, s_modelview_stack[s_modelview_top].m);
+        glUniformMatrix4fv(u_proj, 1, GL_FALSE, s_projection_stack[s_projection_top].m);
+        float nm[9]; mat3_from_mat4(nm, &s_modelview_stack[s_modelview_top]);
+        glUniformMatrix3fv(u_normal_mat, 1, GL_FALSE, nm);
+        s_uniform_dirty &= ~UDIRTY_MATRIX;
+    }
 
-    // Current color
-    glUniform4fv(u_current_color, 1, s_current_color);
-    glUniform1i(u_use_color_array, s_ca_color.enabled ? 1 : 0);
+    // ── Current color / color-array flag ──
+    if (s_uniform_dirty & UDIRTY_COLOR) {
+        glUniform4fv(u_current_color, 1, s_current_color);
+        glUniform1i(u_use_color_array, s_ca_color.enabled ? 1 : 0);
+        s_uniform_dirty &= ~UDIRTY_COLOR;
+    }
 
-    // Lighting
-    glUniform1i(u_lighting, s_lighting_enabled ? 1 : 0);
-    glUniform4fv(u_ambient, 1, s_ambient_light);
-    int nl = 0;
-    for (int i = 0; i < MAX_FILL_LIGHTS; i++) {
-        if (s_lights[i].enabled) {
-            glUniform4fv(u_light_pos[nl], 1, s_lights[i].position);
-            glUniform4fv(u_light_diff[nl], 1, s_lights[i].diffuse);
-            glUniform4fv(u_light_amb[nl], 1, s_lights[i].ambient);
-            nl++;
+    // ── Lighting ──
+    if (s_uniform_dirty & UDIRTY_LIGHTING) {
+        glUniform1i(u_lighting, s_lighting_enabled ? 1 : 0);
+        glUniform4fv(u_ambient, 1, s_ambient_light);
+        int nl = 0;
+        for (int i = 0; i < MAX_FILL_LIGHTS; i++) {
+            if (s_lights[i].enabled) {
+                glUniform4fv(u_light_pos[nl], 1, s_lights[i].position);
+                glUniform4fv(u_light_diff[nl], 1, s_lights[i].diffuse);
+                glUniform4fv(u_light_amb[nl], 1, s_lights[i].ambient);
+                nl++;
+            }
+        }
+        glUniform1i(u_num_lights, nl);
+        s_uniform_dirty &= ~UDIRTY_LIGHTING;
+    }
+
+    // ── Fog ──
+    if (s_uniform_dirty & UDIRTY_FOG) {
+        glUniform1i(u_fog, s_fog_enabled ? 1 : 0);
+        if (s_fog_enabled) {
+            int fm = (s_fog_mode == GL_EXP) ? 1 : (s_fog_mode == GL_EXP2) ? 2 : 0;
+            glUniform1i(u_fog_mode_u, fm);
+            glUniform1f(u_fog_start_u,   s_fog_start);
+            glUniform1f(u_fog_end_u,     s_fog_end);
+            glUniform1f(u_fog_density_u, s_fog_density);
+            glUniform4fv(u_fog_color_u, 1, s_fog_color);
+        }
+        s_uniform_dirty &= ~UDIRTY_FOG;
+    }
+
+    // ── Alpha test ──
+    if (s_uniform_dirty & UDIRTY_ALPHATEST) {
+        glUniform1i(u_alpha_test_u, s_alpha_test_enabled ? 1 : 0);
+        if (s_alpha_test_enabled) {
+            int af = 7; // ALWAYS
+            if      (s_alpha_func == GL_NEVER)   af = 0;
+            else if (s_alpha_func == GL_LESS)    af = 1;
+            else if (s_alpha_func == GL_EQUAL)   af = 2;
+            else if (s_alpha_func == GL_LEQUAL)  af = 3;
+            else if (s_alpha_func == GL_GREATER) af = 4;
+            else if (s_alpha_func == GL_NOTEQUAL)af = 5;
+            else if (s_alpha_func == GL_GEQUAL)  af = 6;
+            glUniform1i(u_alpha_func_u, af);
+            glUniform1f(u_alpha_ref_u, s_alpha_ref);
+        }
+        s_uniform_dirty &= ~UDIRTY_ALPHATEST;
+    }
+
+    // ── Textures — use software-tracked state instead of glGetIntegerv ──
+    // s_bound_texture[] is updated by our glBindTexture wrapper.
+    // s_texture_2d_enabled[] is updated by our glEnable/glDisable wrappers.
+    if (s_uniform_dirty & (UDIRTY_TEXTURE | UDIRTY_TEXENV)) {
+        if (s_uniform_dirty & UDIRTY_TEXTURE) {
+            GLuint tex0 = s_bound_texture[0];
+            GLuint tex1 = s_bound_texture[1];
+
+            int has_tex0 = s_texture_2d_enabled[0] && (tex0 != 0) && s_ca_texcoord[0].enabled;
+            int has_tex1 = s_texture_2d_enabled[1] && (tex1 != 0) && (s_ca_texcoord[1].enabled || s_texgen_s);
+
+            glUniform1i(u_texture0, has_tex0 ? 1 : 0);
+            glUniform1i(u_texture1, has_tex1 ? 1 : 0);
+            glUniform1i(u_sampler0, 0);
+            glUniform1i(u_sampler1, 1);
+            glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
+            s_uniform_dirty &= ~UDIRTY_TEXTURE;
+        }
+
+        if (s_uniform_dirty & UDIRTY_TEXENV) {
+            glUniform1i(u_texenv0, s_texenv_mode[0]);
+            glUniform1i(u_texenv1, s_texenv_mode[1]);
+            s_uniform_dirty &= ~UDIRTY_TEXENV;
         }
     }
-    glUniform1i(u_num_lights, nl);
 
-    // Fog
-    glUniform1i(u_fog, s_fog_enabled ? 1 : 0);
-    if (s_fog_enabled) {
-        int fm = (s_fog_mode == GL_EXP) ? 1 : (s_fog_mode == GL_EXP2) ? 2 : 0;
-        glUniform1i(u_fog_mode_u, fm);
-        glUniform1f(u_fog_start_u,   s_fog_start);
-        glUniform1f(u_fog_end_u,     s_fog_end);
-        glUniform1f(u_fog_density_u, s_fog_density);
-        glUniform4fv(u_fog_color_u, 1, s_fog_color);
-    }
-
-    // Alpha test
-    glUniform1i(u_alpha_test_u, s_alpha_test_enabled ? 1 : 0);
-    if (s_alpha_test_enabled) {
-        int af = 7; // ALWAYS
-        if      (s_alpha_func == GL_NEVER)   af = 0;
-        else if (s_alpha_func == GL_LESS)    af = 1;
-        else if (s_alpha_func == GL_EQUAL)   af = 2;
-        else if (s_alpha_func == GL_LEQUAL)  af = 3;
-        else if (s_alpha_func == GL_GREATER) af = 4;
-        else if (s_alpha_func == GL_NOTEQUAL)af = 5;
-        else if (s_alpha_func == GL_GEQUAL)  af = 6;
-        glUniform1i(u_alpha_func_u, af);
-        glUniform1f(u_alpha_ref_u, s_alpha_ref);
-    }
-
-    // Textures — query which texture units are active
-    GLint tex0 = 0, tex1 = 0;
-    glActiveTexture(GL_TEXTURE0);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex0);
-    glActiveTexture(GL_TEXTURE1);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex1);
-
-    // Restore active texture to 0 for default behaviour
-    glActiveTexture(GL_TEXTURE0);
-
-    int has_tex0 = s_texture_2d_enabled[0] && (tex0 != 0) && s_ca_texcoord[0].enabled;
-    int has_tex1 = s_texture_2d_enabled[1] && (tex1 != 0) && (s_ca_texcoord[1].enabled || s_texgen_s);
-
-    glUniform1i(u_texture0, has_tex0 ? 1 : 0);
-    glUniform1i(u_texture1, has_tex1 ? 1 : 0);
-    glUniform1i(u_sampler0, 0);
-    glUniform1i(u_sampler1, 1);
-    glUniform1i(u_texenv0,  s_texenv_mode[0]);
-    glUniform1i(u_texenv1,  s_texenv_mode[1]);
-    glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
-
-    // Texture matrix (for UV animation via glMatrixMode(GL_TEXTURE))
+    // ── Texture matrix (only when modified) ──
     if (s_tex_matrix_dirty) {
-        glUniformMatrix4fv(u_tex_matrix, 1, GL_FALSE, s_tex_matrix.m);
+        glUniformMatrix4fv(u_tex_matrix,  1, GL_FALSE, s_tex_matrix[0].m);
+        glUniformMatrix4fv(u_tex_matrix2, 1, GL_FALSE, s_tex_matrix[1].m);
         s_tex_matrix_dirty = 0;
+    }
+
+    EndProfilePhase(PROFILE_PHASE_GL_UNIFORMS);
+}
+
+// ── Draw cache helpers ────────────────────────────────────────────────────────
+
+// Find cache entry matching the current draw state or return -1.
+static int dc_find(const void *v_ptr, int v_count, const void *n_ptr,
+                   const void *c_ptr, const void *t0_ptr, const void *t1_ptr,
+                   const void *idx_ptr, int idx_count, int idx_type)
+{
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
+        DrawCacheEntry *e = &s_draw_cache[i];
+        if (!e->valid) continue;
+        if (e->v_ptr    == v_ptr   && e->v_count  == v_count  &&
+            e->n_ptr    == n_ptr   && e->c_ptr    == c_ptr    &&
+            e->t0_ptr   == t0_ptr  && e->t1_ptr   == t1_ptr   &&
+            e->idx_ptr  == idx_ptr && e->idx_count == idx_count &&
+            e->idx_type == idx_type)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Find the index of the LRU (least-recently-used) entry to evict.
+static int dc_find_lru(void)
+{
+    int best = 0;
+    uint64_t best_tick = s_draw_cache[0].lru_tick;
+    for (int i = 1; i < DRAW_CACHE_SIZE; i++) {
+        if (!s_draw_cache[i].valid) return i;  // prefer an already-invalid slot
+        if (s_draw_cache[i].lru_tick < best_tick) {
+            best_tick = s_draw_cache[i].lru_tick;
+            best = i;
+        }
+    }
+    return best;
+}
+
+// Invalidate any cache entries that reference `ptr` in any pointer field.
+// Call after writing new data to a CPU-side vertex/normal/texcoord array,
+// and before the next draw call that uses that array.
+// Bones.c calls this after skeleton deformation; Particles.c, Contrails.c,
+// DustDevil.c, and Confetti.c call this after per-frame geometry updates.
+void COMPAT_GL_InvalidateCachePtr(const void *ptr)
+{
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
+        if (s_draw_cache[i].v_ptr   == ptr ||
+            s_draw_cache[i].n_ptr   == ptr ||
+            s_draw_cache[i].c_ptr   == ptr ||
+            s_draw_cache[i].t0_ptr  == ptr ||
+            s_draw_cache[i].t1_ptr  == ptr ||
+            s_draw_cache[i].idx_ptr == ptr)
+        {
+            s_draw_cache[i].valid = 0;
+        }
     }
 }
 
-// Set up vertex attributes from client-side arrays, upload to VBO, return
-// vertex count (or -1 on error).  stride_out = per-vertex byte size.
-static int setup_vertex_attribs_from_arrays(int vertex_count) {
-    // Build an interleaved buffer: pos(3f) normal(3f) color(4f) tc0(2f) tc1(2f)
+// Bind a cached entry's VAO and draw. The VAO was set up at store time and
+// encapsulates all VBO/IBO bindings + vertex attribute pointers in one call.
+static void dc_bind_and_draw(DrawCacheEntry *e, GLenum mode, GLsizei count, int effective_type) {
+    glBindVertexArray(e->vao);
+    REAL_glDrawElements(mode, count, (GLenum)effective_type, 0);
+    glBindVertexArray(0);
+}
+
+// Build interleaved vertex buffer (CPU-side only) into s_interleave_buf.
+// Returns the buffer size in bytes, or -1 on allocation failure.
+// Does NOT upload to GPU.
+static int build_interleave_buffer(int vertex_count) {
     const int STRIDE_FLOATS = (3+3+4+2+2);
     const int STRIDE_BYTES = STRIDE_FLOATS * sizeof(float);  // 56 bytes
     int buf_size = vertex_count * STRIDE_BYTES;
@@ -498,9 +679,24 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
             dst[12] = src[0]; dst[13] = src[1];
         } else { dst[12]=0; dst[13]=0; }
     }
+    return buf_size;
+}
 
+// Set up vertex attributes from client-side arrays, upload to s_vbo, set
+// vertex attribute pointers.  Used by glDrawArrays and immediate-mode paths.
+// Returns vertex count (or -1 on error).
+static int setup_vertex_attribs_from_arrays(int vertex_count) {
+    const int STRIDE_BYTES = (3+3+4+2+2) * sizeof(float);  // 56 bytes
+    int buf_size = build_interleave_buffer(vertex_count);
+    if (buf_size < 0) return -1;
+
+    StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
-    glBufferData(GL_ARRAY_BUFFER, buf_size, buf, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, buf_size, s_interleave_buf, GL_STREAM_DRAW);
+    EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+
+    gVerticesUploadedThisFrame += vertex_count;
+    gBytesUploadedThisFrame    += buf_size;
 
     // Bind attributes
     glEnableVertexAttribArray(ATTRIB_POSITION);
@@ -544,15 +740,28 @@ void COMPAT_GL_Init(void) {
     real_glDrawArrays   = (void(*)(GLenum,GLint,GLsizei)) dlsym(RTLD_NEXT, "glDrawArrays");
     real_glHint         = (void(*)(GLenum,GLenum)) dlsym(RTLD_NEXT, "glHint");
     real_glIsEnabled    = (GLboolean(*)(GLenum))  dlsym(RTLD_NEXT, "glIsEnabled");
+    real_glBindTexture  = (void(*)(GLenum,GLuint)) dlsym(RTLD_NEXT, "glBindTexture");
 #endif // __ANDROID__
     // Init matrix stacks
     for (int i = 0; i < MATRIX_STACK_DEPTH; i++) {
         mat4_identity(&s_modelview_stack[i]);
         mat4_identity(&s_projection_stack[i]);
     }
-    mat4_identity(&s_tex_matrix);
+    mat4_identity(&s_tex_matrix[0]);
+    mat4_identity(&s_tex_matrix[1]);
     s_tex_matrix_dirty = 1;
     memset(s_lights, 0, sizeof(s_lights));
+
+    // Init draw cache
+    memset(s_draw_cache, 0, sizeof(s_draw_cache));
+    s_cache_lru_tick = 0;
+    s_uniform_dirty  = UDIRTY_ALL;
+
+    // Init software texture tracking
+    s_active_gl_texture_unit = 0;
+    s_active_texcoord_unit   = 0;
+    s_bound_texture[0] = 0;
+    s_bound_texture[1] = 0;
 
     // Compile shader
     GLuint vs = compile_shader(GL_VERTEX_SHADER,   VERT_SRC);
@@ -606,6 +815,7 @@ void COMPAT_GL_Init(void) {
     u_texenv1     = glGetUniformLocation(s_prog, "u_texenv1");
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
     u_tex_matrix  = glGetUniformLocation(s_prog, "u_tex_matrix");
+    u_tex_matrix2 = glGetUniformLocation(s_prog, "u_tex_matrix2");
 
     // VBO/IBO for interleaved vertex data and indices
     glGenBuffers(1, &s_vbo);
@@ -622,15 +832,16 @@ static void mark_tex_dirty_if_needed(void) {
     if (s_matrix_mode == GL_TEXTURE) s_tex_matrix_dirty = 1;
 }
 
-void glLoadIdentity(void) { mat4_identity(current_matrix()); mark_tex_dirty_if_needed(); }
+void glLoadIdentity(void) { mat4_identity(current_matrix()); mark_tex_dirty_if_needed(); s_uniform_dirty |= UDIRTY_MATRIX; }
 
-void glLoadMatrixf(const GLfloat *m) { memcpy(current_matrix()->m, m, 64); mark_tex_dirty_if_needed(); }
+void glLoadMatrixf(const GLfloat *m) { memcpy(current_matrix()->m, m, 64); mark_tex_dirty_if_needed(); s_uniform_dirty |= UDIRTY_MATRIX; }
 
 void glMultMatrixf(const GLfloat *m) {
     Mat4 a = *current_matrix();
     Mat4 b; memcpy(b.m, m, 64);
     mat4_mul(current_matrix(), &a, &b);
     mark_tex_dirty_if_needed();
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 void glPushMatrix(void) {
@@ -647,6 +858,7 @@ void glPushMatrix(void) {
             s_modelview_top++;
         }
     }
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 void glPopMatrix(void) {
@@ -657,6 +869,7 @@ void glPopMatrix(void) {
     } else {
         if (s_modelview_top > 0) s_modelview_top--;
     }
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 void glTranslatef(GLfloat x, GLfloat y, GLfloat z) {
@@ -664,6 +877,7 @@ void glTranslatef(GLfloat x, GLfloat y, GLfloat z) {
     t.m[12]=x; t.m[13]=y; t.m[14]=z;
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &t);
     mark_tex_dirty_if_needed();
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 void glScalef(GLfloat x, GLfloat y, GLfloat z) {
@@ -671,6 +885,7 @@ void glScalef(GLfloat x, GLfloat y, GLfloat z) {
     s.m[0]=x; s.m[5]=y; s.m[10]=z;
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &s);
     mark_tex_dirty_if_needed();
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 void glRotatef(GLfloat angle, GLfloat ax, GLfloat ay, GLfloat az) {
@@ -685,6 +900,7 @@ void glRotatef(GLfloat angle, GLfloat ax, GLfloat ay, GLfloat az) {
     rot.m[8] = ax*az*(1-c)+ay*s;  rot.m[9] = ay*az*(1-c)-ax*s;  rot.m[10]= c+az*az*(1-c);
     Mat4 a = *current_matrix(); mat4_mul(current_matrix(), &a, &rot);
     mark_tex_dirty_if_needed();
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 void glOrtho(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdouble f) {
@@ -696,6 +912,7 @@ void glOrtho(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdoubl
     m.m[13] = -(float)(t+b)/(float)(t-b);
     m.m[14] = -(float)(f+n)/(float)(f-n);
     *current_matrix() = m;
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 void glFrustum(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdouble f) {
@@ -708,6 +925,7 @@ void glFrustum(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdou
     m.m[11] = -1.0f;
     m.m[14] = -2.0f*(float)(f*n)/(float)(f-n);
     *current_matrix() = m;
+    s_uniform_dirty |= UDIRTY_MATRIX;
 }
 
 // ── glGetFloatv / glGetDoublev intercepts ─────────────────────────────────────
@@ -733,25 +951,24 @@ void glGetDoublev(GLenum pname, GLdouble *data) {
 // ── Enable / Disable intercepts ───────────────────────────────────────────────
 void glEnable(GLenum cap) {
     switch (cap) {
-        case GL_LIGHTING:    s_lighting_enabled = 1; break;
+        case GL_LIGHTING:    s_lighting_enabled = 1; s_uniform_dirty |= UDIRTY_LIGHTING; break;
         case GL_LIGHT0: case GL_LIGHT1: case GL_LIGHT2: case GL_LIGHT3:
-            s_lights[cap - GL_LIGHT0].enabled = 1; break;
-        case GL_FOG:         s_fog_enabled = 1; break;
-        case GL_ALPHA_TEST:  s_alpha_test_enabled = 1; break;
-        case GL_TEXTURE_GEN_S: s_texgen_s = 1; break;
-        case GL_TEXTURE_GEN_T: s_texgen_t = 1; break;
+            s_lights[cap - GL_LIGHT0].enabled = 1; s_uniform_dirty |= UDIRTY_LIGHTING; break;
+        case GL_FOG:         s_fog_enabled = 1; s_uniform_dirty |= UDIRTY_FOG; break;
+        case GL_ALPHA_TEST:  s_alpha_test_enabled = 1; s_uniform_dirty |= UDIRTY_ALPHATEST; break;
+        case GL_TEXTURE_GEN_S: s_texgen_s = 1; s_uniform_dirty |= UDIRTY_TEXTURE; break;
+        case GL_TEXTURE_GEN_T: s_texgen_t = 1; s_uniform_dirty |= UDIRTY_TEXTURE; break;
         case GL_NORMALIZE:   break;  // handled by per-vertex normalize in shader
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL; normalize handled in shader
         case GL_COLOR_MATERIAL: break;  // silently ignore
+        case GL_DEPTH_TEST:  s_depth_test_enabled = 1; REAL_glEnable(cap); break;
         case GL_TEXTURE_2D:
-        {
-            GLint unit = 0;
-            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
-            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
-            if (tu > 1) tu = 0;
-            s_texture_2d_enabled[tu] = 1;
+            // Use s_active_texcoord_unit as proxy for the server-side active texture
+            // unit.  OGL_ActiveTextureUnit() always calls both glActiveTexture and
+            // glClientActiveTexture together, so these stay in sync.
+            s_texture_2d_enabled[s_active_texcoord_unit] = 1;
+            s_uniform_dirty |= UDIRTY_TEXTURE;
             break;
-        }
         default:
             // Pass through to GLES2
             {
@@ -762,25 +979,21 @@ void glEnable(GLenum cap) {
 
 void glDisable(GLenum cap) {
     switch (cap) {
-        case GL_LIGHTING:    s_lighting_enabled = 0; break;
+        case GL_LIGHTING:    s_lighting_enabled = 0; s_uniform_dirty |= UDIRTY_LIGHTING; break;
         case GL_LIGHT0: case GL_LIGHT1: case GL_LIGHT2: case GL_LIGHT3:
-            s_lights[cap - GL_LIGHT0].enabled = 0; break;
-        case GL_FOG:         s_fog_enabled = 0; break;
-        case GL_ALPHA_TEST:  s_alpha_test_enabled = 0; break;
-        case GL_TEXTURE_GEN_S: s_texgen_s = 0; break;
-        case GL_TEXTURE_GEN_T: s_texgen_t = 0; break;
+            s_lights[cap - GL_LIGHT0].enabled = 0; s_uniform_dirty |= UDIRTY_LIGHTING; break;
+        case GL_FOG:         s_fog_enabled = 0; s_uniform_dirty |= UDIRTY_FOG; break;
+        case GL_ALPHA_TEST:  s_alpha_test_enabled = 0; s_uniform_dirty |= UDIRTY_ALPHATEST; break;
+        case GL_TEXTURE_GEN_S: s_texgen_s = 0; s_uniform_dirty |= UDIRTY_TEXTURE; break;
+        case GL_TEXTURE_GEN_T: s_texgen_t = 0; s_uniform_dirty |= UDIRTY_TEXTURE; break;
         case GL_NORMALIZE:   break;
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL
         case GL_COLOR_MATERIAL: break;
+        case GL_DEPTH_TEST:  s_depth_test_enabled = 0; REAL_glDisable(cap); break;
         case GL_TEXTURE_2D:
-        {
-            GLint unit = 0;
-            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
-            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
-            if (tu > 1) tu = 0;
-            s_texture_2d_enabled[tu] = 0;
+            s_texture_2d_enabled[s_active_texcoord_unit] = 0;
+            s_uniform_dirty |= UDIRTY_TEXTURE;
             break;
-        }
         default:
             {
                 REAL_glDisable(cap);
@@ -806,10 +1019,14 @@ void glLightfv(GLenum light, GLenum pname, const GLfloat *p) {
     } else if (pname == GL_AMBIENT) {
         memcpy(s_lights[i].ambient, p, 4*sizeof(float));
     }
+    s_uniform_dirty |= UDIRTY_LIGHTING;
 }
 
 void glLightModelfv(GLenum pname, const GLfloat *p) {
-    if (pname == GL_LIGHT_MODEL_AMBIENT) memcpy(s_ambient_light, p, 4*sizeof(float));
+    if (pname == GL_LIGHT_MODEL_AMBIENT) {
+        memcpy(s_ambient_light, p, 4*sizeof(float));
+        s_uniform_dirty |= UDIRTY_LIGHTING;
+    }
 }
 
 void glLightModeli(GLenum pname, GLint param) {
@@ -818,23 +1035,25 @@ void glLightModeli(GLenum pname, GLint param) {
 
 void glMaterialfv(GLenum face, GLenum pname, const GLfloat *p) {
     (void)face;
-    if (pname == GL_DIFFUSE || pname == GL_AMBIENT_AND_DIFFUSE)
+    if (pname == GL_DIFFUSE || pname == GL_AMBIENT_AND_DIFFUSE) {
         memcpy(s_current_color, p, 4*sizeof(float));
+        s_uniform_dirty |= UDIRTY_COLOR;
+    }
 }
 
 void glColorMaterial(GLenum face, GLenum mode) { (void)face; (void)mode; }
 
 // ── Fog ───────────────────────────────────────────────────────────────────────
 void glFogi(GLenum pname, GLint param) {
-    if (pname == GL_FOG_MODE)    s_fog_mode = param;
+    if (pname == GL_FOG_MODE) { s_fog_mode = param; s_uniform_dirty |= UDIRTY_FOG; }
 }
 void glFogf(GLenum pname, GLfloat param) {
-    if (pname == GL_FOG_START)   s_fog_start   = param;
-    else if (pname == GL_FOG_END)     s_fog_end     = param;
-    else if (pname == GL_FOG_DENSITY) s_fog_density = param;
+    if      (pname == GL_FOG_START)   { s_fog_start   = param; s_uniform_dirty |= UDIRTY_FOG; }
+    else if (pname == GL_FOG_END)     { s_fog_end     = param; s_uniform_dirty |= UDIRTY_FOG; }
+    else if (pname == GL_FOG_DENSITY) { s_fog_density = param; s_uniform_dirty |= UDIRTY_FOG; }
 }
 void glFogfv(GLenum pname, const GLfloat *p) {
-    if (pname == GL_FOG_COLOR) memcpy(s_fog_color, p, 4*sizeof(float));
+    if (pname == GL_FOG_COLOR) { memcpy(s_fog_color, p, 4*sizeof(float)); s_uniform_dirty |= UDIRTY_FOG; }
     else glFogf(pname, p[0]);
 }
 
@@ -842,16 +1061,14 @@ void glFogfv(GLenum pname, const GLfloat *p) {
 void glAlphaFunc(GLenum func, GLclampf ref) {
     s_alpha_func = func;
     s_alpha_ref  = ref;
+    s_uniform_dirty |= UDIRTY_ALPHATEST;
 }
 
 // ── Texture env ───────────────────────────────────────────────────────────────
 void glTexEnvi(GLenum target, GLenum pname, GLint param) {
     if (target != GL_TEXTURE_ENV) return;
-    // Determine which texture unit
-    GLint unit = 0;
-    typedef void (*getiv_t)(GLenum, GLint*);
-    REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
-    int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
+    // Use s_active_texcoord_unit as proxy (OGL_ActiveTextureUnit sets both together)
+    int tu = s_active_texcoord_unit;
     if (tu < 0 || tu > 1) tu = 0;
 
     if (pname == GL_TEXTURE_ENV_MODE) {
@@ -859,8 +1076,10 @@ void glTexEnvi(GLenum target, GLenum pname, GLint param) {
         else if (param == GL_ADD)      s_texenv_mode[tu] = 1;
         else if (param == GL_REPLACE)  s_texenv_mode[tu] = 2;
         else if (param == GL_COMBINE)  s_texenv_mode[tu] = 3;  // COMBINE_ADD default
+        s_uniform_dirty |= UDIRTY_TEXENV;
     } else if (pname == GL_COMBINE_RGB && param == GL_ADD) {
         s_texenv_mode[tu] = 3;  // COMBINE_ADD
+        s_uniform_dirty |= UDIRTY_TEXENV;
     }
 }
 
@@ -868,6 +1087,7 @@ void glTexGeni(GLenum coord, GLenum pname, GLint param) {
     if (pname == GL_TEXTURE_GEN_MODE && param == GL_SPHERE_MAP) {
         if (coord == GL_S) s_texgen_s = 1;
         if (coord == GL_T) s_texgen_t = 1;
+        s_uniform_dirty |= UDIRTY_TEXTURE;
     }
 }
 
@@ -875,8 +1095,12 @@ void glTexGeni(GLenum coord, GLenum pname, GLint param) {
 void glColor4f(GLfloat r, GLfloat g, GLfloat b, GLfloat a) {
     s_current_color[0]=r; s_current_color[1]=g;
     s_current_color[2]=b; s_current_color[3]=a;
+    s_uniform_dirty |= UDIRTY_COLOR;
 }
-void glColor4fv(const GLfloat *v) { memcpy(s_current_color, v, 4*sizeof(float)); }
+void glColor4fv(const GLfloat *v) {
+    memcpy(s_current_color, v, 4*sizeof(float));
+    s_uniform_dirty |= UDIRTY_COLOR;
+}
 void glNormal3f(GLfloat nx, GLfloat ny, GLfloat nz) {
     s_imm_cur_nx=nx; s_imm_cur_ny=ny; s_imm_cur_nz=nz;
 }
@@ -886,21 +1110,26 @@ void glEnableClientState(GLenum array) {
     switch (array) {
         case GL_VERTEX_ARRAY:        s_ca_vertex.enabled   = 1; break;
         case GL_NORMAL_ARRAY:        s_ca_normal.enabled   = 1; break;
-        case GL_COLOR_ARRAY:         s_ca_color.enabled    = 1; break;
-        case GL_TEXTURE_COORD_ARRAY: s_ca_texcoord[s_active_texcoord_unit].enabled = 1; break;
+        case GL_COLOR_ARRAY:         s_ca_color.enabled    = 1; s_uniform_dirty |= UDIRTY_COLOR; break;
+        case GL_TEXTURE_COORD_ARRAY: s_ca_texcoord[s_active_texcoord_unit].enabled = 1;
+                                     s_uniform_dirty |= UDIRTY_TEXTURE; break;
     }
 }
 void glDisableClientState(GLenum array) {
     switch (array) {
         case GL_VERTEX_ARRAY:        s_ca_vertex.enabled   = 0; break;
         case GL_NORMAL_ARRAY:        s_ca_normal.enabled   = 0; break;
-        case GL_COLOR_ARRAY:         s_ca_color.enabled    = 0; break;
-        case GL_TEXTURE_COORD_ARRAY: s_ca_texcoord[s_active_texcoord_unit].enabled = 0; break;
+        case GL_COLOR_ARRAY:         s_ca_color.enabled    = 0; s_uniform_dirty |= UDIRTY_COLOR; break;
+        case GL_TEXTURE_COORD_ARRAY: s_ca_texcoord[s_active_texcoord_unit].enabled = 0;
+                                     s_uniform_dirty |= UDIRTY_TEXTURE; break;
     }
 }
 void glClientActiveTexture(GLenum texture) {
     s_active_texcoord_unit = (int)(texture - GL_TEXTURE0);
     if (s_active_texcoord_unit < 0 || s_active_texcoord_unit > 1) s_active_texcoord_unit = 0;
+    // Also update the server-side active texture unit shadow (the two are always
+    // called together via OGL_ActiveTextureUnit).
+    s_active_gl_texture_unit = s_active_texcoord_unit;
 }
 void glVertexPointer(GLint size, GLenum type, GLsizei stride, const void *ptr) {
     s_ca_vertex.size=size; s_ca_vertex.type=type; s_ca_vertex.stride=stride; s_ca_vertex.ptr=ptr;
@@ -946,46 +1175,141 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
 void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count) {
     if (!s_ca_vertex.ptr || count <= 0) return;
 
-    if (setup_vertex_attribs_from_arrays(vertex_count) < 0) return;
     upload_uniforms();
+    gDrawCallsThisFrame++;
 
-    // Upload index buffer to an element VBO
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_ibo);
+    // ── Draw cache lookup ──────────────────────────────────────────────────────
+    // Use the client-side pointer addresses as a cheap cache key.  Static
+    // geometry (terrain tiles, model meshes) reuses the same addresses every
+    // frame so will hit the cache.  Skeleton-animated meshes are explicitly
+    // invalidated by COMPAT_GL_InvalidateCachePtr() after bone deformation.
+    const void *n_ptr  = (s_ca_normal.enabled  && s_ca_normal.ptr)          ? s_ca_normal.ptr          : NULL;
+    const void *c_ptr  = (s_ca_color.enabled   && s_ca_color.ptr)           ? s_ca_color.ptr           : NULL;
+    const void *t0_ptr = (s_ca_texcoord[0].enabled && s_ca_texcoord[0].ptr) ? s_ca_texcoord[0].ptr     : NULL;
+    const void *t1_ptr = (s_ca_texcoord[1].enabled && s_ca_texcoord[1].ptr) ? s_ca_texcoord[1].ptr     : NULL;
 
-    // Convert GL_UNSIGNED_INT indices to GL_UNSIGNED_SHORT if needed
-    // (WebGL1 only supports UNSIGNED_BYTE and UNSIGNED_SHORT unless OES_element_index_uint)
+    // Determine the final index type (we may convert UINT→USHORT below)
+    int effective_type = type;
+#if !defined(USE_WEBGL2) && !defined(__ANDROID__)
+    if (type == GL_UNSIGNED_INT && vertex_count <= 65535) effective_type = GL_UNSIGNED_SHORT;
+#endif
+
+    int cache_idx = dc_find(s_ca_vertex.ptr, vertex_count, n_ptr, c_ptr, t0_ptr, t1_ptr,
+                            indices, count, effective_type);
+    if (cache_idx >= 0) {
+        // ── Cache HIT: bind cached VBO/IBO and draw ───────────────────────────
+        DrawCacheEntry *e = &s_draw_cache[cache_idx];
+        e->lru_tick = ++s_cache_lru_tick;
+        gCacheHitsThisFrame++;
+
+        dc_bind_and_draw(e, mode, count, effective_type);
+        return;
+    }
+
+    // ── Cache MISS: build interleaved vertex buffer (CPU only) ───────────────
+    gCacheMissesThisFrame++;
+
+    // Step 1: build the CPU-side interleaved buffer (no GPU upload yet)
+    int vbo_bytes = build_interleave_buffer(vertex_count);
+    if (vbo_bytes < 0) return;
+
+    // Step 2: convert / prepare the index buffer into s_index_conv_buf if needed
+    int ibo_bytes = 0;
     if (type == GL_UNSIGNED_INT) {
 #if defined(USE_WEBGL2) || defined(__ANDROID__)
-        // WebGL2 and Android GLES typically support 32-bit indices directly.
-        // We only convert if we must (e.g. for WebGL1 compatibility if ever needed).
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STREAM_DRAW);
+        ibo_bytes = count * (int)sizeof(GLuint);
+        effective_type = GL_UNSIGNED_INT;
+        // indices already usable as-is
 #else
-        // For safety, convert to short if small enough
         if (vertex_count <= 65535) {
-            int needed_size = count * sizeof(GLushort);
+            int needed_size = count * (int)sizeof(GLushort);
             if (needed_size > s_index_conv_buf_capacity) {
                 s_index_conv_buf = (GLushort *)realloc(s_index_conv_buf, needed_size);
                 s_index_conv_buf_capacity = needed_size;
             }
-            GLushort *short_idx = s_index_conv_buf;
             const GLuint *uint_idx = (const GLuint *)indices;
-            for (int i = 0; i < count; i++) short_idx[i] = (GLushort)uint_idx[i];
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, needed_size, short_idx, GL_STREAM_DRAW);
-            type = GL_UNSIGNED_SHORT;
+            for (int i = 0; i < count; i++) s_index_conv_buf[i] = (GLushort)uint_idx[i];
+            ibo_bytes = needed_size;
+            effective_type = GL_UNSIGNED_SHORT;
         } else {
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(GLuint), indices, GL_STREAM_DRAW);
+            ibo_bytes = count * (int)sizeof(GLuint);
+            effective_type = GL_UNSIGNED_INT;
         }
 #endif
     } else {
-        GLsizei sz = (type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sz, indices, GL_STREAM_DRAW);
+        GLsizei sz = (type == GL_UNSIGNED_SHORT) ? (GLsizei)sizeof(GLushort) : (GLsizei)sizeof(GLubyte);
+        ibo_bytes = count * (int)sz;
     }
 
-    REAL_glDrawElements(mode, count, type, 0);
+    // Step 3: claim a cache slot and upload directly into it.
+    // Never call glDeleteBuffers at render time — it stalls the pipeline.
+    int slot = dc_find_lru();
+    DrawCacheEntry *e = &s_draw_cache[slot];
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    disable_vertex_attribs();
+    const int STRIDE_BYTES = (3+3+4+2+2) * (int)sizeof(float);
+    const void *ibo_src = (effective_type == GL_UNSIGNED_SHORT) ? (const void *)s_index_conv_buf : indices;
+
+    StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+    if (!e->vao) {
+        // First use of this slot: allocate persistent GPU objects once and record
+        // the vertex attribute layout in the VAO.
+        glGenVertexArrays(1, &e->vao);
+        glGenBuffers(1, &e->vbo);
+        glGenBuffers(1, &e->ibo);
+
+        glBindVertexArray(e->vao);
+        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
+        glBufferData(GL_ARRAY_BUFFER, vbo_bytes, s_interleave_buf, GL_DYNAMIC_DRAW);
+
+        glEnableVertexAttribArray(ATTRIB_POSITION);
+        glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(0*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_NORMAL);
+        glVertexAttribPointer(ATTRIB_NORMAL,    3, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(3*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_COLOR);
+        glVertexAttribPointer(ATTRIB_COLOR,     4, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(6*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_TEXCOORD0);
+        glVertexAttribPointer(ATTRIB_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(10*sizeof(float)));
+        glEnableVertexAttribArray(ATTRIB_TEXCOORD1);
+        glVertexAttribPointer(ATTRIB_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, STRIDE_BYTES, (void*)(12*sizeof(float)));
+
+        // Bind IBO inside VAO scope — WebGL2 stores the IBO binding in the VAO.
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ibo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, ibo_src, GL_DYNAMIC_DRAW);
+
+        glBindVertexArray(0);
+    } else {
+        // Reuse existing VAO/VBO/IBO — re-upload data only, NO delete/gen.
+        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
+        glBufferData(GL_ARRAY_BUFFER, vbo_bytes, s_interleave_buf, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // IBO must be updated inside the VAO scope so it stays recorded there.
+        glBindVertexArray(e->vao);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ibo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_bytes, ibo_src, GL_DYNAMIC_DRAW);
+        glBindVertexArray(0);
+    }
+    EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+
+    gVerticesUploadedThisFrame += vertex_count;
+    gBytesUploadedThisFrame    += vbo_bytes + ibo_bytes;
+
+    e->v_ptr    = s_ca_vertex.ptr;
+    e->n_ptr    = n_ptr;
+    e->c_ptr    = c_ptr;
+    e->t0_ptr   = t0_ptr;
+    e->t1_ptr   = t1_ptr;
+    e->idx_ptr  = indices;
+    e->v_count  = vertex_count;
+    e->idx_count= count;
+    e->idx_type = effective_type;
+    e->valid    = 1;
+    e->lru_tick    = ++s_cache_lru_tick;
+
+    // Step 4: draw from the cached VAO (single bind instead of N attrib calls).
+    dc_bind_and_draw(e, mode, count, effective_type);
 }
+
 
 void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     if (!s_ca_vertex.ptr || count <= 0) return;
@@ -1003,9 +1327,25 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
 
     s_ca_vertex.ptr = orig;
 
+    gDrawCallsThisFrame++;
     REAL_glDrawArrays(mode, 0, count);
 
     disable_vertex_attribs();
+}
+
+// ── glBindTexture intercept: track software state for uniform upload ──────────
+// This avoids glGetIntegerv(GL_TEXTURE_BINDING_2D) round-trips in upload_uniforms().
+void glBindTexture(GLenum target, GLuint texture) {
+    if (target == GL_TEXTURE_2D) {
+        int tu = s_active_texcoord_unit;
+        if (tu >= 0 && tu <= 1) {
+            if (s_bound_texture[tu] != texture) {
+                s_bound_texture[tu] = texture;
+                s_uniform_dirty |= UDIRTY_TEXTURE;
+            }
+        }
+    }
+    REAL_glBindTexture(target, texture);
 }
 
 // ── Immediate mode ────────────────────────────────────────────────────────────
@@ -1038,45 +1378,50 @@ void glEnd(void) {
     if (!s_in_begin || s_imm_count == 0) { s_in_begin = 0; return; }
     s_in_begin = 0;
 
-    // Convert GL_QUADS to triangles (2 tris per quad)
+    // Convert GL_QUADS/GL_POLYGON to triangles using the pre-allocated static buffer
     ImmVert *src  = s_imm_verts;
     int      nsrc = s_imm_count;
     ImmVert *draw_buf = src;
     int      draw_cnt = nsrc;
-    ImmVert *tmp = NULL;
     GLenum   draw_prim = s_imm_prim;
 
     if (s_imm_prim == GL_QUADS && nsrc >= 4) {
         int nquads = nsrc / 4;
-        tmp = (ImmVert *)malloc(nquads * 6 * sizeof(ImmVert));
-        if (tmp) {
+        int needed = nquads * 6;
+        if (needed <= (int)(sizeof(s_imm_quad_buf)/sizeof(s_imm_quad_buf[0]))) {
             draw_cnt = 0;
             for (int q = 0; q < nquads; q++) {
                 ImmVert *qv = &src[q*4];
-                tmp[draw_cnt++] = qv[0]; tmp[draw_cnt++] = qv[1]; tmp[draw_cnt++] = qv[2];
-                tmp[draw_cnt++] = qv[0]; tmp[draw_cnt++] = qv[2]; tmp[draw_cnt++] = qv[3];
+                s_imm_quad_buf[draw_cnt++] = qv[0]; s_imm_quad_buf[draw_cnt++] = qv[1]; s_imm_quad_buf[draw_cnt++] = qv[2];
+                s_imm_quad_buf[draw_cnt++] = qv[0]; s_imm_quad_buf[draw_cnt++] = qv[2]; s_imm_quad_buf[draw_cnt++] = qv[3];
             }
-            draw_buf  = tmp;
+            draw_buf  = s_imm_quad_buf;
             draw_prim = GL_TRIANGLES;
         }
     } else if (s_imm_prim == GL_POLYGON && nsrc >= 3) {
-        tmp = (ImmVert *)malloc((nsrc-2) * 3 * sizeof(ImmVert));
-        if (tmp) {
+        int needed = (nsrc - 2) * 3;
+        if (needed <= (int)(sizeof(s_imm_quad_buf)/sizeof(s_imm_quad_buf[0]))) {
             draw_cnt = 0;
             for (int i = 1; i < nsrc-1; i++) {
-                tmp[draw_cnt++] = src[0];
-                tmp[draw_cnt++] = src[i];
-                tmp[draw_cnt++] = src[i+1];
+                s_imm_quad_buf[draw_cnt++] = src[0];
+                s_imm_quad_buf[draw_cnt++] = src[i];
+                s_imm_quad_buf[draw_cnt++] = src[i+1];
             }
-            draw_buf  = tmp;
+            draw_buf  = s_imm_quad_buf;
             draw_prim = GL_TRIANGLES;
         }
     }
 
     // Build interleaved VBO from the immediate-mode buffer
     const int STRIDE = (3+3+4+2+2) * sizeof(float);
-    float *vbo_data = (float *)malloc(draw_cnt * STRIDE);
-    if (!vbo_data) { free(tmp); return; }
+    int needed_bytes = draw_cnt * STRIDE;
+    if (needed_bytes > s_interleave_buf_capacity) {
+        s_interleave_buf = (float *)realloc(s_interleave_buf, needed_bytes);
+        s_interleave_buf_capacity = needed_bytes;
+    }
+    float *vbo_data = s_interleave_buf;
+    if (!vbo_data) return;
+
     for (int i = 0; i < draw_cnt; i++) {
         float *d = vbo_data + i*(3+3+4+2+2);
         ImmVert *v = &draw_buf[i];
@@ -1086,11 +1431,15 @@ void glEnd(void) {
         d[10]=v->s0; d[11]=v->t0;
         d[12]=v->s1; d[13]=v->t1;
     }
-    free(tmp);
 
+    StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
-    glBufferData(GL_ARRAY_BUFFER, draw_cnt * STRIDE, vbo_data, GL_STREAM_DRAW);
-    free(vbo_data);
+    glBufferData(GL_ARRAY_BUFFER, needed_bytes, vbo_data, GL_STREAM_DRAW);
+    EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+
+    gDrawCallsThisFrame++;
+    gVerticesUploadedThisFrame += draw_cnt;
+    gBytesUploadedThisFrame    += needed_bytes;
 
     glEnableVertexAttribArray(ATTRIB_POSITION);
     glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(0*sizeof(float)));
@@ -1111,9 +1460,12 @@ void glEnd(void) {
     int saved_tex0_enabled = s_ca_texcoord[0].enabled;
     s_ca_color.enabled = 1;
     s_ca_texcoord[0].enabled = 1;
+    s_uniform_dirty |= UDIRTY_COLOR | UDIRTY_TEXTURE;
     upload_uniforms();
     s_ca_color.enabled = saved_use_color;
     s_ca_texcoord[0].enabled = saved_tex0_enabled;
+    // Restore dirty flags for color/texture after immediate mode
+    s_uniform_dirty |= UDIRTY_COLOR | UDIRTY_TEXTURE;
 
     REAL_glDrawArrays(draw_prim, 0, draw_cnt);
 
@@ -1146,19 +1498,40 @@ GLboolean glIsEnabled(GLenum cap) {
         case GL_NORMALIZE:      return GL_FALSE;  // normalize is always handled in shader
         case GL_RESCALE_NORMAL: return GL_FALSE;
         case GL_COLOR_MATERIAL: return GL_FALSE;
+        case GL_DEPTH_TEST:     return s_depth_test_enabled ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_2D:
-        {
-            GLint unit = 0;
-            REAL_glGetIntegerv(GL_ACTIVE_TEXTURE, &unit);
-            int tu = (unit >= (GLint)GL_TEXTURE0) ? (int)(unit - GL_TEXTURE0) : 0;
-            if (tu > 1) tu = 0;
-            return s_texture_2d_enabled[tu] ? GL_TRUE : GL_FALSE;
-        }
+            // Use s_active_texcoord_unit as proxy — no GL state query needed.
+            return s_texture_2d_enabled[s_active_texcoord_unit] ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_GEN_S:  return s_texgen_s ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_GEN_T:  return s_texgen_t ? GL_TRUE : GL_FALSE;
         default:
             return REAL_glIsEnabled(cap);
     }
+}
+
+// glGetBooleanv — intercept GL_DEPTH_WRITEMASK to avoid GPU sync in OGL_PushState.
+void glGetBooleanv(GLenum pname, GLboolean *data) {
+    if (pname == GL_DEPTH_WRITEMASK) {
+        *data = s_depth_mask_enabled;
+    } else {
+        // Fall through to real GL for anything else
+        REAL_glGetIntegerv(pname, (GLint *)data);  // piggyback via getIntegerv
+    }
+}
+
+// glDepthMask — track software state to avoid glGetBooleanv sync in OGL_PushState.
+void glDepthMask(GLboolean flag) {
+    s_depth_mask_enabled = flag;
+    // Pass through to real GL immediately — this is a pipeline state change.
+    typedef void (*pfn_t)(GLboolean);
+#ifdef __EMSCRIPTEN__
+    extern void emscripten_glDepthMask(GLboolean);
+    emscripten_glDepthMask(flag);
+#else
+    static pfn_t real_fn = NULL;
+    if (!real_fn) real_fn = (pfn_t)dlsym(RTLD_NEXT, "glDepthMask");
+    if (real_fn) real_fn(flag);
+#endif
 }
 
 // Apple extension stubs

@@ -431,6 +431,14 @@ short				buffNum;
 
 
 		OGL_SetVertexArrayRangeDirty(theNode->VertexArrayMode);				// we modified some geometry so we'll need an update
+
+		/* Invalidate draw cache: contrail geometry is rebuilt every frame. */
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		if (mesh->points)
+			COMPAT_GL_InvalidateCachePtr(mesh->points);
+		if (mesh->colorsFloat)
+			COMPAT_GL_InvalidateCachePtr(mesh->colorsFloat);
+#endif
 	}
 }
 

@@ -13,6 +13,7 @@
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 // Ensure M_PI is available (not guaranteed by all compilers/platforms)
 #ifndef M_PI
@@ -81,6 +82,7 @@ static const char* kVertSrc =
 "#version 300 es\n"
 "uniform mat4 u_proj;\n"
 "uniform mat4 u_mv;\n"
+"uniform mat4 u_texMatrix;\n"
 "uniform bool u_lighting;\n"
 "uniform vec4 u_ambient;\n"
 "uniform int  u_nLights;\n"
@@ -115,7 +117,7 @@ static const char* kVertSrc =
 "  } else {\n"
 "    v_color=base;\n"
 "  }\n"
-"  v_uv=a_uv;\n"
+"  v_uv=(u_texMatrix*vec4(a_uv,0.0,1.0)).xy;\n"
 "  if(u_fog){\n"
 "    float dist=abs(ep.z);\n"
 "    if(u_fogMode==1){\n"   // GL_LINEAR
@@ -175,18 +177,50 @@ static const char* kFragSrc =
 static GLuint gProgram   = 0;
 static GLuint gVAO       = 0;
 static GLuint gImmVBO    = 0;   // VBO for immediate mode vertex data
-static GLuint gArrayVBO  = 0;   // VBO for vertex array draw calls
-static GLuint gArrayEBO  = 0;   // EBO for vertex array draw calls
+static GLuint gArrayVBO  = 0;   // reserved (was streaming draw path, now unused)
+static GLuint gArrayEBO  = 0;   // reserved (was streaming draw path, now unused)
 static size_t gImmVBOSize   = 0;
 static size_t gArrayVBOSize = 0;
 static size_t gArrayEBOSize = 0;
 
 // Uniform locations
-static GLint uProj, uMV, uLighting, uAmbient, uNLights;
+static GLint uProj, uMV, uTexMatrix, uLighting, uAmbient, uNLights;
 static GLint uLightDir[4], uLightDiff[4];
 static GLint uFog, uFogMode, uFogDensity, uFogStart, uFogEnd, uFogColor;
 static GLint uUseTex, uTex;
 static GLint uAlphaTest, uAlphaFunc, uAlphaRef;
+
+//=============================================================
+// Draw cache – 128-entry LRU, keyed by client-array pointers
+//=============================================================
+// Static geometry (models, tiles) that never changes after loading can be
+// cached on the GPU indefinitely.  Dynamic geometry (skeletons, terrain,
+// water, fences, snake) must call GLES3_InvalidateCachePtr() before each
+// draw to evict stale entries and force a fresh upload.
+
+#define B2_DRAW_CACHE_SIZE 128
+
+typedef struct {
+    const void *vert_ptr;   // gVertArrayPtr   (NULL if disabled)
+    const void *norm_ptr;   // gNormArrayPtr   (NULL if disabled)
+    const void *color_ptr;  // gColorArrayPtr  (NULL if disabled)
+    const void *texc_ptr;   // gTexcArrayPtr   (NULL if disabled)
+    const void *idx_ptr;    // indices pointer
+    int         nVerts;
+    int         nIdx;
+    GLenum      idx_type;   // GL_UNSIGNED_SHORT or GL_UNSIGNED_INT
+    uint8_t     attrib_mask;  // bit0=vert,bit1=norm,bit2=color,bit3=texc
+    GLenum      color_type;   // GL_FLOAT or GL_UNSIGNED_BYTE; 0 = no color
+    GLint       color_size;
+    uint8_t     valid;
+    GLuint      vbo;        // packed attribute VBO (same interleaved layout)
+    GLuint      ebo;        // index EBO
+    size_t      offVert, offNorm, offColor, offTexc;  // byte offsets in vbo
+    uint64_t    lru_tick;
+} B2DrawCacheEntry;
+
+static B2DrawCacheEntry sB2DC[B2_DRAW_CACHE_SIZE];
+static uint64_t sB2DCTick = 0;
 
 //=============================================================
 // Matrix stack (software, column-major like OpenGL)
@@ -200,10 +234,14 @@ static Mat4  gMVStack[MATRIX_STACK_DEPTH];
 static int   gMVTop          = 0;
 static Mat4  gProjStack[MATRIX_STACK_DEPTH];
 static int   gProjTop        = 0;
+static Mat4  gTexStack[MATRIX_STACK_DEPTH];
+static int   gTexTop         = 0;
 
 static inline Mat4* CurMat(void)
 {
-    return (gMatMode == GL_PROJECTION) ? &gProjStack[gProjTop] : &gMVStack[gMVTop];
+    if (gMatMode == GL_PROJECTION) return &gProjStack[gProjTop];
+    if (gMatMode == GL_TEXTURE)    return &gTexStack[gTexTop];
+    return &gMVStack[gMVTop];
 }
 
 static void MatIdentity(float* m)
@@ -322,8 +360,9 @@ static GLenum  gIMMode   = 0;
 
 static void UploadUniforms(void)
 {
-    glUniformMatrix4fv(uMV,   1, GL_FALSE, gMVStack[gMVTop]);
-    glUniformMatrix4fv(uProj, 1, GL_FALSE, gProjStack[gProjTop]);
+    glUniformMatrix4fv(uMV,        1, GL_FALSE, gMVStack[gMVTop]);
+    glUniformMatrix4fv(uProj,      1, GL_FALSE, gProjStack[gProjTop]);
+    glUniformMatrix4fv(uTexMatrix, 1, GL_FALSE, gTexStack[gTexTop]);
 
     // Lighting
     glUniform1i(uLighting, gLightingEnabled ? 1 : 0);
@@ -429,6 +468,7 @@ void GLES3Compat_Init(void)
     // Fetch uniform locations
     uProj        = glGetUniformLocation(gProgram, "u_proj");
     uMV          = glGetUniformLocation(gProgram, "u_mv");
+    uTexMatrix   = glGetUniformLocation(gProgram, "u_texMatrix");
     uLighting    = glGetUniformLocation(gProgram, "u_lighting");
     uAmbient     = glGetUniformLocation(gProgram, "u_ambient");
     uNLights     = glGetUniformLocation(gProgram, "u_nLights");
@@ -461,6 +501,7 @@ void GLES3Compat_Init(void)
     // Initialise matrix stacks to identity
     MatIdentity(gMVStack[0]);
     MatIdentity(gProjStack[0]);
+    MatIdentity(gTexStack[0]);
 
     // Bind our program so the game can start calling legacy GL immediately
     glUseProgram(gProgram);
@@ -669,6 +710,24 @@ void glClientActiveTexture(GLenum texture)
     gClientActiveUnit = (texture == 0x84C0) ? 0 : 1;  // GL_TEXTURE0 = 0x84C0
 }
 
+// Evict all draw-cache entries whose key contains 'ptr'.
+// Call after writing new data to any CPU-side vertex/index buffer.
+void GLES3_InvalidateCachePtr(const void *ptr)
+{
+    for (int i = 0; i < B2_DRAW_CACHE_SIZE; i++)
+    {
+        if (sB2DC[i].valid && (
+                sB2DC[i].vert_ptr  == ptr ||
+                sB2DC[i].norm_ptr  == ptr ||
+                sB2DC[i].color_ptr == ptr ||
+                sB2DC[i].texc_ptr  == ptr ||
+                sB2DC[i].idx_ptr   == ptr))
+        {
+            sB2DC[i].valid = 0;
+        }
+    }
+}
+
 //=============================================================
 // glDrawElements override – bind attribs then draw
 //=============================================================
@@ -678,22 +737,12 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     glUseProgram(gProgram);
     glBindVertexArray(gVAO);
 
-    // Upload vertex attribute data to a shared VBO.
-    // WebGL2 does not support client-side vertex pointers, so we pack all
-    // enabled arrays into one buffer and set up offsets.
-    glBindBuffer(GL_ARRAY_BUFFER, gArrayVBO);
-
-    // Calculate total buffer size needed
-    size_t vertBytes = 0, normBytes = 0, colorBytes = 0, texcBytes = 0;
-    size_t totalSize = 0;
+    // Determine vertex count from hint or by scanning the index buffer.
     int nVerts = 0;
-
-    // Use the vertex count hint if set by the caller (avoids O(count) index scan).
     if (gVertexCountHint > 0) {
         nVerts = (int)gVertexCountHint;
-        gVertexCountHint = 0;  // consume hint
+        gVertexCountHint = 0;
     } else {
-        // Determine vertex count from the index data
         if (type == GL_UNSIGNED_INT) {
             const GLuint* idx = (const GLuint*)indices;
             for (GLsizei i = 0; i < count; i++)
@@ -706,35 +755,127 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     }
     if (nVerts == 0) return;
 
-    if (gVertArrayEnabled && gVertArrayPtr)   { vertBytes  = (size_t)nVerts * 3 * sizeof(float); }
-    if (gNormArrayEnabled && gNormArrayPtr)   { normBytes  = (size_t)nVerts * 3 * sizeof(float); }
-    if (gColorArrayEnabled && gColorArrayPtr) {
-        if (gColorArrayType == GL_UNSIGNED_BYTE)
-            colorBytes = (size_t)nVerts * (size_t)gColorArraySize * sizeof(GLubyte);
-        else
-            colorBytes = (size_t)nVerts * (size_t)gColorArraySize * sizeof(float);
-    }
-    if (gTexcArrayEnabled && gTexcArrayPtr)   { texcBytes  = (size_t)nVerts * 2 * sizeof(float); }
+    // Build cache key fields
+    uint8_t attribMask = 0;
+    if (gVertArrayEnabled && gVertArrayPtr)   attribMask |= (1u << 0);
+    if (gNormArrayEnabled && gNormArrayPtr)   attribMask |= (1u << 1);
+    if (gColorArrayEnabled && gColorArrayPtr) attribMask |= (1u << 2);
+    if (gTexcArrayEnabled  && gTexcArrayPtr)  attribMask |= (1u << 3);
 
-    size_t offVert  = 0;
-    size_t offNorm  = offVert + vertBytes;
-    size_t offColor = offNorm + normBytes;
-    size_t offTexc  = offColor + colorBytes;
-    totalSize       = offTexc + texcBytes;
+    const void *vertPtr  = (attribMask & (1u<<0)) ? gVertArrayPtr  : NULL;
+    const void *normPtr  = (attribMask & (1u<<1)) ? gNormArrayPtr  : NULL;
+    const void *colorPtr = (attribMask & (1u<<2)) ? gColorArrayPtr : NULL;
+    const void *texcPtr  = (attribMask & (1u<<3)) ? gTexcArrayPtr  : NULL;
+    GLenum colorType = (attribMask & (1u<<2)) ? gColorArrayType : 0;
+    GLint  colorSize = (attribMask & (1u<<2)) ? gColorArraySize : 0;
 
-    if (totalSize > 0) {
-        if (totalSize > gArrayVBOSize) {
-            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_DYNAMIC_DRAW);
-            gArrayVBOSize = totalSize;
+    // ── Draw-cache lookup ─────────────────────────────────────────────
+    int cacheIdx = -1;
+    for (int ci = 0; ci < B2_DRAW_CACHE_SIZE; ci++)
+    {
+        B2DrawCacheEntry *e = &sB2DC[ci];
+        if (e->valid &&
+            e->vert_ptr    == vertPtr   && e->norm_ptr   == normPtr  &&
+            e->color_ptr   == colorPtr  && e->texc_ptr   == texcPtr  &&
+            e->idx_ptr     == indices   &&
+            e->nVerts      == nVerts    && e->nIdx       == (int)count &&
+            e->idx_type    == type      &&
+            e->attrib_mask == attribMask &&
+            e->color_type  == colorType && e->color_size == colorSize)
+        {
+            cacheIdx = ci;
+            break;
         }
-        if (vertBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offVert,  (GLsizeiptr)vertBytes,  gVertArrayPtr);
-        if (normBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offNorm,  (GLsizeiptr)normBytes,  gNormArrayPtr);
-        if (colorBytes) glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offColor, (GLsizeiptr)colorBytes, gColorArrayPtr);
-        if (texcBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offTexc,  (GLsizeiptr)texcBytes,  gTexcArrayPtr);
     }
 
-    // Bind vertex attributes from the VBO
-    if (gVertArrayEnabled && gVertArrayPtr) {
+    size_t offVert, offNorm, offColor, offTexc;
+
+    if (cacheIdx >= 0)
+    {
+        // ── Cache HIT: rebind cached VBO/EBO, skip all uploads ────────
+        B2DrawCacheEntry *e = &sB2DC[cacheIdx];
+        e->lru_tick = ++sB2DCTick;
+
+        offVert  = e->offVert;
+        offNorm  = e->offNorm;
+        offColor = e->offColor;
+        offTexc  = e->offTexc;
+
+        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
+    }
+    else
+    {
+        // ── Cache MISS: evict LRU slot and upload ─────────────────────
+        int evict = 0;
+        uint64_t oldest = UINT64_MAX;
+        for (int ci = 0; ci < B2_DRAW_CACHE_SIZE; ci++)
+        {
+            if (!sB2DC[ci].valid) { evict = ci; oldest = 0; break; }
+            if (sB2DC[ci].lru_tick < oldest)
+            {
+                oldest = sB2DC[ci].lru_tick;
+                evict  = ci;
+            }
+        }
+        B2DrawCacheEntry *e = &sB2DC[evict];
+
+        if (!e->vbo) glGenBuffers(1, &e->vbo);
+        if (!e->ebo) glGenBuffers(1, &e->ebo);
+
+        // Calculate packed VBO layout (same interleaved-offsets approach)
+        size_t vertBytes  = 0, normBytes = 0, colorBytes = 0, texcBytes = 0;
+        if (attribMask & (1u<<0)) vertBytes  = (size_t)nVerts * 3 * sizeof(float);
+        if (attribMask & (1u<<1)) normBytes  = (size_t)nVerts * 3 * sizeof(float);
+        if (attribMask & (1u<<2)) {
+            colorBytes = (colorType == GL_UNSIGNED_BYTE)
+                ? (size_t)nVerts * (size_t)colorSize * sizeof(GLubyte)
+                : (size_t)nVerts * (size_t)colorSize * sizeof(float);
+        }
+        if (attribMask & (1u<<3)) texcBytes  = (size_t)nVerts * 2 * sizeof(float);
+
+        offVert  = 0;
+        offNorm  = offVert  + vertBytes;
+        offColor = offNorm  + normBytes;
+        offTexc  = offColor + colorBytes;
+        size_t totalSize = offTexc + texcBytes;
+
+        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
+        if (totalSize > 0)
+        {
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_STATIC_DRAW);
+            if (vertBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offVert,  (GLsizeiptr)vertBytes,  vertPtr);
+            if (normBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offNorm,  (GLsizeiptr)normBytes,  normPtr);
+            if (colorBytes) glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offColor, (GLsizeiptr)colorBytes, colorPtr);
+            if (texcBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offTexc,  (GLsizeiptr)texcBytes,  texcPtr);
+        }
+
+        size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
+
+        // Store cache entry
+        e->vert_ptr    = vertPtr;
+        e->norm_ptr    = normPtr;
+        e->color_ptr   = colorPtr;
+        e->texc_ptr    = texcPtr;
+        e->idx_ptr     = indices;
+        e->nVerts      = nVerts;
+        e->nIdx        = (int)count;
+        e->idx_type    = type;
+        e->attrib_mask = attribMask;
+        e->color_type  = colorType;
+        e->color_size  = colorSize;
+        e->offVert     = offVert;
+        e->offNorm     = offNorm;
+        e->offColor    = offColor;
+        e->offTexc     = offTexc;
+        e->valid       = 1;
+        e->lru_tick    = ++sB2DCTick;
+    }
+
+    // ── Set up vertex attribute pointers from cached/uploaded VBO ────
+    if (attribMask & (1u<<0)) {
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offVert);
     } else {
@@ -742,7 +883,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         glVertexAttrib3f(0, 0, 0, 0);
     }
 
-    if (gNormArrayEnabled && gNormArrayPtr) {
+    if (attribMask & (1u<<1)) {
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offNorm);
     } else {
@@ -750,18 +891,18 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         glVertexAttrib3f(1, gCurrentNormal[0], gCurrentNormal[1], gCurrentNormal[2]);
     }
 
-    if (gColorArrayEnabled && gColorArrayPtr) {
+    if (attribMask & (1u<<2)) {
         glEnableVertexAttribArray(2);
-        if (gColorArrayType == GL_UNSIGNED_BYTE)
-            glVertexAttribPointer(2, gColorArraySize, GL_UNSIGNED_BYTE, GL_TRUE, 0, (const void*)offColor);
+        if (colorType == GL_UNSIGNED_BYTE)
+            glVertexAttribPointer(2, colorSize, GL_UNSIGNED_BYTE, GL_TRUE, 0, (const void*)offColor);
         else
-            glVertexAttribPointer(2, gColorArraySize, GL_FLOAT, GL_FALSE, 0, (const void*)offColor);
+            glVertexAttribPointer(2, colorSize, GL_FLOAT, GL_FALSE, 0, (const void*)offColor);
     } else {
         glDisableVertexAttribArray(2);
         glVertexAttrib4f(2, gCurrentColor[0], gCurrentColor[1], gCurrentColor[2], gCurrentColor[3]);
     }
 
-    if (gTexcArrayEnabled && gTexcArrayPtr) {
+    if (attribMask & (1u<<3)) {
         glEnableVertexAttribArray(3);
         glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, (const void*)offTexc);
     } else {
@@ -769,18 +910,19 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         glVertexAttrib2f(3, gCurrentTexCoord[0], gCurrentTexCoord[1]);
     }
 
-    // Upload index data to EBO
-    size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gArrayEBO);
-    if (indexSize > gArrayEBOSize) {
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, NULL, GL_DYNAMIC_DRAW);
-        gArrayEBOSize = indexSize;
-    }
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)indexSize, indices);
-
     UploadUniforms();
 
     glDrawElements(mode, count, type, 0);
+
+    // Reset the client active texture unit to 0 after every draw.
+    // Multi-texture (sphere-map) objects activate unit 1 at the end of their
+    // setup loop and never restore unit 0 before returning.  If the next draw
+    // call is a single-texture object it calls glTexCoordPointer without
+    // first calling glClientActiveTexture(unit 0), so our override silently
+    // ignores the UV pointer update – leaving gTexcArrayPtr pointing at the
+    // previous object's UV array and causing garbled terrain / fence UVs.
+    // Resetting here ensures every object's UV setup starts with unit 0 active.
+    gClientActiveUnit = 0;
 }
 
 //=============================================================
@@ -798,6 +940,10 @@ void glPushMatrix(void)
         if (gProjTop + 1 >= MATRIX_STACK_DEPTH) return;
         memcpy(gProjStack[gProjTop+1], gProjStack[gProjTop], 16*sizeof(float));
         gProjTop++;
+    } else if (gMatMode == GL_TEXTURE) {
+        if (gTexTop + 1 >= MATRIX_STACK_DEPTH) return;
+        memcpy(gTexStack[gTexTop+1], gTexStack[gTexTop], 16*sizeof(float));
+        gTexTop++;
     } else {
         if (gMVTop + 1 >= MATRIX_STACK_DEPTH) return;
         memcpy(gMVStack[gMVTop+1], gMVStack[gMVTop], 16*sizeof(float));
@@ -809,6 +955,8 @@ void glPopMatrix(void)
 {
     if (gMatMode == GL_PROJECTION) {
         if (gProjTop > 0) gProjTop--;
+    } else if (gMatMode == GL_TEXTURE) {
+        if (gTexTop > 0) gTexTop--;
     } else {
         if (gMVTop > 0) gMVTop--;
     }

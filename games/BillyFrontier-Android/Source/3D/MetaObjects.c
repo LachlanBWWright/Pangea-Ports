@@ -519,10 +519,23 @@ void MO_DrawObject(const MetaObjectPtr object)
 MetaObjectHeader	*objHead = object;
 MOVertexArrayObject	*vObj;
 
+			/* GUARD AGAINST RUNAWAY RECURSION */
+
+	static int sDrawDepth = 0;
+	if (sDrawDepth >= 200)
+	{
+		// Groups should never nest this deeply; skip to avoid call-stack overflow.
+		return;
+	}
+	sDrawDepth++;
+
 			/* VERIFY COOKIE */
 
 	if (objHead->cookie != MO_COOKIE)
+	{
+		sDrawDepth--;
 		DoFatalAlert("MO_DrawObject: cookie is invalid!");
+	}
 
 
 			/* HANDLE TYPE */
@@ -577,6 +590,8 @@ MOVertexArrayObject	*vObj;
 		default:
 			DoFatalAlert("MO_DrawObject: unknown type!");
 	}
+
+	sDrawDepth--;
 }
 
 

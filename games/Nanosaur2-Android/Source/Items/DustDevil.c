@@ -311,6 +311,11 @@ Byte	buffNum;
 
 			n *= .70f;																	// next segment will scroll a little slower
 		}
+
+		/* Invalidate draw cache for the just-updated UV buffer. */
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		COMPAT_GL_InvalidateCachePtr(gDustDevilMeshes[buffNum].uvs[0]);
+#endif
 	}
 }
 

@@ -130,6 +130,10 @@ void ToolBoxInit(void)
 	InitDefaultPrefs();
 	LoadPrefs();
 
+#ifdef __EMSCRIPTEN__
+	// Fullscreen on the web requires user interaction; run windowed by default.
+	gGamePrefs.fullscreen = false;
+#endif
 	SetFullscreenMode(true);
 
 

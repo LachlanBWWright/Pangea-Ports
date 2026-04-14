@@ -34,7 +34,10 @@ void InitWindowStuff(void)
 {
 		/* SET FULLSCREEN MODE ACCORDING TO PREFS */
 
+#ifndef __EMSCRIPTEN__
+	// On web, fullscreen requires user interaction; run windowed by default.
 	SetFullscreenMode(true);
+#endif
 
 		/* SHOW A COUPLE BLACK FRAMES BEFORE WE BEGIN */
 

@@ -372,6 +372,20 @@ void SetFullscreenMode(bool enforceDisplayPref)
 		{
 			MoveToPreferredDisplay();
 		}
+#ifdef __EMSCRIPTEN__
+		else
+		{
+			// On Emscripten the browser controls canvas sizing, so after exiting
+			// fullscreen we must explicitly restore the canvas to its windowed size.
+			// Without this the canvas stays at the full-screen pixel dimensions and
+			// the next glViewport call renders into a fraction of the enlarged canvas,
+			// producing black borders and a zoomed-in image.
+			int w = 1280, h = 800;
+			GetDefaultWindowSize(1, &w, &h);
+			SDL_SetWindowSize(gSDLWindow, w, h);
+			SDL_SyncWindow(gSDLWindow);
+		}
+#endif
 	}
 	else
 	{
@@ -393,6 +407,11 @@ void SetFullscreenMode(bool enforceDisplayPref)
 		SDL_SetWindowFullscreen(gSDLWindow, true);
 		SDL_SyncWindow(gSDLWindow);
 	}
+
+	// Refresh our cached pixel dimensions to reflect the new window state.
+	// SDL_SyncWindow has completed synchronously on native; on Emscripten the
+	// dimensions update may be deferred, but this at least gets the post-sync value.
+	SDL_GetWindowSizeInPixels(gSDLWindow, &gGameWindowWidth, &gGameWindowHeight);
 
 	SDL_GL_SetSwapInterval(gGamePrefs.vsync);
 }

@@ -32,7 +32,7 @@ static void DisposeSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 
 static SkeletonDefType		*gLoadedSkeletonsList[MAX_SKELETON_TYPES];
 
-static short	    gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
+short	    gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
 
 
 /**************** INIT SKELETON MANAGER *********************/
@@ -423,6 +423,10 @@ Byte				buffNum;
 
 					/* SUBMIT IT */
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		COMPAT_GL_InvalidateCachePtr(triMesh->points);
+		COMPAT_GL_InvalidateCachePtr(triMesh->normals);
+#endif
 		MO_DrawGeometry_VertexArray(triMesh);
 
 

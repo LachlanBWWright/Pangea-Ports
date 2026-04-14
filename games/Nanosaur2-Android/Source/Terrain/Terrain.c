@@ -851,6 +851,17 @@ OGLVector3D			*vertexNormals;
 
 	OGL_SetVertexArrayRangeDirty(VERTEX_ARRAY_RANGE_TYPE_TERRAIN);
 
+	/* Invalidate draw cache for this supertile slot.
+	 * When a slot is freed and reused for a different map location, BuildTerrainSuperTile
+	 * writes entirely new geometry into the SAME memory addresses.  Without invalidation
+	 * the draw cache would find the old stale VBO data and render the wrong terrain tile. */
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	COMPAT_GL_InvalidateCachePtr(meshData->points);
+	COMPAT_GL_InvalidateCachePtr(meshData->normals);
+	COMPAT_GL_InvalidateCachePtr(meshData->colorsFloat);
+	COMPAT_GL_InvalidateCachePtr(meshData->triangles);
+#endif
+
 	return(superTileNum);
 }
 

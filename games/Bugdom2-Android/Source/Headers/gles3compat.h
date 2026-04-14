@@ -18,6 +18,7 @@
 // Matrix modes
 #define GL_MODELVIEW              0x1700
 #define GL_PROJECTION             0x1701
+#define GL_TEXTURE                0x1702
 
 // Legacy primitive types
 #define GL_QUADS                  0x0007
@@ -195,6 +196,7 @@ void GLES3_Enable(GLenum cap);
 void GLES3_Disable(GLenum cap);
 GLboolean GLES3_IsEnabled(GLenum cap);
 void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
+void GLES3_InvalidateCachePtr(const void *ptr);
 void GLES3_SetVertexCount(GLsizei n);
 void GLES3_GetFloatv(GLenum pname, GLfloat* params);
 void GLES3_GetIntegerv(GLenum pname, GLint* params);

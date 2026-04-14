@@ -12,8 +12,6 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include <SDL3/SDL_opengles2.h>   // GLES2 types and real function declarations
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -147,6 +145,9 @@ extern "C" {
 #undef glDrawArrays
 #undef glHint
 #undef glIsEnabled
+#undef glBindTexture
+#undef glGetBooleanv
+#undef glDepthMask
 
 // ── Compatibility function declarations ──────────────────────────────────────
 
@@ -213,6 +214,18 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
 void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count);
 void glDrawArrays(GLenum mode, GLint first, GLsizei count);
 
+// Draw cache management
+// Call this when CPU-side vertex data at `ptr` has been modified (e.g., after
+// animating a skeleton mesh, updating particles, building contrail/DustDevil geometry)
+// so the cached GPU buffer is re-uploaded on the next draw call.
+// This MUST be called after ANY per-frame geometry write to a pointer that was
+// previously registered in the draw cache.  Failure to call this will cause
+// the draw cache to serve stale VBO data from a previous frame.
+void COMPAT_GL_InvalidateCachePtr(const void *ptr);
+
+// glBindTexture intercept: tracks bound texture per unit for software state.
+void glBindTexture(GLenum target, GLuint texture);
+
 // Enable/Disable intercepted for lighting/fog/alpha-test/texgen state tracking
 void glEnable(GLenum cap);
 void glDisable(GLenum cap);
@@ -225,6 +238,8 @@ void glGetDoublev(GLenum pname, GLdouble *data);
 void glPolygonMode(GLenum face, GLenum mode);
 void glHint(GLenum target, GLenum mode);
 GLboolean glIsEnabled(GLenum cap);
+void glGetBooleanv(GLenum pname, GLboolean *data);  // intercepts GL_DEPTH_WRITEMASK
+void glDepthMask(GLboolean flag);                   // tracks s_depth_mask for glGetBooleanv
 void glPushAttrib(GLbitfield mask);
 void glPopAttrib(void);
 void glDrawBuffer(GLenum buf);
@@ -237,6 +252,13 @@ void glSetFenceAPPLE(GLuint fence);
 void glFinishFenceAPPLE(GLuint fence);
 GLboolean glTestFenceAPPLE(GLuint fence);
 GLboolean glIsFenceNV(GLuint fence);
+
+// Vertex array object support
+void glGenVertexArrays(GLsizei n, GLuint *arrays);
+void glBindVertexArray(GLuint array);
+void glDeleteVertexArrays(GLsizei n, const GLuint *arrays);
+GLboolean glIsVertexArray(GLuint array);
+
 void glGenVertexArraysAPPLE(GLsizei n, GLuint *arrays);
 void glBindVertexArrayAPPLE(GLuint array);
 void glFlushVertexArrayRangeAPPLE(GLsizei length, void *ptr);
@@ -247,5 +269,3 @@ void glGetDoublev_stub(GLenum pname, GLdouble *params);
 #ifdef __cplusplus
 } // extern "C"
 #endif
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

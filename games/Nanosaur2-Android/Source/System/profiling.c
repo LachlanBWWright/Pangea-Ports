@@ -5,6 +5,20 @@ ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 static uint64_t gPerformanceFrequency;
 static ProfilePhaseType gCurrentPhase = -1;
 
+// Per-frame GL counters
+int gDrawCallsThisFrame         = 0;
+int gCacheHitsThisFrame         = 0;
+int gCacheMissesThisFrame       = 0;
+int gVerticesUploadedThisFrame  = 0;
+int gBytesUploadedThisFrame     = 0;
+
+// Previous-frame snapshots (stable for display)
+int gDrawCallsLastFrame         = 0;
+int gCacheHitsLastFrame         = 0;
+int gCacheMissesLastFrame       = 0;
+int gVerticesUploadedLastFrame  = 0;
+int gBytesUploadedLastFrame     = 0;
+
 void InitProfiling(void) {
     gPerformanceFrequency = SDL_GetPerformanceFrequency();
     for (int i = 0; i < NUM_PROFILE_PHASES; ++i) {
@@ -23,7 +37,9 @@ void InitProfiling(void) {
     gProfilePhases[PROFILE_PHASE_UI].name = "UI";
     gProfilePhases[PROFILE_PHASE_SWAP_BUFFERS].name = "Swap Buffers";
     gProfilePhases[PROFILE_PHASE_ASYNC_YIELD].name = "Async Yield";
-    
+    gProfilePhases[PROFILE_PHASE_GL_GEOMETRY_UPLOAD].name = "GL Geom Upload";
+    gProfilePhases[PROFILE_PHASE_GL_UNIFORMS].name = "GL Uniforms";
+
     gCurrentPhase = -1;
 }
 
@@ -74,4 +90,21 @@ void ResetProfilingForFrame(void) {
         gProfilePhases[i].samples = 0;
         gProfilePhases[i].start_tick = 0;
     }
+    // GL counters are reset separately by ResetGLCounters() in OGL_DrawScene.
+}
+
+// Called at the START of each frame (from OGL_DrawScene) to snapshot the
+// previous frame's GL counters into gGL*LastFrame and zero the current counters.
+void ResetGLCounters(void) {
+    gDrawCallsLastFrame        = gDrawCallsThisFrame;
+    gCacheHitsLastFrame        = gCacheHitsThisFrame;
+    gCacheMissesLastFrame      = gCacheMissesThisFrame;
+    gVerticesUploadedLastFrame = gVerticesUploadedThisFrame;
+    gBytesUploadedLastFrame    = gBytesUploadedThisFrame;
+
+    gDrawCallsThisFrame        = 0;
+    gCacheHitsThisFrame        = 0;
+    gCacheMissesThisFrame      = 0;
+    gVerticesUploadedThisFrame = 0;
+    gBytesUploadedThisFrame    = 0;
 }

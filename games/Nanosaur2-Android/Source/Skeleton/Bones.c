@@ -301,6 +301,20 @@ SkeletonObjDataType	*currentSkelObjData;
 
 	gBBox->isEmpty =
 	theNode->LocalBBox.isEmpty = false;
+
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	// Invalidate draw-cache entries for all deformed meshes in the updated buffer.
+	// Skeleton vertices are modified in-place every frame, so any cached VBO that
+	// contains previous-frame data must be refreshed on the next draw call.
+	{
+		Byte buffNum = gGameViewInfoPtr->frameCount & 1;
+		short numMeshes = gNumDecomposedTriMeshesInSkeleton[skelType];
+		for (short m = 0; m < numMeshes; m++) {
+			COMPAT_GL_InvalidateCachePtr(currentSkelObjData->deformedMeshes[buffNum][m].points);
+			COMPAT_GL_InvalidateCachePtr(currentSkelObjData->deformedMeshes[buffNum][m].normals);
+		}
+	}
+#endif
 }
 
 

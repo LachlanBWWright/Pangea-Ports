@@ -9,7 +9,7 @@ extern void ModernGL_Init(void);
 static inline void OGL_InitFunctions(void) { ModernGL_Init(); }
 // Redirect ARB-suffixed variants through the compat layer's ActiveTexture.
 #define glActiveTextureARB CompatGL_ActiveTexture
-#define glClientActiveTextureARB CompatGL_ActiveTexture
+#define glClientActiveTextureARB CompatGL_ClientActiveTexture
 #else
 extern PFNGLACTIVETEXTUREARBPROC			procptr_glActiveTextureARB;
 extern PFNGLCLIENTACTIVETEXTUREARBPROC		procptr_glClientActiveTextureARB;

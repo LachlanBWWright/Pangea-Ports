@@ -850,6 +850,11 @@ short			skelType, playerNum;
 							}
 						}
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+						/* Skeleton vertex data is updated in-place each frame by UpdateSkinnedGeometry; evict stale cache entries. */
+						CompatGL_InvalidateCachePtr(gLocalTriMeshesOfSkelType[skelType][i].points);
+						CompatGL_InvalidateCachePtr(gLocalTriMeshesOfSkelType[skelType][i].normals);
+#endif
 						MO_DrawGeometry_VertexArray(&gLocalTriMeshesOfSkelType[skelType][i]);
 					}
 					StartProfilePhase(PROFILE_PHASE_OBJECTS);

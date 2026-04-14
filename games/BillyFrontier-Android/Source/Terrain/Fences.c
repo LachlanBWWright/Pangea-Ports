@@ -570,7 +570,11 @@ Boolean					overrideAlphaFunc = false;
 	
 	
 			/* SUBMIT GEO */
-			
+
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	/* Fence vertex colors (alpha fade) are modified per-frame in this function; evict stale cache entry. */
+	CompatGL_InvalidateCachePtr(gFenceTriMeshData[f].colorsByte);
+#endif
 	MO_DrawGeometry_VertexArray(&gFenceTriMeshData[f]);
 }	
 

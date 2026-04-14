@@ -351,6 +351,11 @@ float	ud1, uv1, ud2, uv2;
 			else
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);			
 		
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+			/* Water UVs are scrolled every frame; evict stale cache entry before drawing. */
+			CompatGL_InvalidateCachePtr(gWaterTriMeshData[f].uvs[0]);
+			CompatGL_InvalidateCachePtr(gWaterTriMeshData[f].uvs[1]);
+#endif
 			MO_DrawGeometry_VertexArray(&gWaterTriMeshData[f]);
 			gNumWaterDrawn++;
 		}
