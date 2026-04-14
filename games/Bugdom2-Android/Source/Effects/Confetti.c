@@ -560,6 +560,11 @@ OGLBoundingBox	bbox;
 drawme:
 				/* DRAW IT */
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+			GLES3_InvalidateCachePtr(geoData->points);		// vertex positions rebuilt every frame
+			GLES3_InvalidateCachePtr(geoData->normals);		// face normals rebuilt every frame
+			GLES3_InvalidateCachePtr(geoData->colorsByte);	// vertex colours rebuilt every frame
+#endif
 			MO_DrawObject(confettiGroup->geometryObj);			// draw geometry
 		}
 	}
