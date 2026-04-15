@@ -299,9 +299,11 @@
     </div>
 
     <div class="info-section">
-      <h3>JavaScript API (Console)</h3>
-      <div class="info-row"><label>Fence collisions</label> <span><code>Module.ccall('Nanosaur2_SetFenceCollisionsEnabled', null, ['number'], [0])</code></span></div>
-      <div class="info-row"><label>Current level</label> <span><code>Module.ccall('Nanosaur2_GetCurrentLevel', 'number')</code></span></div>
+      <h3>JavaScript API</h3>
+      <div class="info-row"><label>Skip to level</label> <span><code>PangeaGame.skipToLevel(N)</code> — reloads at level N (0–8)</span></div>
+      <div class="info-row"><label>Current level</label> <span><code>PangeaGame.getCurrentLevel()</code></span></div>
+      <div class="info-row"><label>Fence collisions</label> <span><code>PangeaGame.setFenceCollisions(false)</code></span></div>
+      <div class="info-row"><label>Terrain override</label> <span><code>PangeaGame.setTerrainPath('/Data/Terrain/custom.ter')</code></span></div>
     </div>
   </div>
 
@@ -388,6 +390,31 @@
         var tb = document.getElementById('toolbar');
         if (tb) tb.style.display = 'flex';
         syncCanvasSize();
+
+        // ── Standard PangeaGame API ───────────────────────────────────────
+        // Consistent interface for level-editor integration across all Pangea Ports WASM builds.
+        window.PangeaGame = {
+          // skipToLevel: reload the page at the requested level (0-based).
+          // Nanosaur 2 reads ?level=N at startup; there is no runtime WASM skip call.
+          skipToLevel: function(n) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('level', n);
+            window.location.href = url.toString();
+          },
+          getCurrentLevel: function() {
+            return Module.ccall('Nanosaur2_GetCurrentLevel', 'number', [], []);
+          },
+          setFenceCollisions: function(enabled) {
+            return Module.ccall('Nanosaur2_SetFenceCollisionsEnabled', null, ['number'], [enabled ? 1 : 0]);
+          },
+          getFenceCollisions: function() {
+            return Module.ccall('Nanosaur2_GetFenceCollisionsEnabled', 'number', [], []) !== 0;
+          },
+          setTerrainPath: function(path) {
+            return Module.ccall('Nanosaur2_SetTerrainOverridePath', null, ['string'], [path]);
+          },
+        };
+        console.log('[Nanosaur2] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level (0–8).');
       },
 
       // Display fatal errors in the loading card instead of silently failing

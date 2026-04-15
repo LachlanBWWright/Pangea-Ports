@@ -24,6 +24,13 @@ void OGL_InitFunctions(void)
 // On Emscripten, glActiveTexture is a core GLES2 function.
 // state_compat.c references procptr_glActiveTextureARB directly (extern),
 // so we must provide a definition here, pointing to the real function.
+//
+// IMPORTANT: game.h -> gl_compat.h -> state_compat.h defines
+//   #define glActiveTexture CompatGL_ActiveTexture
+// which would make the initialiser below assign CompatGL_ActiveTexture to
+// the pointer, causing CompatGL_ActiveTexture to call itself infinitely.
+// Undef the macro first so we capture the real GLES2 entry point.
+#undef glActiveTexture
 PFNGLACTIVETEXTUREARBPROC procptr_glActiveTextureARB =
     (PFNGLACTIVETEXTUREARBPROC) glActiveTexture;
 

@@ -43,16 +43,6 @@
     }
     nav::-webkit-scrollbar { height: 4px; }
     nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-    .nav-brand {
-      font-weight: 700;
-      font-size: 1rem;
-      white-space: nowrap;
-      color: var(--accent);
-      margin-right: .5rem;
-      padding-right: .75rem;
-      border-right: 1px solid var(--border);
-      flex-shrink: 0;
-    }
     .nav-btn,
     .game-chip,
     .primary-btn,
@@ -303,6 +293,16 @@
       text-align: center;
     }
     #loading-card.hidden { display: none; }
+    .loading-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(140,208,255,.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto .75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     #status-text {
       font-size: 1rem;
       color: var(--accent);
@@ -321,6 +321,11 @@
       font-size: .78rem;
       color: var(--muted);
     }
+    #progress-pct {
+      font-size: .78rem;
+      color: var(--accent);
+      margin-top: .25rem;
+    }
     @media (max-width: 720px) {
       #welcome,
       #content { padding: 1rem; }
@@ -335,7 +340,6 @@
 </head>
 <body>
   <nav>
-    <span class="nav-brand">🕹 Pangea Ports</span>
     <button class="nav-btn" data-game="billy">Billy Frontier</button>
     <button class="nav-btn" data-game="bugdom">Bugdom</button>
     <button class="nav-btn" data-game="bugdom2">Bugdom 2</button>
@@ -415,8 +419,10 @@
     <div id="game-area">
       <div id="game-stage">
         <div id="loading-card">
+          <div class="loading-spinner"></div>
           <p id="status-text">Loading…</p>
           <progress id="progress-bar" value="0" max="100"></progress>
+          <p id="progress-pct"></p>
           <p id="progress-label">Downloading game data…</p>
         </div>
         <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()" width="1280" height="720"></canvas>
@@ -928,6 +934,7 @@
 
       var statusEl = document.getElementById('status-text');
       var progressEl = document.getElementById('progress-bar');
+      var pctEl = document.getElementById('progress-pct');
       var labelEl = document.getElementById('progress-label');
       var card = document.getElementById('loading-card');
       var scriptSrc = config.script;
@@ -936,6 +943,7 @@
 
       statusEl.textContent = 'Loading ' + config.name + '…';
       labelEl.textContent = 'Downloading game data…';
+      pctEl.textContent = '';
       card.classList.remove('hidden');
       progressEl.removeAttribute('value');
       updateFullscreenButton();
@@ -960,8 +968,13 @@
           statusEl.textContent = text;
           var m = text.match(/(\d+)\/(\d+)/);
           if (m) {
-            progressEl.value = parseInt(m[1], 10);
-            progressEl.max = parseInt(m[2], 10);
+            var loaded = parseInt(m[1], 10);
+            var total  = parseInt(m[2], 10);
+            progressEl.value = loaded;
+            progressEl.max   = total;
+            if (total > 0) {
+              pctEl.textContent = Math.round(loaded / total * 100) + '%';
+            }
           }
         },
         monitorRunDependencies: function(n) {
