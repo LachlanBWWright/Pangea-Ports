@@ -504,6 +504,9 @@
           setFenceCollisions: function(enabled) {
             return Module.ccall('BugdomSetFenceCollision', null, ['number'], [enabled ? 1 : 0]);
           },
+          getFenceCollisions: function() {
+            return Module.ccall('BugdomGetFenceCollision', 'number', [], []) !== 0;
+          },
           setTerrainOverride: function(path) {
             return Module.ccall('BugdomSetTerrainOverride', null, ['string'], [path]);
           },
