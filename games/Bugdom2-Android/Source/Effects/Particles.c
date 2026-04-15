@@ -672,6 +672,10 @@ OGLBoundingBox	bbox;
 				/* DRAW IT */
 
 			glBlendFunc(src, dst);							// set blending mode
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+			GLES3_InvalidateCachePtr(geoData->points);		// vertex positions rebuilt every frame
+			GLES3_InvalidateCachePtr(geoData->colorsByte);	// vertex colours rebuilt every frame
+#endif
 			MO_DrawObject(particleGroup->geometryObj);		// draw geometry
 		}
 	}

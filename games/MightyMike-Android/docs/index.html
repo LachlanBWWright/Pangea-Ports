@@ -618,6 +618,8 @@
     ['resize','fullscreenchange','webkitfullscreenchange','mozfullscreenchange'].forEach(function(evt) {
       window.addEventListener(evt, function() {
         requestAnimationFrame(syncCanvasSize);
+        // Extra delayed sync: fullscreen exit layout may not settle within one rAF
+        setTimeout(syncCanvasSize, 100);
       });
     });
   </script>

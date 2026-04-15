@@ -422,6 +422,11 @@ if(EMSCRIPTEN)
 		# Emscripten exceptions (needed for Pomme::QuitRequest and std::exception)
 		-fexceptions
 		-sDISABLE_EXCEPTION_CATCHING=0
+
+		# Preserve WASM function names in the binary name section so that
+		# browser DevTools and stack traces show human-readable function names
+		# instead of raw offsets (e.g. "billyfrontier.wasm:0x11fbfb").
+		--profiling-funcs
 	)
 
 	target_compile_options(${GAME_TARGET} PRIVATE

@@ -459,6 +459,8 @@
         requestAnimationFrame(syncCanvasSize);
         // And another one for good measure (some browsers lag)
         requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
+        // Extra delayed sync: fullscreen exit layout may not settle within two rAFs
+        setTimeout(syncCanvasSize, 100);
       });
     });
 
