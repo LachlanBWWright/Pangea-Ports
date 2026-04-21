@@ -46,143 +46,28 @@ static int gImmScratchCapacity = 0;
 /*    SHADER SOURCE         */
 /****************************/
 
-// Vertex shader source (embedded)
-static const char* gVertexShaderSource =
-"precision highp float;\nprecision mediump int;\n"
-"attribute vec3 aPosition;\n"
-"attribute vec3 aNormal;\n"
-"attribute vec4 aColor;\n"
-"attribute vec2 aTexCoord0;\n"
-"attribute vec2 aTexCoord1;\n"
-"uniform mat4 uMVPMatrix;\n"
-"uniform mat4 uModelViewMatrix;\n"
-"uniform mediump mat3 uNormalMatrix;\n"
-"uniform vec3 uAmbientLight;\n"
-"uniform vec3 uLightDirection[4];\n"
-"uniform vec3 uLightColor[4];\n"
-"uniform int uNumLights;\n"
-// Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
-"uniform int uFogEnabled;\n"
-"uniform float uFogStart;\n"
-"uniform float uFogEnd;\n"
-"uniform float uFogDensity;\n"
-"uniform int uFogMode;\n"
-"uniform vec4 uMaterialColor;\n"
-"uniform int uUseLighting;\n"
-"uniform int uUseVertexColor;\n"
-"uniform int uUseTexture0;\n"
-"uniform int uUseTexture1;\n"
-"uniform mat4 uTextureMatrix;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
-"void main() {\n"
-"    gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n"
-"    vec4 viewPos = uModelViewMatrix * vec4(aPosition, 1.0);\n"
-"    float fogCoord = length(viewPos.xyz);\n"
-"    if (uFogEnabled != 0) {\n"
-"        if (uFogMode == 0) {\n"
-"            float fogRange = uFogEnd - uFogStart;\n"
-"            if (abs(fogRange) > 0.001)\n"
-"                vFogFactor = (uFogEnd - fogCoord) / fogRange;\n"
-"            else\n"
-"                vFogFactor = 1.0;\n"
-"        }\n"
-"        else if (uFogMode == 1)\n"
-"            vFogFactor = exp(-uFogDensity * fogCoord);\n"
-"        else\n"
-"            vFogFactor = exp(-pow(uFogDensity * fogCoord, 2.0));\n"
-"        vFogFactor = clamp(vFogFactor, 0.0, 1.0);\n"
-"    } else {\n"
-"        vFogFactor = 1.0;\n"
-"    }\n"
-"    vec3 normal = normalize(uNormalMatrix * aNormal);\n"
-"    vNormal = normal;\n"
-"    vec4 finalColor = uMaterialColor;\n"
-"    if (uUseLighting != 0) {\n"
-"        vec3 ambient = uAmbientLight;\n"
-"        vec3 diffuse = vec3(0.0);\n"
-// Unrolled 4-light loop — avoids break+non-constant-bound (invalid GLSL ES 1.0)
-"        if (uNumLights > 0) diffuse += uLightColor[0] * max(dot(normal, uLightDirection[0]), 0.0);\n"
-"        if (uNumLights > 1) diffuse += uLightColor[1] * max(dot(normal, uLightDirection[1]), 0.0);\n"
-"        if (uNumLights > 2) diffuse += uLightColor[2] * max(dot(normal, uLightDirection[2]), 0.0);\n"
-"        if (uNumLights > 3) diffuse += uLightColor[3] * max(dot(normal, uLightDirection[3]), 0.0);\n"
-"        finalColor.rgb *= (ambient + diffuse);\n"
-"    }\n"
-"    if (uUseVertexColor != 0) finalColor *= aColor;\n"
-"    vColor = finalColor;\n"
-"    if (uUseTexture0 != 0) {\n"
-"        vec4 texCoord = uTextureMatrix * vec4(aTexCoord0, 0.0, 1.0);\n"
-"        vTexCoord0 = texCoord.xy;\n"
-"    } else {\n"
-"        vTexCoord0 = aTexCoord0;\n"
-"    }\n"
-"    vTexCoord1 = aTexCoord1;\n"
-"}\n";
+static const char* kVertexShaderPath = "Data/System/Shaders/basic.vert";
+static const char* kFragmentShaderPath = "Data/System/Shaders/basic.frag";
 
-// Fragment shader source (embedded)
-static const char* gFragmentShaderSource =
-"precision mediump float;\nprecision mediump int;\n"
-"uniform sampler2D uTexture0;\n"
-"uniform sampler2D uTexture1;\n"
-// Use int instead of bool for GLSL ES 1.0 compatibility
-"uniform int uUseTexture0;\n"
-"uniform int uUseTexture1;\n"
-"uniform int uMultiTextureMode;\n"
-"uniform int uMultiTextureCombine;\n"
-"uniform int uUseSphereMap;\n"
-"uniform mediump mat3 uNormalMatrix;\n"
-"uniform int uFogEnabled;\n"
-"uniform vec3 uFogColor;\n"
-"uniform int uAlphaTestEnabled;\n"
-"uniform int uAlphaFunc;\n"
-"uniform float uAlphaRef;\n"
-"uniform float uGlobalTransparency;\n"
-"uniform vec3 uGlobalColorFilter;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
-"void main() {\n"
-"    vec4 color = vColor;\n"
-"    if (uUseTexture0 != 0) {\n"
-"        vec4 texColor = texture2D(uTexture0, vTexCoord0);\n"
-"        color *= texColor;\n"
-"    }\n"
-"    if (uUseTexture1 != 0) {\n"
-"        vec2 texCoord1 = vTexCoord1;\n"
-"        if (uUseSphereMap != 0) {\n"
-"            vec3 normal = normalize(vNormal);\n"
-"            vec3 viewNormal = normalize(uNormalMatrix * normal);\n"
-"            texCoord1 = viewNormal.xy * 0.5 + 0.5;\n"
-"        }\n"
-"        vec4 texColor1 = texture2D(uTexture1, texCoord1);\n"
-"        if (uMultiTextureCombine == 0)\n"
-"            color *= texColor1;\n"
-"        else if (uMultiTextureCombine == 1)\n"
-"            color.rgb += texColor1.rgb;\n"
-"    }\n"
-"    color.rgb *= uGlobalColorFilter;\n"
-"    color.a *= uGlobalTransparency;\n"
-"    if (uAlphaTestEnabled != 0) {\n"
-"        bool discard_frag = false;\n"
-"        if (uAlphaFunc == 0) discard_frag = true;\n"
-"        else if (uAlphaFunc == 1) discard_frag = color.a >= uAlphaRef;\n"
-"        else if (uAlphaFunc == 2) discard_frag = abs(color.a - uAlphaRef) > 0.001;\n"
-"        else if (uAlphaFunc == 3) discard_frag = color.a > uAlphaRef;\n"
-"        else if (uAlphaFunc == 4) discard_frag = color.a <= uAlphaRef;\n"
-"        else if (uAlphaFunc == 5) discard_frag = abs(color.a - uAlphaRef) < 0.001;\n"
-"        else if (uAlphaFunc == 6) discard_frag = color.a < uAlphaRef;\n"
-"        if (discard_frag) discard;\n"
-"    }\n"
-"    if (uFogEnabled != 0) {\n"
-"        color.rgb = mix(uFogColor, color.rgb, vFogFactor);\n"
-"    }\n"
-"    gl_FragColor = color;\n"
-"}\n";
+static char* LoadShaderSourceFromFile(const char* path)
+{
+    size_t shaderSize = 0;
+    char* shaderSource = (char*) SDL_LoadFile(path, &shaderSize);
+    if (!shaderSource)
+    {
+        printf("[ModernGL] Failed to load shader file '%s': %s\n", path, SDL_GetError());
+        return NULL;
+    }
+
+    if (shaderSize == 0)
+    {
+        printf("[ModernGL] Shader file '%s' is empty\n", path);
+        SDL_free(shaderSource);
+        return NULL;
+    }
+
+    return shaderSource;
+}
 
 /****************************/
 /*    HELPER FUNCTIONS      */
@@ -357,10 +242,23 @@ Boolean ModernGL_LoadShaders(void)
     // Clear any pending GL errors
     while (glGetError() != GL_NO_ERROR);
 
-    GLuint vertShader = CompileShader(GL_VERTEX_SHADER, gVertexShaderSource);
+    char* vertexShaderSource = LoadShaderSourceFromFile(kVertexShaderPath);
+    if (!vertexShaderSource)
+        return false;
+
+    GLuint vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource);
+    SDL_free(vertexShaderSource);
     if (!vertShader) return false;
 
-    GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, gFragmentShaderSource);
+    char* fragmentShaderSource = LoadShaderSourceFromFile(kFragmentShaderPath);
+    if (!fragmentShaderSource)
+    {
+        glDeleteShader(vertShader);
+        return false;
+    }
+
+    GLuint fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+    SDL_free(fragmentShaderSource);
     if (!fragShader)
     {
         glDeleteShader(vertShader);
