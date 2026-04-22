@@ -539,6 +539,7 @@
       },
 
       preRun: [function() {
+        syncCanvasSize();   // set canvas to CSS layout size before SDL creates the window
         // Suppress the DirCreate error for the config directory
         // The browser's virtual filesystem doesn't need this directory for the game to work
         try {

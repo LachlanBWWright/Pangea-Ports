@@ -537,6 +537,7 @@
 
       // Ensure config/save directories exist in the virtual filesystem
       preRun: [function () {
+        syncCanvasSize();   // set canvas to CSS layout size before SDL creates the window
         try {
           var dirs = ['/home', '/home/web_user', '/home/web_user/.config',
                       '/home/web_user/.config/Bugdom'];

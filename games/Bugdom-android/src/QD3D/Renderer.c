@@ -207,76 +207,20 @@ const RenderModifiers kDefaultRenderMods_Pillarbox =
 /*    SHADER SOURCE         */
 /****************************/
 
-static const char* kVertexShaderSource =
-"precision mediump float;\n"
-"precision mediump int;\n"
-"attribute vec3 a_Position;\n"
-"attribute vec3 a_Normal;\n"
-"attribute vec2 a_TexCoord;\n"
-"attribute vec4 a_Color;\n"
-"uniform mat4 u_Projection;\n"
-"uniform mat4 u_ModelView;\n"
-"uniform mat3 u_NormalMatrix;\n"
-"uniform int  u_LightingEnabled;\n"
-"uniform vec4 u_AmbientColor;\n"
-"uniform int  u_NumLights;\n"
-"uniform vec3 u_LightDir0;\n"
-"uniform vec4 u_LightColor0;\n"
-"uniform vec3 u_LightDir1;\n"
-"uniform vec4 u_LightColor1;\n"
-"uniform int  u_UseVertexColors;\n"
-"uniform vec4 u_DiffuseColor;\n"
-"uniform int  u_FogEnabled;\n"
-"uniform float u_FogStart;\n"
-"uniform float u_FogEnd;\n"
-"varying vec2 v_TexCoord;\n"
-"varying vec4 v_Color;\n"
-"varying float v_FogFactor;\n"
-"void main() {\n"
-"    vec4 eyePos = u_ModelView * vec4(a_Position, 1.0);\n"
-"    gl_Position = u_Projection * eyePos;\n"
-"    v_TexCoord = a_TexCoord;\n"
-"    vec4 baseColor = (u_UseVertexColors != 0) ? a_Color : u_DiffuseColor;\n"
-"    if (u_LightingEnabled != 0) {\n"
-"        vec3 eyeNormal = normalize(u_NormalMatrix * a_Normal);\n"
-"        vec3 lit = u_AmbientColor.rgb;\n"
-"        if (u_NumLights > 0) { lit += u_LightColor0.rgb * max(dot(eyeNormal, u_LightDir0), 0.0); }\n"
-"        if (u_NumLights > 1) { lit += u_LightColor1.rgb * max(dot(eyeNormal, u_LightDir1), 0.0); }\n"
-"        v_Color = vec4(baseColor.rgb * clamp(lit, 0.0, 1.0), baseColor.a);\n"
-"    } else {\n"
-"        v_Color = baseColor;\n"
-"    }\n"
-"    if (u_FogEnabled != 0) {\n"
-"        float d = length(eyePos.xyz);\n"
-"        v_FogFactor = clamp((u_FogEnd - d) / (u_FogEnd - u_FogStart), 0.0, 1.0);\n"
-"    } else {\n"
-"        v_FogFactor = 1.0;\n"
-"    }\n"
-"}\n";
+static const char* kVertexShaderPath   = "Data/System/Shaders/basic.vert";
+static const char* kFragmentShaderPath = "Data/System/Shaders/basic.frag";
 
-static const char* kFragmentShaderSource =
-"precision mediump float;\n"
-"precision mediump int;\n"
-"uniform sampler2D u_Texture0;\n"
-"uniform int u_TextureEnabled;\n"
-"uniform int u_AlphaTestEnabled;\n"
-"uniform float u_AlphaThreshold;\n"
-"uniform vec4 u_FogColor;\n"
-"uniform int u_FogEnabled;\n"
-"varying vec2 v_TexCoord;\n"
-"varying vec4 v_Color;\n"
-"varying float v_FogFactor;\n"
-"void main() {\n"
-"    vec4 color;\n"
-"    if (u_TextureEnabled != 0) {\n"
-"        color = v_Color * texture2D(u_Texture0, v_TexCoord);\n"
-"    } else {\n"
-"        color = v_Color;\n"
-"    }\n"
-"    if (u_AlphaTestEnabled != 0 && color.a < u_AlphaThreshold) discard;\n"
-"    if (u_FogEnabled != 0) { color.rgb = mix(u_FogColor.rgb, color.rgb, v_FogFactor); }\n"
-"    gl_FragColor = color;\n"
-"}\n";
+static char* LoadShaderSourceFromFile(const char* path)
+{
+size_t shaderSize = 0;
+char* shaderSource = (char*) SDL_LoadFile(path, &shaderSize);
+if (!shaderSource)
+{
+	SDL_Log("Renderer: Failed to load shader '%s': %s", path, SDL_GetError());
+	return NULL;
+}
+return shaderSource;
+}
 
 #pragma mark -
 
@@ -334,8 +278,15 @@ return shader;
 
 static void CreateShaderProgram(void)
 {
-GLuint vert = CompileShader(GL_VERTEX_SHADER,   kVertexShaderSource);
-GLuint frag = CompileShader(GL_FRAGMENT_SHADER, kFragmentShaderSource);
+char* vertSrc = LoadShaderSourceFromFile(kVertexShaderPath);
+char* fragSrc = LoadShaderSourceFromFile(kFragmentShaderPath);
+GAME_ASSERT_MESSAGE(vertSrc && fragSrc, "Failed to load shader files");
+
+GLuint vert = CompileShader(GL_VERTEX_SHADER,   vertSrc);
+GLuint frag = CompileShader(GL_FRAGMENT_SHADER, fragSrc);
+
+SDL_free(vertSrc);
+SDL_free(fragSrc);
 
 gState.shaderProgram = glCreateProgram();
 glAttachShader(gState.shaderProgram, vert);

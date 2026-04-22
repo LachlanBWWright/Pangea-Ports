@@ -1391,6 +1391,9 @@ void GameMain(void)
 
 	InitDefaultPrefs();
 	LoadPrefs();
+#ifdef __EMSCRIPTEN__
+	gGamePrefs.displayMode = kDisplayMode_Windowed;		// web build always starts windowed
+#endif
 	ApplyPrefs();
 	MakeGameWindow();	// now called by ApplyPrefs
 

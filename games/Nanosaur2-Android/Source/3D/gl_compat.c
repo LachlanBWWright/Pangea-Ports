@@ -304,128 +304,17 @@ static GLint u_tex_matrix;
 static GLint u_tex_matrix2;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
-static const char *VERT_SRC =
-    "precision mediump float;\nprecision mediump int;\n"
-    "attribute vec3 a_position;\n"
-    "attribute vec3 a_normal;\n"
-    "attribute vec4 a_color;\n"
-    "attribute vec2 a_texcoord0;\n"
-    "attribute vec2 a_texcoord1;\n"
-    "uniform mat4 u_mv;\n"
-    "uniform mat4 u_proj;\n"
-    "uniform mat3 u_normal_mat;\n"
-    "uniform mat4 u_tex_matrix;\n"
-    "uniform mat4 u_tex_matrix2;\n"
-    "uniform vec4 u_current_color;\n"
-    // Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
-    "uniform int  u_use_color_array;\n"
-    "uniform int  u_lighting;\n"
-    "uniform vec4 u_ambient;\n"
-    "uniform int  u_num_lights;\n"
-    "uniform vec4 u_light_pos[4];\n"
-    "uniform vec4 u_light_diff[4];\n"
-    "uniform vec4 u_light_amb[4];\n"
-    "uniform int  u_fog;\n"
-    "uniform int  u_texgen;\n"
-    "varying vec4 v_color;\n"
-    "varying vec2 v_tc0;\n"
-    "varying vec2 v_tc1;\n"
-    "varying float v_fog_depth;\n"
-    // Helper: compute contribution from one light
-    "vec3 light_contrib(int li, vec3 n, vec4 ep) {\n"
-    "  vec3 ld = (u_light_pos[li].w == 0.0)\n"
-    "           ? normalize(vec3(u_light_pos[li]))\n"
-    "           : normalize(vec3(u_light_pos[li]) - vec3(ep));\n"
-    "  float d = max(dot(n, ld), 0.0);\n"
-    "  return u_light_amb[li].rgb + d * u_light_diff[li].rgb;\n"
-    "}\n"
-    "void main() {\n"
-    "  vec4 eye_pos = u_mv * vec4(a_position, 1.0);\n"
-    "  gl_Position  = u_proj * eye_pos;\n"
-    "  vec4 vc = (u_use_color_array != 0) ? a_color : u_current_color;\n"
-    "  if (u_lighting != 0) {\n"
-    "    vec3 n = normalize(u_normal_mat * a_normal);\n"
-    "    vec4 color = u_ambient;\n"
-    // Unrolled 4-light loop — avoids break+non-constant-bound (invalid GLSL ES 1.0)
-    "    if (u_num_lights > 0) color.rgb += light_contrib(0, n, eye_pos);\n"
-    "    if (u_num_lights > 1) color.rgb += light_contrib(1, n, eye_pos);\n"
-    "    if (u_num_lights > 2) color.rgb += light_contrib(2, n, eye_pos);\n"
-    "    if (u_num_lights > 3) color.rgb += light_contrib(3, n, eye_pos);\n"
-    "    v_color = clamp(color, 0.0, 1.0) * vc;\n"
-    "  } else {\n"
-    "    v_color = vc;\n"
-    "  }\n"
-    // Sphere-map texcoords from eye-space normal
-    "  if (u_texgen != 0) {\n"
-    "    vec3 r = reflect(normalize(vec3(eye_pos)), normalize(u_normal_mat * a_normal));\n"
-    "    float m = 2.0 * sqrt(r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0));\n"
-    "    v_tc1 = vec2(r.x/m + 0.5, r.y/m + 0.5);\n"
-    "    v_tc0 = (u_tex_matrix * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
-    "  } else {\n"
-    "    v_tc0 = (u_tex_matrix  * vec4(a_texcoord0, 0.0, 1.0)).xy;\n"
-    "    v_tc1 = (u_tex_matrix2 * vec4(a_texcoord1, 0.0, 1.0)).xy;\n"
-    "  }\n"
-    "  v_fog_depth = (u_fog != 0) ? abs(eye_pos.z) : 0.0;\n"
-    "}\n";
+static const char *kVertShaderPath = "Data/System/Shaders/basic.vert";
+static const char *kFragShaderPath = "Data/System/Shaders/basic.frag";
 
-static const char *FRAG_SRC =
-    "precision mediump float;\nprecision mediump int;\n"
-    "varying vec4  v_color;\n"
-    "varying vec2  v_tc0;\n"
-    "varying vec2  v_tc1;\n"
-    "varying float v_fog_depth;\n"
-    // Use int instead of bool for the same GLSL ES 1.0 compatibility reason
-    "uniform int       u_texture0;\n"
-    "uniform int       u_texture1;\n"
-    "uniform sampler2D u_sampler0;\n"
-    "uniform sampler2D u_sampler1;\n"
-    "uniform int       u_texenv0;\n"   // 0=MODULATE 1=ADD 2=REPLACE 3=COMBINE_ADD
-    "uniform int       u_texenv1;\n"
-    "uniform int       u_fog;\n"
-    "uniform int       u_fog_mode;\n"  // 0=LINEAR 1=EXP 2=EXP2
-    "uniform float     u_fog_start;\n"
-    "uniform float     u_fog_end;\n"
-    "uniform float     u_fog_density;\n"
-    "uniform vec4      u_fog_color;\n"
-    "uniform int       u_alpha_test;\n"
-    "uniform int       u_alpha_func;\n" // 0=NEVER 1=LESS 2=EQUAL 3=LEQUAL 4=GREATER 5=NOTEQUAL 6=GEQUAL 7=ALWAYS
-    "uniform float     u_alpha_ref;\n"
-    "void main() {\n"
-    "  vec4 color = v_color;\n"
-    "  if (u_texture0 != 0) {\n"
-    "    vec4 tex = texture2D(u_sampler0, v_tc0);\n"
-    "    if      (u_texenv0 == 0) color *= tex;\n"          // MODULATE
-    "    else if (u_texenv0 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"  // ADD
-    "    else if (u_texenv0 == 2) color = tex;\n"           // REPLACE
-    "    else if (u_texenv0 == 3) { color.rgb = min(color.rgb+tex.rgb,1.0); }\n"  // COMBINE_ADD
-    "  }\n"
-    "  if (u_texture1 != 0) {\n"
-    "    vec4 tex = texture2D(u_sampler1, v_tc1);\n"
-    "    if      (u_texenv1 == 0) color *= tex;\n"
-    "    else if (u_texenv1 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"
-    "    else if (u_texenv1 == 2) color = tex;\n"
-    "    else if (u_texenv1 == 3) { color.rgb = min(color.rgb+tex.rgb,1.0); }\n"
-    "  }\n"
-    "  if (u_alpha_test != 0) {\n"
-    "    float a = color.a;\n"
-    "    if      (u_alpha_func == 0) discard;\n"            // NEVER
-    "    else if (u_alpha_func == 1 && a >= u_alpha_ref) discard;\n"  // LESS
-    "    else if (u_alpha_func == 2 && a != u_alpha_ref) discard;\n"  // EQUAL
-    "    else if (u_alpha_func == 3 && a >  u_alpha_ref) discard;\n"  // LEQUAL
-    "    else if (u_alpha_func == 4 && a <= u_alpha_ref) discard;\n"  // GREATER
-    "    else if (u_alpha_func == 5 && a == u_alpha_ref) discard;\n"  // NOTEQUAL
-    "    else if (u_alpha_func == 6 && a <  u_alpha_ref) discard;\n"  // GEQUAL
-    "  }\n"
-    "  if (u_fog != 0) {\n"
-    "    float ff;\n"
-    "    if      (u_fog_mode == 0) ff = (u_fog_end - v_fog_depth) / (u_fog_end - u_fog_start);\n"
-    "    else if (u_fog_mode == 1) ff = exp(-u_fog_density * v_fog_depth);\n"
-    "    else { float d = u_fog_density * v_fog_depth; ff = exp(-d*d); }\n"
-    "    ff = clamp(ff, 0.0, 1.0);\n"
-    "    color.rgb = mix(u_fog_color.rgb, color.rgb, ff);\n"
-    "  }\n"
-    "  gl_FragColor = color;\n"
-    "}\n";
+static char *load_shader_from_file(const char *path)
+{
+    size_t sz = 0;
+    char *src = (char *) SDL_LoadFile(path, &sz);
+    if (!src)
+        SDL_Log("gl_compat: Failed to load shader '%s': %s", path, SDL_GetError());
+    return src;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 static GLuint compile_shader(GLenum type, const char *src) {
@@ -764,8 +653,13 @@ void COMPAT_GL_Init(void) {
     s_bound_texture[1] = 0;
 
     // Compile shader
-    GLuint vs = compile_shader(GL_VERTEX_SHADER,   VERT_SRC);
-    GLuint fs = compile_shader(GL_FRAGMENT_SHADER, FRAG_SRC);
+    char *vertSrc = load_shader_from_file(kVertShaderPath);
+    char *fragSrc = load_shader_from_file(kFragShaderPath);
+    if (!vertSrc || !fragSrc) { SDL_Log("gl_compat: missing shader files"); abort(); }
+    GLuint vs = compile_shader(GL_VERTEX_SHADER,   vertSrc);
+    GLuint fs = compile_shader(GL_FRAGMENT_SHADER, fragSrc);
+    SDL_free(vertSrc);
+    SDL_free(fragSrc);
     s_prog = glCreateProgram();
     glAttachShader(s_prog, vs);
     glAttachShader(s_prog, fs);
