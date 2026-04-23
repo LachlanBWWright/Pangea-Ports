@@ -427,6 +427,7 @@
     },
 
     preRun: [function() {
+      syncCanvasSize();   // set canvas to CSS layout size before SDL creates the window
       // Create config directory for persistent settings
       try { FS.mkdir('/home'); } catch(e) {}
       try { FS.mkdir('/home/web_user'); } catch(e) {}

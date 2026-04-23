@@ -281,6 +281,10 @@
     var Module = {
       canvas: document.getElementById('canvas'),
 
+      preRun: [function() {
+        syncCanvasSize();   // set canvas to CSS layout size before SDL creates the window
+      }],
+
       print:    function(t) { console.log('[CroMag]', t); },
       printErr: function(t) { console.warn('[CroMag stderr]', t); },
 

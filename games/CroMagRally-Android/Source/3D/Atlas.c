@@ -704,6 +704,13 @@ void TextMesh_Update(const char* text, int flags, ObjNode* textNode)
 
 	// Lay out triangles
 	PrepVertices(font, text, flags, &metrics, mesh->points, mesh->uvs);
+
+	// Points and UVs were modified above; evict any stale draw-cache entries
+	// so the next MO_DrawObject uploads the fresh CPU data to the GPU.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	CompatGL_InvalidateCachePtr(mesh->points);
+	CompatGL_InvalidateCachePtr(mesh->uvs);
+#endif
 }
 
 /***************************************************************/

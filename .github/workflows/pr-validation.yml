@@ -166,9 +166,9 @@ jobs:
           arch: x86_64
           profile: pixel_6
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -memory 4096
           script: |
-            adb install -r "${{ steps.find-apk.outputs.apk_path }}"
+            adb install -r "${{ steps.find-apk.outputs.apk_path }}" || (sleep 10 && adb install -r "${{ steps.find-apk.outputs.apk_path }}") || (sleep 10 && adb install -r "${{ steps.find-apk.outputs.apk_path }}")
             adb logcat -c
             adb shell monkey -p "$(python3 -c "import scripts.ports as p; print(p.PORTS_BY_NAME['${{ matrix.name }}']['android_package'])")" -c android.intent.category.LAUNCHER 1
             sleep 20

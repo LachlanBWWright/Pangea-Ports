@@ -419,6 +419,14 @@
       canvas: canvas,
       noInitialRun: true,
 
+      preRun: [function() {
+        syncCanvasSize();   // set canvas to CSS layout size before SDL creates the window
+        try { FS.mkdir('/home'); } catch (e) { /* exists */ }
+        try { FS.mkdir('/home/web_user'); } catch (e) { /* exists */ }
+        try { FS.mkdir('/home/web_user/.config'); } catch (e) { /* exists */ }
+        try { FS.mkdir('/home/web_user/.config/Bugdom2'); } catch (e) { /* exists */ }
+      }],
+
       print:    function(text) { console.log('[Bugdom2]', text); },
       printErr: function(text) { console.error('[Bugdom2]', text); },
 

@@ -283,6 +283,14 @@
     var Module = {
       canvas: document.getElementById('canvas'),
 
+      preRun: [function() {
+        syncCanvasSize();   // set canvas to CSS layout size before SDL creates the window
+        try { FS.mkdir('/home'); } catch (e) { /* exists */ }
+        try { FS.mkdir('/home/web_user'); } catch (e) { /* exists */ }
+        try { FS.mkdir('/home/web_user/.config'); } catch (e) { /* exists */ }
+        try { FS.mkdir('/home/web_user/.config/Nanosaur2'); } catch (e) { /* exists */ }
+      }],
+
       // Emscripten calls setStatus during load to report download progress
       setStatus: function(text) {
         var lbl  = document.getElementById('status-text');

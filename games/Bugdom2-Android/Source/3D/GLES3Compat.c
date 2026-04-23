@@ -9,6 +9,7 @@
 // being caught by the macros we define in gles3compat.h.
 #include <GLES3/gl3.h>
 
+#include <SDL3/SDL.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -78,97 +79,20 @@
 // GLSL ES 3.00 shaders
 //=============================================================
 
-static const char* kVertSrc =
-"#version 300 es\n"
-"uniform mat4 u_proj;\n"
-"uniform mat4 u_mv;\n"
-"uniform mat4 u_texMatrix;\n"
-"uniform bool u_lighting;\n"
-"uniform vec4 u_ambient;\n"
-"uniform int  u_nLights;\n"
-"uniform vec3 u_lightDir[4];\n"
-"uniform vec4 u_lightDiff[4];\n"
-"uniform bool u_fog;\n"
-"uniform int  u_fogMode;\n"
-"uniform float u_fogDensity;\n"
-"uniform float u_fogStart;\n"
-"uniform float u_fogEnd;\n"
-"layout(location=0) in vec3 a_pos;\n"
-"layout(location=1) in vec3 a_norm;\n"
-"layout(location=2) in vec4 a_color;\n"
-"layout(location=3) in vec2 a_uv;\n"
-"out vec4 v_color;\n"
-"out vec2 v_uv;\n"
-"out float v_fog;\n"
-"void main(){\n"
-"  vec4 ep = u_mv * vec4(a_pos,1.0);\n"
-"  gl_Position = u_proj * ep;\n"
-"  vec4 base = a_color;\n"
-"  if(u_lighting){\n"
-"    vec3 n = normalize(mat3(u_mv) * a_norm);\n"
-"    vec4 lit = u_ambient * base;\n"
-"    for(int i=0;i<4;i++){\n"
-"      if(i<u_nLights){\n"
-"        float d=max(dot(n,normalize(u_lightDir[i])),0.0);\n"
-"        lit+=vec4(d*u_lightDiff[i].rgb*base.rgb,0.0);\n"
-"      }\n"
-"    }\n"
-"    v_color=vec4(clamp(lit.rgb,0.0,1.0),base.a);\n"
-"  } else {\n"
-"    v_color=base;\n"
-"  }\n"
-"  v_uv=(u_texMatrix*vec4(a_uv,0.0,1.0)).xy;\n"
-"  if(u_fog){\n"
-"    float dist=abs(ep.z);\n"
-"    if(u_fogMode==1){\n"   // GL_LINEAR
-"      v_fog=clamp((u_fogEnd-dist)/max(u_fogEnd-u_fogStart,0.0001),0.0,1.0);\n"
-"    } else if(u_fogMode==2){\n"  // GL_EXP
-"      v_fog=exp(-u_fogDensity*dist);\n"
-"    } else {\n"            // GL_EXP2
-"      float fd=u_fogDensity*dist;\n"
-"      v_fog=exp(-fd*fd);\n"
-"    }\n"
-"  } else {\n"
-"    v_fog=1.0;\n"
-"  }\n"
-"}\n";
+static const char* kVertShaderPath = "Data/System/Shaders/basic.vert";
+static const char* kFragShaderPath = "Data/System/Shaders/basic.frag";
 
-static const char* kFragSrc =
-"#version 300 es\n"
-"precision mediump float;\n"
-"uniform sampler2D u_tex;\n"
-"uniform bool u_useTex;\n"
-"uniform vec4 u_fogColor;\n"
-"uniform bool u_alphaTest;\n"
-"uniform int u_alphaFunc;\n"
-"uniform float u_alphaRef;\n"
-"in vec4 v_color;\n"
-"in vec2 v_uv;\n"
-"in float v_fog;\n"
-"out vec4 fragColor;\n"
-"void main(){\n"
-"  vec4 c;\n"
-"  if(u_useTex){\n"
-"    c=v_color*texture(u_tex,v_uv);\n"
-"  } else {\n"
-"    c=v_color;\n"
-"  }\n"
-"  if(u_alphaTest){\n"
-"    float a = c.a;\n"
-"    if      (u_alphaFunc == 0) discard; // NEVER\n"
-"    else if (u_alphaFunc == 1 && a >= u_alphaRef) discard; // LESS\n"
-"    else if (u_alphaFunc == 2 && a != u_alphaRef) discard; // EQUAL\n"
-"    else if (u_alphaFunc == 3 && a >  u_alphaRef) discard; // LEQUAL\n"
-"    else if (u_alphaFunc == 4 && a <= u_alphaRef) discard; // GREATER\n"
-"    else if (u_alphaFunc == 5 && a == u_alphaRef) discard; // NOTEQUAL\n"
-"    else if (u_alphaFunc == 6 && a <  u_alphaRef) discard; // GEQUAL\n"
-"    else if (u_alphaFunc == 7) {} // ALWAYS\n"
-"  } else {\n"
-"    if(c.a==0.0) discard;\n"
-"  }\n"
-"  c.rgb=mix(u_fogColor.rgb,c.rgb,v_fog);\n"
-"  fragColor=c;\n"
-"}\n";
+static char* LoadShaderSourceFromFile(const char* path)
+{
+    size_t shaderSize = 0;
+    char* shaderSource = (char*) SDL_LoadFile(path, &shaderSize);
+    if (!shaderSource)
+    {
+        fprintf(stderr, "GLES3Compat: Failed to load shader '%s': %s\n", path, SDL_GetError());
+        return NULL;
+    }
+    return shaderSource;
+}
 
 //=============================================================
 // GL objects
@@ -446,8 +370,15 @@ void GLES3_SetVertexCount(GLsizei n)
 void GLES3Compat_Init(void)
 {
     // Compile shaders
-    GLuint vs = CompileShader(GL_VERTEX_SHADER,   kVertSrc);
-    GLuint fs = CompileShader(GL_FRAGMENT_SHADER, kFragSrc);
+    char* vertSrc = LoadShaderSourceFromFile(kVertShaderPath);
+    char* fragSrc = LoadShaderSourceFromFile(kFragShaderPath);
+    if (!vertSrc || !fragSrc) { fprintf(stderr, "GLES3Compat: shader file missing\n"); abort(); }
+
+    GLuint vs = CompileShader(GL_VERTEX_SHADER,   vertSrc);
+    GLuint fs = CompileShader(GL_FRAGMENT_SHADER, fragSrc);
+
+    SDL_free(vertSrc);
+    SDL_free(fragSrc);
 
     gProgram = glCreateProgram();
     glAttachShader(gProgram, vs);
@@ -852,7 +783,10 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
 
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
+        // Orphan the buffer first (NULL data), then upload indices via SubData.
+        // This avoids stalling the pipeline if the GPU is still reading the old data.
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, NULL, GL_STATIC_DRAW);
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)indexSize, indices);
 
         // Store cache entry
         e->vert_ptr    = vertPtr;
