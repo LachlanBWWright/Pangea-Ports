@@ -168,7 +168,19 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -memory 4096
           script: |
-            adb install -r "${{ steps.find-apk.outputs.apk_path }}"
+            installed=0
+            for attempt in 1 2 3; do
+              if adb install -r "${{ steps.find-apk.outputs.apk_path }}"; then
+                installed=1
+                break
+              fi
+              echo "adb install attempt $attempt failed, retrying in 10s..."
+              sleep 10
+            done
+            if [ "$installed" -eq 0 ]; then
+              echo "All adb install attempts failed"
+              exit 1
+            fi
             adb logcat -c
             adb shell monkey -p "$(python3 -c "import scripts.ports as p; print(p.PORTS_BY_NAME['${{ matrix.name }}']['android_package'])")" -c android.intent.category.LAUNCHER 1
             sleep 20
