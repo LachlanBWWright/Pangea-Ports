@@ -783,6 +783,8 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
 
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
+        // Orphan the buffer first (NULL data), then upload indices via SubData.
+        // This avoids stalling the pipeline if the GPU is still reading the old data.
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, NULL, GL_STATIC_DRAW);
         glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)indexSize, indices);
 

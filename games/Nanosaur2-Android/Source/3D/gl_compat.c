@@ -860,6 +860,7 @@ void glEnable(GLenum cap) {
             // Use s_active_texcoord_unit as proxy for the server-side active texture
             // unit.  OGL_ActiveTextureUnit() always calls both glActiveTexture and
             // glClientActiveTexture together, so these stay in sync.
+            // 'tu' aliases s_active_texcoord_unit so the array index is a simple name.
             {
                 int tu = s_active_texcoord_unit;
                 s_texture_2d_enabled[tu] = 1;
@@ -888,6 +889,7 @@ void glDisable(GLenum cap) {
         case GL_COLOR_MATERIAL: break;
         case GL_DEPTH_TEST:  s_depth_test_enabled = 0; REAL_glDisable(cap); break;
         case GL_TEXTURE_2D:
+            // 'tu' aliases s_active_texcoord_unit so the array index is a simple name.
             {
                 int tu = s_active_texcoord_unit;
                 s_texture_2d_enabled[tu] = 0;
@@ -1401,6 +1403,7 @@ GLboolean glIsEnabled(GLenum cap) {
         case GL_DEPTH_TEST:     return s_depth_test_enabled ? GL_TRUE : GL_FALSE;
         case GL_TEXTURE_2D:
             // Use s_active_texcoord_unit as proxy — no GL state query needed.
+            // 'tu' aliases s_active_texcoord_unit so the array index is a simple name.
             {
                 int tu = s_active_texcoord_unit;
                 return s_texture_2d_enabled[tu] ? GL_TRUE : GL_FALSE;
