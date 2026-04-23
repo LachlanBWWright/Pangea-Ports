@@ -9,6 +9,7 @@
 // being caught by the macros we define in gles3compat.h.
 #include <GLES3/gl3.h>
 
+#include <SDL3/SDL.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -782,7 +783,8 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
 
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, NULL, GL_STATIC_DRAW);
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)indexSize, indices);
 
         // Store cache entry
         e->vert_ptr    = vertPtr;

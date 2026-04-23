@@ -824,6 +824,12 @@ uint32_t				matFlags;
 	if (wantBlend)		// if has translucent alpha, then we need blending on
 	{
 	    glEnable(GL_BLEND);
+	    // Alpha-masked textures still need depth writes
+	    if ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))
+	    {
+	        if (!clipAlpha)
+	            glDepthMask(GL_FALSE);
+	    }
 	}
 	else
 	    glDisable(GL_BLEND);

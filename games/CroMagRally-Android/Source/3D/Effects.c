@@ -709,8 +709,10 @@ OGLBoundingBox	bbox;
 					/* DRAW IT */
 
 				glBlendFunc(gParticleGroups[g]->srcBlend, gParticleGroups[g]->dstBlend);		// set blending mode
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 				CompatGL_InvalidateCachePtr(geoData->points);									// points modified this frame
 				CompatGL_InvalidateCachePtr(geoData->colorsByte);								// colors modified this frame
+#endif
 				MO_DrawObject(gParticleGroups[g]->geometryObj);									// draw geometry
 			}
 		}
