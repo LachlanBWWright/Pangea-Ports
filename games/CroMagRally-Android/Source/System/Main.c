@@ -937,6 +937,7 @@ static void PlayArea(void)
 		if (gIsNetworkClient)
 		{
 			ClientReceive_ControlInfoFromHost();			// read all player's control info back from the Host once he's gathered it all
+			ClientApplyPendingSnapshot();					// apply latest authoritative state from host before simulating
 		}
 
 				/* HOST OR NON-NET */
@@ -960,6 +961,9 @@ static void PlayArea(void)
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything();
+
+		if (gIsNetworkHost)
+			HostSend_SnapshotToClients();				// broadcast authoritative car state to all clients
 
 				/* DO GAME MODE SPECIFICS */
 

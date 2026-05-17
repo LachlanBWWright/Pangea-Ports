@@ -15,6 +15,7 @@ typedef void* NSpPlayerLeftMessage;
 #include "game.h"
 #include "network.h"
 #include "window.h"
+#include "pangea_net.h"
 
 /**********************/
 /*     PROTOTYPES     */
@@ -77,6 +78,202 @@ int				gTimeoutCounter;
 Boolean		gHostNetworkGame = false;
 Boolean		gJoinNetworkGame = false;
 
+#ifdef __EMSCRIPTEN__
+enum
+{
+	kPangeaNetHostControlPacket = 1001,
+	kPangeaNetClientControlPacket = 1002,
+	kPangeaNetVehicleTypePacket = 1003,
+	kPangeaNetHostSnapshotPacket = 1004
+};
+
+typedef struct
+{
+	uint32_t packetType;
+	NetHostControlInfoMessageType payload;
+} PangeaNetHostControlPacket;
+
+typedef struct
+{
+	uint32_t packetType;
+	NetClientControlInfoMessageType payload;
+} PangeaNetClientControlPacket;
+
+typedef struct
+{
+	uint32_t packetType;
+	NetPlayerCharTypeMessage payload;
+} PangeaNetVehicleTypePacket;
+
+static short gPendingVehicleType[MAX_PLAYERS];
+static short gPendingVehicleSex[MAX_PLAYERS];
+static Boolean gHavePendingVehicleType[MAX_PLAYERS];
+static uint32_t gExpectedMatchSeed = 1;
+
+static PangeaNetHostSnapshotPacket gPendingSnapshot;
+static Boolean gHavePendingSnapshot = false;
+
+static void HandlePangeaNetMessage(const void* bytes, int byteCount)
+{
+	if (!bytes || byteCount < (int)sizeof(uint32_t))
+	{
+		return;
+	}
+
+	const uint32_t packetType = *(const uint32_t*)bytes;
+
+	if (packetType == kPangeaNetHostControlPacket)
+	{
+		if (byteCount != (int)sizeof(PangeaNetHostControlPacket))
+		{
+			SDL_Log(
+				"CroMag net: invalid host packet size expected=%d got=%d",
+				(int)sizeof(PangeaNetHostControlPacket),
+				byteCount);
+			return;
+		}
+
+		const PangeaNetHostControlPacket* packet = (const PangeaNetHostControlPacket*)bytes;
+		const NetHostControlInfoMessageType* mess = &packet->payload;
+		short i;
+
+		if (mess->frameCounter < gHostSendCounter)
+		{
+			return;
+		}
+
+		if (mess->frameCounter > gHostSendCounter)
+		{
+			SDL_Log(
+				"CroMag net: host frame jump expected=%u got=%u",
+				(unsigned)gHostSendCounter,
+				(unsigned)mess->frameCounter);
+		}
+
+		gHostSendCounter = mess->frameCounter + 1;
+		gFramesPerSecond = mess->fps;
+		gFramesPerSecondFrac = mess->fpsFrac;
+
+		gExpectedMatchSeed = mess->randomSeed;
+		SetMyRandomSeed((unsigned long)mess->randomSeed);
+
+		for (i = 0; i < MAX_PLAYERS; i++)
+		{
+			gPlayerInfo[i].controlBits = mess->controlBits[i];
+			gPlayerInfo[i].controlBits_New = mess->controlBitsNew[i];
+			gPlayerInfo[i].analogSteering = mess->analogSteering[i];
+		}
+		return;
+	}
+
+	if (packetType == kPangeaNetClientControlPacket)
+	{
+		if (byteCount != (int)sizeof(PangeaNetClientControlPacket))
+		{
+			SDL_Log(
+				"CroMag net: invalid client packet size expected=%d got=%d",
+				(int)sizeof(PangeaNetClientControlPacket),
+				byteCount);
+			return;
+		}
+
+		const PangeaNetClientControlPacket* packet = (const PangeaNetClientControlPacket*)bytes;
+		const NetClientControlInfoMessageType* mess = &packet->payload;
+		const short playerNum = mess->playerNum;
+
+		if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+		{
+			return;
+		}
+
+		if (mess->frameCounter < gClientSendCounter[playerNum])
+		{
+			return;
+		}
+
+		if (mess->frameCounter > gClientSendCounter[playerNum])
+		{
+			SDL_Log(
+				"CroMag net: client frame jump player=%d expected=%u got=%u",
+				(int)playerNum,
+				(unsigned)gClientSendCounter[playerNum],
+				(unsigned)mess->frameCounter);
+		}
+
+		gClientSendCounter[playerNum] = mess->frameCounter + 1;
+		gPlayerInfo[playerNum].controlBits = mess->controlBits;
+		gPlayerInfo[playerNum].controlBits_New = mess->controlBitsNew;
+		gPlayerInfo[playerNum].analogSteering = mess->analogSteering;
+		return;
+	}
+
+	if (packetType == kPangeaNetVehicleTypePacket)
+	{
+		if (byteCount != (int)sizeof(PangeaNetVehicleTypePacket))
+		{
+			SDL_Log(
+				"CroMag net: invalid vehicle packet size expected=%d got=%d",
+				(int)sizeof(PangeaNetVehicleTypePacket),
+				byteCount);
+			return;
+		}
+
+		const PangeaNetVehicleTypePacket* packet = (const PangeaNetVehicleTypePacket*)bytes;
+		const short playerNum = packet->payload.playerNum;
+		if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+		{
+			return;
+		}
+
+		gPendingVehicleType[playerNum] = packet->payload.vehicleType;
+		gPendingVehicleSex[playerNum] = packet->payload.sex;
+		gHavePendingVehicleType[playerNum] = true;
+		return;
+	}
+
+	if (packetType == kPangeaNetHostSnapshotPacket)
+	{
+		if (byteCount != (int)sizeof(PangeaNetHostSnapshotPacket))
+		{
+			SDL_Log(
+				"CroMag net: invalid snapshot packet size expected=%d got=%d",
+				(int)sizeof(PangeaNetHostSnapshotPacket),
+				byteCount);
+			return;
+		}
+
+		const PangeaNetHostSnapshotPacket* packet = (const PangeaNetHostSnapshotPacket*)bytes;
+		if (packet->snapshotSeq < gHostSendCounter)
+		{
+			return;
+		}
+
+		gPendingSnapshot = *packet;
+		gHavePendingSnapshot = true;
+		return;
+	}
+
+	SDL_Log("CroMag net: unknown packetType=%u size=%d", (unsigned)packetType, byteCount);
+}
+
+static void PumpPangeaNetMessages(void)
+{
+	uint8_t buffer[4096];
+	int byteCount;
+
+	for (;;)
+	{
+		byteCount = PangeaNetBridge_PollMessage(buffer, (int)sizeof(buffer));
+		if (byteCount <= 0)
+		{
+			break;
+		}
+
+		HandlePangeaNetMessage(buffer, byteCount);
+	}
+}
+#endif
+
 
 /******************* INIT NETWORK MANAGER *********************/
 //
@@ -85,7 +282,11 @@ Boolean		gJoinNetworkGame = false;
 
 void InitNetworkManager(void)
 {
+#ifdef __EMSCRIPTEN__
+	gNetSprocketInitialized = true;
+#else
 	IMPLEMENT_ME_SOFT();
+#endif
 #if 0
 OSStatus    iErr;
 
@@ -160,6 +361,28 @@ OSErr	iErr;
 
 Boolean SetupNetworkHosting(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled())
+	{
+		short i;
+		gNetGameInProgress = true;
+		gIsNetworkHost = PangeaNetBridge_IsHost() != 0;
+		gIsNetworkClient = !gIsNetworkHost;
+		gMyNetworkPlayerNum = (short)PangeaNetBridge_GetLocalPlayerIndex();
+		gNumRealPlayers = (short)PangeaNetBridge_GetPlayerCount();
+		gExpectedMatchSeed = PangeaNetBridge_GetMatchSeed();
+		SetMyRandomSeed((unsigned long)gExpectedMatchSeed);
+		gHostSendCounter = 0;
+		gTimeoutCounter = 0;
+		for (i = 0; i < MAX_PLAYERS; i++)
+		{
+			gClientSendCounter[i] = 0;
+			gHavePendingVehicleType[i] = false;
+		}
+		return false;
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 	return true;
 #if 0
@@ -272,6 +495,13 @@ failure:
 
 Boolean SetupNetworkJoin(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled())
+	{
+		return SetupNetworkHosting();
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 	return true;
 #if 0
@@ -884,7 +1114,8 @@ static void HandleGameConfigMessage(NetConfigMessageType *inMessage)
 
 void HostWaitForPlayersToPrepareLevel(void)
 {
-	IMPLEMENT_ME_SOFT();
+	// Level sync is coordinated by the TypeScript layer before the C game starts.
+	(void)0;
 #if 0
 OSStatus				status;
 NetSyncMessageType		outMess;
@@ -957,7 +1188,8 @@ int						startTick = TickCount();
 
 void ClientTellHostLevelIsPrepared(void)
 {
-	IMPLEMENT_ME_SOFT();
+	// Level sync is coordinated by the TypeScript layer before the C game starts.
+	(void)0;
 #if 0
 OSStatus				status;
 NetSyncMessageType		outMess;
@@ -1022,6 +1254,30 @@ NSpMessageHeader 		*inMess;
 
 void HostSend_ControlInfoToClients(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled() && gIsNetworkHost)
+	{
+		PangeaNetHostControlPacket packet;
+		short i;
+		packet.packetType = kPangeaNetHostControlPacket;
+		packet.payload.frameCounter = gHostSendCounter++;
+		packet.payload.fps = gFramesPerSecond;
+		packet.payload.fpsFrac = gFramesPerSecondFrac;
+		packet.payload.randomSeed = (uint32_t)MyRandomLong();
+		gExpectedMatchSeed = packet.payload.randomSeed;
+
+		for (i = 0; i < MAX_PLAYERS; i++)
+		{
+			packet.payload.controlBits[i] = gPlayerInfo[i].controlBits;
+			packet.payload.controlBitsNew[i] = gPlayerInfo[i].controlBits_New;
+			packet.payload.analogSteering[i] = gPlayerInfo[i].analogSteering;
+		}
+
+		PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+		return;
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 #if 0
 
@@ -1066,6 +1322,14 @@ short							i;
 
 void ClientReceive_ControlInfoFromHost(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled() && gIsNetworkClient)
+	{
+		PumpPangeaNetMessages();
+		return;
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 #if 0
 
@@ -1155,6 +1419,21 @@ Boolean								gotIt = false;
 
 void ClientSend_ControlInfoToHost(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled() && gIsNetworkClient)
+	{
+		PangeaNetClientControlPacket packet;
+		packet.packetType = kPangeaNetClientControlPacket;
+		packet.payload.frameCounter = gClientSendCounter[gMyNetworkPlayerNum]++;
+		packet.payload.playerNum = gMyNetworkPlayerNum;
+		packet.payload.controlBits = gPlayerInfo[gMyNetworkPlayerNum].controlBits;
+		packet.payload.controlBitsNew = gPlayerInfo[gMyNetworkPlayerNum].controlBits_New;
+		packet.payload.analogSteering = gPlayerInfo[gMyNetworkPlayerNum].analogSteering;
+		PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+		return;
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 #if 0
 OSStatus						status;
@@ -1188,6 +1467,14 @@ OSStatus						status;
 
 void HostReceive_ControlInfoFromClients(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled() && gIsNetworkHost)
+	{
+		PumpPangeaNetMessages();
+		return;
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 #if 0
 NetClientControlInfoMessageType		*mess;
@@ -1264,6 +1551,23 @@ short								n,i;
 
 void PlayerBroadcastVehicleType(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled())
+	{
+		PangeaNetVehicleTypePacket packet;
+		packet.packetType = kPangeaNetVehicleTypePacket;
+		packet.payload.playerNum = gMyNetworkPlayerNum;
+		packet.payload.vehicleType = gPlayerInfo[gMyNetworkPlayerNum].vehicleType;
+		packet.payload.sex = gPlayerInfo[gMyNetworkPlayerNum].sex;
+		PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+
+		gPendingVehicleType[gMyNetworkPlayerNum] = packet.payload.vehicleType;
+		gPendingVehicleSex[gMyNetworkPlayerNum] = packet.payload.sex;
+		gHavePendingVehicleType[gMyNetworkPlayerNum] = true;
+		return;
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 #if 0
 OSStatus					status;
@@ -1294,6 +1598,41 @@ NetPlayerCharTypeMessage	outMess;
 
 void GetVehicleSelectionFromNetPlayers(void)
 {
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled())
+	{
+		uint32_t timeoutTick = TickCount() + (DATA_TIMEOUT * 60 * 6);
+		short i;
+
+		for (;;)
+		{
+			short count = 0;
+			PumpPangeaNetMessages();
+
+			for (i = 0; i < gNumRealPlayers; i++)
+			{
+				if (gHavePendingVehicleType[i])
+				{
+					gPlayerInfo[i].vehicleType = gPendingVehicleType[i];
+					gPlayerInfo[i].sex = gPendingVehicleSex[i];
+					count++;
+				}
+			}
+
+			if (count >= gNumRealPlayers)
+			{
+				break;
+			}
+
+			if (TickCount() > timeoutTick)
+			{
+				break;
+			}
+		}
+		return;
+	}
+#endif
+
 	IMPLEMENT_ME_SOFT();
 #if 0
 short	playerNum, charType, count, sex;
@@ -1503,7 +1842,8 @@ matched_id:
 
 void PlayerBroadcastNullPacket(void)
 {
-	IMPLEMENT_ME_SOFT();
+	// No-op in web builds: null packets are not needed with PangeaNet.
+	(void)0;
 #if 0
 OSStatus					status;
 NSpMessageHeader			outMess;
@@ -1526,3 +1866,111 @@ NSpMessageHeader			outMess;
 #endif
 }
 
+
+#pragma mark -
+
+
+/********************* HOST SEND SNAPSHOT TO CLIENTS *******************************/
+//
+// Called by the host after MoveEverything() to broadcast authoritative car state to clients.
+//
+
+void HostSend_SnapshotToClients(void)
+{
+#ifdef __EMSCRIPTEN__
+	if (!PangeaNetBridge_IsEnabled() || !gIsNetworkHost)
+	{
+		return;
+	}
+
+	PangeaNetHostSnapshotPacket packet;
+	short i;
+	packet.packetType = kPangeaNetHostSnapshotPacket;
+	packet.snapshotSeq = gHostSendCounter;
+	packet.frameCounter = gHostSendCounter;
+	packet.playerCount = (uint8_t)gNumRealPlayers;
+	packet.pad[0] = 0;
+	packet.pad[1] = 0;
+	packet.pad[2] = 0;
+
+	for (i = 0; i < MAX_PLAYERS; i++)
+	{
+		PangeaNetPlayerCarState* s = &packet.players[i];
+		s->coord = gPlayerInfo[i].coord;
+		s->rotY = gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Rot.y : 0.0f;
+		s->delta = gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Delta : (OGLVector3D){0, 0, 0};
+		s->steering = gPlayerInfo[i].steering;
+		s->currentThrust = gPlayerInfo[i].currentThrust;
+		s->controlBits = gPlayerInfo[i].controlBits;
+		s->controlBitsNew = gPlayerInfo[i].controlBits_New;
+		s->analogSteering = gPlayerInfo[i].analogSteering;
+		s->lapNum = gPlayerInfo[i].lapNum;
+		s->checkpointNum = gPlayerInfo[i].checkpointNum;
+		s->place = gPlayerInfo[i].place;
+		s->raceComplete = gPlayerInfo[i].raceComplete ? 1 : 0;
+		s->pad = 0;
+		s->powType = gPlayerInfo[i].powType;
+		s->powQuantity = gPlayerInfo[i].powQuantity;
+		s->health = gPlayerInfo[i].health;
+	}
+
+	PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+#endif
+}
+
+
+/********************* CLIENT APPLY PENDING SNAPSHOT *******************************/
+//
+// Called by clients before MoveEverything() to apply the latest host snapshot to
+// remote cars (own car is not overridden).
+//
+
+void ClientApplyPendingSnapshot(void)
+{
+#ifdef __EMSCRIPTEN__
+	if (!PangeaNetBridge_IsEnabled() || !gIsNetworkClient)
+	{
+		return;
+	}
+
+	PumpPangeaNetMessages();
+
+	if (!gHavePendingSnapshot)
+	{
+		return;
+	}
+
+	short i;
+	for (i = 0; i < MAX_PLAYERS; i++)
+	{
+		if (i == gMyNetworkPlayerNum)
+		{
+			continue;
+		}
+
+		if (!gPlayerInfo[i].objNode)
+		{
+			continue;
+		}
+
+		const PangeaNetPlayerCarState* s = &gPendingSnapshot.players[i];
+		gPlayerInfo[i].coord = s->coord;
+		gPlayerInfo[i].objNode->Coord = s->coord;
+		gPlayerInfo[i].objNode->Rot.y = s->rotY;
+		gPlayerInfo[i].objNode->Delta = s->delta;
+		gPlayerInfo[i].steering = s->steering;
+		gPlayerInfo[i].currentThrust = s->currentThrust;
+		gPlayerInfo[i].controlBits = s->controlBits;
+		gPlayerInfo[i].controlBits_New = s->controlBitsNew;
+		gPlayerInfo[i].analogSteering = s->analogSteering;
+		gPlayerInfo[i].lapNum = s->lapNum;
+		gPlayerInfo[i].checkpointNum = s->checkpointNum;
+		gPlayerInfo[i].place = s->place;
+		gPlayerInfo[i].raceComplete = s->raceComplete != 0;
+		gPlayerInfo[i].powType = s->powType;
+		gPlayerInfo[i].powQuantity = s->powQuantity;
+		gPlayerInfo[i].health = s->health;
+	}
+	gHavePendingSnapshot = false;
+#endif
+}

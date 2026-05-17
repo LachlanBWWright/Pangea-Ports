@@ -12,6 +12,7 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <stdlib.h>
 #endif
 
 extern "C"
@@ -24,6 +25,109 @@ extern "C"
 	int gCurrentAntialiasingLevel;
 
 #ifdef __EMSCRIPTEN__
+	static int gPangeaNetEnabled = 0;
+	static int gPangeaNetIsHost = 1;
+	static int gPangeaNetLocalPlayerIndex = 0;
+	static int gPangeaNetPlayerCount = 1;
+	static uint32_t gPangeaNetMatchSeed = 1;
+	static uint32_t gPangeaDebugFrameNumber = 0;
+	static uint32_t gPangeaDebugLastSyncHash = 0;
+	static int gPangeaDebugHasDesync = 0;
+
+	EM_JS(int, JS_PangeaNet_SendReliable, (const void* bytes, int byteCount), {
+		const net = globalThis.PangeaNet;
+		if (!net || typeof net.sendReliable !== "function" || byteCount <= 0)
+		{
+			return 0;
+		}
+		const packet = HEAPU8.slice(bytes, bytes + byteCount);
+		return net.sendReliable(packet.buffer) ? 1 : 0;
+	});
+
+	EM_JS(int, JS_PangeaNet_SendUnreliable, (const void* bytes, int byteCount), {
+		const net = globalThis.PangeaNet;
+		if (!net || typeof net.sendUnreliable !== "function" || byteCount <= 0)
+		{
+			return 0;
+		}
+		const packet = HEAPU8.slice(bytes, bytes + byteCount);
+		return net.sendUnreliable(packet.buffer) ? 1 : 0;
+	});
+
+	EM_JS(int, JS_PangeaNet_PollMessage, (void* outBytes, int maxByteCount), {
+		const net = globalThis.PangeaNet;
+		if (!net || typeof net.pollMessage !== "function" || maxByteCount <= 0)
+		{
+			return 0;
+		}
+		const packet = net.pollMessage(maxByteCount);
+		if (!(packet instanceof ArrayBuffer))
+		{
+			return 0;
+		}
+		const payload = new Uint8Array(packet);
+		if (payload.byteLength <= 0 || payload.byteLength > maxByteCount)
+		{
+			return 0;
+		}
+		HEAPU8.set(payload, outBytes);
+		return payload.byteLength;
+	});
+
+	EM_JS(double, JS_PangeaNet_NowMilliseconds, (void), {
+		const net = globalThis.PangeaNet;
+		if (!net || typeof net.nowMilliseconds !== "function")
+		{
+			return -1;
+		}
+		return net.nowMilliseconds();
+	});
+
+	EM_JS(void, JS_PangeaNet_ReportDesync, (uint32_t frame, uint32_t localHash, uint32_t remoteHash), {
+		const net = globalThis.PangeaNet;
+		if (net && typeof net.reportDesync === "function")
+		{
+			net.reportDesync(frame, localHash, remoteHash);
+		}
+	});
+
+	EM_JS(void, JS_PangeaNet_ReportMatchEnded, (int reason), {
+		const net = globalThis.PangeaNet;
+		if (net && typeof net.reportMatchEnded === "function")
+		{
+			net.reportMatchEnded(reason);
+		}
+	});
+
+	static int ParseJsonInt(const char* json, const char* key, int fallback)
+	{
+		if (!json || !key)
+		{
+			return fallback;
+		}
+
+		const char* keyAt = SDL_strstr(json, key);
+		if (!keyAt)
+		{
+			return fallback;
+		}
+
+		const char* colon = SDL_strchr(keyAt, ':');
+		if (!colon)
+		{
+			return fallback;
+		}
+
+		char* end = nullptr;
+		const long parsed = strtol(colon + 1, &end, 10);
+		if (end == colon + 1)
+		{
+			return fallback;
+		}
+
+		return (int) parsed;
+	}
+
 	// Called once per browser frame when running in WASM mode (legacy path, kept for reference)
 	void GameMain_RunFrame(void);
 	void GameMain_InitEmscripten(void);
@@ -42,6 +146,115 @@ extern "C"
 	int WASM_GetFenceCollision(void)
 	{
 		return gDisableFenceCollision ? 0 : 1;
+	}
+
+	EMSCRIPTEN_KEEPALIVE
+	void PangeaGame_SetNetworkMatchConfig(const char* json, int byteCount)
+	{
+		(void) byteCount;
+		SDL_Log("PangeaGame_SetNetworkMatchConfig json=%s", json ? json : "(null)");
+		gPangeaNetEnabled = 1;
+		gPangeaNetLocalPlayerIndex = ParseJsonInt(json, "\"localPlayerIndex\"", 0);
+		gPangeaNetPlayerCount = ParseJsonInt(json, "\"playerCount\"", 2);
+		gPangeaNetMatchSeed = (uint32_t) ParseJsonInt(json, "\"seed\"", 1);
+		gPangeaNetIsHost = gPangeaNetLocalPlayerIndex == 0 ? 1 : 0;
+
+		if (gPangeaNetPlayerCount < 1)
+		{
+			gPangeaNetPlayerCount = 1;
+		}
+		if (gPangeaNetLocalPlayerIndex < 0)
+		{
+			gPangeaNetLocalPlayerIndex = 0;
+		}
+		if (gPangeaNetLocalPlayerIndex >= gPangeaNetPlayerCount)
+		{
+			gPangeaNetLocalPlayerIndex = gPangeaNetPlayerCount - 1;
+		}
+
+		gNetGameInProgress = true;
+		gIsNetworkHost = gPangeaNetIsHost != 0;
+		gIsNetworkClient = gPangeaNetIsHost == 0;
+		gGameMode = GAME_MODE_MULTIPLAYERRACE;
+		gNumRealPlayers = (short) gPangeaNetPlayerCount;
+		gMyNetworkPlayerNum = (short) gPangeaNetLocalPlayerIndex;
+		SDL_Log(
+			"PangeaGame_SetNetworkMatchConfig resolved host=%d localPlayer=%d playerCount=%d seed=%u",
+			gPangeaNetIsHost,
+			gPangeaNetLocalPlayerIndex,
+			gPangeaNetPlayerCount,
+			(unsigned) gPangeaNetMatchSeed);
+	}
+
+	EMSCRIPTEN_KEEPALIVE
+	void PangeaGame_StartNetworkMatch(void)
+	{
+		SDL_Log("PangeaGame_StartNetworkMatch called");
+		gPangeaNetEnabled = 1;
+		gNetGameInProgress = true;
+		gPangeaDebugFrameNumber = 0;
+		gPangeaDebugLastSyncHash = gPangeaNetMatchSeed;
+		gPangeaDebugHasDesync = 0;
+	}
+
+	EMSCRIPTEN_KEEPALIVE int PangeaNet_IsEnabled(void) { return gPangeaNetEnabled; }
+	EMSCRIPTEN_KEEPALIVE int PangeaNet_IsHost(void) { return gPangeaNetIsHost; }
+	EMSCRIPTEN_KEEPALIVE int PangeaNet_GetLocalPlayerIndex(void) { return gPangeaNetLocalPlayerIndex; }
+	EMSCRIPTEN_KEEPALIVE int PangeaNet_GetPlayerCount(void) { return gPangeaNetPlayerCount; }
+	EMSCRIPTEN_KEEPALIVE uint32_t PangeaNet_GetMatchSeed(void) { return gPangeaNetMatchSeed; }
+	EMSCRIPTEN_KEEPALIVE int PangeaNet_SendReliable(const void* bytes, int byteCount)
+	{
+		return JS_PangeaNet_SendReliable(bytes, byteCount);
+	}
+	EMSCRIPTEN_KEEPALIVE int PangeaNet_SendUnreliable(const void* bytes, int byteCount)
+	{
+		return JS_PangeaNet_SendUnreliable(bytes, byteCount);
+	}
+	EMSCRIPTEN_KEEPALIVE int PangeaNet_PollMessage(void* outBytes, int maxByteCount)
+	{
+		return JS_PangeaNet_PollMessage(outBytes, maxByteCount);
+	}
+	EMSCRIPTEN_KEEPALIVE double PangeaNet_NowMilliseconds(void)
+	{
+		double bridgedNow = JS_PangeaNet_NowMilliseconds();
+		return bridgedNow >= 0 ? bridgedNow : emscripten_get_now();
+	}
+	EMSCRIPTEN_KEEPALIVE void PangeaNet_ReportDesync(uint32_t frame, uint32_t localHash, uint32_t remoteHash)
+	{
+		JS_PangeaNet_ReportDesync(frame, localHash, remoteHash);
+		gPangeaDebugFrameNumber = frame;
+		gPangeaDebugLastSyncHash = remoteHash;
+		gPangeaDebugHasDesync = 1;
+	}
+	EMSCRIPTEN_KEEPALIVE void PangeaNet_ReportMatchEnded(int reason)
+	{
+		JS_PangeaNet_ReportMatchEnded(reason);
+	}
+	EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetFrameNumber(void) { return gPangeaDebugFrameNumber; }
+	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetLocalPlayerIndex(void) { return gPangeaNetLocalPlayerIndex; }
+	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetPlayerCount(void) { return gPangeaNetPlayerCount; }
+	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugIsNetworkMatchRunning(void) { return gPangeaNetEnabled; }
+	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugHasDesync(void) { return gPangeaDebugHasDesync; }
+	EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetLastSyncHash(void) { return gPangeaDebugLastSyncHash; }
+	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetPlayerPosition(int playerIndex, float* outX, float* outY, float* outZ)
+	{
+		if (!outX || !outY || !outZ)
+		{
+			return 0;
+		}
+		if (playerIndex < 0 || playerIndex >= gPangeaNetPlayerCount)
+		{
+			return 0;
+		}
+		*outX = 0.0f;
+		*outY = 0.0f;
+		*outZ = 0.0f;
+		return 1;
+	}
+	EMSCRIPTEN_KEEPALIVE void PangeaGame_DebugSetInputScript(const char* json, int byteCount)
+	{
+		(void) json;
+		(void) byteCount;
 	}
 #endif
 }
@@ -185,15 +398,22 @@ retryVideo:
 
 	// Create window
 #ifdef __EMSCRIPTEN__
-	// WebGL requires an OpenGL ES context profile
+	// Request GLES3 so SDL/Emscripten creates a WebGL2 context.
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-#endif
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
 
 	gCurrentAntialiasingLevel = gGamePrefs.antialiasingLevel;
+#ifdef __EMSCRIPTEN__
+	gCurrentAntialiasingLevel = 0;
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+#endif
 	if (gCurrentAntialiasingLevel != 0)
 	{
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
@@ -203,17 +423,19 @@ retryVideo:
 	// Determine initial window size
 	int initialWidth  = 640;
 	int initialHeight = 480;
+	Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #ifdef __EMSCRIPTEN__
 	// Use a fixed game resolution for WebAssembly builds.
 	// SDL_GetDisplayUsableBounds() may return spuriously small values in
 	// headless browsers before the page layout is fully computed.
 	initialWidth  = 1280;
 	initialHeight = 720;
+	windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
 #endif
 
 	gSDLWindow = SDL_CreateWindow(
 		GAME_FULL_NAME " " GAME_VERSION, initialWidth, initialHeight,
-		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+		windowFlags);
 
 #ifdef __EMSCRIPTEN__
 	// Force the WebGL canvas to the target resolution.

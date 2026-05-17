@@ -4,6 +4,11 @@
 
 #include "game.h"
 
+#if __EMSCRIPTEN__
+extern int PangeaNet_IsEnabled(void);
+extern int PangeaNet_GetLocalPlayerIndex(void);
+#endif
+
 /***************/
 /* CONSTANTS   */
 /***************/
@@ -79,6 +84,7 @@ static SDL_Gamepad* TryOpenGamepadFromJoystick(SDL_JoystickID joystickID);
 static SDL_Gamepad* TryOpenAnyUnusedGamepad(bool showMessage);
 static void TryFillUpVacantGamepadSlots(void);
 static int GetGamepadSlotFromJoystick(SDL_JoystickID joystickID);
+static int GetKeyboardFallbackPlayer(void);
 
 #pragma mark -
 /**********************/
@@ -435,7 +441,7 @@ int GetNeedState(int needID, int playerID)
 #if REQUIRE_LOCK_MAPPING
 	if (gNumLocalPlayers <= 1 || controller->fallbackToKeyboard)
 #else
-	if (playerID == KBMFallbackPlayer())
+	if (playerID == GetKeyboardFallbackPlayer())
 #endif
 	{
 		return gNeedStates[needID];
@@ -489,7 +495,7 @@ float GetNeedAnalogValue(int needID, int playerID)
 #if REQUIRE_LOCK_MAPPING
 	if (gNumLocalPlayers <= 1 || controller->fallbackToKeyboard)
 #else
-	if (playerID == KBMFallbackPlayer())
+	if (playerID == GetKeyboardFallbackPlayer())
 #endif
 	{
 		if (gNeedStates[needID] & KEYSTATE_ACTIVE_BIT)
@@ -499,6 +505,22 @@ float GetNeedAnalogValue(int needID, int playerID)
 	}
 
 	return 0.0f;
+}
+
+static int GetKeyboardFallbackPlayer(void)
+{
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled())
+	{
+		const int localPlayerIndex = PangeaNet_GetLocalPlayerIndex();
+		if (localPlayerIndex >= 0 && localPlayerIndex < gNumPlayers)
+		{
+			return localPlayerIndex;
+		}
+	}
+#endif
+
+	return KBMFallbackPlayer();
 }
 
 float GetNeedAnalogSteering(int negativeNeedID, int positiveNeedID, int playerID)

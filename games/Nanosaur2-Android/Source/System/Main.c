@@ -11,6 +11,19 @@
 /****************************/
 
 #include "game.h"
+
+#if __EMSCRIPTEN__
+extern int PangeaNet_IsEnabled(void);
+extern int PangeaNet_IsHost(void);
+extern int PangeaNet_GetPlayerCount(void);
+extern int PangeaNet_GetRemoteLifecycleReason(void);
+extern void PangeaNet_UpdateMatchLifecycle(void);
+extern void PangeaNet_PublishLocalMatchLifecycle(void);
+extern void PangeaNet_ClientSendInput(void);
+extern void PangeaNet_HostReceiveInputs(void);
+extern void PangeaNet_HostSendSnapshot(void);
+extern void PangeaNet_ClientApplySnapshot(void);
+#endif
 #include "profiling.h"
 #include "uieffects.h"
 
@@ -566,10 +579,29 @@ static bool PlayLevelTick(void)
 	for (int i = 0; i < gNumPlayers; i++)
 		UpdatePlayerSteering(i);
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled())
+	{
+		if (PangeaNet_IsHost())
+			PangeaNet_HostReceiveInputs();
+		else
+		{
+			PangeaNet_ClientApplySnapshot();
+			PangeaNet_ClientSendInput();
+		}
+	}
+#endif
+
 			/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
 	StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 	MoveEverything();
+
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && PangeaNet_IsHost())
+		PangeaNet_HostSendSnapshot();
+#endif
+
 	DoPlayerTerrainUpdate();
 
 	OGL_DrawScene(DrawLevelCallback);
@@ -629,6 +661,39 @@ static bool PlayLevelTick(void)
 	{
 		gLevelCompleted = true;
 	}
+
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled())
+	{
+		PangeaNet_UpdateMatchLifecycle();
+
+		if (PangeaNet_IsHost())
+		{
+			PangeaNet_PublishLocalMatchLifecycle();
+		}
+		else
+		{
+			const int remoteReason = PangeaNet_GetRemoteLifecycleReason();
+			if (remoteReason == 1)
+			{
+				gGameOver = true;
+			}
+			else if (remoteReason == 2)
+			{
+				if (!gLevelCompleted)
+				{
+					gLevelCompleted = true;
+					gLevelCompletedCoolDownTimer = 0.05f;
+				}
+			}
+			else
+			{
+				// In network mode the host decides match-end lifecycle.
+				gGameOver = false;
+			}
+		}
+	}
+#endif
 
 			/*****************************/
 			/* SEE IF LEVEL IS COMPLETED */
@@ -726,10 +791,29 @@ float	fps;
 			UpdatePlayerSteering(i);
 		EndProfilePhase(PROFILE_PHASE_INPUT);
 
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsEnabled())
+		{
+			if (PangeaNet_IsHost())
+				PangeaNet_HostReceiveInputs();
+			else
+			{
+				PangeaNet_ClientApplySnapshot();
+				PangeaNet_ClientSendInput();
+			}
+		}
+#endif
+
 				/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything();
+
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsEnabled() && PangeaNet_IsHost())
+			PangeaNet_HostSendSnapshot();
+#endif
+
 		DoPlayerTerrainUpdate();
 
 		OGL_DrawScene(DrawLevelCallback);
@@ -818,6 +902,39 @@ float	fps;
 			gLevelCompleted = true;
 //			gSkipLevelIntro = true;
 		}
+
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsEnabled())
+		{
+			PangeaNet_UpdateMatchLifecycle();
+
+			if (PangeaNet_IsHost())
+			{
+				PangeaNet_PublishLocalMatchLifecycle();
+			}
+			else
+			{
+				const int remoteReason = PangeaNet_GetRemoteLifecycleReason();
+				if (remoteReason == 1)
+				{
+					gGameOver = true;
+				}
+				else if (remoteReason == 2)
+				{
+					if (!gLevelCompleted)
+					{
+						gLevelCompleted = true;
+						gLevelCompletedCoolDownTimer = 0.05f;
+					}
+				}
+				else
+				{
+					// In network mode the host decides match-end lifecycle.
+					gGameOver = false;
+				}
+			}
+		}
+#endif
 
 
 
@@ -1220,8 +1337,28 @@ unsigned long	someLong;
 	if (gCmdLevelNum >= 0)
 	{
 		gLevelNum = (short) gCmdLevelNum;
-		gNumPlayers = 1;
-		gVSMode = VS_MODE_NONE;
+
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsEnabled())
+		{
+			int networkPlayerCount = PangeaNet_GetPlayerCount();
+			if (networkPlayerCount < 1)
+			{
+				networkPlayerCount = 1;
+			}
+			if (networkPlayerCount > MAX_PLAYERS)
+			{
+				networkPlayerCount = MAX_PLAYERS;
+			}
+			gNumPlayers = (Byte) networkPlayerCount;
+			gVSMode = gNumPlayers > 1 ? VS_MODE_RACE : VS_MODE_NONE;
+		}
+		else
+#endif
+		{
+			gNumPlayers = 1;
+			gVSMode = VS_MODE_NONE;
+		}
 		gPlayingFromSavedGame = false;
 		gSkipLevelIntro = true;
 		InitPlayerInfo_Game();

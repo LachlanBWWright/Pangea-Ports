@@ -62,7 +62,7 @@ typedef struct
 	uint32_t				randomSeed;					// simply used for error checking (all machines should have same seed!)
 	uint32_t				controlBits[MAX_PLAYERS];
 	uint32_t				controlBitsNew[MAX_PLAYERS];
-	float				analogSteering[MAX_PLAYERS];
+	OGLVector2D			analogSteering[MAX_PLAYERS];
 	uint32_t				frameCounter;
 }NetHostControlInfoMessageType;
 
@@ -76,7 +76,7 @@ typedef struct
 	uint32_t				controlBits;
 	uint32_t				controlBitsNew;
 	uint32_t				frameCounter;
-	float				analogSteering;
+	OGLVector2D			analogSteering;
 }NetClientControlInfoMessageType;
 
 
@@ -91,6 +91,40 @@ typedef struct
 }NetPlayerCharTypeMessage;
 
 
+		/* PER-PLAYER CAR STATE (for host snapshots) */
+
+typedef struct
+{
+	OGLPoint3D			coord;
+	float				rotY;
+	OGLVector3D			delta;
+	float				steering;
+	float				currentThrust;
+	uint32_t			controlBits;
+	uint32_t			controlBitsNew;
+	OGLVector2D			analogSteering;
+	short				lapNum;
+	short				checkpointNum;
+	short				place;
+	uint8_t				raceComplete;
+	uint8_t				pad;
+	short				powType;
+	short				powQuantity;
+	float				health;
+}PangeaNetPlayerCarState;
+
+
+		/* HOST SNAPSHOT PACKET */
+
+typedef struct
+{
+	uint32_t					packetType;
+	uint32_t					snapshotSeq;
+	uint32_t					frameCounter;
+	uint8_t						playerCount;
+	uint8_t						pad[3];
+	PangeaNetPlayerCarState		players[MAX_PLAYERS];
+}PangeaNetHostSnapshotPacket;
 
 
 //===============================================================================
@@ -106,6 +140,9 @@ void HostSend_ControlInfoToClients(void);
 void ClientSend_ControlInfoToHost(void);
 void ClientReceive_ControlInfoFromHost(void);
 void HostReceive_ControlInfoFromClients(void);
+
+void HostSend_SnapshotToClients(void);
+void ClientApplyPendingSnapshot(void);
 
 void PlayerBroadcastVehicleType(void);
 void GetVehicleSelectionFromNetPlayers(void);

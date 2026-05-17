@@ -74,6 +74,19 @@ void DoFatalAlert(const char* format, ...)
 	SDL_vsnprintf(message, sizeof(message), format, args);
 	va_end(args);
 
+	if (message[0] == '\0')
+	{
+		const char* sdlError = SDL_GetError();
+		if (sdlError && sdlError[0] != '\0')
+		{
+			SDL_snprintf(message, sizeof(message), "(empty fatal message) SDL_GetError: %s", sdlError);
+		}
+		else
+		{
+			SDL_strlcpy(message, "(empty fatal message)", sizeof(message));
+		}
+	}
+
 	SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Game Fatal Alert: %s", message);
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME, message, NULL);//gSDLWindow);
 

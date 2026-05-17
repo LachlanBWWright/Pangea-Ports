@@ -166,9 +166,9 @@ retryVideo:
 
 	// Create window
 #ifdef __EMSCRIPTEN__
-	// WebGL requires GLES2 context profile
+	// Request GLES3 so SDL/Emscripten creates a WebGL2 context.
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
@@ -177,15 +177,25 @@ retryVideo:
 #endif
 
 	gCurrentAntialiasingLevel = gGamePrefs.antialiasingLevel;
+#ifdef __EMSCRIPTEN__
+	gCurrentAntialiasingLevel = 0;
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
+#endif
 	if (gCurrentAntialiasingLevel != 0)
 	{
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 1 << gCurrentAntialiasingLevel);
 	}
 
+	Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#ifdef __EMSCRIPTEN__
+	windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+#endif
+
 	gSDLWindow = SDL_CreateWindow(
 		GAME_FULL_NAME " (" GAME_VERSION ")", 640, 480,
-		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+		windowFlags);
 
 	if (!gSDLWindow)
 	{

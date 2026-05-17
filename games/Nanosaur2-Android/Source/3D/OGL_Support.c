@@ -356,16 +356,38 @@ GLint			maxTexSize;
 
 	gAGLContext = SDL_GL_CreateContext(gSDLWindow);
 
+#ifdef __EMSCRIPTEN__
 	if (!gAGLContext)
-		DoFatalAlert(SDL_GetError());
+	{
+		SDL_GLContext existingContext = SDL_GL_GetCurrentContext();
+		if (existingContext)
+		{
+			gAGLContext = existingContext;
+		}
+	}
+#endif
 
-	GAME_ASSERT(glGetError() == GL_NO_ERROR);
+	if (!gAGLContext)
+	{
+		const char* sdlError = SDL_GetError();
+		DoFatalAlert(
+			"OGL_CreateDrawContext: SDL_GL_CreateContext failed: %s",
+			sdlError && sdlError[0] ? sdlError : "(no SDL error)");
+	}
 
 
 			/* ACTIVATE CONTEXT */
 
 	bool didMakeCurrent = SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);
-	GAME_ASSERT_MESSAGE(didMakeCurrent, SDL_GetError());
+	if (!didMakeCurrent)
+	{
+		const char* sdlError = SDL_GetError();
+		DoFatalAlert(
+			"OGL_CreateDrawContext: SDL_GL_MakeCurrent failed: %s",
+			sdlError && sdlError[0] ? sdlError : "(no SDL error)");
+	}
+
+	GAME_ASSERT(glGetError() == GL_NO_ERROR);
 
 			/* ENABLE VSYNC */
 

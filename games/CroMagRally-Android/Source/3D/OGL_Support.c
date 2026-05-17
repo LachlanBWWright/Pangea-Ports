@@ -360,8 +360,24 @@ static void OGL_CreateDrawContext(void)
 
 	gAGLContext = SDL_GL_CreateContext(gSDLWindow);
 
+#ifdef __EMSCRIPTEN__
 	if (!gAGLContext)
-		DoFatalAlert(SDL_GetError());
+	{
+		SDL_GLContext existingContext = SDL_GL_GetCurrentContext();
+		if (existingContext)
+		{
+			gAGLContext = existingContext;
+		}
+	}
+#endif
+
+	if (!gAGLContext)
+	{
+		const char* sdlError = SDL_GetError();
+		DoFatalAlert(
+			"OGL_CreateDrawContext: SDL_GL_CreateContext failed: %s",
+			sdlError && sdlError[0] ? sdlError : "(no SDL error)");
+	}
 
 #ifndef __EMSCRIPTEN__
 	GAME_ASSERT(glGetError() == GL_NO_ERROR);
@@ -371,7 +387,13 @@ static void OGL_CreateDrawContext(void)
 			/* ACTIVATE CONTEXT */
 
 	bool didMakeCurrent = SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);
-	GAME_ASSERT_MESSAGE(didMakeCurrent, SDL_GetError());
+	if (!didMakeCurrent)
+	{
+		const char* sdlError = SDL_GetError();
+		DoFatalAlert(
+			"OGL_CreateDrawContext: SDL_GL_MakeCurrent failed: %s",
+			sdlError && sdlError[0] ? sdlError : "(no SDL error)");
+	}
 
 #ifdef __EMSCRIPTEN__
 	// Initialize the custom GLES2 fixed-function compatibility layer.

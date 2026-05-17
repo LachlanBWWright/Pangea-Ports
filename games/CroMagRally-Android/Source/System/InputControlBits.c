@@ -52,7 +52,12 @@ void ReadKeyboard(void)
 
 	for (int i = 0; i < gNumLocalPlayers; i++)
 	{
-		gPlayerInfo[i].analogSteering = GetAnalogSteering(i);
+		const int localInputIndex = i;
+		const int targetPlayerIndex =
+			(gNetGameInProgress && gNumLocalPlayers == 1)
+				? gMyNetworkPlayerNum
+				: i;
+		gPlayerInfo[targetPlayerIndex].analogSteering = GetAnalogSteering(localInputIndex);
 	}
 
 #if _DEBUG
