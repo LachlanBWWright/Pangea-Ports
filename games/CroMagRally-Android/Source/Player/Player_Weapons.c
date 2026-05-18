@@ -85,6 +85,8 @@ short	playerNum = theNode->PlayerNum;
 
 	if (gPlayerMultiPassCount > 0)							// if doing multipass and on secondary passes, then dont check "New" keys.
 		return;
+	if (PangeaNet_IsHostAuthoritativeRemotePlayer(playerNum))
+		return;
 
 				/***************/
 				/* SEE IF FIRE */
@@ -1881,7 +1883,6 @@ Boolean DoTrig_LandMine(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	return(false);
 }
-
 
 
 

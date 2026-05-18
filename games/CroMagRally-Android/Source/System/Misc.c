@@ -20,6 +20,7 @@ extern	SDL_Window* 	gSDLWindow;
 /****************************/
 
 #define	DEFAULT_FPS			9
+#define	MAX_FPS				300
 #define	PTRCOOKIE_SIZE		16
 
 /**********************/
@@ -31,7 +32,8 @@ long	gPrefsFolderDirID;
 
 uint32_t 	seed0 = 0, seed1 = 0, seed2 = 0;
 
-float	gFramesPerSecond, gFramesPerSecondFrac;
+float	gFramesPerSecond = DEFAULT_FPS;
+float	gFramesPerSecondFrac = 1.0f / DEFAULT_FPS;
 
 int		gNumPointers = 0;
 long	gRAMAlloced = 0;
@@ -403,14 +405,34 @@ void CalcFramesPerSecond(void)
 static UnsignedWide time;
 UnsignedWide currTime;
 unsigned long deltaTime;
+float fps;
 
+wait:
 	Microseconds(&currTime);
 	deltaTime = currTime.lo - time.lo;
 
-	gFramesPerSecond = 1000000.0f / deltaTime;
+	if (deltaTime == 0)
+	{
+		fps = DEFAULT_FPS;
+	}
+	else
+	{
+		fps = 1000000.0f / deltaTime;
+		if (fps < DEFAULT_FPS)					// avoid too-low FPS pathologies
+		{
+			fps = DEFAULT_FPS;
+		}
+		else if (fps > MAX_FPS)				// cap runaway loop speed, especially on web
+		{
+			if (fps - MAX_FPS > 1000)
+			{
+				SDL_Delay(1);
+			}
+			goto wait;
+		}
+	}
 
-	if (gFramesPerSecond < DEFAULT_FPS)			// (avoid divide by 0's later)
-		gFramesPerSecond = DEFAULT_FPS;
+	gFramesPerSecond = fps;
 
 #if _DEBUG
 	if (GetKeyState(SDL_SCANCODE_KP_PLUS))		// debug speed-up with KP_PLUS

@@ -539,7 +539,7 @@ Byte			playerNum = gCurrentSplitScreenPane;			// get the player # who's draw con
 
 	/* FIRST DO OUR CULLING */
 
-	bool isOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
+	bool isOverlayPane = gDrawingOverlayPane;
 
 	if (!isOverlayPane)
 	{

@@ -354,7 +354,9 @@ int				i;
 static int		sampIndex = 0;
 static float	sampleList[16] = {60,60,60,60,60,60,60,60,60,60,60,60,60,60,60,60};
 
+#if !__EMSCRIPTEN__
 wait:
+#endif
 	Microseconds(&currTime);
 
 	if (gTimeDemo)
@@ -379,11 +381,15 @@ wait:
 			}
 			else if (fps > MAX_FPS)					// limit to avoid issue
 			{
+#if __EMSCRIPTEN__
+				fps = MAX_FPS;
+#else
 				if (fps - MAX_FPS > 1000)			// try to sneak in some sleep if we have 1 ms to spare
 				{
 					SDL_Delay(1);
 				}
 				goto wait;
+#endif
 			}
 		}
 

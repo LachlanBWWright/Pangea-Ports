@@ -280,6 +280,13 @@ static void(*myMoveTable[])(ObjNode *) =
 		return;
 	}
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_ShouldSimulateGameplayForPlayer(theNode->PlayerNum))
+	{
+		return;
+	}
+#endif
+
 
 	GetObjectInfo(theNode);
 
@@ -2083,7 +2090,6 @@ float	x,z;
 
 	gBestCheckpointAim[playerNum] = player->Rot.y;
 }
-
 
 
 

@@ -335,4 +335,6 @@ void ReleaseVertexArrayRangeMemory(Byte type);
 
 void ColorBalanceRGBForAnaglyph(uint32_t *rr, uint32_t *gg, uint32_t *bb, Boolean doChannelBalancing);
 
-#define GetOverlayPaneNumber() (gNumPlayers)
+extern Byte gNumRenderedPanes;
+extern Byte gDrawingOverlayPane;
+#define GetOverlayPaneNumber() (gNumRenderedPanes)

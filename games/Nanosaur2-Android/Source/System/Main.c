@@ -556,16 +556,36 @@ OGLSetupInputType	viewDef;
 
 #ifdef __EMSCRIPTEN__
 
+static void PangeaNet_DebugLogEarlyFramePhase(const char* phase)
+{
+	if (!PangeaNet_IsEnabled())
+	{
+		return;
+	}
+	if (gGameFrameNum >= 12)
+	{
+		return;
+	}
+	SDL_Log(
+		"Nanosaur2 net frame %u phase %s host=%d players=%d",
+		(unsigned)gGameFrameNum,
+		phase,
+		PangeaNet_IsHost(),
+		gNumPlayers);
+}
+
 // Per-frame tick body used by the ASYNCIFY while-loop in PlayLevel.
 // Returns true if the level should continue, false when it is over.
 static bool PlayLevelTick(void)
 {
 	float fps;
+	PangeaNet_DebugLogEarlyFramePhase("tick-begin");
 
 			/* INPUT */
 
 	StartProfilePhase(PROFILE_PHASE_INPUT);
 	DoSDLMaintenance();
+	PangeaNet_DebugLogEarlyFramePhase("after-maintenance");
 
 	if (gGamePaused)
 	{
@@ -576,9 +596,6 @@ static bool PlayLevelTick(void)
 		return true;
 	}
 
-	for (int i = 0; i < gNumPlayers; i++)
-		UpdatePlayerSteering(i);
-
 #if __EMSCRIPTEN__
 	if (PangeaNet_IsEnabled())
 	{
@@ -587,24 +604,48 @@ static bool PlayLevelTick(void)
 		else
 		{
 			PangeaNet_ClientApplySnapshot();
-			PangeaNet_ClientSendInput();
 		}
 	}
+	PangeaNet_DebugLogEarlyFramePhase("after-net-recv");
+#endif
+
+	for (int i = 0; i < gNumPlayers; i++)
+	{
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsEnabled() && !PangeaNet_ShouldSimulateGameplayForPlayer(i))
+		{
+			continue;
+		}
+#endif
+		UpdatePlayerSteering(i);
+	}
+	PangeaNet_DebugLogEarlyFramePhase("after-steering");
+
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_IsHost())
+	{
+		PangeaNet_ClientSendInput();
+	}
+	PangeaNet_DebugLogEarlyFramePhase("after-client-send-input");
 #endif
 
 			/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
 	StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 	MoveEverything();
+	PangeaNet_DebugLogEarlyFramePhase("after-move-everything");
 
 #if __EMSCRIPTEN__
 	if (PangeaNet_IsEnabled() && PangeaNet_IsHost())
 		PangeaNet_HostSendSnapshot();
+	PangeaNet_DebugLogEarlyFramePhase("after-host-send-snapshot");
 #endif
 
 	DoPlayerTerrainUpdate();
+	PangeaNet_DebugLogEarlyFramePhase("after-terrain-update");
 
 	OGL_DrawScene(DrawLevelCallback);
+	PangeaNet_DebugLogEarlyFramePhase("after-draw");
 
 		/*************************/
 		/* UPDATE FPS AND TIMERS */
@@ -787,10 +828,6 @@ float	fps;
 		}
 
 
-		for (int i = 0; i < gNumPlayers; i++)
-			UpdatePlayerSteering(i);
-		EndProfilePhase(PROFILE_PHASE_INPUT);
-
 #if __EMSCRIPTEN__
 		if (PangeaNet_IsEnabled())
 		{
@@ -799,8 +836,26 @@ float	fps;
 			else
 			{
 				PangeaNet_ClientApplySnapshot();
-				PangeaNet_ClientSendInput();
 			}
+		}
+#endif
+
+		for (int i = 0; i < gNumPlayers; i++)
+		{
+#if __EMSCRIPTEN__
+			if (PangeaNet_IsEnabled() && !PangeaNet_ShouldSimulateGameplayForPlayer(i))
+			{
+				continue;
+			}
+#endif
+			UpdatePlayerSteering(i);
+		}
+		EndProfilePhase(PROFILE_PHASE_INPUT);
+
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsEnabled() && !PangeaNet_IsHost())
+		{
+			PangeaNet_ClientSendInput();
 		}
 #endif
 
@@ -1009,6 +1064,16 @@ static void DrawLevelCallback(void)
 	if (IsStereo())
 	{
 		Byte	p = gCurrentSplitScreenPane;			// get the player # who's draw context is being drawn
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsOnlineMatch() && gDrawingOverlayPane)
+		{
+			const int localPlayerIndex = PangeaNet_GetLocalPlayerIndex();
+			if (localPlayerIndex >= 0 && localPlayerIndex < MAX_PLAYERS)
+			{
+				p = (Byte)localPlayerIndex;
+			}
+		}
+#endif
 
 			/* MAKE SURE ANAGLYPH SETTINGS ARE GOOD FOR THIS CAMERA MODE */
 

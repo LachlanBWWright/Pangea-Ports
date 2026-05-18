@@ -91,6 +91,8 @@ OGLMatrix4x4	gWorldToWindowMatrix[MAX_VIEWPORTS],gFrustumToWindowMatrix[MAX_VIEW
 
 Byte			gCurrentSplitScreenPane = 0;
 Byte			gActiveSplitScreenMode 	= SPLITSCREEN_MODE_NONE;		// currently active split mode
+Byte			gNumRenderedPanes = 1;
+Byte			gDrawingOverlayPane = false;
 
 
 float			gCurrentPaneAspectRatio = 1;
@@ -249,6 +251,15 @@ short	i;
 			/* SET SOME PANE INFO */
 
 	gCurrentSplitScreenPane = 0;
+	gNumRenderedPanes = gNumPlayers;
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsOnlineMatch())
+	{
+		gNumRenderedPanes = 1;
+		gActiveSplitScreenMode = SPLITSCREEN_MODE_NONE;
+	}
+	else
+#endif
 	switch(gNumPlayers)
 	{
 		case	1:
@@ -816,12 +827,13 @@ do_anaglyph:
 				/* DRAW EACH SPLIT-SCREEN PANE IF ANY */
 				/**************************************/
 
-	int numPasses = gNumPlayers + 1;
+	int numPasses = gNumRenderedPanes + 1;
 
-	for (gCurrentSplitScreenPane = 0; gCurrentSplitScreenPane < numPasses; gCurrentSplitScreenPane++)
+	for (Byte renderPane = 0; renderPane < numPasses; renderPane++)
 	{
-		bool isOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
-		if (isOverlayPane)
+		gCurrentSplitScreenPane = renderPane;
+		gDrawingOverlayPane = renderPane == GetOverlayPaneNumber();
+		if (gDrawingOverlayPane)
 			StartProfilePhase(PROFILE_PHASE_UI);
 
 				/* OFFSET ANAGLYPH CAMERAS */
@@ -836,9 +848,20 @@ do_anaglyph:
 		int y = 0;
 		int w = 1;
 		int h = 1;
-		OGL_GetCurrentViewport(&x, &y, &w, &h, gCurrentSplitScreenPane);
+		OGL_GetCurrentViewport(&x, &y, &w, &h, renderPane);
 		glViewport(x,y, w, h);
 		gCurrentPaneAspectRatio = (float)h/(float)w;
+
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsOnlineMatch() && !gDrawingOverlayPane)
+		{
+			const int localPlayerIndex = PangeaNet_GetLocalPlayerIndex();
+			if (localPlayerIndex >= 0 && localPlayerIndex < MAX_PLAYERS)
+			{
+				gCurrentSplitScreenPane = (Byte)localPlayerIndex;
+			}
+		}
+#endif
 
 
 				/* GET UPDATED GLOBAL COPIES OF THE VARIOUS MATRICES */
@@ -851,6 +874,8 @@ do_anaglyph:
 		if (drawRoutine != nil)
 			drawRoutine();
 	}
+
+	gDrawingOverlayPane = false;
 
 
 			/***********************************/

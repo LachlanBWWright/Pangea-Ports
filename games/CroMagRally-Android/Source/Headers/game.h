@@ -12,6 +12,7 @@
 #include "collision.h"
 #include "sound2.h"
 #include "main.h"
+#include "network.h"
 #include "file.h"
 #include "input.h"
 #include "player.h"

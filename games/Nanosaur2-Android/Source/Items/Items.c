@@ -87,7 +87,7 @@ void DrawCyclorama(void)
 {
 	if (!gCyclorama) return;
 
-	if (gCurrentSplitScreenPane == GetOverlayPaneNumber())
+	if (gDrawingOverlayPane)
 		return;
 
 	ObjNode *theNode = gCyclorama;
@@ -157,7 +157,7 @@ static void MoveCloudLayer(ObjNode *theNode)
 
 static void DrawCloudLayer(ObjNode *theNode)
 {
-	if (gCurrentSplitScreenPane == GetOverlayPaneNumber())
+	if (gDrawingOverlayPane)
 		return;
 
 OGLPoint3D cameraCoord = gGameViewInfoPtr->cameraPlacement[gCurrentSplitScreenPane].cameraLocation;
@@ -511,7 +511,6 @@ Boolean AddAsteroid(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	return(true);													// item was added
 }
-
 
 
 

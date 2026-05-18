@@ -40,6 +40,7 @@ static inline float AnchorBottom(float y);
 
 
 
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -204,7 +205,8 @@ static inline float AnchorCenterY(float y)
 
 static void DrawPaneDivider(ObjNode* theNode)
 {
-	if (gCurrentDrawPass == 0) return;
+	if (gCurrentDrawPass == 0)
+		return;
 	if (gActiveSplitScreenMode == SPLITSCREEN_MODE_NONE)
 		return;
 
@@ -545,6 +547,18 @@ void SetInfobarSpriteState(float anaglyphZ, float zoom)
 
 void DrawInfobar(ObjNode *theNode)
 {
+	const Byte originalPane = gCurrentSplitScreenPane;
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsOnlineMatch() && gDrawingOverlayPane)
+	{
+		const int localPlayerIndex = PangeaNet_GetLocalPlayerIndex();
+		if (localPlayerIndex >= 0 && localPlayerIndex < MAX_PLAYERS)
+		{
+			gCurrentSplitScreenPane = (Byte)localPlayerIndex;
+		}
+	}
+#endif
+
 	if (gCurrentDrawPass == 0) return;
 	(void) theNode;
 
@@ -560,7 +574,10 @@ void DrawInfobar(ObjNode *theNode)
 	}
 
 	if (gHideInfobar)
+	{
+		gCurrentSplitScreenPane = originalPane;
 		return;
+	}
 
 		/************/
 		/* SET TAGS */
@@ -630,6 +647,7 @@ void DrawInfobar(ObjNode *theNode)
 
 	OGL_PopState();
 	gGlobalMaterialFlags = 0;
+	gCurrentSplitScreenPane = originalPane;
 }
 
 #pragma mark -
@@ -1983,12 +2001,5 @@ float		scale;
 
 
 }
-
-
-
-
-
-
-
 
 

@@ -16,6 +16,7 @@ typedef void* NSpPlayerLeftMessage;
 #include "network.h"
 #include "window.h"
 #include "pangea_net.h"
+#include <math.h>
 
 /**********************/
 /*     PROTOTYPES     */
@@ -79,186 +80,795 @@ Boolean		gHostNetworkGame = false;
 Boolean		gJoinNetworkGame = false;
 
 #ifdef __EMSCRIPTEN__
+#define PANGEA_NET_MAGIC 0x54454E50u /* 'PNET' little-endian */
+#define PANGEA_NET_VERSION 2u
+#define PANGEA_NET_PLAYER_NA 0xFFFFu
+#define PANGEA_NET_MAX_PACKET_SIZE 4096
+#define PANGEA_NET_LOCAL_RECONCILE_SNAP_DISTANCE 6.0f
+#define PANGEA_NET_LOCAL_RECONCILE_BLEND 0.35f
+#define PANGEA_NET_REMOTE_INTERPOLATION_BLEND 0.3f
+#define PANGEA_NET_REMOTE_TELEPORT_DISTANCE 180.0f
+#define PANGEA_NET_INPUT_TIMEOUT_MS 750.0
+#define PANGEA_NET_INPUT_DISCONNECT_MS 2500.0
+#define PANGEA_NET_INPUT_HISTORY_CAP 64
+#define PANGEA_NET_REMOTE_BUFFER_CAP 8
+#define PANGEA_NET_REMOTE_INTERP_DELAY 2
+#define PANGEA_NET_KEYFRAME_INTERVAL_FRAMES 20u
+#define PANGEA_NET_KEYFRAME_TIMEOUT_MS 1200.0
+
 enum
 {
-	kPangeaNetHostControlPacket = 1001,
-	kPangeaNetClientControlPacket = 1002,
-	kPangeaNetVehicleTypePacket = 1003,
-	kPangeaNetHostSnapshotPacket = 1004
+	kPangeaPacketMatchConfig = 1,
+	kPangeaPacketClientInput = 2,
+	kPangeaPacketHostSnapshot = 3,
+	kPangeaPacketReliableEvent = 4,
+	kPangeaPacketClientAck = 5,
+	kPangeaPacketPause = 6,
+	kPangeaPacketResume = 7,
+	kPangeaPacketDisconnect = 8,
+	kPangeaPacketProtocolError = 9,
+	kPangeaPacketVehicleType = 10,
+	kPangeaPacketKeyframeResendRequest = 11
+};
+
+enum
+{
+	kPangeaReliableEventRaceComplete = 1,
+	kPangeaReliableEventEliminated = 2
 };
 
 typedef struct
 {
-	uint32_t packetType;
-	NetHostControlInfoMessageType payload;
-} PangeaNetHostControlPacket;
+	uint32_t magic;
+	uint16_t version;
+	uint16_t packetType;
+	uint32_t matchIdLow;
+	uint32_t matchIdHigh;
+	uint32_t tick;
+	uint32_t sequence;
+	uint16_t playerIndex;
+	uint16_t reserved;
+} PangeaNetPacketHeader;
 
 typedef struct
 {
-	uint32_t packetType;
-	NetClientControlInfoMessageType payload;
-} PangeaNetClientControlPacket;
+	uint8_t* bytes;
+	int byteCount;
+	int cursor;
+	int ok;
+} PangeaNetWriter;
 
 typedef struct
 {
-	uint32_t packetType;
-	NetPlayerCharTypeMessage payload;
-} PangeaNetVehicleTypePacket;
+	const uint8_t* bytes;
+	int byteCount;
+	int cursor;
+	int ok;
+} PangeaNetReader;
+
+typedef struct
+{
+	uint32_t lastReceivedInputTick;
+	uint32_t lastAckedSnapshotTick;
+	uint32_t lastSentSequence;
+	uint32_t lastReceivedSequence;
+	float rttMs;
+	float jitterMs;
+	uint32_t inputBufferLength;
+	uint8_t timeoutState;
+	double lastInputTimeMs;
+} PangeaNetPlayerConnState;
+
+typedef PangeaNetPlayerCarState PangeaNetSnapshotPlayerState;
+
+typedef struct
+{
+	PangeaNetSnapshotPlayerState fromState;
+	PangeaNetSnapshotPlayerState toState;
+	Boolean hasFrom;
+	Boolean hasTo;
+} PangeaNetRemoteInterpState;
+
+typedef struct
+{
+	uint32_t sequence;
+	uint32_t controlBits;
+	uint32_t controlBitsNew;
+	OGLVector2D analogSteering;
+} PangeaNetInputHistoryEntry;
 
 static short gPendingVehicleType[MAX_PLAYERS];
 static short gPendingVehicleSex[MAX_PLAYERS];
 static Boolean gHavePendingVehicleType[MAX_PLAYERS];
 static uint32_t gExpectedMatchSeed = 1;
-
 static PangeaNetHostSnapshotPacket gPendingSnapshot;
 static Boolean gHavePendingSnapshot = false;
+static uint32_t gPangeaMatchId = 1;
+static uint32_t gPangeaMatchIdHigh = 0;
+static uint32_t gPangeaLocalTick = 0;
+static uint32_t gPangeaSendSequence = 1;
+static uint32_t gPangeaLastHostSnapshotSeq = 0;
+static float gPangeaCorrectionDistance = 0.0f;
+static uint32_t gPangeaDroppedPacketCount = 0;
+static uint32_t gPangeaReorderedPacketCount = 0;
+static uint32_t gPangeaLastHostKeyframeSeq = 0;
+static uint32_t gPangeaLastHostDeltaSeq = 0;
+static uint32_t gPangeaLastSnapshotStateHash = 0;
+static uint8_t gPangeaForceKeyframe = 0;
+static double gPangeaLastReceivedKeyframeAtMs = 0.0;
+static double gPangeaLastResendRequestAtMs = 0.0;
+static PangeaNetPlayerConnState gPangeaConnState[MAX_PLAYERS];
+static PangeaNetRemoteInterpState gPangeaRemoteInterp[MAX_PLAYERS];
+static PangeaNetInputHistoryEntry gPangeaLocalInputHistory[PANGEA_NET_INPUT_HISTORY_CAP];
+static uint32_t gPangeaLocalInputHistoryHead = 0;
+static uint32_t gPangeaLocalInputHistoryCount = 0;
+static PangeaNetSnapshotPlayerState gPangeaRemoteSnapshotBuffer[MAX_PLAYERS][PANGEA_NET_REMOTE_BUFFER_CAP];
+static uint32_t gPangeaRemoteSnapshotHead[MAX_PLAYERS] = {0};
+static uint32_t gPangeaRemoteSnapshotCount[MAX_PLAYERS] = {0};
+static uint8_t gPangeaReliableRaceCompleteSent[MAX_PLAYERS] = {0};
+static uint8_t gPangeaReliableEliminatedSent[MAX_PLAYERS] = {0};
+static uint32_t gPangeaLastAckedKeyframeSeq[MAX_PLAYERS] = {0};
+static uint32_t gPangeaLastAckedDeltaSeq[MAX_PLAYERS] = {0};
+
+void PangeaNetBridge_SetRuntimeMatchIdentity(uint32_t matchIdLow, uint32_t matchIdHigh)
+{
+	gPangeaMatchId = matchIdLow;
+	gPangeaMatchIdHigh = matchIdHigh;
+}
+
+static Boolean PangeaNet_ShouldLogSequence(uint32_t sequence)
+{
+	return sequence <= 5 || (sequence % 60u) == 0u;
+}
+
+static uint32_t PangeaNet_HashMix(uint32_t hash, uint32_t value)
+{
+	hash ^= value + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+	return hash;
+}
+
+static uint32_t PangeaNet_HashF32(float value)
+{
+	uint32_t bits = 0;
+	SDL_memcpy(&bits, &value, sizeof(bits));
+	return bits;
+}
+
+static uint32_t PangeaNet_ComputeAuthoritativeStateHash(short playerCount)
+{
+	uint32_t hash = 0x811C9DC5u;
+	const short clampedPlayerCount = playerCount > MAX_PLAYERS ? MAX_PLAYERS : playerCount;
+	hash = PangeaNet_HashMix(hash, (uint32_t)clampedPlayerCount);
+	hash = PangeaNet_HashMix(hash, (uint32_t)gGameMode);
+	hash = PangeaNet_HashMix(hash, (uint32_t)gTrackCompleted);
+	for (short i = 0; i < clampedPlayerCount; i++)
+	{
+		hash = PangeaNet_HashMix(hash, (uint32_t)i);
+		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].lapNum);
+		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].checkpointNum);
+		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].place);
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].raceComplete ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].isEliminated ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].powType);
+		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].powQuantity);
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].health));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].frozenTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].greasedTiresTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].nitroTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].stickyTiresTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].invisibilityTimer));
+	}
+	return hash;
+}
+
+static void PangeaNet_RecordLocalInput(uint32_t sequence, short playerNum)
+{
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+	{
+		return;
+	}
+	uint32_t slot = (gPangeaLocalInputHistoryHead + gPangeaLocalInputHistoryCount) % PANGEA_NET_INPUT_HISTORY_CAP;
+	if (gPangeaLocalInputHistoryCount >= PANGEA_NET_INPUT_HISTORY_CAP)
+	{
+		gPangeaLocalInputHistoryHead = (gPangeaLocalInputHistoryHead + 1) % PANGEA_NET_INPUT_HISTORY_CAP;
+		slot = (gPangeaLocalInputHistoryHead + gPangeaLocalInputHistoryCount - 1) % PANGEA_NET_INPUT_HISTORY_CAP;
+	}
+	else
+	{
+		gPangeaLocalInputHistoryCount++;
+	}
+	gPangeaLocalInputHistory[slot].sequence = sequence;
+	gPangeaLocalInputHistory[slot].controlBits = gPlayerInfo[playerNum].controlBits;
+	gPangeaLocalInputHistory[slot].controlBitsNew = gPlayerInfo[playerNum].controlBits_New;
+	gPangeaLocalInputHistory[slot].analogSteering = gPlayerInfo[playerNum].analogSteering;
+}
+
+static void PangeaNet_ReapplyUnackedLocalInput(uint32_t lastProcessedInputSequence, short playerNum)
+{
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+	{
+		return;
+	}
+	for (uint32_t i = 0; i < gPangeaLocalInputHistoryCount; i++)
+	{
+		const uint32_t slot = (gPangeaLocalInputHistoryHead + i) % PANGEA_NET_INPUT_HISTORY_CAP;
+		const PangeaNetInputHistoryEntry* entry = &gPangeaLocalInputHistory[slot];
+		if (entry->sequence <= lastProcessedInputSequence)
+		{
+			continue;
+		}
+		gPlayerInfo[playerNum].controlBits = entry->controlBits;
+		gPlayerInfo[playerNum].controlBits_New = entry->controlBitsNew;
+		gPlayerInfo[playerNum].analogSteering = entry->analogSteering;
+	}
+}
+
+static void PangeaNet_PushRemoteSnapshot(short playerNum, const PangeaNetPlayerCarState* source)
+{
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS || !source)
+	{
+		return;
+	}
+	uint32_t slot = (gPangeaRemoteSnapshotHead[playerNum] + gPangeaRemoteSnapshotCount[playerNum]) % PANGEA_NET_REMOTE_BUFFER_CAP;
+	if (gPangeaRemoteSnapshotCount[playerNum] >= PANGEA_NET_REMOTE_BUFFER_CAP)
+	{
+		gPangeaRemoteSnapshotHead[playerNum] = (gPangeaRemoteSnapshotHead[playerNum] + 1) % PANGEA_NET_REMOTE_BUFFER_CAP;
+		slot = (gPangeaRemoteSnapshotHead[playerNum] + gPangeaRemoteSnapshotCount[playerNum] - 1) % PANGEA_NET_REMOTE_BUFFER_CAP;
+	}
+	else
+	{
+		gPangeaRemoteSnapshotCount[playerNum]++;
+	}
+	PangeaNetSnapshotPlayerState* target = &gPangeaRemoteSnapshotBuffer[playerNum][slot];
+	SDL_memset(target, 0, sizeof(*target));
+	target->coord = source->coord;
+	target->rotY = source->rotY;
+	target->delta = source->delta;
+	target->steering = source->steering;
+	target->currentThrust = source->currentThrust;
+	target->controlBits = source->controlBits;
+	target->controlBitsNew = source->controlBitsNew;
+	target->analogSteering = source->analogSteering;
+	target->lapNum = source->lapNum;
+	target->checkpointNum = source->checkpointNum;
+	target->place = source->place;
+	target->raceComplete = source->raceComplete;
+	target->isEliminated = source->isEliminated;
+	target->powType = source->powType;
+	target->powQuantity = source->powQuantity;
+	target->health = source->health;
+	target->frozenTimer = source->frozenTimer;
+	target->greasedTiresTimer = source->greasedTiresTimer;
+	target->nitroTimer = source->nitroTimer;
+	target->stickyTiresTimer = source->stickyTiresTimer;
+	target->invisibilityTimer = source->invisibilityTimer;
+}
+
+static int PangeaNet_GetDelayedRemoteSnapshot(short playerNum, PangeaNetSnapshotPlayerState* outSnapshot)
+{
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS || !outSnapshot)
+	{
+		return 0;
+	}
+	const uint32_t count = gPangeaRemoteSnapshotCount[playerNum];
+	if (count == 0)
+	{
+		return 0;
+	}
+	const uint32_t delayedOffset = count > PANGEA_NET_REMOTE_INTERP_DELAY
+		? (count - 1 - PANGEA_NET_REMOTE_INTERP_DELAY)
+		: (count - 1);
+	const uint32_t slot = (gPangeaRemoteSnapshotHead[playerNum] + delayedOffset) % PANGEA_NET_REMOTE_BUFFER_CAP;
+	*outSnapshot = gPangeaRemoteSnapshotBuffer[playerNum][slot];
+	return 1;
+}
+
+static void PangeaNetWriter_Init(PangeaNetWriter* writer, void* bytes, int byteCount)
+{
+	writer->bytes = (uint8_t*)bytes;
+	writer->byteCount = byteCount;
+	writer->cursor = 0;
+	writer->ok = 1;
+}
+
+static void PangeaNetReader_Init(PangeaNetReader* reader, const void* bytes, int byteCount)
+{
+	reader->bytes = (const uint8_t*)bytes;
+	reader->byteCount = byteCount;
+	reader->cursor = 0;
+	reader->ok = 1;
+}
+
+static void PangeaNetWriter_WriteU8(PangeaNetWriter* writer, uint8_t value)
+{
+	if (!writer->ok || writer->cursor + 1 > writer->byteCount)
+	{
+		writer->ok = 0;
+		return;
+	}
+	writer->bytes[writer->cursor++] = value;
+}
+
+static void PangeaNetWriter_WriteU16(PangeaNetWriter* writer, uint16_t value)
+{
+	if (!writer->ok || writer->cursor + 2 > writer->byteCount)
+	{
+		writer->ok = 0;
+		return;
+	}
+	writer->bytes[writer->cursor++] = (uint8_t)(value & 0xFFu);
+	writer->bytes[writer->cursor++] = (uint8_t)((value >> 8) & 0xFFu);
+}
+
+static void PangeaNetWriter_WriteU32(PangeaNetWriter* writer, uint32_t value)
+{
+	if (!writer->ok || writer->cursor + 4 > writer->byteCount)
+	{
+		writer->ok = 0;
+		return;
+	}
+	writer->bytes[writer->cursor++] = (uint8_t)(value & 0xFFu);
+	writer->bytes[writer->cursor++] = (uint8_t)((value >> 8) & 0xFFu);
+	writer->bytes[writer->cursor++] = (uint8_t)((value >> 16) & 0xFFu);
+	writer->bytes[writer->cursor++] = (uint8_t)((value >> 24) & 0xFFu);
+}
+
+static void PangeaNetWriter_WriteF32(PangeaNetWriter* writer, float value)
+{
+	uint32_t bits = 0;
+	SDL_memcpy(&bits, &value, sizeof(bits));
+	PangeaNetWriter_WriteU32(writer, bits);
+}
+
+static uint8_t PangeaNetReader_ReadU8(PangeaNetReader* reader)
+{
+	if (!reader->ok || reader->cursor + 1 > reader->byteCount)
+	{
+		reader->ok = 0;
+		return 0;
+	}
+	return reader->bytes[reader->cursor++];
+}
+
+static uint16_t PangeaNetReader_ReadU16(PangeaNetReader* reader)
+{
+	const uint16_t lo = PangeaNetReader_ReadU8(reader);
+	const uint16_t hi = PangeaNetReader_ReadU8(reader);
+	return (uint16_t)(lo | (hi << 8));
+}
+
+static uint32_t PangeaNetReader_ReadU32(PangeaNetReader* reader)
+{
+	const uint32_t b0 = PangeaNetReader_ReadU8(reader);
+	const uint32_t b1 = PangeaNetReader_ReadU8(reader);
+	const uint32_t b2 = PangeaNetReader_ReadU8(reader);
+	const uint32_t b3 = PangeaNetReader_ReadU8(reader);
+	return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+}
+
+static float PangeaNetReader_ReadF32(PangeaNetReader* reader)
+{
+	const uint32_t bits = PangeaNetReader_ReadU32(reader);
+	float value = 0.0f;
+	SDL_memcpy(&value, &bits, sizeof(value));
+	return value;
+}
+
+static int PangeaNet_WriteHeader(PangeaNetWriter* writer, const PangeaNetPacketHeader* header)
+{
+	PangeaNetWriter_WriteU32(writer, header->magic);
+	PangeaNetWriter_WriteU16(writer, header->version);
+	PangeaNetWriter_WriteU16(writer, header->packetType);
+	PangeaNetWriter_WriteU32(writer, header->matchIdLow);
+	PangeaNetWriter_WriteU32(writer, header->matchIdHigh);
+	PangeaNetWriter_WriteU32(writer, header->tick);
+	PangeaNetWriter_WriteU32(writer, header->sequence);
+	PangeaNetWriter_WriteU16(writer, header->playerIndex);
+	PangeaNetWriter_WriteU16(writer, header->reserved);
+	return writer->ok;
+}
+
+static int PangeaNet_ReadHeader(PangeaNetReader* reader, PangeaNetPacketHeader* outHeader)
+{
+	outHeader->magic = PangeaNetReader_ReadU32(reader);
+	outHeader->version = PangeaNetReader_ReadU16(reader);
+	outHeader->packetType = PangeaNetReader_ReadU16(reader);
+	outHeader->matchIdLow = PangeaNetReader_ReadU32(reader);
+	outHeader->matchIdHigh = PangeaNetReader_ReadU32(reader);
+	outHeader->tick = PangeaNetReader_ReadU32(reader);
+	outHeader->sequence = PangeaNetReader_ReadU32(reader);
+	outHeader->playerIndex = PangeaNetReader_ReadU16(reader);
+	outHeader->reserved = PangeaNetReader_ReadU16(reader);
+	return reader->ok;
+}
+
+static void PangeaNet_SendReliableEvent(uint8_t eventType, short playerNum)
+{
+	uint8_t bytes[128];
+	PangeaNetWriter writer;
+	PangeaNetPacketHeader header;
+	header.magic = PANGEA_NET_MAGIC;
+	header.version = PANGEA_NET_VERSION;
+	header.packetType = kPangeaPacketReliableEvent;
+	header.matchIdLow = gPangeaMatchId;
+	header.matchIdHigh = gPangeaMatchIdHigh;
+	header.tick = gPangeaLocalTick;
+	header.sequence = gPangeaSendSequence++;
+	header.playerIndex = PANGEA_NET_PLAYER_NA;
+	header.reserved = 0;
+	PangeaNetWriter_Init(&writer, bytes, (int)sizeof(bytes));
+	PangeaNet_WriteHeader(&writer, &header);
+	PangeaNetWriter_WriteU8(&writer, eventType);
+	PangeaNetWriter_WriteU8(&writer, (uint8_t)playerNum);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[playerNum].lapNum);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[playerNum].place);
+	PangeaNetWriter_WriteU8(&writer, gPlayerInfo[playerNum].raceComplete ? 1 : 0);
+	PangeaNetWriter_WriteU8(&writer, gPlayerInfo[playerNum].isEliminated ? 1 : 0);
+	if (!writer.ok)
+	{
+		return;
+	}
+	PangeaNetBridge_SendReliable(bytes, writer.cursor);
+}
+
+static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlayerCarState* source)
+{
+	PangeaNetRemoteInterpState* interp = &gPangeaRemoteInterp[playerNum];
+	if (interp->hasTo)
+	{
+		interp->fromState = interp->toState;
+		interp->hasFrom = true;
+	}
+	else
+	{
+		SDL_memset(&interp->fromState, 0, sizeof(interp->fromState));
+		interp->fromState.coord = source->coord;
+		interp->fromState.rotY = source->rotY;
+		interp->fromState.delta = source->delta;
+		interp->fromState.steering = source->steering;
+		interp->fromState.currentThrust = source->currentThrust;
+		interp->fromState.controlBits = source->controlBits;
+		interp->fromState.controlBitsNew = source->controlBitsNew;
+		interp->fromState.analogSteering = source->analogSteering;
+		interp->fromState.lapNum = source->lapNum;
+		interp->fromState.checkpointNum = source->checkpointNum;
+		interp->fromState.place = source->place;
+		interp->fromState.raceComplete = source->raceComplete;
+		interp->fromState.powType = source->powType;
+		interp->fromState.powQuantity = source->powQuantity;
+		interp->fromState.health = source->health;
+		interp->fromState.isEliminated = 0;
+		interp->fromState.frozenTimer = 0.0f;
+		interp->fromState.greasedTiresTimer = 0.0f;
+		interp->fromState.nitroTimer = 0.0f;
+		interp->fromState.stickyTiresTimer = 0.0f;
+		interp->fromState.invisibilityTimer = 0.0f;
+		interp->hasFrom = true;
+	}
+
+	SDL_memset(&interp->toState, 0, sizeof(interp->toState));
+	interp->toState.coord = source->coord;
+	interp->toState.rotY = source->rotY;
+	interp->toState.delta = source->delta;
+	interp->toState.steering = source->steering;
+	interp->toState.currentThrust = source->currentThrust;
+	interp->toState.controlBits = source->controlBits;
+	interp->toState.controlBitsNew = source->controlBitsNew;
+	interp->toState.analogSteering = source->analogSteering;
+	interp->toState.lapNum = source->lapNum;
+	interp->toState.checkpointNum = source->checkpointNum;
+	interp->toState.place = source->place;
+	interp->toState.raceComplete = source->raceComplete;
+	interp->toState.powType = source->powType;
+	interp->toState.powQuantity = source->powQuantity;
+	interp->toState.health = source->health;
+	interp->toState.isEliminated = 0;
+	interp->toState.frozenTimer = 0.0f;
+	interp->toState.greasedTiresTimer = 0.0f;
+	interp->toState.nitroTimer = 0.0f;
+	interp->toState.stickyTiresTimer = 0.0f;
+	interp->toState.invisibilityTimer = 0.0f;
+	interp->hasTo = true;
+}
 
 static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 {
-	if (!bytes || byteCount < (int)sizeof(uint32_t))
+	PangeaNetReader reader;
+	PangeaNetPacketHeader header;
+	PangeaNetReader_Init(&reader, bytes, byteCount);
+
+	if (!PangeaNet_ReadHeader(&reader, &header))
 	{
+		SDL_Log("CroMag net: malformed packet (header)");
 		return;
 	}
 
-	const uint32_t packetType = *(const uint32_t*)bytes;
-
-	if (packetType == kPangeaNetHostControlPacket)
+	if (header.magic != PANGEA_NET_MAGIC || header.version != PANGEA_NET_VERSION)
 	{
-		if (byteCount != (int)sizeof(PangeaNetHostControlPacket))
+		gPangeaDroppedPacketCount++;
+		SDL_Log("CroMag net: drop packet bad header magic=%08x version=%u bytes=%d drops=%u",
+			(unsigned)header.magic,
+			(unsigned)header.version,
+			byteCount,
+			(unsigned)gPangeaDroppedPacketCount);
+		return;
+	}
+
+	if (header.matchIdLow != gPangeaMatchId || header.matchIdHigh != gPangeaMatchIdHigh)
+	{
+		gPangeaDroppedPacketCount++;
+		SDL_Log("CroMag net: drop packet match mismatch type=%u got=%u:%u expected=%u:%u drops=%u",
+			(unsigned)header.packetType,
+			(unsigned)header.matchIdHigh,
+			(unsigned)header.matchIdLow,
+			(unsigned)gPangeaMatchIdHigh,
+			(unsigned)gPangeaMatchId,
+			(unsigned)gPangeaDroppedPacketCount);
+		return;
+	}
+
+	if (header.sequence <= gPangeaConnState[gMyNetworkPlayerNum].lastReceivedSequence && header.sequence != 0)
+	{
+		gPangeaReorderedPacketCount++;
+	}
+	gPangeaConnState[gMyNetworkPlayerNum].lastReceivedSequence = header.sequence;
+
+	if (header.packetType == kPangeaPacketClientInput)
+	{
+		const short playerNum = (short)header.playerIndex;
+		if (!gIsNetworkHost || playerNum < 0 || playerNum >= MAX_PLAYERS)
 		{
-			SDL_Log(
-				"CroMag net: invalid host packet size expected=%d got=%d",
-				(int)sizeof(PangeaNetHostControlPacket),
-				byteCount);
 			return;
 		}
 
-		const PangeaNetHostControlPacket* packet = (const PangeaNetHostControlPacket*)bytes;
-		const NetHostControlInfoMessageType* mess = &packet->payload;
-		short i;
-
-		if (mess->frameCounter < gHostSendCounter)
+		gPlayerInfo[playerNum].controlBits = PangeaNetReader_ReadU32(&reader);
+		gPlayerInfo[playerNum].controlBits_New = PangeaNetReader_ReadU32(&reader);
+		gPlayerInfo[playerNum].analogSteering.x = PangeaNetReader_ReadF32(&reader);
+		gPlayerInfo[playerNum].analogSteering.y = PangeaNetReader_ReadF32(&reader);
+		if (!reader.ok)
 		{
+			SDL_Log("CroMag net: malformed client input payload");
 			return;
 		}
 
-		if (mess->frameCounter > gHostSendCounter)
+		gPangeaConnState[playerNum].lastReceivedInputTick = header.tick;
+		gPangeaConnState[playerNum].lastReceivedSequence = header.sequence;
+		gPangeaConnState[playerNum].inputBufferLength = 1;
+		gPangeaConnState[playerNum].timeoutState = 0;
+		gPangeaConnState[playerNum].lastInputTimeMs = (double)SDL_GetTicks();
+		if (PangeaNet_ShouldLogSequence(header.sequence))
 		{
-			SDL_Log(
-				"CroMag net: host frame jump expected=%u got=%u",
-				(unsigned)gHostSendCounter,
-				(unsigned)mess->frameCounter);
-		}
-
-		gHostSendCounter = mess->frameCounter + 1;
-		gFramesPerSecond = mess->fps;
-		gFramesPerSecondFrac = mess->fpsFrac;
-
-		gExpectedMatchSeed = mess->randomSeed;
-		SetMyRandomSeed((unsigned long)mess->randomSeed);
-
-		for (i = 0; i < MAX_PLAYERS; i++)
-		{
-			gPlayerInfo[i].controlBits = mess->controlBits[i];
-			gPlayerInfo[i].controlBits_New = mess->controlBitsNew[i];
-			gPlayerInfo[i].analogSteering = mess->analogSteering[i];
+			SDL_Log("CroMag net: host recv input seq=%u tick=%u player=%d bits=%08x new=%08x steer=(%.2f,%.2f) pos=(%.1f,%.1f,%.1f)",
+				(unsigned)header.sequence,
+				(unsigned)header.tick,
+				playerNum,
+				(unsigned)gPlayerInfo[playerNum].controlBits,
+				(unsigned)gPlayerInfo[playerNum].controlBits_New,
+				gPlayerInfo[playerNum].analogSteering.x,
+				gPlayerInfo[playerNum].analogSteering.y,
+				gPlayerInfo[playerNum].coord.x,
+				gPlayerInfo[playerNum].coord.y,
+				gPlayerInfo[playerNum].coord.z);
 		}
 		return;
 	}
 
-	if (packetType == kPangeaNetClientControlPacket)
+	if (header.packetType == kPangeaPacketVehicleType)
 	{
-		if (byteCount != (int)sizeof(PangeaNetClientControlPacket))
-		{
-			SDL_Log(
-				"CroMag net: invalid client packet size expected=%d got=%d",
-				(int)sizeof(PangeaNetClientControlPacket),
-				byteCount);
-			return;
-		}
-
-		const PangeaNetClientControlPacket* packet = (const PangeaNetClientControlPacket*)bytes;
-		const NetClientControlInfoMessageType* mess = &packet->payload;
-		const short playerNum = mess->playerNum;
-
+		const short playerNum = (short)header.playerIndex;
 		if (playerNum < 0 || playerNum >= MAX_PLAYERS)
 		{
 			return;
 		}
-
-		if (mess->frameCounter < gClientSendCounter[playerNum])
+		gPendingVehicleType[playerNum] = (short)PangeaNetReader_ReadU16(&reader);
+		gPendingVehicleSex[playerNum] = (short)PangeaNetReader_ReadU16(&reader);
+		if (!reader.ok)
 		{
+			SDL_Log("CroMag net: malformed vehicle payload");
 			return;
 		}
-
-		if (mess->frameCounter > gClientSendCounter[playerNum])
-		{
-			SDL_Log(
-				"CroMag net: client frame jump player=%d expected=%u got=%u",
-				(int)playerNum,
-				(unsigned)gClientSendCounter[playerNum],
-				(unsigned)mess->frameCounter);
-		}
-
-		gClientSendCounter[playerNum] = mess->frameCounter + 1;
-		gPlayerInfo[playerNum].controlBits = mess->controlBits;
-		gPlayerInfo[playerNum].controlBits_New = mess->controlBitsNew;
-		gPlayerInfo[playerNum].analogSteering = mess->analogSteering;
-		return;
-	}
-
-	if (packetType == kPangeaNetVehicleTypePacket)
-	{
-		if (byteCount != (int)sizeof(PangeaNetVehicleTypePacket))
-		{
-			SDL_Log(
-				"CroMag net: invalid vehicle packet size expected=%d got=%d",
-				(int)sizeof(PangeaNetVehicleTypePacket),
-				byteCount);
-			return;
-		}
-
-		const PangeaNetVehicleTypePacket* packet = (const PangeaNetVehicleTypePacket*)bytes;
-		const short playerNum = packet->payload.playerNum;
-		if (playerNum < 0 || playerNum >= MAX_PLAYERS)
-		{
-			return;
-		}
-
-		gPendingVehicleType[playerNum] = packet->payload.vehicleType;
-		gPendingVehicleSex[playerNum] = packet->payload.sex;
 		gHavePendingVehicleType[playerNum] = true;
 		return;
 	}
 
-	if (packetType == kPangeaNetHostSnapshotPacket)
+	if (header.packetType == kPangeaPacketReliableEvent)
 	{
-		if (byteCount != (int)sizeof(PangeaNetHostSnapshotPacket))
-		{
-			SDL_Log(
-				"CroMag net: invalid snapshot packet size expected=%d got=%d",
-				(int)sizeof(PangeaNetHostSnapshotPacket),
-				byteCount);
-			return;
-		}
-
-		const PangeaNetHostSnapshotPacket* packet = (const PangeaNetHostSnapshotPacket*)bytes;
-		if (packet->snapshotSeq < gHostSendCounter)
+		if (!gIsNetworkClient)
 		{
 			return;
 		}
-
-		gPendingSnapshot = *packet;
-		gHavePendingSnapshot = true;
+		const uint8_t eventType = PangeaNetReader_ReadU8(&reader);
+		const short playerNum = (short)PangeaNetReader_ReadU8(&reader);
+		const short lap = (short)PangeaNetReader_ReadU16(&reader);
+		const short place = (short)PangeaNetReader_ReadU16(&reader);
+		const uint8_t raceComplete = PangeaNetReader_ReadU8(&reader);
+		const uint8_t eliminated = PangeaNetReader_ReadU8(&reader);
+		if (!reader.ok || playerNum < 0 || playerNum >= MAX_PLAYERS)
+		{
+			return;
+		}
+		if (eventType == kPangeaReliableEventRaceComplete)
+		{
+			gPlayerInfo[playerNum].raceComplete = raceComplete != 0;
+			gPlayerInfo[playerNum].lapNum = lap;
+			gPlayerInfo[playerNum].place = place;
+		}
+		else if (eventType == kPangeaReliableEventEliminated)
+		{
+			gPlayerInfo[playerNum].isEliminated = eliminated != 0;
+		}
 		return;
 	}
 
-	SDL_Log("CroMag net: unknown packetType=%u size=%d", (unsigned)packetType, byteCount);
+	if (header.packetType == kPangeaPacketHostSnapshot)
+	{
+		if (!gIsNetworkClient || header.sequence <= gPangeaLastHostSnapshotSeq)
+		{
+			gPangeaDroppedPacketCount++;
+			SDL_Log("CroMag net: drop snapshot seq=%u last=%u isClient=%d drops=%u",
+				(unsigned)header.sequence,
+				(unsigned)gPangeaLastHostSnapshotSeq,
+				gIsNetworkClient,
+				(unsigned)gPangeaDroppedPacketCount);
+			return;
+		}
+
+		gPendingSnapshot.protocolVersion = PangeaNetReader_ReadU16(&reader);
+		gPendingSnapshot.snapshotKind = PangeaNetReader_ReadU8(&reader);
+		gPendingSnapshot.reserved0 = PangeaNetReader_ReadU8(&reader);
+		gPendingSnapshot.packetType = kPangeaPacketHostSnapshot;
+		gPendingSnapshot.snapshotSeq = header.sequence;
+		gPendingSnapshot.frameCounter = header.tick;
+		gPendingSnapshot.stateHash = PangeaNetReader_ReadU32(&reader);
+		gPendingSnapshot.lastKeyframeSeq = PangeaNetReader_ReadU32(&reader);
+		gPendingSnapshot.lastDeltaSeq = PangeaNetReader_ReadU32(&reader);
+		gPendingSnapshot.playerCount = (uint8_t)PangeaNetReader_ReadU8(&reader);
+		gPendingSnapshot.pad[0] = gPendingSnapshot.pad[1] = gPendingSnapshot.pad[2] = 0;
+		if (!reader.ok || gPendingSnapshot.protocolVersion != PANGEA_NET_VERSION)
+		{
+			SDL_Log("CroMag net: rejected snapshot protocolVersion=%u expected=%u",
+				(unsigned)gPendingSnapshot.protocolVersion,
+				(unsigned)PANGEA_NET_VERSION);
+			gPangeaDroppedPacketCount++;
+			return;
+		}
+
+		for (short i = 0; i < MAX_PLAYERS; i++)
+		{
+			PangeaNetPlayerCarState* s = &gPendingSnapshot.players[i];
+			s->coord.x = PangeaNetReader_ReadF32(&reader);
+			s->coord.y = PangeaNetReader_ReadF32(&reader);
+			s->coord.z = PangeaNetReader_ReadF32(&reader);
+			s->rotY = PangeaNetReader_ReadF32(&reader);
+			s->delta.x = PangeaNetReader_ReadF32(&reader);
+			s->delta.y = PangeaNetReader_ReadF32(&reader);
+			s->delta.z = PangeaNetReader_ReadF32(&reader);
+			s->steering = PangeaNetReader_ReadF32(&reader);
+			s->currentThrust = PangeaNetReader_ReadF32(&reader);
+			s->controlBits = PangeaNetReader_ReadU32(&reader);
+			s->controlBitsNew = PangeaNetReader_ReadU32(&reader);
+			s->analogSteering.x = PangeaNetReader_ReadF32(&reader);
+			s->analogSteering.y = PangeaNetReader_ReadF32(&reader);
+			s->lapNum = (short)PangeaNetReader_ReadU16(&reader);
+			s->checkpointNum = (short)PangeaNetReader_ReadU16(&reader);
+			s->place = (short)PangeaNetReader_ReadU16(&reader);
+			s->raceComplete = PangeaNetReader_ReadU8(&reader);
+			s->isEliminated = PangeaNetReader_ReadU8(&reader);
+			s->powType = (short)PangeaNetReader_ReadU16(&reader);
+			s->powQuantity = (short)PangeaNetReader_ReadU16(&reader);
+			s->health = PangeaNetReader_ReadF32(&reader);
+			s->frozenTimer = PangeaNetReader_ReadF32(&reader);
+			s->greasedTiresTimer = PangeaNetReader_ReadF32(&reader);
+			s->nitroTimer = PangeaNetReader_ReadF32(&reader);
+			s->stickyTiresTimer = PangeaNetReader_ReadF32(&reader);
+			s->invisibilityTimer = PangeaNetReader_ReadF32(&reader);
+			s->lastProcessedInputSequence = PangeaNetReader_ReadU32(&reader);
+
+			if (i < MAX_PLAYERS)
+			{
+				gPlayerInfo[i].isEliminated = s->isEliminated != 0;
+				gPlayerInfo[i].frozenTimer = s->frozenTimer;
+				gPlayerInfo[i].greasedTiresTimer = s->greasedTiresTimer;
+				gPlayerInfo[i].nitroTimer = s->nitroTimer;
+				gPlayerInfo[i].stickyTiresTimer = s->stickyTiresTimer;
+				gPlayerInfo[i].invisibilityTimer = s->invisibilityTimer;
+				if (i != gMyNetworkPlayerNum)
+				{
+					PangeaNet_PushRemoteSnapshot(i, s);
+				}
+			}
+		}
+
+		if (!reader.ok)
+		{
+			SDL_Log("CroMag net: malformed snapshot payload");
+			return;
+		}
+
+		gPangeaLastHostSnapshotSeq = header.sequence;
+		gPangeaConnState[gMyNetworkPlayerNum].lastAckedSnapshotTick = header.tick;
+		gPangeaLastSnapshotStateHash = gPendingSnapshot.stateHash;
+		if (gPendingSnapshot.snapshotKind == kPangeaSnapshotKeyframe)
+		{
+			gPangeaLastHostKeyframeSeq = gPendingSnapshot.snapshotSeq;
+			gPangeaLastReceivedKeyframeAtMs = (double)SDL_GetTicks();
+		}
+		else if (gPendingSnapshot.snapshotKind == kPangeaSnapshotDelta)
+		{
+			gPangeaLastHostDeltaSeq = gPendingSnapshot.snapshotSeq;
+		}
+		gHavePendingSnapshot = true;
+		if (PangeaNet_ShouldLogSequence(header.sequence))
+		{
+			const short remotePlayer = gMyNetworkPlayerNum == 0 ? 1 : 0;
+			const PangeaNetPlayerCarState* local = &gPendingSnapshot.players[gMyNetworkPlayerNum];
+			const PangeaNetPlayerCarState* remote = &gPendingSnapshot.players[remotePlayer];
+			SDL_Log("CroMag net: client recv snapshot seq=%u kind=%u tick=%u players=%u local%d=(%.1f,%.1f,%.1f) remote%d=(%.1f,%.1f,%.1f) remoteBits=%08x",
+				(unsigned)header.sequence,
+				(unsigned)gPendingSnapshot.snapshotKind,
+				(unsigned)header.tick,
+				(unsigned)gPendingSnapshot.playerCount,
+				gMyNetworkPlayerNum,
+				local->coord.x,
+				local->coord.y,
+				local->coord.z,
+				remotePlayer,
+				remote->coord.x,
+				remote->coord.y,
+				remote->coord.z,
+				(unsigned)remote->controlBits);
+		}
+		return;
+	}
+
+	if (header.packetType == kPangeaPacketClientAck)
+	{
+		if (!gIsNetworkHost)
+		{
+			return;
+		}
+		const short playerNum = (short)header.playerIndex;
+		if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+		{
+			return;
+		}
+		gPangeaConnState[playerNum].lastAckedSnapshotTick = header.tick;
+		const uint32_t ackedSnapshotSeq = PangeaNetReader_ReadU32(&reader);
+		gPangeaLastAckedKeyframeSeq[playerNum] = PangeaNetReader_ReadU32(&reader);
+		gPangeaLastAckedDeltaSeq[playerNum] = PangeaNetReader_ReadU32(&reader);
+		if (!reader.ok)
+		{
+			gPangeaLastAckedDeltaSeq[playerNum] = 0;
+			gPangeaLastAckedKeyframeSeq[playerNum] = 0;
+		}
+		else if (ackedSnapshotSeq > gPangeaConnState[playerNum].lastSentSequence)
+		{
+			gPangeaConnState[playerNum].lastSentSequence = ackedSnapshotSeq;
+		}
+		return;
+	}
+
+	if (header.packetType == kPangeaPacketKeyframeResendRequest)
+	{
+		if (!gIsNetworkHost)
+		{
+			return;
+		}
+		const short playerNum = (short)header.playerIndex;
+		if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+		{
+			return;
+		}
+		gPangeaForceKeyframe = 1;
+		return;
+	}
+
+	SDL_Log("CroMag net: protocol error packetType=%u", (unsigned)header.packetType);
 }
 
 static void PumpPangeaNetMessages(void)
 {
-	uint8_t buffer[4096];
+	uint8_t buffer[PANGEA_NET_MAX_PACKET_SIZE];
 	int byteCount;
 
 	for (;;)
@@ -268,7 +878,6 @@ static void PumpPangeaNetMessages(void)
 		{
 			break;
 		}
-
 		HandlePangeaNetMessage(buffer, byteCount);
 	}
 }
@@ -372,12 +981,45 @@ Boolean SetupNetworkHosting(void)
 		gNumRealPlayers = (short)PangeaNetBridge_GetPlayerCount();
 		gExpectedMatchSeed = PangeaNetBridge_GetMatchSeed();
 		SetMyRandomSeed((unsigned long)gExpectedMatchSeed);
+		gPangeaMatchId = PangeaNetBridge_GetMatchIdLow();
+		gPangeaMatchIdHigh = PangeaNetBridge_GetMatchIdHigh();
+		gPangeaLocalTick = 0;
+		gPangeaSendSequence = 1;
+		gPangeaLastHostSnapshotSeq = 0;
+		gPangeaLastHostKeyframeSeq = 0;
+		gPangeaLastHostDeltaSeq = 0;
+		gPangeaLastSnapshotStateHash = 0;
+		gPangeaForceKeyframe = 0;
+		gPangeaLastReceivedKeyframeAtMs = (double)SDL_GetTicks();
+		gPangeaLastResendRequestAtMs = 0.0;
+		gPangeaCorrectionDistance = 0.0f;
+		gPangeaDroppedPacketCount = 0;
+		gPangeaReorderedPacketCount = 0;
+		gPangeaLocalInputHistoryHead = 0;
+		gPangeaLocalInputHistoryCount = 0;
 		gHostSendCounter = 0;
 		gTimeoutCounter = 0;
 		for (i = 0; i < MAX_PLAYERS; i++)
 		{
 			gClientSendCounter[i] = 0;
 			gHavePendingVehicleType[i] = false;
+			gPangeaConnState[i].lastReceivedInputTick = 0;
+			gPangeaConnState[i].lastAckedSnapshotTick = 0;
+			gPangeaConnState[i].lastSentSequence = 0;
+			gPangeaConnState[i].lastReceivedSequence = 0;
+			gPangeaConnState[i].rttMs = 0.0f;
+			gPangeaConnState[i].jitterMs = 0.0f;
+			gPangeaConnState[i].inputBufferLength = 0;
+			gPangeaConnState[i].timeoutState = 0;
+			gPangeaConnState[i].lastInputTimeMs = 0.0;
+			gPangeaRemoteInterp[i].hasFrom = false;
+			gPangeaRemoteInterp[i].hasTo = false;
+			gPangeaRemoteSnapshotHead[i] = 0;
+			gPangeaRemoteSnapshotCount[i] = 0;
+			gPangeaReliableRaceCompleteSent[i] = 0;
+			gPangeaReliableEliminatedSent[i] = 0;
+			gPangeaLastAckedKeyframeSeq[i] = 0;
+			gPangeaLastAckedDeltaSeq[i] = 0;
 		}
 		return false;
 	}
@@ -1257,23 +1899,7 @@ void HostSend_ControlInfoToClients(void)
 #ifdef __EMSCRIPTEN__
 	if (PangeaNetBridge_IsEnabled() && gIsNetworkHost)
 	{
-		PangeaNetHostControlPacket packet;
-		short i;
-		packet.packetType = kPangeaNetHostControlPacket;
-		packet.payload.frameCounter = gHostSendCounter++;
-		packet.payload.fps = gFramesPerSecond;
-		packet.payload.fpsFrac = gFramesPerSecondFrac;
-		packet.payload.randomSeed = (uint32_t)MyRandomLong();
-		gExpectedMatchSeed = packet.payload.randomSeed;
-
-		for (i = 0; i < MAX_PLAYERS; i++)
-		{
-			packet.payload.controlBits[i] = gPlayerInfo[i].controlBits;
-			packet.payload.controlBitsNew[i] = gPlayerInfo[i].controlBits_New;
-			packet.payload.analogSteering[i] = gPlayerInfo[i].analogSteering;
-		}
-
-		PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+		// Host-authoritative web flow does not broadcast lockstep control packets.
 		return;
 	}
 #endif
@@ -1422,14 +2048,51 @@ void ClientSend_ControlInfoToHost(void)
 #ifdef __EMSCRIPTEN__
 	if (PangeaNetBridge_IsEnabled() && gIsNetworkClient)
 	{
-		PangeaNetClientControlPacket packet;
-		packet.packetType = kPangeaNetClientControlPacket;
-		packet.payload.frameCounter = gClientSendCounter[gMyNetworkPlayerNum]++;
-		packet.payload.playerNum = gMyNetworkPlayerNum;
-		packet.payload.controlBits = gPlayerInfo[gMyNetworkPlayerNum].controlBits;
-		packet.payload.controlBitsNew = gPlayerInfo[gMyNetworkPlayerNum].controlBits_New;
-		packet.payload.analogSteering = gPlayerInfo[gMyNetworkPlayerNum].analogSteering;
-		PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+		uint8_t packetBytes[128];
+		PangeaNetWriter writer;
+		const short playerNum = gMyNetworkPlayerNum;
+		PangeaNetPacketHeader header;
+
+		gPangeaLocalTick++;
+		header.magic = PANGEA_NET_MAGIC;
+		header.version = PANGEA_NET_VERSION;
+		header.packetType = kPangeaPacketClientInput;
+		header.matchIdLow = gPangeaMatchId;
+		header.matchIdHigh = gPangeaMatchIdHigh;
+		header.tick = gPangeaLocalTick;
+		header.sequence = gPangeaSendSequence++;
+		header.playerIndex = (uint16_t)playerNum;
+		header.reserved = 0;
+
+		PangeaNetWriter_Init(&writer, packetBytes, (int)sizeof(packetBytes));
+		PangeaNet_WriteHeader(&writer, &header);
+		PangeaNetWriter_WriteU32(&writer, gPlayerInfo[playerNum].controlBits);
+		PangeaNetWriter_WriteU32(&writer, gPlayerInfo[playerNum].controlBits_New);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[playerNum].analogSteering.x);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[playerNum].analogSteering.y);
+
+		if (!writer.ok)
+		{
+			SDL_Log("CroMag net: failed to encode client input");
+			return;
+		}
+
+		PangeaNet_RecordLocalInput(header.sequence, playerNum);
+		gPangeaConnState[playerNum].lastSentSequence = header.sequence;
+		const int sent = PangeaNetBridge_SendReliable(packetBytes, writer.cursor);
+		if (PangeaNet_ShouldLogSequence(header.sequence) || !sent)
+		{
+			SDL_Log("CroMag net: client send input seq=%u tick=%u player=%d bits=%08x new=%08x steer=(%.2f,%.2f) bytes=%d sent=%d",
+				(unsigned)header.sequence,
+				(unsigned)header.tick,
+				playerNum,
+				(unsigned)gPlayerInfo[playerNum].controlBits,
+				(unsigned)gPlayerInfo[playerNum].controlBits_New,
+				gPlayerInfo[playerNum].analogSteering.x,
+				gPlayerInfo[playerNum].analogSteering.y,
+				writer.cursor,
+				sent);
+		}
 		return;
 	}
 #endif
@@ -1471,6 +2134,42 @@ void HostReceive_ControlInfoFromClients(void)
 	if (PangeaNetBridge_IsEnabled() && gIsNetworkHost)
 	{
 		PumpPangeaNetMessages();
+		const double nowMs = (double)SDL_GetTicks();
+		for (short i = 0; i < gNumRealPlayers; i++)
+		{
+			if (i == gMyNetworkPlayerNum)
+			{
+				continue;
+			}
+
+			const double ageMs = nowMs - gPangeaConnState[i].lastInputTimeMs;
+			if (gPangeaConnState[i].lastInputTimeMs <= 0.0)
+			{
+				gPangeaConnState[i].timeoutState = 1;
+				continue;
+			}
+
+			if (ageMs >= PANGEA_NET_INPUT_DISCONNECT_MS)
+			{
+				gPangeaConnState[i].timeoutState = 3;
+				gPlayerInfo[i].controlBits = 0;
+				gPlayerInfo[i].controlBits_New = 0;
+				gPlayerInfo[i].analogSteering.x = 0.0f;
+				gPlayerInfo[i].analogSteering.y = 0.0f;
+				gPlayerInfo[i].isEliminated = true;
+				continue;
+			}
+
+			if (ageMs >= PANGEA_NET_INPUT_TIMEOUT_MS)
+			{
+				// Missing-input window: keep applying the last known input briefly.
+				gPangeaConnState[i].timeoutState = 2;
+			}
+			else
+			{
+				gPangeaConnState[i].timeoutState = 0;
+			}
+		}
 		return;
 	}
 #endif
@@ -1554,15 +2253,36 @@ void PlayerBroadcastVehicleType(void)
 #ifdef __EMSCRIPTEN__
 	if (PangeaNetBridge_IsEnabled())
 	{
-		PangeaNetVehicleTypePacket packet;
-		packet.packetType = kPangeaNetVehicleTypePacket;
-		packet.payload.playerNum = gMyNetworkPlayerNum;
-		packet.payload.vehicleType = gPlayerInfo[gMyNetworkPlayerNum].vehicleType;
-		packet.payload.sex = gPlayerInfo[gMyNetworkPlayerNum].sex;
-		PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+		uint8_t packetBytes[96];
+		PangeaNetWriter writer;
+		PangeaNetPacketHeader header;
+		const short playerNum = gMyNetworkPlayerNum;
 
-		gPendingVehicleType[gMyNetworkPlayerNum] = packet.payload.vehicleType;
-		gPendingVehicleSex[gMyNetworkPlayerNum] = packet.payload.sex;
+		header.magic = PANGEA_NET_MAGIC;
+		header.version = PANGEA_NET_VERSION;
+		header.packetType = kPangeaPacketVehicleType;
+		header.matchIdLow = gPangeaMatchId;
+		header.matchIdHigh = gPangeaMatchIdHigh;
+		header.tick = gPangeaLocalTick;
+		header.sequence = gPangeaSendSequence++;
+		header.playerIndex = (uint16_t)playerNum;
+		header.reserved = 0;
+
+		PangeaNetWriter_Init(&writer, packetBytes, (int)sizeof(packetBytes));
+		PangeaNet_WriteHeader(&writer, &header);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[playerNum].vehicleType);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[playerNum].sex);
+
+		if (!writer.ok)
+		{
+			SDL_Log("CroMag net: failed to encode vehicle type");
+			return;
+		}
+
+		PangeaNetBridge_SendReliable(packetBytes, writer.cursor);
+
+		gPendingVehicleType[playerNum] = gPlayerInfo[playerNum].vehicleType;
+		gPendingVehicleSex[playerNum] = gPlayerInfo[playerNum].sex;
 		gHavePendingVehicleType[gMyNetworkPlayerNum] = true;
 		return;
 	}
@@ -1842,7 +2562,24 @@ matched_id:
 
 void PlayerBroadcastNullPacket(void)
 {
-	// No-op in web builds: null packets are not needed with PangeaNet.
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled())
+	{
+		PumpPangeaNetMessages();
+
+		if (gIsNetworkClient)
+		{
+			ClientSend_ControlInfoToHost();
+		}
+		else if (gIsNetworkHost)
+		{
+			HostReceive_ControlInfoFromClients();
+			HostSend_SnapshotToClients();
+		}
+		return;
+	}
+#endif
+
 	(void)0;
 #if 0
 OSStatus					status;
@@ -1883,38 +2620,148 @@ void HostSend_SnapshotToClients(void)
 		return;
 	}
 
-	PangeaNetHostSnapshotPacket packet;
+	uint8_t packetBytes[PANGEA_NET_MAX_PACKET_SIZE];
+	PangeaNetWriter writer;
+	PangeaNetPacketHeader header;
+	uint8_t snapshotKind = kPangeaSnapshotDelta;
+	uint32_t stateHash = 0;
+	uint32_t advertisedKeyframeSeq = gPangeaLastHostKeyframeSeq;
+	uint8_t clientNeedsKeyframe = 0;
 	short i;
-	packet.packetType = kPangeaNetHostSnapshotPacket;
-	packet.snapshotSeq = gHostSendCounter;
-	packet.frameCounter = gHostSendCounter;
-	packet.playerCount = (uint8_t)gNumRealPlayers;
-	packet.pad[0] = 0;
-	packet.pad[1] = 0;
-	packet.pad[2] = 0;
+
+	gPangeaLocalTick++;
+	for (i = 0; i < gNumRealPlayers; i++)
+	{
+		if (i == gMyNetworkPlayerNum)
+		{
+			continue;
+		}
+		if (gPangeaLastHostKeyframeSeq != 0 && gPangeaLastAckedKeyframeSeq[i] < gPangeaLastHostKeyframeSeq)
+		{
+			clientNeedsKeyframe = 1;
+			break;
+		}
+	}
+	if (gPangeaForceKeyframe || gPangeaLastHostKeyframeSeq == 0 || (gPangeaLocalTick % PANGEA_NET_KEYFRAME_INTERVAL_FRAMES) == 0)
+	{
+		snapshotKind = kPangeaSnapshotKeyframe;
+	}
+	if (clientNeedsKeyframe)
+	{
+		snapshotKind = kPangeaSnapshotKeyframe;
+	}
+	if (gTrackCompleted)
+	{
+		snapshotKind = kPangeaSnapshotMatchEnd;
+	}
+	header.magic = PANGEA_NET_MAGIC;
+	header.version = PANGEA_NET_VERSION;
+	header.packetType = kPangeaPacketHostSnapshot;
+	header.matchIdLow = gPangeaMatchId;
+	header.matchIdHigh = gPangeaMatchIdHigh;
+	header.tick = gPangeaLocalTick;
+	header.sequence = gPangeaSendSequence++;
+	header.playerIndex = PANGEA_NET_PLAYER_NA;
+	header.reserved = 0;
+	if (snapshotKind == kPangeaSnapshotKeyframe)
+	{
+		advertisedKeyframeSeq = header.sequence;
+	}
+
+	PangeaNetWriter_Init(&writer, packetBytes, (int)sizeof(packetBytes));
+	PangeaNet_WriteHeader(&writer, &header);
+	stateHash = PangeaNet_ComputeAuthoritativeStateHash(gNumRealPlayers);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)PANGEA_NET_VERSION);
+	PangeaNetWriter_WriteU8(&writer, snapshotKind);
+	PangeaNetWriter_WriteU8(&writer, 0);
+	PangeaNetWriter_WriteU32(&writer, stateHash);
+	PangeaNetWriter_WriteU32(&writer, advertisedKeyframeSeq);
+	PangeaNetWriter_WriteU32(&writer, gPangeaLastHostDeltaSeq);
+	PangeaNetWriter_WriteU8(&writer, (uint8_t)gNumRealPlayers);
 
 	for (i = 0; i < MAX_PLAYERS; i++)
 	{
-		PangeaNetPlayerCarState* s = &packet.players[i];
-		s->coord = gPlayerInfo[i].coord;
-		s->rotY = gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Rot.y : 0.0f;
-		s->delta = gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Delta : (OGLVector3D){0, 0, 0};
-		s->steering = gPlayerInfo[i].steering;
-		s->currentThrust = gPlayerInfo[i].currentThrust;
-		s->controlBits = gPlayerInfo[i].controlBits;
-		s->controlBitsNew = gPlayerInfo[i].controlBits_New;
-		s->analogSteering = gPlayerInfo[i].analogSteering;
-		s->lapNum = gPlayerInfo[i].lapNum;
-		s->checkpointNum = gPlayerInfo[i].checkpointNum;
-		s->place = gPlayerInfo[i].place;
-		s->raceComplete = gPlayerInfo[i].raceComplete ? 1 : 0;
-		s->pad = 0;
-		s->powType = gPlayerInfo[i].powType;
-		s->powQuantity = gPlayerInfo[i].powQuantity;
-		s->health = gPlayerInfo[i].health;
+		const ObjNode* obj = gPlayerInfo[i].objNode;
+		const OGLVector3D zeroDelta = {0.0f, 0.0f, 0.0f};
+		const OGLVector3D delta = obj ? obj->Delta : zeroDelta;
+
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].coord.x);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].coord.y);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].coord.z);
+		PangeaNetWriter_WriteF32(&writer, obj ? obj->Rot.y : 0.0f);
+		PangeaNetWriter_WriteF32(&writer, delta.x);
+		PangeaNetWriter_WriteF32(&writer, delta.y);
+		PangeaNetWriter_WriteF32(&writer, delta.z);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].steering);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].currentThrust);
+		PangeaNetWriter_WriteU32(&writer, gPlayerInfo[i].controlBits);
+		PangeaNetWriter_WriteU32(&writer, gPlayerInfo[i].controlBits_New);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].analogSteering.x);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].analogSteering.y);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].lapNum);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].checkpointNum);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].place);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].raceComplete ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].isEliminated ? 1 : 0);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].powType);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].powQuantity);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].health);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].frozenTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].greasedTiresTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].nitroTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].stickyTiresTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].invisibilityTimer);
+		PangeaNetWriter_WriteU32(&writer, gPangeaConnState[i].lastReceivedSequence);
 	}
 
-	PangeaNetBridge_SendReliable(&packet, (int)sizeof(packet));
+	if (!writer.ok)
+	{
+		SDL_Log("CroMag net: failed to encode host snapshot");
+		return;
+	}
+
+	const int sent = PangeaNetBridge_SendReliable(packetBytes, writer.cursor);
+	if (snapshotKind == kPangeaSnapshotKeyframe)
+	{
+		gPangeaLastHostKeyframeSeq = header.sequence;
+	}
+	else
+	{
+		gPangeaLastHostDeltaSeq = header.sequence;
+	}
+	gPangeaForceKeyframe = 0;
+	if (PangeaNet_ShouldLogSequence(header.sequence) || !sent)
+	{
+		const ObjNode* player0Obj = gPlayerInfo[0].objNode;
+		const ObjNode* player1Obj = gPlayerInfo[1].objNode;
+		SDL_Log("CroMag net: host send snapshot seq=%u kind=%u tick=%u bytes=%d sent=%d p0=(%.1f,%.1f,%.1f) p1=(%.1f,%.1f,%.1f) p1Bits=%08x p1Obj=%d",
+			(unsigned)header.sequence,
+			(unsigned)snapshotKind,
+			(unsigned)header.tick,
+			writer.cursor,
+			sent,
+			gPlayerInfo[0].coord.x,
+			gPlayerInfo[0].coord.y,
+			gPlayerInfo[0].coord.z,
+			gPlayerInfo[1].coord.x,
+			gPlayerInfo[1].coord.y,
+			gPlayerInfo[1].coord.z,
+			(unsigned)gPlayerInfo[1].controlBits,
+			player0Obj && player1Obj ? 1 : 0);
+	}
+	for (i = 0; i < MAX_PLAYERS; i++)
+	{
+		if (gPlayerInfo[i].raceComplete && !gPangeaReliableRaceCompleteSent[i])
+		{
+			PangeaNet_SendReliableEvent(kPangeaReliableEventRaceComplete, i);
+			gPangeaReliableRaceCompleteSent[i] = 1;
+		}
+		if (gPlayerInfo[i].isEliminated && !gPangeaReliableEliminatedSent[i])
+		{
+			PangeaNet_SendReliableEvent(kPangeaReliableEventEliminated, i);
+			gPangeaReliableEliminatedSent[i] = 1;
+		}
+	}
 #endif
 }
 
@@ -1937,14 +2784,65 @@ void ClientApplyPendingSnapshot(void)
 
 	if (!gHavePendingSnapshot)
 	{
+		const double nowMs = (double)SDL_GetTicks();
+		if (gPangeaLastReceivedKeyframeAtMs > 0.0
+			&& (nowMs - gPangeaLastReceivedKeyframeAtMs) > PANGEA_NET_KEYFRAME_TIMEOUT_MS
+			&& (nowMs - gPangeaLastResendRequestAtMs) > 350.0)
+		{
+			uint8_t resendBytes[64];
+			PangeaNetWriter resendWriter;
+			PangeaNetPacketHeader resendHeader;
+			resendHeader.magic = PANGEA_NET_MAGIC;
+			resendHeader.version = PANGEA_NET_VERSION;
+			resendHeader.packetType = kPangeaPacketKeyframeResendRequest;
+			resendHeader.matchIdLow = gPangeaMatchId;
+			resendHeader.matchIdHigh = gPangeaMatchIdHigh;
+			resendHeader.tick = gPangeaLocalTick;
+			resendHeader.sequence = gPangeaSendSequence++;
+			resendHeader.playerIndex = (uint16_t)gMyNetworkPlayerNum;
+			resendHeader.reserved = 0;
+			PangeaNetWriter_Init(&resendWriter, resendBytes, (int)sizeof(resendBytes));
+			PangeaNet_WriteHeader(&resendWriter, &resendHeader);
+			PangeaNetWriter_WriteU32(&resendWriter, gPangeaLastHostKeyframeSeq);
+			if (resendWriter.ok)
+			{
+				PangeaNetBridge_SendReliable(resendBytes, resendWriter.cursor);
+			}
+			gPangeaLastResendRequestAtMs = nowMs;
+			PangeaNetBridge_ReportDesync(gPangeaLocalTick, 0, gPangeaLastSnapshotStateHash);
+		}
 		return;
 	}
 
 	short i;
 	for (i = 0; i < MAX_PLAYERS; i++)
 	{
+		const PangeaNetPlayerCarState* s = &gPendingSnapshot.players[i];
 		if (i == gMyNetworkPlayerNum)
 		{
+			const float dx = gPlayerInfo[i].coord.x - s->coord.x;
+			const float dy = gPlayerInfo[i].coord.y - s->coord.y;
+			const float dz = gPlayerInfo[i].coord.z - s->coord.z;
+			const float correctionDistance = sqrtf(dx * dx + dy * dy + dz * dz);
+			gPangeaCorrectionDistance = correctionDistance;
+
+			gPlayerInfo[i].lapNum = s->lapNum;
+			gPlayerInfo[i].checkpointNum = s->checkpointNum;
+			gPlayerInfo[i].place = s->place;
+			gPlayerInfo[i].raceComplete = s->raceComplete != 0;
+			gPlayerInfo[i].powType = s->powType;
+			gPlayerInfo[i].powQuantity = s->powQuantity;
+			gPlayerInfo[i].health = s->health;
+			gPlayerInfo[i].isEliminated = gPlayerInfo[i].isEliminated || (s->health <= 0.0f);
+
+			if (gPlayerInfo[i].objNode)
+			{
+				gPlayerInfo[i].coord = s->coord;
+				gPlayerInfo[i].objNode->Coord = s->coord;
+				gPlayerInfo[i].objNode->Delta = s->delta;
+				gPlayerInfo[i].objNode->Rot.y = s->rotY;
+			}
+			PangeaNet_ReapplyUnackedLocalInput(s->lastProcessedInputSequence, i);
 			continue;
 		}
 
@@ -1953,24 +2851,108 @@ void ClientApplyPendingSnapshot(void)
 			continue;
 		}
 
-		const PangeaNetPlayerCarState* s = &gPendingSnapshot.players[i];
-		gPlayerInfo[i].coord = s->coord;
-		gPlayerInfo[i].objNode->Coord = s->coord;
-		gPlayerInfo[i].objNode->Rot.y = s->rotY;
-		gPlayerInfo[i].objNode->Delta = s->delta;
-		gPlayerInfo[i].steering = s->steering;
-		gPlayerInfo[i].currentThrust = s->currentThrust;
-		gPlayerInfo[i].controlBits = s->controlBits;
-		gPlayerInfo[i].controlBits_New = s->controlBitsNew;
-		gPlayerInfo[i].analogSteering = s->analogSteering;
-		gPlayerInfo[i].lapNum = s->lapNum;
-		gPlayerInfo[i].checkpointNum = s->checkpointNum;
-		gPlayerInfo[i].place = s->place;
-		gPlayerInfo[i].raceComplete = s->raceComplete != 0;
-		gPlayerInfo[i].powType = s->powType;
-		gPlayerInfo[i].powQuantity = s->powQuantity;
-		gPlayerInfo[i].health = s->health;
+		PangeaNetSnapshotPlayerState delayedRemote = *s;
+		if (PangeaNet_GetDelayedRemoteSnapshot(i, &delayedRemote))
+		{
+			s = &delayedRemote;
+		}
+		PangeaNet_SetRemoteInterpTarget(i, s);
+		PangeaNetRemoteInterpState* interp = &gPangeaRemoteInterp[i];
+
+		if (!interp->hasTo)
+		{
+			continue;
+		}
+
+		const OGLPoint3D targetCoord = interp->toState.coord;
+		gPlayerInfo[i].coord = targetCoord;
+		gPlayerInfo[i].objNode->Coord = targetCoord;
+		gPlayerInfo[i].objNode->Rot.y = interp->toState.rotY;
+		gPlayerInfo[i].objNode->Delta = interp->toState.delta;
+		gPlayerInfo[i].steering = interp->toState.steering;
+		gPlayerInfo[i].currentThrust = interp->toState.currentThrust;
+		gPlayerInfo[i].controlBits = interp->toState.controlBits;
+		gPlayerInfo[i].controlBits_New = interp->toState.controlBitsNew;
+		gPlayerInfo[i].analogSteering = interp->toState.analogSteering;
+		gPlayerInfo[i].lapNum = interp->toState.lapNum;
+		gPlayerInfo[i].checkpointNum = interp->toState.checkpointNum;
+		gPlayerInfo[i].place = interp->toState.place;
+		gPlayerInfo[i].raceComplete = interp->toState.raceComplete != 0;
+		gPlayerInfo[i].powType = interp->toState.powType;
+		gPlayerInfo[i].powQuantity = interp->toState.powQuantity;
+		gPlayerInfo[i].health = interp->toState.health;
+		if (PangeaNet_ShouldLogSequence(gPendingSnapshot.snapshotSeq))
+		{
+			SDL_Log("CroMag net: client apply remote snapshot seq=%u player=%d objCoord=(%.1f,%.1f,%.1f) target=(%.1f,%.1f,%.1f) status=%08x hidden=%d shadow=%d",
+				(unsigned)gPendingSnapshot.snapshotSeq,
+				i,
+				gPlayerInfo[i].objNode->Coord.x,
+				gPlayerInfo[i].objNode->Coord.y,
+				gPlayerInfo[i].objNode->Coord.z,
+				targetCoord.x,
+				targetCoord.y,
+				targetCoord.z,
+				(unsigned)gPlayerInfo[i].objNode->StatusBits,
+				(gPlayerInfo[i].objNode->StatusBits & STATUS_BIT_HIDDEN) != 0,
+				gPlayerInfo[i].objNode->ShadowNode != nil);
+		}
+	}
+
+	{
+		const uint32_t localHash = PangeaNet_ComputeAuthoritativeStateHash((short)gPendingSnapshot.playerCount);
+		if (localHash != gPendingSnapshot.stateHash)
+		{
+			PangeaNetBridge_ReportDesync(gPendingSnapshot.frameCounter, localHash, gPendingSnapshot.stateHash);
+		}
+		uint8_t ackBytes[96];
+		PangeaNetWriter writer;
+		PangeaNetPacketHeader ackHeader;
+		ackHeader.magic = PANGEA_NET_MAGIC;
+		ackHeader.version = PANGEA_NET_VERSION;
+		ackHeader.packetType = kPangeaPacketClientAck;
+		ackHeader.matchIdLow = gPangeaMatchId;
+		ackHeader.matchIdHigh = gPangeaMatchIdHigh;
+		ackHeader.tick = gPendingSnapshot.frameCounter;
+		ackHeader.sequence = gPangeaSendSequence++;
+		ackHeader.playerIndex = (uint16_t)gMyNetworkPlayerNum;
+		ackHeader.reserved = 0;
+		PangeaNetWriter_Init(&writer, ackBytes, (int)sizeof(ackBytes));
+		PangeaNet_WriteHeader(&writer, &ackHeader);
+		PangeaNetWriter_WriteU32(&writer, gPendingSnapshot.snapshotSeq);
+		PangeaNetWriter_WriteU32(&writer, gPendingSnapshot.lastKeyframeSeq);
+		PangeaNetWriter_WriteU32(&writer, gPendingSnapshot.lastDeltaSeq);
+		if (writer.ok)
+		{
+			PangeaNetBridge_SendReliable(ackBytes, writer.cursor);
+		}
 	}
 	gHavePendingSnapshot = false;
 #endif
+}
+
+Boolean PangeaNet_IsHostAuthoritativeRemotePlayer(short playerNum)
+{
+#ifdef __EMSCRIPTEN__
+	if (!PangeaNetBridge_IsEnabled() || !gIsNetworkClient)
+	{
+		return false;
+	}
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+	{
+		return false;
+	}
+	return playerNum != gMyNetworkPlayerNum;
+#else
+	(void)playerNum;
+	return false;
+#endif
+}
+
+Boolean PangeaNet_IsHostAuthoritativeCpuSimulation(short playerNum)
+{
+	if (!PangeaNet_IsHostAuthoritativeRemotePlayer(playerNum))
+	{
+		return false;
+	}
+	return gPlayerInfo[playerNum].isComputer;
 }

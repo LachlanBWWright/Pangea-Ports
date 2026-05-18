@@ -172,6 +172,12 @@ short			playerNum = player->PlayerNum;
 short			weaponType;
 Boolean			didShoot = false;
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_ShouldSimulateGameplayForPlayer(playerNum))
+	{
+		return;
+	}
+#endif
 
 	weaponType  = gPlayerInfo[playerNum].currentWeapon;
 
@@ -2237,5 +2243,4 @@ static const OGLPoint3D 	muzzleTipOff_Right = {15,14,-17};
 		}
 	}
 }
-
 

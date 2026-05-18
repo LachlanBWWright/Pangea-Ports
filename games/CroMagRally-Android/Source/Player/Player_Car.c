@@ -498,13 +498,24 @@ long	oldLeft,oldRight,oldFront,oldBack,oldTop,oldBottom;
 
 static void MovePlayer_Car_Multipass(ObjNode *theNode)
 {
+	const short playerNum = gCurrentPlayerNum;
+	const Boolean hostAuthoritativeRemotePlayer = PangeaNet_IsHostAuthoritativeRemotePlayer(playerNum);
+	const Boolean hostAuthoritativeCpu = PangeaNet_IsHostAuthoritativeCpuSimulation(playerNum);
+	if (hostAuthoritativeRemotePlayer)
+	{
+		gCoord = gPlayerInfo[playerNum].coord;
+		gDelta.x = 0.0f;
+		gDelta.y = 0.0f;
+		gDelta.z = 0.0f;
+		return;
+	}
             /***********/
 			/* CONTROL */
             /***********/
 
             /* CPU DRIVEN */
 
-    if (gPlayerInfo[gCurrentPlayerNum].isComputer || gAutoPilot)
+    if (!hostAuthoritativeCpu && (gPlayerInfo[playerNum].isComputer || gAutoPilot))
     {
     	DoCPUControl_Car(theNode);
     }
@@ -525,7 +536,7 @@ static void MovePlayer_Car_Multipass(ObjNode *theNode)
 	DoCarGroundCollision(theNode);
 	DoVehicleCollisionDetect(theNode);
 	DoFenceCollision(theNode);
-	UpdatePlayerCheckpoints(gCurrentPlayerNum);
+	UpdatePlayerCheckpoints(playerNum);
 }
 
 
@@ -1200,6 +1211,7 @@ static void UpdatePlayer_Car(ObjNode *theNode)
 {
 short	p = theNode->PlayerNum;
 float	fps = gFramesPerSecondFrac;
+	const Boolean hostAuthoritativeRemotePlayer = PangeaNet_IsHostAuthoritativeRemotePlayer(p);
 
 	UpdateObject(theNode);
 
@@ -1214,12 +1226,15 @@ float	fps = gFramesPerSecondFrac;
 
 			/* UPDATE POWERUP TIMERS */
 
-	UpdateNitro(p);
-	UpdateStickyTires(p);
-	UpdateSuperSuspension(p);
-	UpdateInvisibility(p);
-	UpdateFrozenTimer(p);
-	UpdateFlaming(p);
+	if (!hostAuthoritativeRemotePlayer)
+	{
+		UpdateNitro(p);
+		UpdateStickyTires(p);
+		UpdateSuperSuspension(p);
+		UpdateInvisibility(p);
+		UpdateFrozenTimer(p);
+		UpdateFlaming(p);
+	}
 
 	gPlayerInfo[p].bumpSoundTimer -=  fps;
 
@@ -1714,6 +1729,8 @@ Boolean		wasInWater;
 
 			if (ctype & CTYPE_PLAYER)
 			{
+				if (gIsNetworkClient && PangeaNet_IsHostAuthoritativeRemotePlayer(hitObj->PlayerNum))
+					continue;
 				VehicleHitVehicle(vehicle, hitObj);
 			}
 
@@ -3568,9 +3585,6 @@ new_group:
 
 
 }
-
-
-
 
 
 

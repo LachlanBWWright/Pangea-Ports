@@ -6,7 +6,12 @@
 
 #if __EMSCRIPTEN__
 extern int PangeaNet_IsEnabled(void);
+extern int PangeaNet_IsHost(void);
 extern int PangeaNet_GetLocalPlayerIndex(void);
+extern int PangeaNet_HostIsRemoteNeedActive(int playerNum, int needID);
+extern int PangeaNet_HostIsRemoteNeedDown(int playerNum, int needID);
+extern float PangeaNet_HostGetRemoteAnalogX(int playerNum);
+extern float PangeaNet_HostGetRemoteAnalogZ(int playerNum);
 #endif
 
 /***************/
@@ -430,6 +435,22 @@ int GetNeedState(int needID, int playerID)
 	GAME_ASSERT(needID >= 0);
 	GAME_ASSERT(needID < NUM_CONTROL_NEEDS);
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled()
+		&& PangeaNet_IsHost()
+		&& playerID != PangeaNet_GetLocalPlayerIndex())
+	{
+		if (PangeaNet_HostIsRemoteNeedDown(playerID, needID))
+		{
+			return KEYSTATE_DOWN;
+		}
+		if (PangeaNet_HostIsRemoteNeedActive(playerID, needID))
+		{
+			return KEYSTATE_HELD;
+		}
+	}
+#endif
+
 	const Gamepad* controller = &gGamepads[playerID];
 
 	if (controller->open && controller->needStates[needID])
@@ -483,6 +504,43 @@ float GetNeedAnalogValue(int needID, int playerID)
 	GAME_ASSERT(playerID < MAX_LOCAL_PLAYERS);
 	GAME_ASSERT(needID >= 0);
 	GAME_ASSERT(needID < NUM_CONTROL_NEEDS);
+
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled()
+		&& PangeaNet_IsHost()
+		&& playerID != PangeaNet_GetLocalPlayerIndex())
+	{
+		switch (needID)
+		{
+			case kNeed_YawLeft:
+			{
+				const float analog = PangeaNet_HostGetRemoteAnalogX(playerID);
+				return analog < 0.0f ? -analog : 0.0f;
+			}
+
+			case kNeed_YawRight:
+			{
+				const float analog = PangeaNet_HostGetRemoteAnalogX(playerID);
+				return analog > 0.0f ? analog : 0.0f;
+			}
+
+			case kNeed_PitchUp:
+			{
+				const float analog = PangeaNet_HostGetRemoteAnalogZ(playerID);
+				return analog < 0.0f ? -analog : 0.0f;
+			}
+
+			case kNeed_PitchDown:
+			{
+				const float analog = PangeaNet_HostGetRemoteAnalogZ(playerID);
+				return analog > 0.0f ? analog : 0.0f;
+			}
+
+			default:
+				break;
+		}
+	}
+#endif
 
 	const Gamepad* controller = &gGamepads[playerID];
 

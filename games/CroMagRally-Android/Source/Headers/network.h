@@ -2,6 +2,8 @@
 // network.h
 //
 
+#pragma once
+
 //#include <NetSprocket.h>
 #include "main.h"
 
@@ -111,16 +113,38 @@ typedef struct
 	short				powType;
 	short				powQuantity;
 	float				health;
+	float				frozenTimer;
+	float				greasedTiresTimer;
+	float				nitroTimer;
+	float				stickyTiresTimer;
+	float				invisibilityTimer;
+	uint8_t				isEliminated;
+	uint8_t				pad2[3];
+	uint32_t			lastProcessedInputSequence;
 }PangeaNetPlayerCarState;
+
+enum
+{
+	kPangeaSnapshotDelta = 0,
+	kPangeaSnapshotKeyframe = 1,
+	kPangeaSnapshotCorrection = 2,
+	kPangeaSnapshotMatchEnd = 3
+};
 
 
 		/* HOST SNAPSHOT PACKET */
 
 typedef struct
 {
+	uint16_t					protocolVersion;
+	uint8_t						snapshotKind;
+	uint8_t						reserved0;
 	uint32_t					packetType;
 	uint32_t					snapshotSeq;
 	uint32_t					frameCounter;
+	uint32_t					stateHash;
+	uint32_t					lastKeyframeSeq;
+	uint32_t					lastDeltaSeq;
 	uint8_t						playerCount;
 	uint8_t						pad[3];
 	PangeaNetPlayerCarState		players[MAX_PLAYERS];
@@ -143,6 +167,8 @@ void HostReceive_ControlInfoFromClients(void);
 
 void HostSend_SnapshotToClients(void);
 void ClientApplyPendingSnapshot(void);
+Boolean PangeaNet_IsHostAuthoritativeRemotePlayer(short playerNum);
+Boolean PangeaNet_IsHostAuthoritativeCpuSimulation(short playerNum);
 
 void PlayerBroadcastVehicleType(void);
 void GetVehicleSelectionFromNetPlayers(void);

@@ -71,6 +71,7 @@
 #include "quadmesh.h"
 #include "atlas.h"
 #include "menu.h"
+#include "pangea_net.h"
 
 #define GAME_ASSERT(condition) do { if (!(condition)) DoFatalAlert("%s:%d: %s", __func__, __LINE__, #condition); } while(0)
 #define GAME_ASSERT_MESSAGE(condition, message) do { if (!(condition)) DoFatalAlert("%s:%d: %s", __func__, __LINE__, message); } while(0)

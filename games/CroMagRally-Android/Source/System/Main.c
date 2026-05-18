@@ -13,6 +13,7 @@
 #include "profiling.h"
 #include "miscscreens.h"
 #include "network.h"
+#include "pangea_net.h"
 #include <SDL3/SDL.h>
 
 #ifdef __EMSCRIPTEN__
@@ -1071,6 +1072,10 @@ static void PlayArea(void)
 
 		if (!gIsNetworkClient)					// clients dont need to calc frame rate since its passed to them from host.
 			CalcFramesPerSecond();
+#ifdef __EMSCRIPTEN__
+		else if (PangeaNetBridge_IsEnabled())	// host no longer sends lockstep FPS in web host-authoritative flow
+			CalcFramesPerSecond();
+#endif
 
 		gGameFrameNum++;
 
@@ -1941,6 +1946,4 @@ Boolean GameMain_IsEmscriptenDone(void)
 }
 
 #endif  // __EMSCRIPTEN__
-
-
 

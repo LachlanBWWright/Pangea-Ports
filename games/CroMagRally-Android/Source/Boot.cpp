@@ -18,6 +18,7 @@
 extern "C"
 {
 	#include "game.h"
+	#include "pangea_net.h"
 
 	SDL_Window* gSDLWindow = nullptr;
 	FSSpec gDataSpec;
@@ -28,8 +29,11 @@ extern "C"
 	static int gPangeaNetEnabled = 0;
 	static int gPangeaNetIsHost = 1;
 	static int gPangeaNetLocalPlayerIndex = 0;
+	static int gPangeaNetHostPlayerIndex = 0;
 	static int gPangeaNetPlayerCount = 1;
 	static uint32_t gPangeaNetMatchSeed = 1;
+	static uint32_t gPangeaNetMatchIdLow = 1;
+	static uint32_t gPangeaNetMatchIdHigh = 0;
 	static uint32_t gPangeaDebugFrameNumber = 0;
 	static uint32_t gPangeaDebugLastSyncHash = 0;
 	static int gPangeaDebugHasDesync = 0;
@@ -128,6 +132,35 @@ extern "C"
 		return (int) parsed;
 	}
 
+	static uint32_t ParseJsonU32(const char* json, const char* key, uint32_t fallback)
+	{
+		if (!json || !key)
+		{
+			return fallback;
+		}
+
+		const char* keyAt = SDL_strstr(json, key);
+		if (!keyAt)
+		{
+			return fallback;
+		}
+
+		const char* colon = SDL_strchr(keyAt, ':');
+		if (!colon)
+		{
+			return fallback;
+		}
+
+		char* end = nullptr;
+		const unsigned long parsed = strtoul(colon + 1, &end, 10);
+		if (end == colon + 1)
+		{
+			return fallback;
+		}
+
+		return (uint32_t) parsed;
+	}
+
 	// Called once per browser frame when running in WASM mode (legacy path, kept for reference)
 	void GameMain_RunFrame(void);
 	void GameMain_InitEmscripten(void);
@@ -154,14 +187,21 @@ extern "C"
 		(void) byteCount;
 		SDL_Log("PangeaGame_SetNetworkMatchConfig json=%s", json ? json : "(null)");
 		gPangeaNetEnabled = 1;
+		const int explicitIsHost = ParseJsonInt(json, "\"isHost\"", -1);
 		gPangeaNetLocalPlayerIndex = ParseJsonInt(json, "\"localPlayerIndex\"", 0);
+		gPangeaNetHostPlayerIndex = ParseJsonInt(json, "\"hostPlayerIndex\"", 0);
 		gPangeaNetPlayerCount = ParseJsonInt(json, "\"playerCount\"", 2);
-		gPangeaNetMatchSeed = (uint32_t) ParseJsonInt(json, "\"seed\"", 1);
-		gPangeaNetIsHost = gPangeaNetLocalPlayerIndex == 0 ? 1 : 0;
+		gPangeaNetMatchSeed = ParseJsonU32(json, "\"seed\"", 1);
+		gPangeaNetMatchIdLow = ParseJsonU32(json, "\"matchIdLow\"", gPangeaNetMatchSeed);
+		gPangeaNetMatchIdHigh = ParseJsonU32(json, "\"matchIdHigh\"", 0);
 
 		if (gPangeaNetPlayerCount < 1)
 		{
 			gPangeaNetPlayerCount = 1;
+		}
+		if (gPangeaNetHostPlayerIndex < 0 || gPangeaNetHostPlayerIndex >= gPangeaNetPlayerCount)
+		{
+			gPangeaNetHostPlayerIndex = 0;
 		}
 		if (gPangeaNetLocalPlayerIndex < 0)
 		{
@@ -171,6 +211,23 @@ extern "C"
 		{
 			gPangeaNetLocalPlayerIndex = gPangeaNetPlayerCount - 1;
 		}
+		if (explicitIsHost == 0 || explicitIsHost == 1)
+		{
+			gPangeaNetIsHost = explicitIsHost;
+		}
+		else
+		{
+			gPangeaNetIsHost = gPangeaNetLocalPlayerIndex == gPangeaNetHostPlayerIndex ? 1 : 0;
+		}
+
+		if (gPangeaNetIsHost)
+		{
+			gPangeaNetLocalPlayerIndex = gPangeaNetHostPlayerIndex;
+		}
+		else if (gPangeaNetPlayerCount > 1 && gPangeaNetLocalPlayerIndex == gPangeaNetHostPlayerIndex)
+		{
+			gPangeaNetLocalPlayerIndex = gPangeaNetHostPlayerIndex == 0 ? 1 : 0;
+		}
 
 		gNetGameInProgress = true;
 		gIsNetworkHost = gPangeaNetIsHost != 0;
@@ -178,12 +235,16 @@ extern "C"
 		gGameMode = GAME_MODE_MULTIPLAYERRACE;
 		gNumRealPlayers = (short) gPangeaNetPlayerCount;
 		gMyNetworkPlayerNum = (short) gPangeaNetLocalPlayerIndex;
+		PangeaNetBridge_SetRuntimeMatchIdentity(gPangeaNetMatchIdLow, gPangeaNetMatchIdHigh);
 		SDL_Log(
-			"PangeaGame_SetNetworkMatchConfig resolved host=%d localPlayer=%d playerCount=%d seed=%u",
+			"PangeaGame_SetNetworkMatchConfig resolved host=%d localPlayer=%d hostPlayer=%d playerCount=%d seed=%u matchId=%u:%u",
 			gPangeaNetIsHost,
 			gPangeaNetLocalPlayerIndex,
+			gPangeaNetHostPlayerIndex,
 			gPangeaNetPlayerCount,
-			(unsigned) gPangeaNetMatchSeed);
+			(unsigned) gPangeaNetMatchSeed,
+			(unsigned) gPangeaNetMatchIdHigh,
+			(unsigned) gPangeaNetMatchIdLow);
 	}
 
 	EMSCRIPTEN_KEEPALIVE
@@ -202,6 +263,8 @@ extern "C"
 	EMSCRIPTEN_KEEPALIVE int PangeaNet_GetLocalPlayerIndex(void) { return gPangeaNetLocalPlayerIndex; }
 	EMSCRIPTEN_KEEPALIVE int PangeaNet_GetPlayerCount(void) { return gPangeaNetPlayerCount; }
 	EMSCRIPTEN_KEEPALIVE uint32_t PangeaNet_GetMatchSeed(void) { return gPangeaNetMatchSeed; }
+	EMSCRIPTEN_KEEPALIVE uint32_t PangeaNet_GetMatchIdLow(void) { return gPangeaNetMatchIdLow; }
+	EMSCRIPTEN_KEEPALIVE uint32_t PangeaNet_GetMatchIdHigh(void) { return gPangeaNetMatchIdHigh; }
 	EMSCRIPTEN_KEEPALIVE int PangeaNet_SendReliable(const void* bytes, int byteCount)
 	{
 		return JS_PangeaNet_SendReliable(bytes, byteCount);

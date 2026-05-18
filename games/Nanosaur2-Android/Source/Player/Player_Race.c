@@ -48,6 +48,13 @@ OGLVector2D	checkToCheck,aim,deltaVec;
 short	p = player->PlayerNum;
 long		c;
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_ShouldSimulateGameplayForPlayer(p))
+	{
+		return;
+	}
+#endif
+
 				/********************************/
 				/* SEE IF CROSSED A LINE MARKER */
 				/********************************/
@@ -328,7 +335,6 @@ short	i;
 		StartLevelCompletion(5.0f);
 	}
 }
-
 
 
 

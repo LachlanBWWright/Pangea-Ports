@@ -71,6 +71,8 @@ OGLVector2D	checkToCheck,aim,deltaVec;
 		case	GAME_MODE_CAPTUREFLAG:
 				return;
 	}
+	if (PangeaNet_IsHostAuthoritativeRemotePlayer(p))
+		return;
 
 
 			/* GET PLAYER'S MOVEMENT LINE SEGMENT */
@@ -401,7 +403,6 @@ void PlayerCompletedRace(short playerNum)
 		}
 	}
 }
-
 
 
 
