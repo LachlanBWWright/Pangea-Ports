@@ -1075,6 +1075,36 @@ static void PlayArea(void)
 #ifdef __EMSCRIPTEN__
 		else if (PangeaNetBridge_IsEnabled())	// host no longer sends lockstep FPS in web host-authoritative flow
 			CalcFramesPerSecond();
+
+		if (PangeaNetBridge_IsEnabled())
+		{
+			PangeaNetBridge_UpdateMatchLifecycle();
+
+			if (PangeaNetBridge_IsHost())
+			{
+				PangeaNetBridge_PublishLocalMatchLifecycle();
+			}
+			else
+			{
+				const int remoteReason = PangeaNetBridge_GetRemoteLifecycleReason();
+				if (remoteReason == PANGEA_NET_MATCH_STATE_GAME_OVER)
+				{
+					gGameOver = true;
+				}
+				else if (remoteReason == PANGEA_NET_MATCH_STATE_TRACK_COMPLETED)
+				{
+					if (!gTrackCompleted)
+					{
+						gTrackCompleted = true;
+						gTrackCompletedCoolDownTimer = 0.05f;
+					}
+				}
+				else
+				{
+					gGameOver = false;
+				}
+			}
+		}
 #endif
 
 		gGameFrameNum++;
@@ -1477,6 +1507,21 @@ short	i,t,winner;
 	if (gTrackCompleted)										// if track is done then dont do anything
 		return;
 
+	if (gIsNetworkClient)
+	{
+		switch (gGameMode)
+		{
+			case GAME_MODE_TAG1:
+			case GAME_MODE_TAG2:
+				UpdateTagMarker();
+				break;
+
+			default:
+				break;
+		}
+		return;
+	}
+
 	switch(gGameMode)
 	{
 				/****************************/
@@ -1682,8 +1727,20 @@ void GameMain(void)
 
 	if (gCommandLine.bootToTrack != 0)
 	{
-		gGameMode = GAME_MODE_PRACTICE;
 		gTrackNum = gCommandLine.bootToTrack - 1;
+		if (!gNetGameInProgress)
+		{
+			gGameMode = GAME_MODE_PRACTICE;
+		}
+#if __EMSCRIPTEN__
+		else
+		{
+			SDL_Log(
+				"Cro-Mag direct boot preserving network mode=%d track=%d",
+				gGameMode,
+				gTrackNum);
+		}
+#endif
 		InitPlayerInfo_Game();
 
 		if (gCommandLine.car)
@@ -1849,10 +1906,22 @@ void GameMain_InitEmscripten(void)
 
 			/* SET UP TRACK */
 
-	gGameMode = GAME_MODE_PRACTICE;
 	gTrackNum = (track - 1);
 	if (gTrackNum < 0 || gTrackNum >= NUM_TRACKS)
 		gTrackNum = 0;
+	if (!gNetGameInProgress)
+	{
+		gGameMode = GAME_MODE_PRACTICE;
+	}
+#if __EMSCRIPTEN__
+	else
+	{
+		SDL_Log(
+			"Cro-Mag Emscripten init preserving network mode=%d track=%d",
+			gGameMode,
+			gTrackNum);
+	}
+#endif
 
 	InitPlayerInfo_Game();
 
@@ -1903,6 +1972,38 @@ void GameMain_RunFrame(void)
 	UpdateGameModeSpecifics();
 	DoPlayerTerrainUpdate();
 
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled())
+	{
+		PangeaNetBridge_UpdateMatchLifecycle();
+
+		if (PangeaNetBridge_IsHost())
+		{
+			PangeaNetBridge_PublishLocalMatchLifecycle();
+		}
+		else
+		{
+			const int remoteReason = PangeaNetBridge_GetRemoteLifecycleReason();
+			if (remoteReason == PANGEA_NET_MATCH_STATE_GAME_OVER)
+			{
+				gGameOver = true;
+			}
+			else if (remoteReason == PANGEA_NET_MATCH_STATE_TRACK_COMPLETED)
+			{
+				if (!gTrackCompleted)
+				{
+					gTrackCompleted = true;
+					gTrackCompletedCoolDownTimer = 0.05f;
+				}
+			}
+			else
+			{
+				gGameOver = false;
+			}
+		}
+	}
+#endif
+
 			/* DRAW */
 
 	OGL_DrawScene(DrawTerrain);
@@ -1946,4 +2047,3 @@ Boolean GameMain_IsEmscriptenDone(void)
 }
 
 #endif  // __EMSCRIPTEN__
-

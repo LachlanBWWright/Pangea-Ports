@@ -601,12 +601,14 @@ float				dot;
 	JetpackOff(player->PlayerNum);
 
 	MorphToSkeletonAnim(player->Skeleton, PLAYER_ANIM_ENTERWORMHOLE, 2.0f);
+#if __EMSCRIPTEN__
+	PangeaNet_SendWormholeEntered(player->PlayerNum, &wormhole->Coord);
+#endif
 
 	player->MotionVector = v2;
 
 	gCameraInExitMode = true;
 }
-
 
 
 

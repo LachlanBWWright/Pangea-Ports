@@ -754,6 +754,9 @@ short	p = player->PlayerNum;
 	JetpackOff(p);
 
 	MorphToSkeletonAnim(player->Skeleton, PLAYER_ANIM_DUSTDEVIL, 3.0);
+#if __EMSCRIPTEN__
+	PangeaNet_SendDustDevilCaptured(p, &player->Coord);
+#endif
 
 	player->Timer = 4.0f;									// set duration of time in dust devil
 
@@ -769,7 +772,6 @@ short	p = player->PlayerNum;
 	gPlayerInfo[p].ejectedFromDustDevil = false;
 
 }
-
 
 
 

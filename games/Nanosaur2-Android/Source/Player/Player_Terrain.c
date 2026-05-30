@@ -436,6 +436,9 @@ float				fps = gFramesPerSecondFrac;
 
 	if (gCoord.y < GetTerrainY(gCoord.x, gCoord.z))
 	{
+#if __EMSCRIPTEN__
+		PangeaNet_SendPlayerDeathDiveImpact(player->PlayerNum, &gCoord);
+#endif
 		ExplodePlayer(player, player->PlayerNum, &gCoord);
 	}
 
@@ -653,6 +656,9 @@ ObjNode		*devil = gPlayerInfo[p].dustDevilObj;							// get dust devil objNode
 			gCurrentMaxSpeed[p] = speed;
 
 			gPlayerInfo[p].ejectedFromDustDevil = true;
+#if __EMSCRIPTEN__
+			PangeaNet_SendDustDevilReleased(p, &gCoord);
+#endif
 
 			player->Rot.y = CalcYAngleFromPointToPoint(0, gCoord.x, gCoord.z, gCoord.x + v.x, gCoord.z + v.z);
 
@@ -776,7 +782,14 @@ short	playerNum = theNode->PlayerNum;
 	{
 		case	LEVEL_NUM_RACE1:								// call special line marker function for race modes
 		case	LEVEL_NUM_RACE2:
-				UpdatePlayerRaceMarkers(theNode);
+				if (gVSMode == VS_MODE_RACE)
+				{
+					UpdatePlayerRaceMarkers(theNode);
+				}
+				else
+				{
+					HandlePlayerLineMarkerCrossing(theNode);
+				}
 				break;
 
 		default:
@@ -1178,6 +1191,9 @@ float	fps = gFramesPerSecondFrac;
 	if (!gPlayerInfo[playerNum].jetpackActive)
 	{
 		PlayEffect_Parms3D(EFFECT_JETPACKIGNITE, &gCoord, NORMAL_CHANNEL_RATE, .7);
+#if __EMSCRIPTEN__
+		PangeaNet_SendJetpackIgnited(playerNum, &gCoord);
+#endif
 #if 0
 		{
 			OGLPoint3D	buttPt;
@@ -1236,6 +1252,12 @@ void JetpackOff(short playerNum)
 {
 ObjNode	*player = gPlayerInfo[playerNum].objNode;
 
+	if (gPlayerInfo[playerNum].jetpackActive)
+	{
+#if __EMSCRIPTEN__
+		PangeaNet_SendJetpackShutoff(playerNum, &player->Coord);
+#endif
+	}
 	gPlayerInfo[playerNum].jetpackActive = false;
 
 	StopAChannelIfEffectNum(&player->EffectChannel, EFFECT_JETPACKHUM);		// stop jetpack sfx
@@ -2090,8 +2112,6 @@ float	x,z;
 
 	gBestCheckpointAim[playerNum] = player->Rot.y;
 }
-
-
 
 
 

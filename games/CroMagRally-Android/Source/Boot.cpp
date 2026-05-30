@@ -34,6 +34,8 @@ extern "C"
 	static uint32_t gPangeaNetMatchSeed = 1;
 	static uint32_t gPangeaNetMatchIdLow = 1;
 	static uint32_t gPangeaNetMatchIdHigh = 0;
+	static char gPangeaNetLobbyId[64] = "00000000-0000-0000-0000-000000000000";
+	static char gPangeaNetMatchId[64] = "00000000-0000-0000-0000-000000000000";
 	static uint32_t gPangeaDebugFrameNumber = 0;
 	static uint32_t gPangeaDebugLastSyncHash = 0;
 	static int gPangeaDebugHasDesync = 0;
@@ -103,6 +105,14 @@ extern "C"
 		}
 	});
 
+	EM_JS(void, JS_PangeaNet_ReportMatchResult, (const char* json), {
+		const net = globalThis.PangeaNet;
+		if (net && typeof net.reportMatchResult === "function")
+		{
+			net.reportMatchResult(UTF8ToString(json));
+		}
+	});
+
 	static int ParseJsonInt(const char* json, const char* key, int fallback)
 	{
 		if (!json || !key)
@@ -161,6 +171,152 @@ extern "C"
 		return (uint32_t) parsed;
 	}
 
+	static void ParseJsonString(const char* json, const char* key, char* outValue, size_t outValueSize)
+	{
+		if (!outValue || outValueSize == 0)
+		{
+			return;
+		}
+
+		outValue[0] = '\0';
+		if (!json || !key)
+		{
+			return;
+		}
+
+		const char* keyAt = SDL_strstr(json, key);
+		if (!keyAt)
+		{
+			return;
+		}
+
+		const char* colon = SDL_strchr(keyAt, ':');
+		if (!colon)
+		{
+			return;
+		}
+
+		const char* quoteStart = SDL_strchr(colon, '"');
+		if (!quoteStart)
+		{
+			return;
+		}
+
+		quoteStart++;
+		const char* quoteEnd = SDL_strchr(quoteStart, '"');
+		if (!quoteEnd || quoteEnd <= quoteStart)
+		{
+			return;
+		}
+
+		size_t copyLength = (size_t) (quoteEnd - quoteStart);
+		if (copyLength >= outValueSize)
+		{
+			copyLength = outValueSize - 1;
+		}
+
+		SDL_memcpy(outValue, quoteStart, copyLength);
+		outValue[copyLength] = '\0';
+	}
+
+	static int ParseCroMagTrackNumber(const char* json, int fallback)
+	{
+		char trackOrLevel[64];
+		ParseJsonString(json, "\"trackOrLevel\"", trackOrLevel, sizeof(trackOrLevel));
+		if (trackOrLevel[0] == '\0')
+		{
+			return fallback;
+		}
+
+		char* end = nullptr;
+		const long parsed = strtol(trackOrLevel, &end, 10);
+		if (end == trackOrLevel)
+		{
+			return fallback;
+		}
+
+		const int parsedTrack = (int) parsed;
+		return parsedTrack > 0 ? parsedTrack - 1 : fallback;
+	}
+
+	static const char* CroMagGameModeName(int gameMode)
+	{
+		switch (gameMode)
+		{
+			case GAME_MODE_PRACTICE:
+				return "practice";
+
+			case GAME_MODE_TOURNAMENT:
+				return "tournament";
+
+			case GAME_MODE_MULTIPLAYERRACE:
+				return "multiplayerRace";
+
+			case GAME_MODE_TAG1:
+				return "multiplayerTag1";
+
+			case GAME_MODE_TAG2:
+				return "multiplayerTag2";
+
+			case GAME_MODE_SURVIVAL:
+				return "multiplayerSurvival";
+
+			case GAME_MODE_CAPTUREFLAG:
+				return "multiplayerQuestForFire";
+
+			default:
+				return "unknown";
+		}
+	}
+
+	static int FallbackCroMagModeFromTrack(int trackNumber, const char* fallbackReason)
+	{
+		const int fallbackMode = trackNumber >= NUM_RACE_TRACKS
+			? GAME_MODE_SURVIVAL
+			: GAME_MODE_MULTIPLAYERRACE;
+		SDL_Log(
+			"Cro-Mag network mode fallback reason=%s track=%d resolvedMode=%s(%d)",
+			fallbackReason,
+			trackNumber + 1,
+			CroMagGameModeName(fallbackMode),
+			fallbackMode);
+		return fallbackMode;
+	}
+
+	static int ParseCroMagMode(const char* json, int trackNumber)
+	{
+		char mode[64];
+		ParseJsonString(json, "\"mode\"", mode, sizeof(mode));
+
+		if (mode[0] == '\0')
+		{
+			return FallbackCroMagModeFromTrack(trackNumber, "missing-mode");
+		}
+
+		if (SDL_strcasecmp(mode, "multiplayerRace") == 0 || SDL_strcasecmp(mode, "race") == 0)
+		{
+			return GAME_MODE_MULTIPLAYERRACE;
+		}
+		if (SDL_strcasecmp(mode, "multiplayerTag1") == 0 || SDL_strcasecmp(mode, "tagKeepAway") == 0 || SDL_strcasecmp(mode, "tag1") == 0)
+		{
+			return GAME_MODE_TAG1;
+		}
+		if (SDL_strcasecmp(mode, "multiplayerTag2") == 0 || SDL_strcasecmp(mode, "tagStampede") == 0 || SDL_strcasecmp(mode, "tag2") == 0)
+		{
+			return GAME_MODE_TAG2;
+		}
+		if (SDL_strcasecmp(mode, "multiplayerSurvival") == 0 || SDL_strcasecmp(mode, "survival") == 0 || SDL_strcasecmp(mode, "multiplayerBattle") == 0 || SDL_strcasecmp(mode, "battle") == 0)
+		{
+			return GAME_MODE_SURVIVAL;
+		}
+		if (SDL_strcasecmp(mode, "multiplayerQuestForFire") == 0 || SDL_strcasecmp(mode, "multiplayerFlag") == 0 || SDL_strcasecmp(mode, "captureFlag") == 0 || SDL_strcasecmp(mode, "questForFire") == 0)
+		{
+			return GAME_MODE_CAPTUREFLAG;
+		}
+
+		return FallbackCroMagModeFromTrack(trackNumber, mode);
+	}
+
 	// Called once per browser frame when running in WASM mode (legacy path, kept for reference)
 	void GameMain_RunFrame(void);
 	void GameMain_InitEmscripten(void);
@@ -194,6 +350,18 @@ extern "C"
 		gPangeaNetMatchSeed = ParseJsonU32(json, "\"seed\"", 1);
 		gPangeaNetMatchIdLow = ParseJsonU32(json, "\"matchIdLow\"", gPangeaNetMatchSeed);
 		gPangeaNetMatchIdHigh = ParseJsonU32(json, "\"matchIdHigh\"", 0);
+		ParseJsonString(json, "\"lobbyId\"", gPangeaNetLobbyId, sizeof(gPangeaNetLobbyId));
+		ParseJsonString(json, "\"matchId\"", gPangeaNetMatchId, sizeof(gPangeaNetMatchId));
+		if (gPangeaNetLobbyId[0] == '\0')
+		{
+			SDL_strlcpy(gPangeaNetLobbyId, "00000000-0000-0000-0000-000000000000", sizeof(gPangeaNetLobbyId));
+		}
+		if (gPangeaNetMatchId[0] == '\0')
+		{
+			SDL_strlcpy(gPangeaNetMatchId, "00000000-0000-0000-0000-000000000000", sizeof(gPangeaNetMatchId));
+		}
+		const int trackNumber = ParseCroMagTrackNumber(json, gTrackNum);
+		const int tagDurationMinutes = ParseJsonInt(json, "\"tagDurationMinutes\"", gGamePrefs.tagDuration);
 
 		if (gPangeaNetPlayerCount < 1)
 		{
@@ -232,25 +400,39 @@ extern "C"
 		gNetGameInProgress = true;
 		gIsNetworkHost = gPangeaNetIsHost != 0;
 		gIsNetworkClient = gPangeaNetIsHost == 0;
-		gGameMode = GAME_MODE_MULTIPLAYERRACE;
+		gTrackNum = trackNumber;
+		gGameMode = ParseCroMagMode(json, trackNumber);
+		gGamePrefs.tagDuration = (Byte)SDL_clamp(tagDurationMinutes, 2, 4);
 		gNumRealPlayers = (short) gPangeaNetPlayerCount;
 		gMyNetworkPlayerNum = (short) gPangeaNetLocalPlayerIndex;
 		PangeaNetBridge_SetRuntimeMatchIdentity(gPangeaNetMatchIdLow, gPangeaNetMatchIdHigh);
 		SDL_Log(
-			"PangeaGame_SetNetworkMatchConfig resolved host=%d localPlayer=%d hostPlayer=%d playerCount=%d seed=%u matchId=%u:%u",
+			"PangeaGame_SetNetworkMatchConfig resolved host=%d localPlayer=%d hostPlayer=%d playerCount=%d seed=%u matchId=%u:%u mode=%s(%d) track=%d raceMode=%d tagDuration=%d",
 			gPangeaNetIsHost,
 			gPangeaNetLocalPlayerIndex,
 			gPangeaNetHostPlayerIndex,
 			gPangeaNetPlayerCount,
 			(unsigned) gPangeaNetMatchSeed,
 			(unsigned) gPangeaNetMatchIdHigh,
-			(unsigned) gPangeaNetMatchIdLow);
+			(unsigned) gPangeaNetMatchIdLow,
+			CroMagGameModeName(gGameMode),
+			gGameMode,
+			gTrackNum + 1,
+			IsRaceMode(),
+			gGamePrefs.tagDuration);
 	}
 
 	EMSCRIPTEN_KEEPALIVE
 	void PangeaGame_StartNetworkMatch(void)
 	{
-		SDL_Log("PangeaGame_StartNetworkMatch called");
+		SDL_Log(
+			"PangeaGame_StartNetworkMatch called mode=%s(%d) track=%d players=%d host=%d raceMode=%d",
+			CroMagGameModeName(gGameMode),
+			gGameMode,
+			gTrackNum + 1,
+			gPangeaNetPlayerCount,
+			gPangeaNetIsHost,
+			IsRaceMode());
 		gPangeaNetEnabled = 1;
 		gNetGameInProgress = true;
 		gPangeaDebugFrameNumber = 0;
@@ -265,6 +447,8 @@ extern "C"
 	EMSCRIPTEN_KEEPALIVE uint32_t PangeaNet_GetMatchSeed(void) { return gPangeaNetMatchSeed; }
 	EMSCRIPTEN_KEEPALIVE uint32_t PangeaNet_GetMatchIdLow(void) { return gPangeaNetMatchIdLow; }
 	EMSCRIPTEN_KEEPALIVE uint32_t PangeaNet_GetMatchIdHigh(void) { return gPangeaNetMatchIdHigh; }
+	EMSCRIPTEN_KEEPALIVE const char* PangeaNet_GetLobbyIdString(void) { return gPangeaNetLobbyId; }
+	EMSCRIPTEN_KEEPALIVE const char* PangeaNet_GetMatchIdString(void) { return gPangeaNetMatchId; }
 	EMSCRIPTEN_KEEPALIVE int PangeaNet_SendReliable(const void* bytes, int byteCount)
 	{
 		return JS_PangeaNet_SendReliable(bytes, byteCount);
@@ -293,12 +477,22 @@ extern "C"
 	{
 		JS_PangeaNet_ReportMatchEnded(reason);
 	}
+	EMSCRIPTEN_KEEPALIVE void PangeaNet_ReportMatchResult(const char* json)
+	{
+		if (!json)
+		{
+			return;
+		}
+		JS_PangeaNet_ReportMatchResult(json);
+	}
 	EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetFrameNumber(void) { return gPangeaDebugFrameNumber; }
 	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetLocalPlayerIndex(void) { return gPangeaNetLocalPlayerIndex; }
 	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetPlayerCount(void) { return gPangeaNetPlayerCount; }
 	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugIsNetworkMatchRunning(void) { return gPangeaNetEnabled; }
 	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugHasDesync(void) { return gPangeaDebugHasDesync; }
 	EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetLastSyncHash(void) { return gPangeaDebugLastSyncHash; }
+	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetLastMatchEndReason(void) { return PangeaNetBridge_GetLastMatchEndReason(); }
+	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugHasMatchResult(void) { return PangeaNetBridge_HasMatchResult(); }
 	EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetPlayerPosition(int playerIndex, float* outX, float* outY, float* outZ)
 	{
 		if (!outX || !outY || !outZ)

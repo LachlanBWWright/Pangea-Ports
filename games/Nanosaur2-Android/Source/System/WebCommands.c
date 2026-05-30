@@ -21,9 +21,35 @@ static uint32_t gPangeaNetLifecycleSequence = 0;
 static int gPangeaNetLastSentLifecycleReason = 0;
 static int gPangeaNetRemoteLifecycleReason = 0;
 static uint32_t gPangeaNetRemoteLifecycleSequence = 0;
+static int gPangeaNetLastMatchEndReason = 0;
+static int gPangeaNetHasMatchResult = 0;
+static int gPangeaNetResultPublished = 0;
+static char gPangeaNetLobbyId[64] = "00000000-0000-0000-0000-000000000000";
+static char gPangeaNetMatchId[64] = "00000000-0000-0000-0000-000000000000";
 static uint32_t gPangeaDebugFrameNumber = 0;
 static uint32_t gPangeaDebugLastSyncHash = 0;
 static int gPangeaDebugHasDesync = 0;
+
+static const char* Nanosaur2VSModeName(int vsMode)
+{
+	switch (vsMode)
+	{
+		case VS_MODE_NONE:
+			return "adventure";
+
+		case VS_MODE_RACE:
+			return "race";
+
+		case VS_MODE_BATTLE:
+			return "battle";
+
+		case VS_MODE_CAPTURETHEFLAG:
+			return "capture-the-flag";
+
+		default:
+			return "unknown";
+	}
+}
 
 /***
  * Sequence tracking for disruption resilience
@@ -86,6 +112,7 @@ static int ValidateLifecycleSequence(uint32_t incomingSequence, int isFromHost)
 #define PANGEA_NET_LIFECYCLE_MAGIC 0x504E4D53u
 #define PANGEA_NET_LIFECYCLE_VERSION 1u
 #define PANGEA_NET_LIFECYCLE_MATCH_END 1u
+#define PANGEA_NET_LIFECYCLE_MATCH_RESULT 2u
 #define PANGEA_NET_MATCH_STATE_NONE 0
 #define PANGEA_NET_MATCH_STATE_GAME_OVER 1
 #define PANGEA_NET_MATCH_STATE_LEVEL_COMPLETED 2
@@ -101,6 +128,39 @@ typedef struct
 	int32_t reason;
 	int32_t fromHost;
 } PangeaNetLifecyclePacket;
+
+#define PANGEA_NET_RESULT_PLAYERS 2
+
+typedef struct
+{
+	uint8_t playerIndex;
+	uint8_t placement;
+	uint8_t finished;
+	uint8_t eliminated;
+	int16_t score;
+	uint16_t lapsCompleted;
+	uint16_t checkpoint;
+	uint16_t reserved;
+} PangeaNetResultPlayer;
+
+typedef struct
+{
+	uint32_t magic;
+	uint32_t version;
+	uint32_t messageType;
+	uint32_t sequence;
+	uint32_t matchIdLow;
+	uint32_t matchIdHigh;
+	uint32_t seed;
+	int32_t endReason;
+	int32_t winnerPlayerIndex;
+	int32_t winningTeam;
+	int32_t mode;
+	int32_t trackOrLevel;
+	int32_t playerCount;
+	PangeaNetResultPlayer players[PANGEA_NET_RESULT_PLAYERS];
+	int32_t fromHost;
+} PangeaNetMatchResultPacket;
 
 typedef struct
 {
@@ -223,6 +283,14 @@ EM_JS(void, JS_PangeaNet_ReportMatchEnded, (int reason), {
 	}
 });
 
+EM_JS(void, JS_PangeaNet_ReportMatchResult, (const char* json), {
+	const net = globalThis.PangeaNet;
+	if (net && typeof net.reportMatchResult === "function")
+	{
+		net.reportMatchResult(UTF8ToString(json));
+	}
+});
+
 static int ParseJsonInt(const char* json, const char* key, int fallback)
 {
 	if (!json || !key)
@@ -279,6 +347,241 @@ static uint32_t ParseJsonU32(const char* json, const char* key, uint32_t fallbac
 	}
 
 	return (uint32_t)parsed;
+}
+
+static void ParseJsonString(const char* json, const char* key, char* outValue, size_t outValueSize)
+{
+	if (!outValue || outValueSize == 0)
+	{
+		return;
+	}
+
+	outValue[0] = '\0';
+	if (!json || !key)
+	{
+		return;
+	}
+
+	const char* keyAt = SDL_strstr(json, key);
+	if (!keyAt)
+	{
+		return;
+	}
+
+	const char* colon = SDL_strchr(keyAt, ':');
+	if (!colon)
+	{
+		return;
+	}
+
+	const char* quoteStart = SDL_strchr(colon, '"');
+	if (!quoteStart)
+	{
+		return;
+	}
+
+	quoteStart++;
+	const char* quoteEnd = SDL_strchr(quoteStart, '"');
+	if (!quoteEnd || quoteEnd <= quoteStart)
+	{
+		return;
+	}
+
+	size_t copyLength = (size_t)(quoteEnd - quoteStart);
+	if (copyLength >= outValueSize)
+	{
+		copyLength = outValueSize - 1;
+	}
+
+	SDL_memcpy(outValue, quoteStart, copyLength);
+	outValue[copyLength] = '\0';
+}
+
+static int ParseNanosaur2LevelNumber(const char* json, int fallback)
+{
+	char trackOrLevel[64];
+	ParseJsonString(json, "\"trackOrLevel\"", trackOrLevel, sizeof(trackOrLevel));
+	if (trackOrLevel[0] == '\0')
+	{
+		return fallback;
+	}
+
+	char* end = NULL;
+	const long parsed = strtol(trackOrLevel, &end, 10);
+	if (end == trackOrLevel)
+	{
+		return fallback;
+	}
+
+	return (int)parsed;
+}
+
+static int ParseNanosaur2Mode(const char* json, int levelNumber)
+{
+	char mode[64];
+	ParseJsonString(json, "\"mode\"", mode, sizeof(mode));
+
+	if (mode[0] != '\0')
+	{
+		if (SDL_strcasecmp(mode, "multiplayerRace") == 0 || SDL_strcasecmp(mode, "race") == 0)
+		{
+			return VS_MODE_RACE;
+		}
+		if (SDL_strcasecmp(mode, "multiplayerBattle") == 0 || SDL_strcasecmp(mode, "battle") == 0)
+		{
+			return VS_MODE_BATTLE;
+		}
+		if (SDL_strcasecmp(mode, "multiplayerFlag") == 0 || SDL_strcasecmp(mode, "captureEggs") == 0 || SDL_strcasecmp(mode, "captureTheFlag") == 0 || SDL_strcasecmp(mode, "flag") == 0)
+		{
+			return VS_MODE_CAPTURETHEFLAG;
+		}
+	}
+
+	const int fallbackMode = GetVSModeForLevel((short)levelNumber);
+	SDL_Log(
+		"Nanosaur2 network mode fallback reason=%s level=%d resolvedMode=%s(%d)",
+		mode[0] == '\0' ? "missing-mode" : mode,
+		levelNumber,
+		Nanosaur2VSModeName(fallbackMode),
+		fallbackMode);
+	return fallbackMode;
+}
+
+static const char* Nanosaur2ResultModeName(int vsMode)
+{
+	switch (vsMode)
+	{
+		case VS_MODE_BATTLE:
+			return "multiplayerBattle";
+		case VS_MODE_CAPTURETHEFLAG:
+			return "multiplayerFlag";
+		case VS_MODE_RACE:
+		default:
+			return "multiplayerRace";
+	}
+}
+
+static const char* Nanosaur2EndReasonName(int reason)
+{
+	return reason == PANGEA_NET_MATCH_STATE_GAME_OVER ? "game-over" : "level-completed";
+}
+
+static int Nanosaur2PlayerTeam(int playerIndex)
+{
+	return playerIndex & 1;
+}
+
+static int PangeaNetBuildMatchResultPacket(int reason, PangeaNetMatchResultPacket* outPacket)
+{
+	if (!outPacket)
+	{
+		return 0;
+	}
+
+	const int playerCount = SDL_clamp(gPangeaNetPlayerCount, 1, PANGEA_NET_RESULT_PLAYERS);
+	int winnerPlayerIndex = -1;
+	int bestPlacement = 9999;
+	for (int i = 0; i < playerCount; i++)
+	{
+		const int placement = (int) gPlayerInfo[i].place;
+		const int normalizedPlacement = placement > 0 ? placement : i + 1;
+		if (normalizedPlacement < bestPlacement)
+		{
+			bestPlacement = normalizedPlacement;
+			winnerPlayerIndex = i;
+		}
+	}
+
+	SDL_memset(outPacket, 0, sizeof(*outPacket));
+	outPacket->magic = PANGEA_NET_LIFECYCLE_MAGIC;
+	outPacket->version = PANGEA_NET_LIFECYCLE_VERSION;
+	outPacket->messageType = PANGEA_NET_LIFECYCLE_MATCH_RESULT;
+	outPacket->sequence = ++gPangeaNetLifecycleSequence;
+	outPacket->matchIdLow = gPangeaNetMatchIdLow;
+	outPacket->matchIdHigh = gPangeaNetMatchIdHigh;
+	outPacket->seed = gPangeaNetMatchSeed;
+	outPacket->endReason = reason;
+	outPacket->winnerPlayerIndex = winnerPlayerIndex;
+	outPacket->winningTeam = -1;
+	outPacket->mode = gVSMode;
+	outPacket->trackOrLevel = gLevelNum;
+	outPacket->playerCount = playerCount;
+	outPacket->fromHost = 1;
+
+	for (int i = 0; i < playerCount; i++)
+	{
+		PangeaNetResultPlayer* resultPlayer = &outPacket->players[i];
+		const int placement = (int) gPlayerInfo[i].place;
+		const int lapsCompleted = SDL_max(0, (int) gPlayerInfo[i].lapNum);
+		resultPlayer->playerIndex = (uint8_t) i;
+		resultPlayer->placement = (uint8_t) (placement > 0 ? placement : i + 1);
+		resultPlayer->finished = gPlayerInfo[i].raceComplete ? 1u : 0u;
+		resultPlayer->eliminated = gPlayerInfo[i].health <= 0.0f ? 1u : 0u;
+		resultPlayer->score = (int16_t) (gVSMode == VS_MODE_CAPTURETHEFLAG ? gNumEggsSaved[Nanosaur2PlayerTeam(i)] : (resultPlayer->finished ? 1 : 0));
+		resultPlayer->lapsCompleted = (uint16_t) lapsCompleted;
+		resultPlayer->checkpoint = 0;
+	}
+
+	return 1;
+}
+
+static void PangeaNetEmitMatchResultJson(const PangeaNetMatchResultPacket* packet)
+{
+	if (!packet || packet->playerCount <= 0)
+	{
+		return;
+	}
+
+	char playersJson[768];
+	char placementsJson[128];
+	char json[1024];
+	char trackOrLevel[64];
+	playersJson[0] = '\0';
+	placementsJson[0] = '\0';
+	SDL_snprintf(trackOrLevel, (int) sizeof(trackOrLevel), "%d", packet->trackOrLevel);
+
+	for (int i = 0; i < packet->playerCount && i < PANGEA_NET_RESULT_PLAYERS; i++)
+	{
+		const PangeaNetResultPlayer* player = &packet->players[i];
+		char entry[192];
+		char placementEntry[32];
+		SDL_snprintf(
+			entry,
+			(int) sizeof(entry),
+			"%s{\"participantId\":\"player%d\",\"playerIndex\":%d,\"displayName\":\"Player %d\",\"team\":\"%d\",\"placement\":%d,\"finished\":%s,\"eliminated\":%s,\"score\":%d,\"timeMs\":0,\"lapsCompleted\":%d,\"checkpoint\":%d}",
+			i > 0 ? "," : "",
+			i,
+			(int) player->playerIndex,
+			i + 1,
+			Nanosaur2PlayerTeam(i),
+			(int) player->placement,
+			player->finished ? "true" : "false",
+			player->eliminated ? "true" : "false",
+			(int) player->score,
+			(int) player->lapsCompleted,
+			(int) player->checkpoint);
+		SDL_strlcat(playersJson, entry, sizeof(playersJson));
+		SDL_snprintf(placementEntry, (int) sizeof(placementEntry), "%s%d", i > 0 ? "," : "", (int) player->placement);
+		SDL_strlcat(placementsJson, placementEntry, sizeof(placementsJson));
+	}
+
+	SDL_snprintf(
+		json,
+		(int) sizeof(json),
+		"{\"lobbyId\":\"%s\",\"matchId\":\"%s\",\"gameId\":\"nanosaur2\",\"mode\":\"%s\",\"trackOrLevel\":\"%s\",\"seed\":%u,\"endedAt\":\"1970-01-01T00:00:00Z\",\"endReason\":\"%s\",\"winnerPlayerIndex\":%d,\"winningTeam\":\"none\",\"placements\":[%s],\"players\":[%s]}",
+		gPangeaNetLobbyId,
+		gPangeaNetMatchId,
+		Nanosaur2ResultModeName(packet->mode),
+		trackOrLevel,
+		(unsigned) packet->seed,
+		Nanosaur2EndReasonName(packet->endReason),
+		packet->winnerPlayerIndex,
+		placementsJson,
+		playersJson);
+
+	gPangeaNetHasMatchResult = 1;
+	gPangeaNetLastMatchEndReason = packet->endReason;
+	PangeaNet_ReportMatchResult(json);
 }
 
 /****************************/
@@ -340,6 +643,17 @@ EMSCRIPTEN_KEEPALIVE void PangeaGame_SetNetworkMatchConfig(const char* json, int
 	gPangeaNetMatchSeed = ParseJsonU32(json, "\"seed\"", 1);
 	gPangeaNetMatchIdLow = ParseJsonU32(json, "\"matchIdLow\"", gPangeaNetMatchSeed);
 	gPangeaNetMatchIdHigh = ParseJsonU32(json, "\"matchIdHigh\"", 0);
+	ParseJsonString(json, "\"lobbyId\"", gPangeaNetLobbyId, sizeof(gPangeaNetLobbyId));
+	ParseJsonString(json, "\"matchId\"", gPangeaNetMatchId, sizeof(gPangeaNetMatchId));
+	if (gPangeaNetLobbyId[0] == '\0')
+	{
+		SDL_strlcpy(gPangeaNetLobbyId, "00000000-0000-0000-0000-000000000000", sizeof(gPangeaNetLobbyId));
+	}
+	if (gPangeaNetMatchId[0] == '\0')
+	{
+		SDL_strlcpy(gPangeaNetMatchId, "00000000-0000-0000-0000-000000000000", sizeof(gPangeaNetMatchId));
+	}
+	const int levelNumber = ParseNanosaur2LevelNumber(json, gLevelNum);
 
 	if (gPangeaNetPlayerCount < 1)
 	{
@@ -376,26 +690,39 @@ EMSCRIPTEN_KEEPALIVE void PangeaGame_SetNetworkMatchConfig(const char* json, int
 	}
 
 	gNumPlayers = (Byte)gPangeaNetPlayerCount;
-	gVSMode = VS_MODE_RACE;
+	gLevelNum = (short)levelNumber;
+	gVSMode = (short)ParseNanosaur2Mode(json, levelNumber);
 	SDL_Log(
-		"PangeaGame_SetNetworkMatchConfig resolved host=%d localPlayer=%d hostPlayer=%d playerCount=%d seed=%u matchId=%u:%u",
+		"PangeaGame_SetNetworkMatchConfig resolved host=%d localPlayer=%d hostPlayer=%d playerCount=%d seed=%u matchId=%u:%u level=%d vsMode=%s(%d)",
 		gPangeaNetIsHost,
 		gPangeaNetLocalPlayerIndex,
 		gPangeaNetHostPlayerIndex,
 		gPangeaNetPlayerCount,
 		(unsigned)gPangeaNetMatchSeed,
 		(unsigned)gPangeaNetMatchIdHigh,
-		(unsigned)gPangeaNetMatchIdLow);
+		(unsigned)gPangeaNetMatchIdLow,
+		gLevelNum,
+		Nanosaur2VSModeName(gVSMode),
+		gVSMode);
 }
 
 EMSCRIPTEN_KEEPALIVE void PangeaGame_StartNetworkMatch(void)
 {
-	SDL_Log("PangeaGame_StartNetworkMatch called");
+	SDL_Log(
+		"PangeaGame_StartNetworkMatch called level=%d vsMode=%s(%d) players=%d host=%d",
+		gLevelNum,
+		Nanosaur2VSModeName(gVSMode),
+		gVSMode,
+		gPangeaNetPlayerCount,
+		gPangeaNetIsHost);
 	gPangeaNetEnabled = 1;
 	gPangeaNetLifecycleSequence = 0;
 	gPangeaNetLastSentLifecycleReason = 0;
 	gPangeaNetRemoteLifecycleReason = 0;
 	gPangeaNetRemoteLifecycleSequence = 0;
+	gPangeaNetLastMatchEndReason = 0;
+	gPangeaNetHasMatchResult = 0;
+	gPangeaNetResultPublished = 0;
 	gPangeaNetBacklogHead = 0;
 	gPangeaNetBacklogTail = 0;
 	gPangeaDebugFrameNumber = 0;
@@ -462,9 +789,28 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ReportMatchEnded(int reason)
 	JS_PangeaNet_ReportMatchEnded(reason);
 }
 
+EMSCRIPTEN_KEEPALIVE void PangeaNet_ReportMatchResult(const char* json)
+{
+	if (!json)
+	{
+		return;
+	}
+	JS_PangeaNet_ReportMatchResult(json);
+}
+
 EMSCRIPTEN_KEEPALIVE int PangeaNet_GetRemoteLifecycleReason(void)
 {
 	return gPangeaNetRemoteLifecycleReason;
+}
+
+EMSCRIPTEN_KEEPALIVE int PangeaNet_GetLastMatchEndReason(void)
+{
+	return gPangeaNetLastMatchEndReason;
+}
+
+EMSCRIPTEN_KEEPALIVE int PangeaNet_HasMatchResult(void)
+{
+	return gPangeaNetHasMatchResult;
 }
 
 EMSCRIPTEN_KEEPALIVE void PangeaNet_ResetNetworkSequenceTracking(void)
@@ -502,10 +848,30 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_UpdateMatchLifecycle(void)
 					{
 						gPangeaNetRemoteLifecycleSequence = packet->sequence;
 						gPangeaNetRemoteLifecycleReason = packet->reason;
+						gPangeaNetLastMatchEndReason = packet->reason;
+						PangeaNet_ReportMatchEnded(packet->reason);
 						SDL_Log(
 							"PangeaNet lifecycle received host match-end reason=%d sequence=%u",
 							packet->reason,
 							(unsigned)packet->sequence);
+					}
+				}
+				continue;
+			}
+		}
+		if (byteCount == (int) sizeof(PangeaNetMatchResultPacket))
+		{
+			const PangeaNetMatchResultPacket* packet = (const PangeaNetMatchResultPacket*) payload;
+			if (packet->magic == PANGEA_NET_LIFECYCLE_MAGIC
+				&& packet->version == PANGEA_NET_LIFECYCLE_VERSION
+				&& packet->messageType == PANGEA_NET_LIFECYCLE_MATCH_RESULT)
+			{
+				if (!gPangeaNetIsHost && packet->fromHost != 0)
+				{
+					if (ValidateLifecycleSequence(packet->sequence, packet->fromHost))
+					{
+						gPangeaNetRemoteLifecycleSequence = packet->sequence;
+						PangeaNetEmitMatchResultJson(packet);
 					}
 				}
 				continue;
@@ -550,10 +916,24 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_PublishLocalMatchLifecycle(void)
 	if (JS_PangeaNet_SendReliable(&packet, (int)sizeof(packet)) != 0)
 	{
 		gPangeaNetLastSentLifecycleReason = reason;
+		gPangeaNetLastMatchEndReason = reason;
+		PangeaNet_ReportMatchEnded(reason);
 		SDL_Log(
 			"PangeaNet lifecycle sent host match-end reason=%d sequence=%u",
 			reason,
 			(unsigned)packet.sequence);
+		if (!gPangeaNetResultPublished)
+		{
+			PangeaNetMatchResultPacket resultPacket;
+			if (PangeaNetBuildMatchResultPacket(reason, &resultPacket))
+			{
+				if (JS_PangeaNet_SendReliable(&resultPacket, (int) sizeof(resultPacket)) != 0)
+				{
+					gPangeaNetResultPublished = 1;
+					PangeaNetEmitMatchResultJson(&resultPacket);
+				}
+			}
+		}
 	}
 }
 EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetFrameNumber(void) { return gPangeaDebugFrameNumber; }
@@ -562,6 +942,8 @@ EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetPlayerCount(void) { return gPangeaNe
 EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugIsNetworkMatchRunning(void) { return gPangeaNetEnabled; }
 EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugHasDesync(void) { return gPangeaDebugHasDesync; }
 EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetLastSyncHash(void) { return gPangeaDebugLastSyncHash; }
+EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetLastMatchEndReason(void) { return gPangeaNetLastMatchEndReason; }
+EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugHasMatchResult(void) { return gPangeaNetHasMatchResult; }
 EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetPlayerPosition(int playerIndex, float* outX, float* outY, float* outZ)
 {
 	if (!outX || !outY || !outZ)
@@ -577,6 +959,7 @@ EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugGetPlayerPosition(int playerIndex, floa
 	*outZ = 0.0f;
 	return 1;
 }
+
 EMSCRIPTEN_KEEPALIVE void PangeaGame_DebugSetInputScript(const char* json, int byteCount)
 {
 	(void)json;
@@ -595,7 +978,7 @@ EMSCRIPTEN_KEEPALIVE void PangeaGame_DebugSetInputScript(const char* json, int b
  */
 
 #define PANGEA_NET_GAMEPLAY_MAGIC 0x54454E50u /* 'PNET' */
-#define PANGEA_NET_GAMEPLAY_VERSION 2u
+#define PANGEA_NET_GAMEPLAY_VERSION 6u
 #define PANGEA_NET_GAMEPLAY_PLAYER_NA 0xFFFFu
 #define PANGEA_NET_GAMEPLAY_INPUT_TIMEOUT_MS 750.0
 #define PANGEA_NET_GAMEPLAY_INTERP_ALPHA 0.32f
@@ -641,7 +1024,30 @@ enum
 enum
 {
 	kNS2ReliableEventRaceComplete = 1,
-	kNS2ReliableEventEliminated = 2
+	kNS2ReliableEventEliminated = 2,
+	kNS2ReliableEventPlayerExploded = 3,
+	kNS2ReliableEventPlayerDeathDiveImpact = 4,
+	kNS2ReliableEventWeaponFired = 5,
+	kNS2ReliableEventWeaponHit = 6,
+	kNS2ReliableEventJetpackIgnited = 7,
+	kNS2ReliableEventJetpackShutoff = 8,
+	kNS2ReliableEventShieldHit = 9,
+	kNS2ReliableEventWormholeEntered = 10,
+	kNS2ReliableEventWormholeExited = 11,
+	kNS2ReliableEventDustDevilCaptured = 12,
+	kNS2ReliableEventDustDevilReleased = 13,
+	kNS2ReliableEventEggPickedUp = 14,
+	kNS2ReliableEventEggDropped = 15,
+	kNS2ReliableEventEggRetrieved = 16
+};
+
+enum
+{
+	kNS2DeathPhaseAlive = 0,
+	kNS2DeathPhaseDeathDive = 1,
+	kNS2DeathPhaseExploded = 2,
+	kNS2DeathPhaseWaitingToRespawn = 3,
+	kNS2DeathPhaseRespawned = 4
 };
 
 typedef struct
@@ -670,14 +1076,26 @@ typedef struct
 	uint8_t currentWeapon;
 	uint8_t place;
 	uint8_t raceComplete;
-	uint8_t animNum;
-	uint8_t isDead;
+	uint8_t deathPhase;
+	uint8_t shieldVisible;
+	uint8_t hiddenState;
 	uint16_t lapNum;
 	uint16_t raceCheckpointNum;
 	uint16_t weaponQuantity0;
 	uint16_t weaponQuantity1;
 	uint16_t weaponQuantity2;
+	float alpha;
+	float distToNextCheckpoint;
+	float invincibilityTimer;
+	float deathTimer;
+	float currentAnimTime;
+	uint32_t checkpointBits[4];
 	uint32_t lastProcessedInputSequence;
+	uint16_t numFreeLives;
+	uint8_t wrongWay;
+	uint8_t movingBackwards;
+	uint8_t currentAnimNum;
+	uint8_t reserved0;
 } NS2SnapshotPlayerState;
 
 typedef struct
@@ -754,6 +1172,50 @@ static uint32_t gNS2RemoteSnapshotHead[2] = {0u, 0u};
 static uint32_t gNS2RemoteSnapshotCount[2] = {0u, 0u};
 static uint8_t gNS2ReliableRaceCompleteSent[2] = {0u, 0u};
 static uint8_t gNS2ReliableEliminatedSent[2] = {0u, 0u};
+static uint32_t gNS2LastVisualEventSequence = 0;
+static uint32_t gNS2LastAppliedVisualEventSequence = 0;
+static uint32_t gNS2DuplicateVisualEventCount = 0;
+static uint32_t gNS2StaleVisualEventCount = 0;
+
+extern short gNumEggs;
+extern ObjNode *gEggObjs[];
+
+#define NS2_NET_MAX_EGGS MAX_NET_EGGS
+
+static uint8_t gNS2PendingEggCount = 0;
+static uint8_t gNS2PendingEggState[NS2_NET_MAX_EGGS];
+static uint8_t gNS2PendingEggCarrier[NS2_NET_MAX_EGGS];
+static float gNS2PendingEggCoordX[NS2_NET_MAX_EGGS];
+static float gNS2PendingEggCoordY[NS2_NET_MAX_EGGS];
+static float gNS2PendingEggCoordZ[NS2_NET_MAX_EGGS];
+static Byte gNS2PendingNumEggsSaved[NUM_EGG_TYPES];
+static Boolean gNS2HavePendingEggState = false;
+
+EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugForcePlayerDeath(int playerIndex)
+{
+	if (playerIndex < 0 || playerIndex >= gPangeaNetPlayerCount || playerIndex >= 2)
+	{
+		return 0;
+	}
+	if (gPangeaNetEnabled && !gPangeaNetIsHost && playerIndex != gPangeaNetLocalPlayerIndex)
+	{
+		return 0;
+	}
+
+	ObjNode* player = gPlayerInfo[playerIndex].objNode;
+	if (!player)
+	{
+		return 0;
+	}
+
+	KillPlayer((short)playerIndex, PLAYER_DEATH_TYPE_EXPLODE, &player->Coord);
+	if (gPangeaNetEnabled && gPangeaNetIsHost)
+	{
+		gNS2ForceKeyframe = 1;
+	}
+	return 1;
+}
+static uint32_t gNS2LastRemoteExplosionTick[2] = {0u, 0u};
 
 static void NS2DebugLogEarlyNetPhase(const char* phase)
 {
@@ -814,32 +1276,301 @@ static void NS2ReapplyUnackedLocalInput(uint32_t lastProcessedInputSequence, int
 	}
 }
 
+static void NS2PackCheckpointBits(int playerIndex, uint32_t outBits[4])
+{
+	if (playerIndex < 0 || playerIndex >= 2 || !outBits)
+	{
+		return;
+	}
+	for (int word = 0; word < 4; word++)
+	{
+		outBits[word] = 0u;
+	}
+	for (int marker = 0; marker < MAX_LINEMARKERS; marker++)
+	{
+		if (gPlayerInfo[playerIndex].raceCheckpointTagged[marker])
+		{
+			outBits[marker / 32] |= 1u << (marker % 32);
+		}
+	}
+}
+
+static void NS2UnpackCheckpointBits(const uint32_t checkpointBits[4], int playerIndex)
+{
+	if (playerIndex < 0 || playerIndex >= 2 || !checkpointBits)
+	{
+		return;
+	}
+	for (int marker = 0; marker < MAX_LINEMARKERS; marker++)
+	{
+		gPlayerInfo[playerIndex].raceCheckpointTagged[marker] =
+			(checkpointBits[marker / 32] & (1u << (marker % 32))) != 0u;
+	}
+}
+
+static uint8_t NS2GetPlayerDeathPhase(int playerIndex, const ObjNode* obj)
+{
+	if (playerIndex < 0 || playerIndex >= 2)
+	{
+		return kNS2DeathPhaseAlive;
+	}
+	if (!gPlayerIsDead[playerIndex])
+	{
+		if (obj && obj->Skeleton && obj->Skeleton->AnimNum == PLAYER_ANIM_APPEARWORMHOLE)
+		{
+			return kNS2DeathPhaseRespawned;
+		}
+		return kNS2DeathPhaseAlive;
+	}
+	if (obj && obj->Skeleton && obj->Skeleton->AnimNum == PLAYER_ANIM_DEATHDIVE)
+	{
+		return kNS2DeathPhaseDeathDive;
+	}
+	if (gDeathTimer[playerIndex] > 0.0f)
+	{
+		return kNS2DeathPhaseWaitingToRespawn;
+	}
+	return kNS2DeathPhaseExploded;
+}
+
+static void NS2ApplySnapshotDeathState(int playerIndex, ObjNode* obj, const NS2SnapshotPlayerState* snapshot)
+{
+	if (playerIndex < 0 || playerIndex >= 2 || !snapshot)
+	{
+		return;
+	}
+
+	const uint8_t deathPhase = snapshot->deathPhase;
+	gPlayerIsDead[playerIndex] = deathPhase != kNS2DeathPhaseAlive && deathPhase != kNS2DeathPhaseRespawned;
+	gCameraInDeathDiveMode[playerIndex] = deathPhase == kNS2DeathPhaseDeathDive;
+	gDeathTimer[playerIndex] = snapshot->deathTimer;
+
+	switch (deathPhase)
+	{
+		case kNS2DeathPhaseAlive:
+		case kNS2DeathPhaseRespawned:
+			if (gDeathTimer[playerIndex] < 0.0f)
+			{
+				gDeathTimer[playerIndex] = 0.0f;
+			}
+			break;
+
+		case kNS2DeathPhaseDeathDive:
+		case kNS2DeathPhaseWaitingToRespawn:
+			if (gDeathTimer[playerIndex] <= 0.0f)
+			{
+				gDeathTimer[playerIndex] = 1.0f;
+			}
+			break;
+
+		case kNS2DeathPhaseExploded:
+			gDeathTimer[playerIndex] = -1.0f;
+			break;
+
+		default:
+			break;
+	}
+
+	if (!obj)
+	{
+		return;
+	}
+
+	if (snapshot->hiddenState != 0)
+	{
+		HidePlayer(obj);
+	}
+	else
+	{
+		ShowPlayer(obj);
+	}
+}
+
+static void NS2SetPlayerAlpha(ObjNode* obj, float alpha)
+{
+	if (!obj)
+	{
+		return;
+	}
+	if (alpha < 0.0f)
+	{
+		alpha = 0.0f;
+	}
+	if (alpha > 1.0f)
+	{
+		alpha = 1.0f;
+	}
+	for (ObjNode* cursor = obj; cursor != NULL; cursor = cursor->ChainNode)
+	{
+		cursor->ColorFilter.a = alpha;
+	}
+}
+
+static void NS2SetShieldVisibility(int playerIndex, int visible)
+{
+	if (playerIndex < 0 || playerIndex >= 2)
+	{
+		return;
+	}
+	if (visible && gPlayerInfo[playerIndex].shieldPower > 0.0f && gPlayerInfo[playerIndex].shieldObj == NULL)
+	{
+		CreatePlayerShield(playerIndex);
+	}
+	ObjNode* shield = gPlayerInfo[playerIndex].shieldObj;
+	if (!shield)
+	{
+		return;
+	}
+	if (visible)
+	{
+		shield->StatusBits &= ~STATUS_BIT_HIDDEN;
+	}
+	else
+	{
+		shield->StatusBits |= STATUS_BIT_HIDDEN;
+	}
+}
+
+static int NS2CanEmitVisualEvent(short playerNum)
+{
+	return gPangeaNetEnabled
+		&& gPangeaNetIsHost
+		&& playerNum >= 0
+		&& playerNum < gPangeaNetPlayerCount
+		&& playerNum < 2;
+}
+
+static int NS2ShouldTreatVisualEventAsStale(uint8_t eventType, int playerIndex, uint32_t tick)
+{
+	if (playerIndex < 0 || playerIndex >= 2)
+	{
+		return 1;
+	}
+	const ObjNode* obj = gPlayerInfo[playerIndex].objNode;
+	const uint8_t currentDeathPhase = NS2GetPlayerDeathPhase(playerIndex, obj);
+	const bool playerAliveNow = currentDeathPhase == kNS2DeathPhaseAlive || currentDeathPhase == kNS2DeathPhaseRespawned;
+
+	switch (eventType)
+	{
+		case kNS2ReliableEventPlayerExploded:
+		case kNS2ReliableEventPlayerDeathDiveImpact:
+			return playerAliveNow ? 1 : 0;
+
+		case kNS2ReliableEventWeaponFired:
+		case kNS2ReliableEventWeaponHit:
+		case kNS2ReliableEventJetpackIgnited:
+		case kNS2ReliableEventJetpackShutoff:
+		case kNS2ReliableEventShieldHit:
+			if (!playerAliveNow)
+			{
+				return 1;
+			}
+			if (gNS2LastRemoteExplosionTick[playerIndex] != 0u && tick < gNS2LastRemoteExplosionTick[playerIndex])
+			{
+				return 1;
+			}
+			return 0;
+
+		default:
+			return 0;
+	}
+}
+
+static bool NS2RemoteAnimIsEventDriven(const ObjNode* obj)
+{
+	if (!obj || !obj->Skeleton)
+	{
+		return false;
+	}
+
+	switch (obj->Skeleton->AnimNum)
+	{
+		case PLAYER_ANIM_APPEARWORMHOLE:
+		case PLAYER_ANIM_ENTERWORMHOLE:
+		case PLAYER_ANIM_DUSTDEVIL:
+			return true;
+
+		default:
+			return false;
+	}
+}
+
+static short NS2DeriveRemoteFlightAnim(ObjNode* obj)
+{
+	if (!obj || !obj->Skeleton)
+	{
+		return PLAYER_ANIM_FLAP;
+	}
+
+	if (obj->Rot.z < (-PI / 7))
+	{
+		return PLAYER_ANIM_BANKRIGHT;
+	}
+
+	if (obj->Rot.z > (PI / 7))
+	{
+		return PLAYER_ANIM_BANKLEFT;
+	}
+
+	switch (obj->Skeleton->AnimNum)
+	{
+		case PLAYER_ANIM_FLAP:
+			obj->SpecialF[3] -= gFramesPerSecondFrac;
+			if (obj->SpecialF[3] <= 0.0f)
+			{
+				obj->SpecialF[3] = 2.0f + RandomFloat() * 3.0f;
+				return PLAYER_ANIM_COASTING;
+			}
+			return PLAYER_ANIM_FLAP;
+
+		case PLAYER_ANIM_COASTING:
+			obj->SpecialF[3] -= gFramesPerSecondFrac;
+			if (obj->SpecialF[3] <= 0.0f)
+			{
+				obj->SpecialF[3] = 1.0f + RandomFloat() * 3.0f;
+				return PLAYER_ANIM_FLAP;
+			}
+			return PLAYER_ANIM_COASTING;
+
+		default:
+			obj->SpecialF[3] = 1.0f + RandomFloat() * 3.0f;
+			return PLAYER_ANIM_FLAP;
+	}
+}
+
 static void NS2ApplyRemotePlayerAnimation(int playerIndex, ObjNode* obj, const NS2SnapshotPlayerState* snapshot)
 {
 	if (playerIndex < 0 || playerIndex >= 2 || !obj || !snapshot || !obj->Skeleton)
 	{
 		return;
 	}
-	if (snapshot->animNum >= obj->Skeleton->skeletonDefinition->NumAnims)
+
+	const uint8_t deathPhase = snapshot->deathPhase;
+	const uint8_t currentAnimNum = snapshot->currentAnimNum;
+	if (currentAnimNum <= PLAYER_ANIM_COASTING)
 	{
-		return;
+		if (obj->Skeleton->AnimNum != currentAnimNum)
+		{
+			SetSkeletonAnim(obj->Skeleton, currentAnimNum);
+		}
+		obj->Skeleton->CurrentAnimTime = snapshot->currentAnimTime;
+	}
+	else if (deathPhase == kNS2DeathPhaseDeathDive)
+	{
+		if (obj->Skeleton->AnimNum != PLAYER_ANIM_DEATHDIVE)
+		{
+			SetSkeletonAnim(obj->Skeleton, PLAYER_ANIM_DEATHDIVE);
+		}
+	}
+	else if (!NS2RemoteAnimIsEventDriven(obj))
+	{
+		const short desiredAnim = NS2DeriveRemoteFlightAnim(obj);
+		if (obj->Skeleton->AnimNum != desiredAnim)
+		{
+			MorphToSkeletonAnim(obj->Skeleton, desiredAnim, 3.0f);
+		}
 	}
 
-	const bool wasDead = gPlayerIsDead[playerIndex];
-	const bool isDead = snapshot->isDead != 0;
-	if (!wasDead && isDead && snapshot->animNum != PLAYER_ANIM_DEATHDIVE)
-	{
-		ExplodePlayer(obj, playerIndex, &obj->Coord);
-		return;
-	}
-
-	if (obj->Skeleton->AnimNum != snapshot->animNum)
-	{
-		MorphToSkeletonAnim(obj->Skeleton, snapshot->animNum, 3.0f);
-	}
-
-	gPlayerIsDead[playerIndex] = isDead;
-	gCameraInDeathDiveMode[playerIndex] = snapshot->animNum == PLAYER_ANIM_DEATHDIVE;
 }
 
 static void NS2RestoreRemotePlayerRenderState(int playerIndex, ObjNode* obj, const NS2SnapshotPlayerState* snapshot)
@@ -848,16 +1579,18 @@ static void NS2RestoreRemotePlayerRenderState(int playerIndex, ObjNode* obj, con
 	{
 		return;
 	}
-	const bool shouldBeVisible = snapshot->health > 0.0f || snapshot->animNum == PLAYER_ANIM_DEATHDIVE;
-	if (!shouldBeVisible)
+	if (snapshot->hiddenState != 0)
 	{
+		HidePlayer(obj);
+		NS2SetShieldVisibility(playerIndex, 0);
 		return;
 	}
 
 	obj->Health = snapshot->health;
 	obj->CType = CTYPE_PLAYER1 << playerIndex;
 	ShowPlayer(obj);
-	FadePlayer(obj, 1.0f);
+	NS2SetPlayerAlpha(obj, snapshot->alpha);
+	NS2SetShieldVisibility(playerIndex, snapshot->shieldVisible != 0);
 	UpdateObjectTransforms(obj);
 	CalcObjectBoxFromNode(obj);
 	UpdateShadow(obj);
@@ -945,6 +1678,12 @@ static void NS2EnsureMatchStateInitialized(void)
 	gNS2ReliableRaceCompleteSent[1] = 0;
 	gNS2ReliableEliminatedSent[0] = 0;
 	gNS2ReliableEliminatedSent[1] = 0;
+	gNS2LastVisualEventSequence = 0;
+	gNS2LastAppliedVisualEventSequence = 0;
+	gNS2DuplicateVisualEventCount = 0;
+	gNS2StaleVisualEventCount = 0;
+	gNS2LastRemoteExplosionTick[0] = 0;
+	gNS2LastRemoteExplosionTick[1] = 0;
 	for (int i = 0; i < 2; i++)
 	{
 		gNetInputAnalogX[i] = 0.0f;
@@ -1078,6 +1817,7 @@ static uint32_t NS2ComputeAuthoritativeStateHash(uint8_t playerCount)
 	for (int i = 0; i < playerCount && i < 2; i++)
 	{
 		const ObjNode* obj = gPlayerInfo[i].objNode;
+		const SkeletonObjDataType* skeleton = obj ? obj->Skeleton : NULL;
 		const float coordX = obj ? obj->Coord.x : 0.0f;
 		const float coordY = obj ? obj->Coord.y : 0.0f;
 		const float coordZ = obj ? obj->Coord.z : 0.0f;
@@ -1093,7 +1833,34 @@ static uint32_t NS2ComputeAuthoritativeStateHash(uint8_t playerCount)
 		hash ^= (uint32_t)gPlayerInfo[i].lapNum + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 		hash ^= (uint32_t)gPlayerInfo[i].raceCheckpointNum + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 		hash ^= (uint32_t)gPlayerInfo[i].place + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)gPlayerInfo[i].numFreeLives + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(gPlayerInfo[i].wrongWay ? 1 : 0) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(gPlayerInfo[i].movingBackwards ? 1 : 0) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(gPlayerInfo[i].distToNextCheckpoint * 10.0f) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(gPlayerInfo[i].invincibilityTimer * 10.0f) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(skeleton ? skeleton->AnimNum : 0) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		uint32_t checkpointBits[4];
+		NS2PackCheckpointBits(i, checkpointBits);
+		for (int word = 0; word < 4; word++)
+		{
+			hash ^= checkpointBits[word] + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		}
 		hash ^= gPlayerInfo[i].raceComplete ? 0xA5A5A5A5u : 0x5A5A5A5Au;
+	}
+	{
+		Byte eggState[NS2_NET_MAX_EGGS];
+		Byte eggCarrier[NS2_NET_MAX_EGGS];
+		float eggX[NS2_NET_MAX_EGGS], eggY[NS2_NET_MAX_EGGS], eggZ[NS2_NET_MAX_EGGS];
+		const int eggCount = PangeaNet_GetEggSnapshotData(eggState, eggCarrier, eggX, eggY, eggZ, NS2_NET_MAX_EGGS);
+		for (int ei = 0; ei < eggCount; ei++)
+		{
+			hash ^= (uint32_t)eggState[ei] + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+			hash ^= (uint32_t)eggCarrier[ei] + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		}
+	}
+	for (int k = 0; k < NUM_EGG_TYPES; k++)
+	{
+		hash ^= (uint32_t)gNumEggsSaved[k] + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 	}
 	return hash;
 }
@@ -1129,6 +1896,87 @@ static void NS2SendReliableEvent(uint8_t eventType, int playerIndex)
 		return;
 	}
 	JS_PangeaNet_SendReliable(packet, writer.cursor);
+}
+
+static void NS2SendVisualEvent(uint8_t eventType, short playerNum, short aux0, short aux1, const OGLPoint3D* where)
+{
+	if (!NS2CanEmitVisualEvent(playerNum))
+	{
+		return;
+	}
+	const ObjNode* obj = gPlayerInfo[playerNum].objNode;
+	const OGLPoint3D zeroPoint = {0.0f, 0.0f, 0.0f};
+	const OGLPoint3D eventPoint = where ? *where : (obj ? obj->Coord : zeroPoint);
+	uint8_t packet[PANGEA_NET_GAMEPLAY_BUFFER_SIZE];
+	NS2Writer writer;
+	PangeaNetGameplayHeader header;
+	header.magic = PANGEA_NET_GAMEPLAY_MAGIC;
+	header.version = PANGEA_NET_GAMEPLAY_VERSION;
+	header.packetType = kPangeaNetPacketReliableEvent;
+	header.matchIdLow = gNS2MatchId;
+	header.matchIdHigh = gNS2MatchIdHigh;
+	header.tick = gNS2Tick;
+	header.sequence = gNS2Sequence++;
+	header.playerIndex = PANGEA_NET_GAMEPLAY_PLAYER_NA;
+	header.reserved = 0;
+	NS2Writer_Init(&writer, packet, (int)sizeof(packet));
+	NS2WriteHeader(&writer, &header);
+	NS2Writer_U8(&writer, eventType);
+	NS2Writer_U8(&writer, (uint8_t)playerNum);
+	NS2Writer_F32(&writer, eventPoint.x);
+	NS2Writer_F32(&writer, eventPoint.y);
+	NS2Writer_F32(&writer, eventPoint.z);
+	NS2Writer_U8(&writer, (uint8_t)aux0);
+	NS2Writer_U8(&writer, (uint8_t)aux1);
+	NS2Writer_U8(&writer, NS2GetPlayerDeathPhase(playerNum, obj));
+	if (!writer.ok)
+	{
+		return;
+	}
+	gNS2LastVisualEventSequence = header.sequence;
+	JS_PangeaNet_SendReliable(packet, writer.cursor);
+}
+
+static void NS2SendEggEvent(uint8_t eventType, uint8_t eggIndex, uint8_t playerNum, uint8_t kind)
+{
+	uint8_t packet[PANGEA_NET_GAMEPLAY_BUFFER_SIZE];
+	NS2Writer writer;
+	PangeaNetGameplayHeader header;
+	header.magic = PANGEA_NET_GAMEPLAY_MAGIC;
+	header.version = PANGEA_NET_GAMEPLAY_VERSION;
+	header.packetType = kPangeaNetPacketReliableEvent;
+	header.matchIdLow = gNS2MatchId;
+	header.matchIdHigh = gNS2MatchIdHigh;
+	header.tick = gNS2Tick;
+	header.sequence = gNS2Sequence++;
+	header.playerIndex = PANGEA_NET_GAMEPLAY_PLAYER_NA;
+	header.reserved = 0;
+	NS2Writer_Init(&writer, packet, (int)sizeof(packet));
+	NS2WriteHeader(&writer, &header);
+	NS2Writer_U8(&writer, eventType);
+	NS2Writer_U8(&writer, eggIndex);
+	NS2Writer_U8(&writer, playerNum);
+	NS2Writer_U8(&writer, kind);
+	if (!writer.ok)
+	{
+		return;
+	}
+	JS_PangeaNet_SendReliable(packet, writer.cursor);
+}
+
+void PangeaNet_SendEggPickedUp(int eggIndex, int playerNum)
+{
+	NS2SendEggEvent(kNS2ReliableEventEggPickedUp, (uint8_t)eggIndex, (uint8_t)playerNum, 0);
+}
+
+void PangeaNet_SendEggDropped(int eggIndex, int playerNum)
+{
+	NS2SendEggEvent(kNS2ReliableEventEggDropped, (uint8_t)eggIndex, (uint8_t)playerNum, 0);
+}
+
+void PangeaNet_SendEggRetrieved(int eggIndex, int kind)
+{
+	NS2SendEggEvent(kNS2ReliableEventEggRetrieved, (uint8_t)eggIndex, 0, (uint8_t)kind);
 }
 
 static void NS2PumpGameplayMessages(void)
@@ -1246,14 +2094,46 @@ static void NS2PumpGameplayMessages(void)
 				s->currentWeapon = NS2Reader_U8(&reader);
 				s->place = NS2Reader_U8(&reader);
 				s->raceComplete = NS2Reader_U8(&reader);
-				s->animNum = NS2Reader_U8(&reader);
-				s->isDead = NS2Reader_U8(&reader);
+				s->deathPhase = NS2Reader_U8(&reader);
+				s->shieldVisible = NS2Reader_U8(&reader);
+				s->hiddenState = NS2Reader_U8(&reader);
 				s->lapNum = NS2Reader_U16(&reader);
 				s->raceCheckpointNum = NS2Reader_U16(&reader);
 				s->weaponQuantity0 = NS2Reader_U16(&reader);
 				s->weaponQuantity1 = NS2Reader_U16(&reader);
 				s->weaponQuantity2 = NS2Reader_U16(&reader);
+				s->alpha = NS2Reader_F32(&reader);
+				s->distToNextCheckpoint = NS2Reader_F32(&reader);
+				s->invincibilityTimer = NS2Reader_F32(&reader);
+				s->deathTimer = NS2Reader_F32(&reader);
+				s->currentAnimTime = NS2Reader_F32(&reader);
+				for (int word = 0; word < 4; word++)
+				{
+					s->checkpointBits[word] = NS2Reader_U32(&reader);
+				}
 				s->lastProcessedInputSequence = NS2Reader_U32(&reader);
+				s->numFreeLives = NS2Reader_U16(&reader);
+				s->wrongWay = NS2Reader_U8(&reader);
+				s->movingBackwards = NS2Reader_U8(&reader);
+				s->currentAnimNum = NS2Reader_U8(&reader);
+				s->reserved0 = NS2Reader_U8(&reader);
+			}
+
+			/* Read egg objective state */
+			{
+				const uint8_t pendingCount = NS2Reader_U8(&reader);
+				gNS2PendingEggCount = pendingCount < NS2_NET_MAX_EGGS ? pendingCount : NS2_NET_MAX_EGGS;
+				for (int k = 0; k < NUM_EGG_TYPES; k++)
+					gNS2PendingNumEggsSaved[k] = NS2Reader_U8(&reader);
+				for (uint8_t ei = 0; ei < gNS2PendingEggCount; ei++)
+				{
+					gNS2PendingEggState[ei] = NS2Reader_U8(&reader);
+					gNS2PendingEggCarrier[ei] = NS2Reader_U8(&reader);
+					gNS2PendingEggCoordX[ei] = NS2Reader_F32(&reader);
+					gNS2PendingEggCoordY[ei] = NS2Reader_F32(&reader);
+					gNS2PendingEggCoordZ[ei] = NS2Reader_F32(&reader);
+				}
+				gNS2HavePendingEggState = reader.ok;
 			}
 
 			if (!reader.ok)
@@ -1263,7 +2143,7 @@ static void NS2PumpGameplayMessages(void)
 			}
 
 			NS2DebugLogEarlyNetPhase("pump-host-snapshot");
-			gNS2PendingSnapshotPlayerCount = playerCount;
+			gNS2PendingSnapshotPlayerCount = playerCount > 2 ? 2 : playerCount;
 			gNS2PendingSnapshotKind = snapshotKind;
 			gNS2PendingSnapshotTick = header.tick;
 			gNS2PendingSnapshotSequence = header.sequence;
@@ -1320,27 +2200,159 @@ static void NS2PumpGameplayMessages(void)
 				continue;
 			}
 			const uint8_t eventType = NS2Reader_U8(&reader);
-			const uint8_t eventPlayer = NS2Reader_U8(&reader);
-			const uint16_t lapNum = NS2Reader_U16(&reader);
-			const uint16_t place = NS2Reader_U16(&reader);
-			const uint8_t raceComplete = NS2Reader_U8(&reader);
-			const uint8_t eliminated = NS2Reader_U8(&reader);
-			if (!reader.ok || eventPlayer >= 2)
+			const uint8_t eventArg = NS2Reader_U8(&reader);
+			if (!reader.ok)
+			{
+				continue;
+			}
+			if (eventType == kNS2ReliableEventEggPickedUp)
+			{
+				const uint8_t playerNum = NS2Reader_U8(&reader);
+				(void)NS2Reader_U8(&reader);
+				if (reader.ok && eventArg < NS2_NET_MAX_EGGS && playerNum < 2)
+				{
+					PangeaNet_ApplyEggNetworkState(eventArg, 1, playerNum, 0.0f, 0.0f, 0.0f);
+				}
+				continue;
+			}
+			if (eventType == kNS2ReliableEventEggDropped)
+			{
+				(void)NS2Reader_U8(&reader);
+				(void)NS2Reader_U8(&reader);
+				if (reader.ok && eventArg < NS2_NET_MAX_EGGS)
+				{
+					PangeaNet_ApplyEggNetworkState(eventArg, 0, 0xFF, 0.0f, 0.0f, 0.0f);
+				}
+				continue;
+			}
+			if (eventType == kNS2ReliableEventEggRetrieved)
+			{
+				(void)NS2Reader_U8(&reader);
+				(void)NS2Reader_U8(&reader);
+				if (reader.ok && eventArg < NS2_NET_MAX_EGGS)
+				{
+					PangeaNet_ApplyEggNetworkState(eventArg, 3, 0xFF, 0.0f, 0.0f, 0.0f);
+				}
+				continue;
+			}
+			const uint8_t eventPlayer = eventArg;
+			if (eventPlayer >= 2)
 			{
 				continue;
 			}
 			if (eventType == kNS2ReliableEventRaceComplete)
 			{
+				const uint16_t lapNum = NS2Reader_U16(&reader);
+				const uint16_t place = NS2Reader_U16(&reader);
+				const uint8_t raceComplete = NS2Reader_U8(&reader);
+				(void)NS2Reader_U8(&reader);
 				gPlayerInfo[eventPlayer].lapNum = (int)lapNum;
 				gPlayerInfo[eventPlayer].place = (int)place;
 				gPlayerInfo[eventPlayer].raceComplete = raceComplete != 0;
 			}
 			else if (eventType == kNS2ReliableEventEliminated)
 			{
+				(void)NS2Reader_U16(&reader);
+				(void)NS2Reader_U16(&reader);
+				(void)NS2Reader_U8(&reader);
+				const uint8_t eliminated = NS2Reader_U8(&reader);
 				if (eliminated != 0)
 				{
 					gPlayerInfo[eventPlayer].health = 0.0f;
 				}
+			}
+			else
+			{
+				OGLPoint3D eventPoint =
+				{
+					NS2Reader_F32(&reader),
+					NS2Reader_F32(&reader),
+					NS2Reader_F32(&reader),
+				};
+				const uint8_t aux0 = NS2Reader_U8(&reader);
+				const uint8_t aux1 = NS2Reader_U8(&reader);
+				(void)NS2Reader_U8(&reader);
+				if (!reader.ok)
+				{
+					continue;
+				}
+				if (header.sequence <= gNS2LastAppliedVisualEventSequence)
+				{
+					gNS2DuplicateVisualEventCount++;
+					continue;
+				}
+				if (NS2ShouldTreatVisualEventAsStale(eventType, eventPlayer, header.tick))
+				{
+					gNS2StaleVisualEventCount++;
+					continue;
+				}
+				ObjNode* obj = gPlayerInfo[eventPlayer].objNode;
+				switch (eventType)
+				{
+					case kNS2ReliableEventPlayerExploded:
+					case kNS2ReliableEventPlayerDeathDiveImpact:
+						if (obj)
+						{
+							ExplodePlayer(obj, eventPlayer, &eventPoint);
+							gNS2LastRemoteExplosionTick[eventPlayer] = header.tick;
+						}
+						break;
+
+					case kNS2ReliableEventWeaponFired:
+						PangeaNet_PlayRemoteWeaponFire((short)aux0, &eventPoint);
+						break;
+
+					case kNS2ReliableEventWeaponHit:
+						PangeaNet_PlayRemoteWeaponHit((short)aux0, aux1 != 0, &eventPoint);
+						break;
+
+					case kNS2ReliableEventJetpackIgnited:
+						PlayEffect_Parms3D(EFFECT_JETPACKIGNITE, &eventPoint, NORMAL_CHANNEL_RATE, .7f);
+						break;
+
+					case kNS2ReliableEventJetpackShutoff:
+						if (obj)
+						{
+							StopAChannelIfEffectNum(&obj->EffectChannel, EFFECT_JETPACKHUM);
+						}
+						break;
+
+					case kNS2ReliableEventShieldHit:
+						PlayEffect_Parms3D(EFFECT_SHIELD, &eventPoint, NORMAL_CHANNEL_RATE, .8f);
+						break;
+
+					case kNS2ReliableEventWormholeEntered:
+						if (obj && obj->Skeleton)
+						{
+							SetSkeletonAnim(obj->Skeleton, PLAYER_ANIM_ENTERWORMHOLE);
+						}
+						break;
+
+					case kNS2ReliableEventWormholeExited:
+						if (obj && obj->Skeleton)
+						{
+							SetSkeletonAnim(obj->Skeleton, PLAYER_ANIM_APPEARWORMHOLE);
+						}
+						break;
+
+					case kNS2ReliableEventDustDevilCaptured:
+						if (obj && obj->Skeleton)
+						{
+							MorphToSkeletonAnim(obj->Skeleton, PLAYER_ANIM_DUSTDEVIL, 2.0f);
+						}
+						break;
+
+					case kNS2ReliableEventDustDevilReleased:
+						if (obj && obj->Skeleton)
+						{
+							MorphToSkeletonAnim(obj->Skeleton, PLAYER_ANIM_FLAP, 2.0f);
+						}
+						break;
+
+					default:
+						break;
+				}
+				gNS2LastAppliedVisualEventSequence = header.sequence;
 			}
 		}
 	}
@@ -1572,6 +2584,8 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_HostSendSnapshot(void)
 		const OGLPoint3D coord = obj ? obj->Coord : zeroPoint;
 		const OGLVector3D rot = obj ? obj->Rot : zeroVec;
 		const OGLVector3D delta = obj ? obj->Delta : zeroVec;
+		uint32_t checkpointBits[4];
+		NS2PackCheckpointBits(i, checkpointBits);
 
 		NS2Writer_F32(&writer, coord.x);
 		NS2Writer_F32(&writer, coord.y);
@@ -1590,14 +2604,48 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_HostSendSnapshot(void)
 		NS2Writer_U8(&writer, (uint8_t)gPlayerInfo[i].currentWeapon);
 		NS2Writer_U8(&writer, (uint8_t)gPlayerInfo[i].place);
 		NS2Writer_U8(&writer, gPlayerInfo[i].raceComplete ? 1 : 0);
-		NS2Writer_U8(&writer, obj && obj->Skeleton ? (uint8_t)obj->Skeleton->AnimNum : (uint8_t)0);
-		NS2Writer_U8(&writer, gPlayerIsDead[i] ? 1 : 0);
+		NS2Writer_U8(&writer, NS2GetPlayerDeathPhase(i, obj));
+		NS2Writer_U8(&writer, gPlayerInfo[i].shieldObj && (gPlayerInfo[i].shieldObj->StatusBits & STATUS_BIT_HIDDEN) == 0 ? 1 : 0);
+		NS2Writer_U8(&writer, obj && (obj->StatusBits & STATUS_BIT_HIDDEN) != 0 ? 1 : 0);
 		NS2Writer_U16(&writer, (uint16_t)gPlayerInfo[i].lapNum);
 		NS2Writer_U16(&writer, (uint16_t)gPlayerInfo[i].raceCheckpointNum);
 		NS2Writer_U16(&writer, (uint16_t)gPlayerInfo[i].weaponQuantity[0]);
 		NS2Writer_U16(&writer, (uint16_t)gPlayerInfo[i].weaponQuantity[1]);
 		NS2Writer_U16(&writer, (uint16_t)gPlayerInfo[i].weaponQuantity[2]);
+		NS2Writer_F32(&writer, obj ? obj->ColorFilter.a : 1.0f);
+		NS2Writer_F32(&writer, gPlayerInfo[i].distToNextCheckpoint);
+		NS2Writer_F32(&writer, gPlayerInfo[i].invincibilityTimer);
+		NS2Writer_F32(&writer, gDeathTimer[i]);
+		NS2Writer_F32(&writer, obj && obj->Skeleton ? obj->Skeleton->CurrentAnimTime : 0.0f);
+		for (int word = 0; word < 4; word++)
+		{
+			NS2Writer_U32(&writer, checkpointBits[word]);
+		}
 		NS2Writer_U32(&writer, gNS2ConnState[i].lastReceivedSequence);
+		NS2Writer_U16(&writer, (uint16_t)gPlayerInfo[i].numFreeLives);
+		NS2Writer_U8(&writer, gPlayerInfo[i].wrongWay ? 1 : 0);
+		NS2Writer_U8(&writer, gPlayerInfo[i].movingBackwards ? 1 : 0);
+		NS2Writer_U8(&writer, obj && obj->Skeleton ? obj->Skeleton->AnimNum : 0);
+		NS2Writer_U8(&writer, 0);
+	}
+
+	/* Write egg objective state */
+	{
+		Byte eggState[NS2_NET_MAX_EGGS];
+		Byte eggCarrier[NS2_NET_MAX_EGGS];
+		float eggX[NS2_NET_MAX_EGGS], eggY[NS2_NET_MAX_EGGS], eggZ[NS2_NET_MAX_EGGS];
+		const int eggCount = PangeaNet_GetEggSnapshotData(eggState, eggCarrier, eggX, eggY, eggZ, NS2_NET_MAX_EGGS);
+		NS2Writer_U8(&writer, (uint8_t)eggCount);
+		for (int k = 0; k < NUM_EGG_TYPES; k++)
+			NS2Writer_U8(&writer, gNumEggsSaved[k]);
+		for (int ei = 0; ei < eggCount; ei++)
+		{
+			NS2Writer_U8(&writer, eggState[ei]);
+			NS2Writer_U8(&writer, eggCarrier[ei]);
+			NS2Writer_F32(&writer, eggX[ei]);
+			NS2Writer_F32(&writer, eggY[ei]);
+			NS2Writer_F32(&writer, eggZ[ei]);
+		}
 	}
 
 	if (!writer.ok)
@@ -1625,7 +2673,8 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 	}
 
 	NS2PumpGameplayMessages();
-	if (!gNS2HavePendingSnapshot)
+	const int havePendingSnapshot = gNS2HavePendingSnapshot;
+	if (!havePendingSnapshot)
 	{
 		const double nowMs = (double)SDL_GetTicks();
 		if (gNS2LastReceivedKeyframeAtMs > 0.0 && (nowMs - gNS2LastReceivedKeyframeAtMs) > PANGEA_NET_GAMEPLAY_KEYFRAME_TIMEOUT_MS)
@@ -1651,13 +2700,13 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 			}
 			PangeaNet_ReportDesync(gNS2Tick, 0u, gNS2LastHostStateHash);
 		}
-		return;
 	}
 
 	const int me = gPangeaNetLocalPlayerIndex;
-	for (int i = 0; i < gNS2PendingSnapshotPlayerCount && i < 2; i++)
+	for (int i = 0; i < gPangeaNetPlayerCount && i < 2; i++)
 	{
-		const NS2SnapshotPlayerState* s = &gNS2PendingSnapshotPlayers[i];
+		NS2SnapshotPlayerState appliedSnapshot = {0};
+		const NS2SnapshotPlayerState* s = NULL;
 		ObjNode* obj = gPlayerInfo[i].objNode;
 		if (!obj)
 		{
@@ -1666,6 +2715,12 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 
 		if (i == me)
 		{
+			if (!havePendingSnapshot)
+			{
+				continue;
+			}
+			appliedSnapshot = gNS2PendingSnapshotPlayers[i];
+			s = &appliedSnapshot;
 			const float dx = gPlayerInfo[i].coord.x - s->coordX;
 			const float dy = gPlayerInfo[i].coord.y - s->coordY;
 			const float dz = gPlayerInfo[i].coord.z - s->coordZ;
@@ -1688,10 +2743,19 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 		}
 		else
 		{
-			NS2SnapshotPlayerState delayedRemote = *s;
-			if (NS2GetDelayedRemoteSnapshot(i, &delayedRemote))
+			if (havePendingSnapshot)
 			{
-				s = &delayedRemote;
+				appliedSnapshot = gNS2PendingSnapshotPlayers[i];
+			}
+			const int haveRemoteSnapshot = NS2GetDelayedRemoteSnapshot(i, &appliedSnapshot);
+			if (!haveRemoteSnapshot && !havePendingSnapshot)
+			{
+				continue;
+			}
+			s = &appliedSnapshot;
+			if (haveRemoteSnapshot)
+			{
+				s = &appliedSnapshot;
 			}
 			const float dx = gPlayerInfo[i].coord.x - s->coordX;
 			const float dy = gPlayerInfo[i].coord.y - s->coordY;
@@ -1725,14 +2789,21 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 		gPlayerInfo[i].weaponCharge = s->weaponCharge;
 		gPlayerInfo[i].jetpackActive = s->jetpackActive != 0;
 		gPlayerInfo[i].currentWeapon = s->currentWeapon;
+		gPlayerInfo[i].numFreeLives = (short)s->numFreeLives;
+		gPlayerInfo[i].wrongWay = s->wrongWay != 0;
+		gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
 		gPlayerInfo[i].place = s->place;
 		gPlayerInfo[i].raceComplete = s->raceComplete != 0;
+		gPlayerInfo[i].distToNextCheckpoint = s->distToNextCheckpoint;
+		gPlayerInfo[i].invincibilityTimer = s->invincibilityTimer;
+		NS2ApplySnapshotDeathState(i, obj, s);
 		if (i != me)
 		{
 			NS2ApplyRemotePlayerAnimation(i, obj, s);
 		}
 		gPlayerInfo[i].lapNum = (short)s->lapNum;
 		gPlayerInfo[i].raceCheckpointNum = (short)s->raceCheckpointNum;
+		NS2UnpackCheckpointBits(s->checkpointBits, i);
 		gPlayerInfo[i].weaponQuantity[0] = (short)s->weaponQuantity0;
 		gPlayerInfo[i].weaponQuantity[1] = (short)s->weaponQuantity1;
 		gPlayerInfo[i].weaponQuantity[2] = (short)s->weaponQuantity2;
@@ -1743,6 +2814,20 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 		}
 	}
 
+	/* Apply egg objective state from snapshot */
+	if (gNS2HavePendingEggState)
+	{
+		for (int k = 0; k < NUM_EGG_TYPES; k++)
+			gNumEggsSaved[k] = gNS2PendingNumEggsSaved[k];
+		for (int ei = 0; ei < gNS2PendingEggCount; ei++)
+		{
+			PangeaNet_ApplyEggNetworkState(ei, gNS2PendingEggState[ei], gNS2PendingEggCarrier[ei],
+				gNS2PendingEggCoordX[ei], gNS2PendingEggCoordY[ei], gNS2PendingEggCoordZ[ei]);
+		}
+		gNS2HavePendingEggState = false;
+	}
+
+	if (havePendingSnapshot)
 	{
 		const uint32_t localHash = NS2ComputeAuthoritativeStateHash(gNS2PendingSnapshotPlayerCount);
 		if (gNS2PendingSnapshotKind == kNS2SnapshotKeyframe && localHash != gNS2LastHostStateHash)
@@ -1773,6 +2858,92 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 	}
 
 	gNS2HavePendingSnapshot = 0;
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendPlayerExploded(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventPlayerExploded, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendPlayerDeathDiveImpact(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventPlayerDeathDiveImpact, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendWeaponFired(short playerNum, short weaponType, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventWeaponFired, playerNum, weaponType, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendWeaponHit(short playerNum, short weaponType, int terrainHit, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventWeaponHit, playerNum, weaponType, terrainHit ? 1 : 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendJetpackIgnited(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventJetpackIgnited, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendJetpackShutoff(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventJetpackShutoff, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendShieldHit(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventShieldHit, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendWormholeEntered(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventWormholeEntered, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendWormholeExited(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventWormholeExited, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendDustDevilCaptured(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventDustDevilCaptured, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE void PangeaNet_SendDustDevilReleased(short playerNum, const OGLPoint3D* where)
+{
+	NS2EnsureMatchStateInitialized();
+	NS2SendVisualEvent(kNS2ReliableEventDustDevilReleased, playerNum, 0, 0, where);
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetLastVisualEventSequence(void)
+{
+	return gNS2LastVisualEventSequence;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetAppliedVisualEventSequence(void)
+{
+	return gNS2LastAppliedVisualEventSequence;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetDuplicateVisualEventCount(void)
+{
+	return gNS2DuplicateVisualEventCount;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetStaleVisualEventCount(void)
+{
+	return gNS2StaleVisualEventCount;
 }
 
 #endif // __EMSCRIPTEN__

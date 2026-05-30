@@ -453,6 +453,9 @@ short		i;
 
 	PlayEffect_Parms3D(EFFECT_STUNGUN, &where, NORMAL_CHANNEL_RATE, .7);
 	PlayRumbleEffect(EFFECT_STUNGUN, player->PlayerNum);
+#if __EMSCRIPTEN__
+	PangeaNet_SendWeaponFired(player->PlayerNum, WEAPON_TYPE_BLASTER, &where);
+#endif
 
 
 
@@ -573,6 +576,9 @@ uint32_t			cType;
 			DoBlasterImpactTerrainEffect(&hitPt, &hitNormal);			// do special terrain impact
 		else
 			DoBlasterImpactObjectEffect(&hitPt, &hitNormal);			// do special object impact
+#if __EMSCRIPTEN__
+		PangeaNet_SendWeaponHit(theNode->PlayerNum, WEAPON_TYPE_BLASTER, cType == CTYPE_TERRAIN, &hitPt);
+#endif
 
 		DeleteObject(theNode);
 		return(true);
@@ -766,6 +772,9 @@ OGLVector3D	aim;
 
 	PlayEffect_Parms3D(EFFECT_FLARESHOOT, &where, NORMAL_CHANNEL_RATE, .7);
 	PlayRumbleEffect(EFFECT_FLARESHOOT, player->PlayerNum);
+#if __EMSCRIPTEN__
+	PangeaNet_SendWeaponFired(player->PlayerNum, WEAPON_TYPE_CLUSTERSHOT, &where);
+#endif
 }
 
 
@@ -1080,6 +1089,9 @@ float		speed;
 
 	PlayEffect_Parms3D(EFFECT_LAUNCHMISSILE, &where, NORMAL_CHANNEL_RATE, .8);
 	PlayRumbleEffect(EFFECT_LAUNCHMISSILE, playerNum);
+#if __EMSCRIPTEN__
+	PangeaNet_SendWeaponFired(playerNum, WEAPON_TYPE_HEATSEEKER, &where);
+#endif
 }
 
 
@@ -1375,6 +1387,9 @@ uint32_t			cType;
 //			DoBlasterImpactObjectEffect(&hitPt, &hitNormal);			// do special object impact
 
 		DoHeatSeekerImpactEffect(&hitPt);
+#if __EMSCRIPTEN__
+		PangeaNet_SendWeaponHit(theNode->PlayerNum, WEAPON_TYPE_HEATSEEKER, false, &hitPt);
+#endif
 
 
 		DeleteObject(theNode);
@@ -1567,6 +1582,9 @@ short   p = player->PlayerNum;
 
 
 	PlayEffect_Parms3D(EFFECT_SONICSCREAM, &where, NORMAL_CHANNEL_RATE, .9);
+#if __EMSCRIPTEN__
+	PangeaNet_SendWeaponFired(p, WEAPON_TYPE_SONICSCREAM, &where);
+#endif
 }
 
 
@@ -1807,6 +1825,9 @@ float		speed;
 
 	PlayEffect_Parms3D(EFFECT_BOMBDROP, &where, NORMAL_CHANNEL_RATE, .8);
 	PlayRumbleEffect(EFFECT_BOMBDROP, playerNum);
+#if __EMSCRIPTEN__
+	PangeaNet_SendWeaponFired(playerNum, WEAPON_TYPE_BOMB, &where);
+#endif
 }
 
 
@@ -1982,6 +2003,9 @@ uint32_t			cType;
 			CreateMultipleNewRipples(hitPt.x, hitPt.z, 10.0, 40.0, .5, 3);
 
 		DoBombImpactEffect(&hitPt);
+#if __EMSCRIPTEN__
+		PangeaNet_SendWeaponHit(theNode->PlayerNum, WEAPON_TYPE_BOMB, false, &hitPt);
+#endif
 
 		DeleteObject(theNode);
 
@@ -2244,3 +2268,75 @@ static const OGLPoint3D 	muzzleTipOff_Right = {15,14,-17};
 	}
 }
 
+void PangeaNet_PlayRemoteWeaponFire(short weaponType, const OGLPoint3D* where)
+{
+	if (!where)
+	{
+		return;
+	}
+
+	OGLPoint3D effectWhere = *where;
+
+	switch (weaponType)
+	{
+		case WEAPON_TYPE_BLASTER:
+			PlayEffect_Parms3D(EFFECT_STUNGUN, &effectWhere, NORMAL_CHANNEL_RATE, .7f);
+			break;
+
+		case WEAPON_TYPE_CLUSTERSHOT:
+			PlayEffect_Parms3D(EFFECT_FLARESHOOT, &effectWhere, NORMAL_CHANNEL_RATE, .7f);
+			break;
+
+		case WEAPON_TYPE_HEATSEEKER:
+			PlayEffect_Parms3D(EFFECT_LAUNCHMISSILE, &effectWhere, NORMAL_CHANNEL_RATE, .8f);
+			break;
+
+		case WEAPON_TYPE_SONICSCREAM:
+			PlayEffect_Parms3D(EFFECT_SONICSCREAM, &effectWhere, NORMAL_CHANNEL_RATE, .9f);
+			break;
+
+		case WEAPON_TYPE_BOMB:
+			PlayEffect_Parms3D(EFFECT_BOMBDROP, &effectWhere, NORMAL_CHANNEL_RATE, .8f);
+			break;
+
+		default:
+			break;
+	}
+}
+
+void PangeaNet_PlayRemoteWeaponHit(short weaponType, Boolean terrainHit, const OGLPoint3D* where)
+{
+	static const OGLVector3D up = {0.0f, 1.0f, 0.0f};
+
+	if (!where)
+	{
+		return;
+	}
+
+	OGLPoint3D impactWhere = *where;
+
+	switch (weaponType)
+	{
+		case WEAPON_TYPE_BLASTER:
+			if (terrainHit)
+			{
+				DoBlasterImpactTerrainEffect(&impactWhere, &up);
+			}
+			else
+			{
+				DoBlasterImpactObjectEffect(&impactWhere, &up);
+			}
+			break;
+
+		case WEAPON_TYPE_HEATSEEKER:
+			DoHeatSeekerImpactEffect(&impactWhere);
+			break;
+
+		case WEAPON_TYPE_BOMB:
+			DoBombImpactEffect(&impactWhere);
+			break;
+
+		default:
+			break;
+	}
+}

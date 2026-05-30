@@ -98,10 +98,15 @@ typedef struct
 typedef struct
 {
 	OGLPoint3D			coord;
+	float				rotX;
 	float				rotY;
+	float				rotZ;
 	OGLVector3D			delta;
+	OGLVector3D			deltaRot;
 	float				steering;
 	float				currentThrust;
+	float				currentRPM;
+	float				skidDot;
 	uint32_t			controlBits;
 	uint32_t			controlBitsNew;
 	OGLVector2D			analogSteering;
@@ -109,16 +114,22 @@ typedef struct
 	short				checkpointNum;
 	short				place;
 	uint8_t				raceComplete;
-	uint8_t				pad;
+	uint8_t				wrongWay;
 	short				powType;
 	short				powQuantity;
 	float				health;
+	float				tagTimer;
 	float				frozenTimer;
 	float				greasedTiresTimer;
 	float				nitroTimer;
 	float				stickyTiresTimer;
 	float				invisibilityTimer;
 	uint8_t				isEliminated;
+	uint8_t				isIt;
+	uint8_t				movingBackwards;
+	uint8_t				accelBackwards;
+	uint8_t				braking;
+	uint8_t				onWater;
 	uint8_t				pad2[3];
 	uint32_t			lastProcessedInputSequence;
 }PangeaNetPlayerCarState;
@@ -147,6 +158,12 @@ typedef struct
 	uint32_t					lastDeltaSeq;
 	uint8_t						playerCount;
 	uint8_t						pad[3];
+	uint16_t					whoIsIt;
+	uint16_t					whoWasIt;
+	uint16_t					capturedFlagCount[2];
+	uint16_t					numPlayersEliminated;
+	uint16_t					reserved1;
+	float						reTagTimer;
 	PangeaNetPlayerCarState		players[MAX_PLAYERS];
 }PangeaNetHostSnapshotPacket;
 
@@ -169,6 +186,8 @@ void HostSend_SnapshotToClients(void);
 void ClientApplyPendingSnapshot(void);
 Boolean PangeaNet_IsHostAuthoritativeRemotePlayer(short playerNum);
 Boolean PangeaNet_IsHostAuthoritativeCpuSimulation(short playerNum);
+void PangeaNet_ForceKeyframe(void);
+void PangeaNet_RequestTagHandoff(short fromPlayer, short toPlayer);
 
 void PlayerBroadcastVehicleType(void);
 void GetVehicleSelectionFromNetPlayers(void);

@@ -590,3 +590,10 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
 }
 
 #endif // __EMSCRIPTEN__ || __ANDROID__
+
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+void CompatGL_InvalidateCachePtr(const void* ptr)
+{
+	(void) ptr;
+}
+#endif

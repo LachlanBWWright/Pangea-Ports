@@ -24,6 +24,9 @@ static void EggWasRetrieved(ObjNode *egg);
 static void MoveNest(ObjNode *nest);
 static void PlayerPickedUpEgg(ObjNode *egg, short playerNum);
 static void ResetEggToNest(ObjNode *egg);
+#ifdef __EMSCRIPTEN__
+static int Egg_FindIndex(ObjNode *egg);
+#endif
 
 
 
@@ -48,6 +51,9 @@ static void ResetEggToNest(ObjNode *egg);
 
 Byte	gNumEggsToSave[NUM_EGG_TYPES];
 Byte	gNumEggsSaved[NUM_EGG_TYPES];
+
+short	gNumEggs = 0;
+ObjNode	*gEggObjs[MAX_NET_EGGS];
 
 
 /******************** FIND ALL EGG ITEMS *******************/
@@ -204,6 +210,9 @@ short	eggColor = itemPtr->parm[0];
 		egg->ChainNode = beam;
 
 		AttachShadowToObject(egg, SHADOW_TYPE_CIRCULAR, 3, 3, true);
+
+		if (gNumEggs < MAX_NET_EGGS)
+			gEggObjs[gNumEggs++] = egg;
 	}
 
 
@@ -390,6 +399,11 @@ static void ResetEggToNest(ObjNode *egg)
 {
 ObjNode *nest;
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_IsHost())
+		return;
+#endif
+
 	nest = egg->ChainHead;
 
 			/* MOVE BACK TO NEST */
@@ -410,6 +424,11 @@ static void PlayerPickedUpEgg(ObjNode *egg, short playerNum)
 {
 ObjNode *nest;
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_IsHost())
+		return;
+#endif
+
 			/* LET NEST KNOW THE EGG IS GONE */
 
 	nest = egg->ChainHead;
@@ -426,6 +445,15 @@ ObjNode *nest;
 	
 	PlayEffect_Parms3D(EFFECT_GRABEGG, &gCoord, NORMAL_CHANNEL_RATE, .6);
 	PlayRumbleEffect(EFFECT_GRABEGG, playerNum);
+
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && PangeaNet_IsHost())
+	{
+		int idx = Egg_FindIndex(egg);
+		if (idx >= 0)
+			PangeaNet_SendEggPickedUp(idx, playerNum);
+	}
+#endif
 }
 
 
@@ -456,7 +484,11 @@ ObjNode			*wormhole;
 
 
 	wormhole = FindClosestEggWormholeInRange(egg->Kind, &egg->Coord);	// find closest in-range wormhole
+#if __EMSCRIPTEN__
+	if (wormhole && !(PangeaNet_IsEnabled() && !PangeaNet_IsHost()))
+#else
 	if (wormhole)
+#endif
 	{
 		ObjNode *nest = egg->ChainHead;
 
@@ -496,15 +528,27 @@ void DropEgg_NoWormhole(short playerNum)
 {
 ObjNode *egg;
 
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_IsHost())
+		return;
+#endif
+
 	egg = gPlayerInfo[playerNum].carriedObj;							// get egg
 	if (egg)
 	{
+#if __EMSCRIPTEN__
+		int idx = PangeaNet_IsEnabled() ? Egg_FindIndex(egg) : -1;
+#endif
 		egg->DelayUntilCanPickup = 1.0f;								// delay until can be picked back up
 		egg->MoveCall = MoveEgg_NotCarried;
 		egg->Delta.x = gPlayerInfo[playerNum].objNode->Delta.x * .8f;	// match player's delta minus some friction
 		egg->Delta.y = gPlayerInfo[playerNum].objNode->Delta.y * .8f;
 		egg->Delta.z = gPlayerInfo[playerNum].objNode->Delta.z * .8f;
 		gPlayerInfo[playerNum].carriedObj = nil;						// player not holding anything
+#if __EMSCRIPTEN__
+		if (PangeaNet_IsEnabled() && idx >= 0)
+			PangeaNet_SendEggDropped(idx, playerNum);
+#endif
 	}
 }
 
@@ -606,6 +650,25 @@ static void EggWasRetrieved(ObjNode *egg)
 short	i;
 Boolean	gotAllEggs = true;
 
+	/* Find network index before clearing registry */
+	int netIdx = -1;
+	for (int ni = 0; ni < gNumEggs; ni++)
+	{
+		if (gEggObjs[ni] == egg)
+		{
+			netIdx = ni;
+			gEggObjs[ni] = nil;
+			break;
+		}
+	}
+
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && PangeaNet_IsHost() && netIdx >= 0)
+	{
+		PangeaNet_SendEggRetrieved(netIdx, egg->Kind);
+	}
+#endif
+
 			/* INC COUNTER */
 
 	gNumEggsSaved[egg->Kind]++;
@@ -671,6 +734,110 @@ Boolean	gotAllEggs = true;
 
 	DeleteObject(egg);			// note: also deletes the light beam that's chained onto this
 }
+
+
+/****************** EGG_FINDINDEX ************************/
+
+#ifdef __EMSCRIPTEN__
+
+static int Egg_FindIndex(ObjNode *egg)
+{
+	for (int i = 0; i < gNumEggs; i++)
+	{
+		if (gEggObjs[i] == egg)
+			return i;
+	}
+	return -1;
+}
+
+
+/****************** PANGANET_GETEGGSNAPSHOTDATA ************************/
+
+int PangeaNet_GetEggSnapshotData(Byte *outState, Byte *outCarrier, float *outX, float *outY, float *outZ, int maxEggs)
+{
+	const int count = gNumEggs < maxEggs ? gNumEggs : maxEggs;
+	for (int i = 0; i < count; i++)
+	{
+		const ObjNode *egg = gEggObjs[i];
+		if (!egg)
+		{
+			outState[i] = 3;
+			outCarrier[i] = 0xFF;
+			outX[i] = outY[i] = outZ[i] = 0.0f;
+			continue;
+		}
+		outCarrier[i] = 0xFF;
+		if (egg->MoveCall == MoveEgg_Carried || egg->MoveCall == MoveEgg_IntoWormhole)
+		{
+			outState[i] = 1;
+			outCarrier[i] = (Byte)egg->PlayerNum;
+		}
+		else
+		{
+			outState[i] = 0;
+		}
+		outX[i] = egg->Coord.x;
+		outY[i] = egg->Coord.y;
+		outZ[i] = egg->Coord.z;
+	}
+	return count;
+}
+
+
+/****************** PANGANET_APPLYEGGNETWORKSTATE ************************/
+
+void PangeaNet_ApplyEggNetworkState(int eggIndex, int state, int carrier, float x, float y, float z)
+{
+	if (eggIndex < 0 || eggIndex >= gNumEggs)
+		return;
+
+	ObjNode *egg = gEggObjs[eggIndex];
+
+	if (state == 3)
+	{
+		if (egg)
+		{
+			if (egg->MoveCall == MoveEgg_Carried && egg->PlayerNum >= 0 && egg->PlayerNum < gNumPlayers)
+				gPlayerInfo[egg->PlayerNum].carriedObj = nil;
+			gEggObjs[eggIndex] = nil;
+			gNumEggsSaved[egg->Kind]++;
+			HighlightInfobarEgg(egg->Kind);
+			DeleteObject(egg);
+		}
+		return;
+	}
+
+	if (!egg)
+		return;
+
+	if (state == 1 && carrier >= 0 && carrier < gNumPlayers)
+	{
+		if (egg->MoveCall != MoveEgg_Carried && egg->MoveCall != MoveEgg_IntoWormhole)
+		{
+			ObjNode *nest = egg->ChainHead;
+			if (nest)
+				nest->NestHasEgg = false;
+			egg->PlayerNum = (short)carrier;
+			egg->MoveCall = MoveEgg_Carried;
+			egg->CanResetEgg = true;
+			egg->ResetEggDelay = 15.0f;
+			gPlayerInfo[carrier].carriedObj = egg;
+		}
+	}
+	else if (state == 0)
+	{
+		if (egg->MoveCall == MoveEgg_Carried)
+			gPlayerInfo[egg->PlayerNum].carriedObj = nil;
+		egg->MoveCall = MoveEgg_NotCarried;
+		egg->Coord.x = x;
+		egg->Coord.y = y;
+		egg->Coord.z = z;
+		egg->Delta.x = egg->Delta.y = egg->Delta.z = 0;
+		UpdateObjectTransforms(egg);
+	}
+}
+
+#endif // __EMSCRIPTEN__
 
 
 

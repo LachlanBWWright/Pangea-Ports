@@ -1287,6 +1287,9 @@ static Boolean DoTrig_TeamTorch(ObjNode *theNode, ObjNode *whoNode, Byte sideBit
 {
 	(void) sideBits;
 
+	if (gIsNetworkClient)
+		return(false);
+
 	if (whoNode->CapturedFlag)					// see if player already has a flag
 		return(true);
 
@@ -1306,6 +1309,9 @@ static Boolean DoTrig_TeamTorch(ObjNode *theNode, ObjNode *whoNode, Byte sideBit
 void PlayerDropFlag(ObjNode *theCar)
 {
 ObjNode	*theTorch;
+
+	if (gIsNetworkClient)
+		return;
 
 	theTorch = (ObjNode *)theCar->CapturedFlag;				// get torch object that player is carrying
 	if (theTorch == nil)									// bail if none
@@ -1381,6 +1387,9 @@ ObjNode	*theTorch;
 short	teamNum;
 
 	(void) sideBits;
+
+	if (gIsNetworkClient)
+		return(true);
 
 	theTorch = (ObjNode *)whoNode->CapturedFlag;				// get torch object that player is carrying
 	if (theTorch == nil)										// bail if none

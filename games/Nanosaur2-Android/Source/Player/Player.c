@@ -331,6 +331,9 @@ ObjNode	*player = gPlayerInfo[playerNum].objNode;
 	{
 		case	PLAYER_DEATH_TYPE_EXPLODE:
 				ExplodePlayer(player, playerNum, where);
+#if __EMSCRIPTEN__
+				PangeaNet_SendPlayerExploded(playerNum, where ? where : &player->Coord);
+#endif
 				break;
 
 		case	PLAYER_DEATH_TYPE_DEATHDIVE:
@@ -1093,6 +1096,9 @@ ObjNode	*shield = gPlayerInfo[playerNum].shieldObj;
 		{
 			PlayEffect_Parms3D(EFFECT_SHIELD, &gPlayerInfo[playerNum].coord, NORMAL_CHANNEL_RATE, .3);
 			PlayRumbleEffect(EFFECT_SHIELD, playerNum);
+#if __EMSCRIPTEN__
+			PangeaNet_SendShieldHit(playerNum, &gPlayerInfo[playerNum].coord);
+#endif
 		}
 
 

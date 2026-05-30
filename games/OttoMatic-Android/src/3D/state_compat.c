@@ -326,18 +326,24 @@ void CompatGL_Light(GLenum light, GLenum pname, const GLfloat* params)
 
     if (pname == GL_POSITION)
     {
-        // Position is a direction for directional lights
-        gModernGLState.lightDirection[lightIndex][0] = params[0];
-        gModernGLState.lightDirection[lightIndex][1] = params[1];
-        gModernGLState.lightDirection[lightIndex][2] = params[2];
-        // Normalize
-        float len = sqrtf(params[0]*params[0] + params[1]*params[1] + params[2]*params[2]);
+        EnsureMatrixStacksInitialized();
+
+        const float* mv = gModelViewStack.matrices[gModelViewStack.depth];
+        float x = (mv[0] * params[0]) + (mv[4] * params[1]) + (mv[8] * params[2]);
+        float y = (mv[1] * params[0]) + (mv[5] * params[1]) + (mv[9] * params[2]);
+        float z = (mv[2] * params[0]) + (mv[6] * params[1]) + (mv[10] * params[2]);
+
+        float len = sqrtf(x*x + y*y + z*z);
         if (len > 0.0001f)
         {
-            gModernGLState.lightDirection[lightIndex][0] /= len;
-            gModernGLState.lightDirection[lightIndex][1] /= len;
-            gModernGLState.lightDirection[lightIndex][2] /= len;
+            x /= len;
+            y /= len;
+            z /= len;
         }
+
+        gModernGLState.lightDirection[lightIndex][0] = x;
+        gModernGLState.lightDirection[lightIndex][1] = y;
+        gModernGLState.lightDirection[lightIndex][2] = z;
         gModernGLState.dirtyFlags |= MODERNGL_DIRTY_LIGHTING;
     }
     else if (pname == GL_DIFFUSE)

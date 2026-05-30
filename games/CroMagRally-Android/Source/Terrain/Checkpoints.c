@@ -61,18 +61,13 @@ float	x1,z1,x2,z2,rot;
 OGLVector2D	checkToCheck,aim,deltaVec;
 
 
-		/* SEE IF NEED TO DO THIS */
+	/* SEE IF NEED TO DO THIS */
 
-	switch(gGameMode)
-	{
-		case	GAME_MODE_TAG1:
-		case	GAME_MODE_TAG2:
-		case	GAME_MODE_SURVIVAL:
-		case	GAME_MODE_CAPTUREFLAG:
-				return;
-	}
-	if (PangeaNet_IsHostAuthoritativeRemotePlayer(p))
-		return;
+if (!IsRaceMode())
+	return;
+
+if (PangeaNet_IsHostAuthoritativeRemotePlayer(p))
+	return;
 
 
 			/* GET PLAYER'S MOVEMENT LINE SEGMENT */
@@ -278,14 +273,8 @@ short	p,place,i;
 
 		/* SEE IF NEED TO DO THIS */
 
-	switch(gGameMode)
-	{
-		case	GAME_MODE_TAG1:
-		case	GAME_MODE_TAG2:
-		case	GAME_MODE_SURVIVAL:
-		case	GAME_MODE_CAPTUREFLAG:
-				return;
-	}
+	if (!IsRaceMode())
+		return;
 
 	if (gIsSelfRunningDemo)
 		gWorstHumanPlace = 5;										// no humans in demo, so trick so that CPU cars will all attack each other
@@ -403,7 +392,6 @@ void PlayerCompletedRace(short playerNum)
 		}
 	}
 }
-
 
 
 

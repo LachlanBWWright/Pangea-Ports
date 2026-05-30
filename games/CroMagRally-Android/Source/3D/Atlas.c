@@ -704,6 +704,8 @@ void TextMesh_Update(const char* text, int flags, ObjNode* textNode)
 
 	// Lay out triangles
 	PrepVertices(font, text, flags, &metrics, mesh->points, mesh->uvs);
+	CompatGL_InvalidateCachePtr(mesh->points);
+	CompatGL_InvalidateCachePtr(mesh->uvs);
 }
 
 /***************************************************************/

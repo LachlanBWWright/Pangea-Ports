@@ -209,6 +209,8 @@ float CalcDistanceToClosestPlayer(OGLPoint3D *pt, short *playerNum);
 void HidePlayer(ObjNode *player);
 void ShowPlayer(ObjNode *player);
 Boolean	FadePlayer(ObjNode *player, float rate);
+void CreatePlayerShield(short playerNum);
+void UpdatePlayerShield(short playerNum);
 
 void SetPlayerFlyingAnim(ObjNode *player);
 float CalcPlayerMaxAltitude(float x, float z);
@@ -236,6 +238,9 @@ void UpdatePlayerCrosshairs(ObjNode *player);
 void PlayerFireButtonPressed(ObjNode *player, Boolean newFireButton);
 void PlayerFireButtonReleased(ObjNode *player);
 void SelectNextWeapon(short playerNum, Boolean allowSonicScream, int delta);
+
+void PangeaNet_PlayRemoteWeaponFire(short weaponType, const OGLPoint3D* where);
+void PangeaNet_PlayRemoteWeaponHit(short weaponType, Boolean terrainHit, const OGLPoint3D* where);
 Boolean AddWeaponPOW(TerrainItemEntryType *itemPtr, float  x, float z);
 void CauseBombShockwaveDamage(ObjNode *wave, uint32_t ctype);
 

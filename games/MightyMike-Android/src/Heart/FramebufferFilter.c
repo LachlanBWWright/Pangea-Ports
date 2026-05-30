@@ -29,8 +29,10 @@ void IndexedFramebufferToColor_FilterDithering(color_t* color, int threadNum, in
 
 #if __BIG_ENDIAN__
 	static const int RI = 0, GI = 1, BI = 2;
+	static const int AI = 3;
 #else
 	static const int RI = 3, GI = 2, BI = 1;
+	static const int AI = 0;
 #endif
 
 	for (int y = 0; y < numRows; y++)
@@ -54,6 +56,7 @@ void IndexedFramebufferToColor_FilterDithering(color_t* color, int threadNum, in
 				((uint8_t*)color)[RI] = rmix8;
 				((uint8_t*)color)[GI] = gmix8;
 				((uint8_t*)color)[BI] = bmix8;
+				((uint8_t*)color)[AI] = 0xFF;
 #else
 				_Static_assert(false, "unsupported framebuffer color depth");
 #endif

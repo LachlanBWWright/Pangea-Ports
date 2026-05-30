@@ -691,4 +691,3 @@ void OnChangeIntegerScaling(void)
 	SDLRender_InitTexture();
 #endif
 }
-

@@ -42,6 +42,18 @@ void FindAllEggItems(void);
 extern	Byte	gNumEggsToSave[NUM_EGG_TYPES];
 extern	Byte	gNumEggsSaved[NUM_EGG_TYPES];
 
+#define MAX_NET_EGGS 32
+extern short gNumEggs;
+extern ObjNode *gEggObjs[MAX_NET_EGGS];
+
+#ifdef __EMSCRIPTEN__
+int PangeaNet_GetEggSnapshotData(Byte *outState, Byte *outCarrier, float *outX, float *outY, float *outZ, int maxEggs);
+void PangeaNet_ApplyEggNetworkState(int eggIndex, int state, int carrier, float x, float y, float z);
+void PangeaNet_SendEggPickedUp(int eggIndex, int playerNum);
+void PangeaNet_SendEggDropped(int eggIndex, int playerNum);
+void PangeaNet_SendEggRetrieved(int eggIndex, int kind);
+#endif
+
 
 
 		/* WORMHOLE */

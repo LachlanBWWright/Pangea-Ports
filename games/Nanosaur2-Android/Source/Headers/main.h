@@ -50,6 +50,7 @@ void GameMain(void);
 extern	void ToolBoxInit(void);
 void MoveEverything(void);
 void InitDefaultPrefs(void);
+short GetVSModeForLevel(short levelNum);
 void StartLevelCompletion(float coolDownTimer);
 Boolean PrimeTimeDemoSpline(long splineNum, SplineItemType *itemPtr);
 

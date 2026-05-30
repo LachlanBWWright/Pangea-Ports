@@ -81,7 +81,7 @@ Boolean		gJoinNetworkGame = false;
 
 #ifdef __EMSCRIPTEN__
 #define PANGEA_NET_MAGIC 0x54454E50u /* 'PNET' little-endian */
-#define PANGEA_NET_VERSION 2u
+	#define PANGEA_NET_VERSION 7u
 #define PANGEA_NET_PLAYER_NA 0xFFFFu
 #define PANGEA_NET_MAX_PACKET_SIZE 4096
 #define PANGEA_NET_LOCAL_RECONCILE_SNAP_DISTANCE 6.0f
@@ -108,14 +108,18 @@ enum
 	kPangeaPacketDisconnect = 8,
 	kPangeaPacketProtocolError = 9,
 	kPangeaPacketVehicleType = 10,
-	kPangeaPacketKeyframeResendRequest = 11
+	kPangeaPacketKeyframeResendRequest = 11,
+	kPangeaPacketTagHandoffRequest = 12
 };
 
 enum
 {
 	kPangeaReliableEventRaceComplete = 1,
-	kPangeaReliableEventEliminated = 2
+	kPangeaReliableEventEliminated = 2,
+	kPangeaReliableEventTagHandoff = 3
 };
+
+#define PANGEA_NET_TAG_SPAZ_TIMER 3.0f
 
 typedef struct
 {
@@ -210,10 +214,25 @@ static uint8_t gPangeaReliableEliminatedSent[MAX_PLAYERS] = {0};
 static uint32_t gPangeaLastAckedKeyframeSeq[MAX_PLAYERS] = {0};
 static uint32_t gPangeaLastAckedDeltaSeq[MAX_PLAYERS] = {0};
 
+extern short gNumTorches;
+extern ObjNode *gTorchObjs[];
+
+#define PANGEA_NET_MAX_TORCHES 12
+
+static uint8_t gPendingTorchCount = 0;
+static uint8_t gPendingTorchMode[PANGEA_NET_MAX_TORCHES];
+static uint8_t gPendingTorchCarrier[PANGEA_NET_MAX_TORCHES];
+static float gPendingTorchCoordX[PANGEA_NET_MAX_TORCHES];
+static float gPendingTorchCoordY[PANGEA_NET_MAX_TORCHES];
+static float gPendingTorchCoordZ[PANGEA_NET_MAX_TORCHES];
+static Boolean gHavePendingTorchState = false;
+static short gPangeaPrevWhoIsIt = -1;
+
 void PangeaNetBridge_SetRuntimeMatchIdentity(uint32_t matchIdLow, uint32_t matchIdHigh)
 {
 	gPangeaMatchId = matchIdLow;
 	gPangeaMatchIdHigh = matchIdHigh;
+	PangeaNetBridge_ResetMatchLifecycle();
 }
 
 static Boolean PangeaNet_ShouldLogSequence(uint32_t sequence)
@@ -241,6 +260,12 @@ static uint32_t PangeaNet_ComputeAuthoritativeStateHash(short playerCount)
 	hash = PangeaNet_HashMix(hash, (uint32_t)clampedPlayerCount);
 	hash = PangeaNet_HashMix(hash, (uint32_t)gGameMode);
 	hash = PangeaNet_HashMix(hash, (uint32_t)gTrackCompleted);
+	hash = PangeaNet_HashMix(hash, (uint32_t)gWhoIsIt);
+	hash = PangeaNet_HashMix(hash, (uint32_t)gWhoWasIt);
+	hash = PangeaNet_HashMix(hash, (uint32_t)gCapturedFlagCount[0]);
+	hash = PangeaNet_HashMix(hash, (uint32_t)gCapturedFlagCount[1]);
+	hash = PangeaNet_HashMix(hash, (uint32_t)gNumPlayersEliminated);
+	hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gReTagTimer));
 	for (short i = 0; i < clampedPlayerCount; i++)
 	{
 		hash = PangeaNet_HashMix(hash, (uint32_t)i);
@@ -248,15 +273,38 @@ static uint32_t PangeaNet_ComputeAuthoritativeStateHash(short playerCount)
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].checkpointNum);
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].place);
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].raceComplete ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].wrongWay ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].isEliminated ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].isIt ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].movingBackwards ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].accelBackwards ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].braking ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].onWater ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].powType);
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].powQuantity);
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Rot.x : 0.0f));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Rot.z : 0.0f));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->DeltaRot.x : 0.0f));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->DeltaRot.y : 0.0f));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->DeltaRot.z : 0.0f));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].currentRPM));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].skidDot));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].health));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].tagTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].frozenTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].greasedTiresTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].nitroTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].stickyTiresTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].invisibilityTimer));
+	}
+	for (int t = 0; t < gNumTorches && t < PANGEA_NET_MAX_TORCHES; t++)
+	{
+		const ObjNode* torch = gTorchObjs[t];
+		if (torch)
+		{
+			hash = PangeaNet_HashMix(hash, (uint32_t)torch->Mode);
+			hash = PangeaNet_HashMix(hash, (uint32_t)(torch->Mode == 1 ? (uint8_t)torch->PlayerNum : 0xFFu));
+		}
 	}
 	return hash;
 }
@@ -322,10 +370,15 @@ static void PangeaNet_PushRemoteSnapshot(short playerNum, const PangeaNetPlayerC
 	PangeaNetSnapshotPlayerState* target = &gPangeaRemoteSnapshotBuffer[playerNum][slot];
 	SDL_memset(target, 0, sizeof(*target));
 	target->coord = source->coord;
+	target->rotX = source->rotX;
 	target->rotY = source->rotY;
+	target->rotZ = source->rotZ;
 	target->delta = source->delta;
+	target->deltaRot = source->deltaRot;
 	target->steering = source->steering;
 	target->currentThrust = source->currentThrust;
+	target->currentRPM = source->currentRPM;
+	target->skidDot = source->skidDot;
 	target->controlBits = source->controlBits;
 	target->controlBitsNew = source->controlBitsNew;
 	target->analogSteering = source->analogSteering;
@@ -333,15 +386,22 @@ static void PangeaNet_PushRemoteSnapshot(short playerNum, const PangeaNetPlayerC
 	target->checkpointNum = source->checkpointNum;
 	target->place = source->place;
 	target->raceComplete = source->raceComplete;
+	target->wrongWay = source->wrongWay;
 	target->isEliminated = source->isEliminated;
 	target->powType = source->powType;
 	target->powQuantity = source->powQuantity;
 	target->health = source->health;
+	target->tagTimer = source->tagTimer;
 	target->frozenTimer = source->frozenTimer;
 	target->greasedTiresTimer = source->greasedTiresTimer;
 	target->nitroTimer = source->nitroTimer;
 	target->stickyTiresTimer = source->stickyTiresTimer;
 	target->invisibilityTimer = source->invisibilityTimer;
+	target->isIt = source->isIt;
+	target->movingBackwards = source->movingBackwards;
+	target->accelBackwards = source->accelBackwards;
+	target->braking = source->braking;
+	target->onWater = source->onWater;
 }
 
 static int PangeaNet_GetDelayedRemoteSnapshot(short playerNum, PangeaNetSnapshotPlayerState* outSnapshot)
@@ -511,6 +571,70 @@ static void PangeaNet_SendReliableEvent(uint8_t eventType, short playerNum)
 	PangeaNetBridge_SendReliable(bytes, writer.cursor);
 }
 
+static void PangeaNet_SendTagHandoffEvent(void)
+{
+	uint8_t bytes[128];
+	PangeaNetWriter writer;
+	PangeaNetPacketHeader header;
+	header.magic = PANGEA_NET_MAGIC;
+	header.version = PANGEA_NET_VERSION;
+	header.packetType = kPangeaPacketReliableEvent;
+	header.matchIdLow = gPangeaMatchId;
+	header.matchIdHigh = gPangeaMatchIdHigh;
+	header.tick = gPangeaLocalTick;
+	header.sequence = gPangeaSendSequence++;
+	header.playerIndex = PANGEA_NET_PLAYER_NA;
+	header.reserved = 0;
+	PangeaNetWriter_Init(&writer, bytes, (int)sizeof(bytes));
+	PangeaNet_WriteHeader(&writer, &header);
+	PangeaNetWriter_WriteU8(&writer, kPangeaReliableEventTagHandoff);
+	PangeaNetWriter_WriteU8(&writer, (uint8_t)gWhoIsIt);
+	PangeaNetWriter_WriteU8(&writer, (uint8_t)gWhoWasIt);
+	PangeaNetWriter_WriteU8(&writer, 0);
+	PangeaNetWriter_WriteF32(&writer, gReTagTimer);
+	if (!writer.ok)
+	{
+		return;
+	}
+	PangeaNetBridge_SendReliable(bytes, writer.cursor);
+}
+
+static void PangeaNet_SetTaggedPlayer(short playerNum)
+{
+	for (short i = 0; i < MAX_PLAYERS; i++)
+	{
+		gPlayerInfo[i].isIt = i == playerNum;
+	}
+
+	gWhoIsIt = playerNum;
+}
+
+static Boolean PangeaNet_ApplyTagHandoff(short fromPlayer, short toPlayer)
+{
+	if (fromPlayer < 0 || fromPlayer >= MAX_PLAYERS || toPlayer < 0 || toPlayer >= MAX_PLAYERS)
+	{
+		return false;
+	}
+	if (gGameMode != GAME_MODE_TAG1 && gGameMode != GAME_MODE_TAG2)
+	{
+		return false;
+	}
+	if (gTrackCompleted || gWhoIsIt != fromPlayer)
+	{
+		return false;
+	}
+	if ((toPlayer == gWhoWasIt) && (gReTagTimer > 0.0f))
+	{
+		return false;
+	}
+
+	gWhoWasIt = fromPlayer;
+	PangeaNet_SetTaggedPlayer(toPlayer);
+	gReTagTimer = PANGEA_NET_TAG_SPAZ_TIMER;
+	PangeaNet_ForceKeyframe();
+	return true;
+}
+
 static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlayerCarState* source)
 {
 	PangeaNetRemoteInterpState* interp = &gPangeaRemoteInterp[playerNum];
@@ -523,10 +647,15 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 	{
 		SDL_memset(&interp->fromState, 0, sizeof(interp->fromState));
 		interp->fromState.coord = source->coord;
+		interp->fromState.rotX = source->rotX;
 		interp->fromState.rotY = source->rotY;
+		interp->fromState.rotZ = source->rotZ;
 		interp->fromState.delta = source->delta;
+		interp->fromState.deltaRot = source->deltaRot;
 		interp->fromState.steering = source->steering;
 		interp->fromState.currentThrust = source->currentThrust;
+		interp->fromState.currentRPM = source->currentRPM;
+		interp->fromState.skidDot = source->skidDot;
 		interp->fromState.controlBits = source->controlBits;
 		interp->fromState.controlBitsNew = source->controlBitsNew;
 		interp->fromState.analogSteering = source->analogSteering;
@@ -534,24 +663,36 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 		interp->fromState.checkpointNum = source->checkpointNum;
 		interp->fromState.place = source->place;
 		interp->fromState.raceComplete = source->raceComplete;
+		interp->fromState.wrongWay = source->wrongWay;
 		interp->fromState.powType = source->powType;
 		interp->fromState.powQuantity = source->powQuantity;
 		interp->fromState.health = source->health;
+		interp->fromState.tagTimer = source->tagTimer;
+		interp->fromState.isIt = source->isIt;
 		interp->fromState.isEliminated = 0;
 		interp->fromState.frozenTimer = 0.0f;
 		interp->fromState.greasedTiresTimer = 0.0f;
 		interp->fromState.nitroTimer = 0.0f;
 		interp->fromState.stickyTiresTimer = 0.0f;
 		interp->fromState.invisibilityTimer = 0.0f;
+		interp->fromState.movingBackwards = source->movingBackwards;
+		interp->fromState.accelBackwards = source->accelBackwards;
+		interp->fromState.braking = source->braking;
+		interp->fromState.onWater = source->onWater;
 		interp->hasFrom = true;
 	}
 
 	SDL_memset(&interp->toState, 0, sizeof(interp->toState));
 	interp->toState.coord = source->coord;
+	interp->toState.rotX = source->rotX;
 	interp->toState.rotY = source->rotY;
+	interp->toState.rotZ = source->rotZ;
 	interp->toState.delta = source->delta;
+	interp->toState.deltaRot = source->deltaRot;
 	interp->toState.steering = source->steering;
 	interp->toState.currentThrust = source->currentThrust;
+	interp->toState.currentRPM = source->currentRPM;
+	interp->toState.skidDot = source->skidDot;
 	interp->toState.controlBits = source->controlBits;
 	interp->toState.controlBitsNew = source->controlBitsNew;
 	interp->toState.analogSteering = source->analogSteering;
@@ -559,15 +700,22 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 	interp->toState.checkpointNum = source->checkpointNum;
 	interp->toState.place = source->place;
 	interp->toState.raceComplete = source->raceComplete;
+	interp->toState.wrongWay = source->wrongWay;
 	interp->toState.powType = source->powType;
 	interp->toState.powQuantity = source->powQuantity;
 	interp->toState.health = source->health;
+	interp->toState.tagTimer = source->tagTimer;
+	interp->toState.isIt = source->isIt;
 	interp->toState.isEliminated = 0;
 	interp->toState.frozenTimer = 0.0f;
 	interp->toState.greasedTiresTimer = 0.0f;
 	interp->toState.nitroTimer = 0.0f;
 	interp->toState.stickyTiresTimer = 0.0f;
 	interp->toState.invisibilityTimer = 0.0f;
+	interp->toState.movingBackwards = source->movingBackwards;
+	interp->toState.accelBackwards = source->accelBackwards;
+	interp->toState.braking = source->braking;
+	interp->toState.onWater = source->onWater;
 	interp->hasTo = true;
 }
 
@@ -671,6 +819,26 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 		return;
 	}
 
+	if (header.packetType == kPangeaPacketTagHandoffRequest)
+	{
+		const short observerPlayer = (short)header.playerIndex;
+		const short fromPlayer = (short)PangeaNetReader_ReadU8(&reader);
+		const short toPlayer = (short)PangeaNetReader_ReadU8(&reader);
+		if (!gIsNetworkHost || !reader.ok)
+		{
+			return;
+		}
+		if (observerPlayer != fromPlayer && observerPlayer != toPlayer)
+		{
+			return;
+		}
+		if (PangeaNet_ApplyTagHandoff(fromPlayer, toPlayer) && gDebugMode)
+		{
+			SDL_Log("CroMag net: host accepted tag handoff request observer=%d from=%d to=%d", observerPlayer, fromPlayer, toPlayer);
+		}
+		return;
+	}
+
 	if (header.packetType == kPangeaPacketReliableEvent)
 	{
 		if (!gIsNetworkClient)
@@ -678,6 +846,24 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 			return;
 		}
 		const uint8_t eventType = PangeaNetReader_ReadU8(&reader);
+		if (!reader.ok)
+		{
+			return;
+		}
+			if (eventType == kPangeaReliableEventTagHandoff)
+			{
+				const uint8_t whoIsIt = PangeaNetReader_ReadU8(&reader);
+				const uint8_t whoWasIt = PangeaNetReader_ReadU8(&reader);
+				(void) PangeaNetReader_ReadU8(&reader);
+				const float reTagTimer = PangeaNetReader_ReadF32(&reader);
+				if (reader.ok)
+				{
+					gWhoWasIt = (short)whoWasIt;
+					gReTagTimer = reTagTimer;
+					PangeaNet_SetTaggedPlayer((short)whoIsIt);
+				}
+				return;
+			}
 		const short playerNum = (short)PangeaNetReader_ReadU8(&reader);
 		const short lap = (short)PangeaNetReader_ReadU16(&reader);
 		const short place = (short)PangeaNetReader_ReadU16(&reader);
@@ -724,6 +910,13 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 		gPendingSnapshot.lastDeltaSeq = PangeaNetReader_ReadU32(&reader);
 		gPendingSnapshot.playerCount = (uint8_t)PangeaNetReader_ReadU8(&reader);
 		gPendingSnapshot.pad[0] = gPendingSnapshot.pad[1] = gPendingSnapshot.pad[2] = 0;
+		gPendingSnapshot.whoIsIt = PangeaNetReader_ReadU16(&reader);
+		gPendingSnapshot.whoWasIt = PangeaNetReader_ReadU16(&reader);
+		gPendingSnapshot.capturedFlagCount[0] = PangeaNetReader_ReadU16(&reader);
+		gPendingSnapshot.capturedFlagCount[1] = PangeaNetReader_ReadU16(&reader);
+		gPendingSnapshot.numPlayersEliminated = PangeaNetReader_ReadU16(&reader);
+		gPendingSnapshot.reserved1 = PangeaNetReader_ReadU16(&reader);
+		gPendingSnapshot.reTagTimer = PangeaNetReader_ReadF32(&reader);
 		if (!reader.ok || gPendingSnapshot.protocolVersion != PANGEA_NET_VERSION)
 		{
 			SDL_Log("CroMag net: rejected snapshot protocolVersion=%u expected=%u",
@@ -739,12 +932,19 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 			s->coord.x = PangeaNetReader_ReadF32(&reader);
 			s->coord.y = PangeaNetReader_ReadF32(&reader);
 			s->coord.z = PangeaNetReader_ReadF32(&reader);
+			s->rotX = PangeaNetReader_ReadF32(&reader);
 			s->rotY = PangeaNetReader_ReadF32(&reader);
+			s->rotZ = PangeaNetReader_ReadF32(&reader);
 			s->delta.x = PangeaNetReader_ReadF32(&reader);
 			s->delta.y = PangeaNetReader_ReadF32(&reader);
 			s->delta.z = PangeaNetReader_ReadF32(&reader);
+			s->deltaRot.x = PangeaNetReader_ReadF32(&reader);
+			s->deltaRot.y = PangeaNetReader_ReadF32(&reader);
+			s->deltaRot.z = PangeaNetReader_ReadF32(&reader);
 			s->steering = PangeaNetReader_ReadF32(&reader);
 			s->currentThrust = PangeaNetReader_ReadF32(&reader);
+			s->currentRPM = PangeaNetReader_ReadF32(&reader);
+			s->skidDot = PangeaNetReader_ReadF32(&reader);
 			s->controlBits = PangeaNetReader_ReadU32(&reader);
 			s->controlBitsNew = PangeaNetReader_ReadU32(&reader);
 			s->analogSteering.x = PangeaNetReader_ReadF32(&reader);
@@ -753,20 +953,39 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 			s->checkpointNum = (short)PangeaNetReader_ReadU16(&reader);
 			s->place = (short)PangeaNetReader_ReadU16(&reader);
 			s->raceComplete = PangeaNetReader_ReadU8(&reader);
+			s->wrongWay = PangeaNetReader_ReadU8(&reader);
 			s->isEliminated = PangeaNetReader_ReadU8(&reader);
 			s->powType = (short)PangeaNetReader_ReadU16(&reader);
 			s->powQuantity = (short)PangeaNetReader_ReadU16(&reader);
 			s->health = PangeaNetReader_ReadF32(&reader);
+			s->tagTimer = PangeaNetReader_ReadF32(&reader);
 			s->frozenTimer = PangeaNetReader_ReadF32(&reader);
 			s->greasedTiresTimer = PangeaNetReader_ReadF32(&reader);
 			s->nitroTimer = PangeaNetReader_ReadF32(&reader);
 			s->stickyTiresTimer = PangeaNetReader_ReadF32(&reader);
 			s->invisibilityTimer = PangeaNetReader_ReadF32(&reader);
+			s->isIt = PangeaNetReader_ReadU8(&reader);
+			s->movingBackwards = PangeaNetReader_ReadU8(&reader);
+			s->accelBackwards = PangeaNetReader_ReadU8(&reader);
+			s->braking = PangeaNetReader_ReadU8(&reader);
+			s->onWater = PangeaNetReader_ReadU8(&reader);
+			(void) PangeaNetReader_ReadU8(&reader);
+			(void) PangeaNetReader_ReadU8(&reader);
+			(void) PangeaNetReader_ReadU8(&reader);
 			s->lastProcessedInputSequence = PangeaNetReader_ReadU32(&reader);
 
 			if (i < MAX_PLAYERS)
 			{
+				gPlayerInfo[i].isIt = s->isIt != 0;
 				gPlayerInfo[i].isEliminated = s->isEliminated != 0;
+				gPlayerInfo[i].wrongWay = s->wrongWay != 0;
+				gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
+				gPlayerInfo[i].accelBackwards = s->accelBackwards != 0;
+				gPlayerInfo[i].braking = s->braking != 0;
+				gPlayerInfo[i].onWater = s->onWater != 0;
+				gPlayerInfo[i].currentRPM = s->currentRPM;
+				gPlayerInfo[i].skidDot = s->skidDot;
+				gPlayerInfo[i].tagTimer = s->tagTimer;
 				gPlayerInfo[i].frozenTimer = s->frozenTimer;
 				gPlayerInfo[i].greasedTiresTimer = s->greasedTiresTimer;
 				gPlayerInfo[i].nitroTimer = s->nitroTimer;
@@ -777,6 +996,21 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 					PangeaNet_PushRemoteSnapshot(i, s);
 				}
 			}
+		}
+
+		/* Read torch objective state */
+		{
+			const uint8_t pendingTorchCount = PangeaNetReader_ReadU8(&reader);
+			gPendingTorchCount = pendingTorchCount < PANGEA_NET_MAX_TORCHES ? pendingTorchCount : PANGEA_NET_MAX_TORCHES;
+			for (uint8_t t = 0; t < gPendingTorchCount; t++)
+			{
+				gPendingTorchMode[t] = PangeaNetReader_ReadU8(&reader);
+				gPendingTorchCarrier[t] = PangeaNetReader_ReadU8(&reader);
+				gPendingTorchCoordX[t] = PangeaNetReader_ReadF32(&reader);
+				gPendingTorchCoordY[t] = PangeaNetReader_ReadF32(&reader);
+				gPendingTorchCoordZ[t] = PangeaNetReader_ReadF32(&reader);
+			}
+			gHavePendingTorchState = reader.ok;
 		}
 
 		if (!reader.ok)
@@ -2678,22 +2912,37 @@ void HostSend_SnapshotToClients(void)
 	PangeaNetWriter_WriteU32(&writer, advertisedKeyframeSeq);
 	PangeaNetWriter_WriteU32(&writer, gPangeaLastHostDeltaSeq);
 	PangeaNetWriter_WriteU8(&writer, (uint8_t)gNumRealPlayers);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gWhoIsIt);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gWhoWasIt);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gCapturedFlagCount[0]);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gCapturedFlagCount[1]);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gNumPlayersEliminated);
+	PangeaNetWriter_WriteU16(&writer, 0);
+	PangeaNetWriter_WriteF32(&writer, gReTagTimer);
 
 	for (i = 0; i < MAX_PLAYERS; i++)
 	{
 		const ObjNode* obj = gPlayerInfo[i].objNode;
 		const OGLVector3D zeroDelta = {0.0f, 0.0f, 0.0f};
 		const OGLVector3D delta = obj ? obj->Delta : zeroDelta;
+		const OGLVector3D deltaRot = obj ? obj->DeltaRot : zeroDelta;
 
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].coord.x);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].coord.y);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].coord.z);
+		PangeaNetWriter_WriteF32(&writer, obj ? obj->Rot.x : 0.0f);
 		PangeaNetWriter_WriteF32(&writer, obj ? obj->Rot.y : 0.0f);
+		PangeaNetWriter_WriteF32(&writer, obj ? obj->Rot.z : 0.0f);
 		PangeaNetWriter_WriteF32(&writer, delta.x);
 		PangeaNetWriter_WriteF32(&writer, delta.y);
 		PangeaNetWriter_WriteF32(&writer, delta.z);
+		PangeaNetWriter_WriteF32(&writer, deltaRot.x);
+		PangeaNetWriter_WriteF32(&writer, deltaRot.y);
+		PangeaNetWriter_WriteF32(&writer, deltaRot.z);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].steering);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].currentThrust);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].currentRPM);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].skidDot);
 		PangeaNetWriter_WriteU32(&writer, gPlayerInfo[i].controlBits);
 		PangeaNetWriter_WriteU32(&writer, gPlayerInfo[i].controlBits_New);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].analogSteering.x);
@@ -2702,16 +2951,47 @@ void HostSend_SnapshotToClients(void)
 		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].checkpointNum);
 		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].place);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].raceComplete ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].wrongWay ? 1 : 0);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].isEliminated ? 1 : 0);
 		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].powType);
 		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].powQuantity);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].health);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].tagTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].frozenTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].greasedTiresTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].nitroTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].stickyTiresTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].invisibilityTimer);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].isIt ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].movingBackwards ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].accelBackwards ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].braking ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].onWater ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, 0);
+		PangeaNetWriter_WriteU8(&writer, 0);
+		PangeaNetWriter_WriteU8(&writer, 0);
 		PangeaNetWriter_WriteU32(&writer, gPangeaConnState[i].lastReceivedSequence);
+	}
+
+	/* Write torch objective state */
+	PangeaNetWriter_WriteU8(&writer, (uint8_t)gNumTorches);
+	for (int t = 0; t < gNumTorches && t < PANGEA_NET_MAX_TORCHES; t++)
+	{
+		const ObjNode* torch = gTorchObjs[t];
+		if (!torch)
+		{
+			PangeaNetWriter_WriteU8(&writer, 0xFF);
+			PangeaNetWriter_WriteU8(&writer, 0xFF);
+			PangeaNetWriter_WriteF32(&writer, 0.0f);
+			PangeaNetWriter_WriteF32(&writer, 0.0f);
+			PangeaNetWriter_WriteF32(&writer, 0.0f);
+			continue;
+		}
+		PangeaNetWriter_WriteU8(&writer, (uint8_t)torch->Mode);
+		PangeaNetWriter_WriteU8(&writer, (uint8_t)(torch->Mode == 1 ? torch->PlayerNum : 0xFF));
+		PangeaNetWriter_WriteF32(&writer, torch->Coord.x);
+		PangeaNetWriter_WriteF32(&writer, torch->Coord.y);
+		PangeaNetWriter_WriteF32(&writer, torch->Coord.z);
 	}
 
 	if (!writer.ok)
@@ -2762,6 +3042,11 @@ void HostSend_SnapshotToClients(void)
 			gPangeaReliableEliminatedSent[i] = 1;
 		}
 	}
+	if (gPangeaPrevWhoIsIt >= 0 && gWhoIsIt != gPangeaPrevWhoIsIt)
+	{
+		PangeaNet_SendTagHandoffEvent();
+	}
+	gPangeaPrevWhoIsIt = gWhoIsIt;
 #endif
 }
 
@@ -2815,6 +3100,12 @@ void ClientApplyPendingSnapshot(void)
 	}
 
 	short i;
+	gWhoIsIt = (short) gPendingSnapshot.whoIsIt;
+	gWhoWasIt = (short) gPendingSnapshot.whoWasIt;
+	gCapturedFlagCount[0] = (short) gPendingSnapshot.capturedFlagCount[0];
+	gCapturedFlagCount[1] = (short) gPendingSnapshot.capturedFlagCount[1];
+	gNumPlayersEliminated = (short) gPendingSnapshot.numPlayersEliminated;
+	gReTagTimer = gPendingSnapshot.reTagTimer;
 	for (i = 0; i < MAX_PLAYERS; i++)
 	{
 		const PangeaNetPlayerCarState* s = &gPendingSnapshot.players[i];
@@ -2830,9 +3121,18 @@ void ClientApplyPendingSnapshot(void)
 			gPlayerInfo[i].checkpointNum = s->checkpointNum;
 			gPlayerInfo[i].place = s->place;
 			gPlayerInfo[i].raceComplete = s->raceComplete != 0;
+			gPlayerInfo[i].wrongWay = s->wrongWay != 0;
 			gPlayerInfo[i].powType = s->powType;
 			gPlayerInfo[i].powQuantity = s->powQuantity;
 			gPlayerInfo[i].health = s->health;
+			gPlayerInfo[i].currentRPM = s->currentRPM;
+			gPlayerInfo[i].skidDot = s->skidDot;
+			gPlayerInfo[i].tagTimer = s->tagTimer;
+			gPlayerInfo[i].isIt = s->isIt != 0;
+			gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
+			gPlayerInfo[i].accelBackwards = s->accelBackwards != 0;
+			gPlayerInfo[i].braking = s->braking != 0;
+			gPlayerInfo[i].onWater = s->onWater != 0;
 			gPlayerInfo[i].isEliminated = gPlayerInfo[i].isEliminated || (s->health <= 0.0f);
 
 			if (gPlayerInfo[i].objNode)
@@ -2840,7 +3140,10 @@ void ClientApplyPendingSnapshot(void)
 				gPlayerInfo[i].coord = s->coord;
 				gPlayerInfo[i].objNode->Coord = s->coord;
 				gPlayerInfo[i].objNode->Delta = s->delta;
+				gPlayerInfo[i].objNode->DeltaRot = s->deltaRot;
+				gPlayerInfo[i].objNode->Rot.x = s->rotX;
 				gPlayerInfo[i].objNode->Rot.y = s->rotY;
+				gPlayerInfo[i].objNode->Rot.z = s->rotZ;
 			}
 			PangeaNet_ReapplyUnackedLocalInput(s->lastProcessedInputSequence, i);
 			continue;
@@ -2878,9 +3181,19 @@ void ClientApplyPendingSnapshot(void)
 		gPlayerInfo[i].checkpointNum = interp->toState.checkpointNum;
 		gPlayerInfo[i].place = interp->toState.place;
 		gPlayerInfo[i].raceComplete = interp->toState.raceComplete != 0;
+		gPlayerInfo[i].wrongWay = interp->toState.wrongWay != 0;
 		gPlayerInfo[i].powType = interp->toState.powType;
 		gPlayerInfo[i].powQuantity = interp->toState.powQuantity;
 		gPlayerInfo[i].health = interp->toState.health;
+		gPlayerInfo[i].currentRPM = interp->toState.currentRPM;
+		gPlayerInfo[i].skidDot = interp->toState.skidDot;
+		gPlayerInfo[i].tagTimer = interp->toState.tagTimer;
+		gPlayerInfo[i].isIt = interp->toState.isIt != 0;
+		gPlayerInfo[i].movingBackwards = interp->toState.movingBackwards != 0;
+		gPlayerInfo[i].accelBackwards = interp->toState.accelBackwards != 0;
+		gPlayerInfo[i].braking = interp->toState.braking != 0;
+		gPlayerInfo[i].onWater = interp->toState.onWater != 0;
+		gPlayerInfo[i].objNode->Rot.x = interp->toState.rotX;
 		if (PangeaNet_ShouldLogSequence(gPendingSnapshot.snapshotSeq))
 		{
 			SDL_Log("CroMag net: client apply remote snapshot seq=%u player=%d objCoord=(%.1f,%.1f,%.1f) target=(%.1f,%.1f,%.1f) status=%08x hidden=%d shadow=%d",
@@ -2896,6 +3209,40 @@ void ClientApplyPendingSnapshot(void)
 				(gPlayerInfo[i].objNode->StatusBits & STATUS_BIT_HIDDEN) != 0,
 				gPlayerInfo[i].objNode->ShadowNode != nil);
 		}
+		gPlayerInfo[i].objNode->Rot.y = interp->toState.rotY;
+		gPlayerInfo[i].objNode->Rot.z = interp->toState.rotZ;
+		gPlayerInfo[i].objNode->DeltaRot = interp->toState.deltaRot;
+	}
+
+	/* Apply torch objective state from snapshot */
+	if (gHavePendingTorchState)
+	{
+		for (uint8_t t = 0; t < gPendingTorchCount && t < gNumTorches; t++)
+		{
+			ObjNode* torch = gTorchObjs[t];
+			if (!torch) continue;
+			const uint8_t mode = gPendingTorchMode[t];
+			const uint8_t carrier = gPendingTorchCarrier[t];
+			if (mode != 1 && torch->Mode == 1 && torch->CapturedFlag)
+			{
+				/* Torch was being carried — release from car */
+				ObjNode* car = (ObjNode*)torch->CapturedFlag;
+				car->CapturedFlag = nil;
+				torch->CapturedFlag = nil;
+			}
+			torch->Mode = mode;
+			if (mode == 1 && carrier < MAX_PLAYERS && gPlayerInfo[carrier].objNode)
+			{
+				ObjNode* car = gPlayerInfo[carrier].objNode;
+				car->CapturedFlag = (Ptr)torch;
+				torch->CapturedFlag = (Ptr)car;
+			}
+			torch->Coord.x = gPendingTorchCoordX[t];
+			torch->Coord.y = gPendingTorchCoordY[t];
+			torch->Coord.z = gPendingTorchCoordZ[t];
+			UpdateObjectTransforms(torch);
+		}
+		gHavePendingTorchState = false;
 	}
 
 	{
@@ -2945,6 +3292,67 @@ Boolean PangeaNet_IsHostAuthoritativeRemotePlayer(short playerNum)
 #else
 	(void)playerNum;
 	return false;
+#endif
+}
+
+void PangeaNet_ForceKeyframe(void)
+{
+#ifdef __EMSCRIPTEN__
+	if (PangeaNetBridge_IsEnabled() && gIsNetworkHost)
+	{
+		gPangeaForceKeyframe = 1;
+	}
+#endif
+}
+
+void PangeaNet_RequestTagHandoff(short fromPlayer, short toPlayer)
+{
+#ifdef __EMSCRIPTEN__
+	if (!PangeaNetBridge_IsEnabled())
+	{
+		return;
+	}
+	if (gIsNetworkHost)
+	{
+		PangeaNet_ApplyTagHandoff(fromPlayer, toPlayer);
+		return;
+	}
+	if (!gIsNetworkClient)
+	{
+		return;
+	}
+	if (fromPlayer < 0 || fromPlayer >= MAX_PLAYERS || toPlayer < 0 || toPlayer >= MAX_PLAYERS)
+	{
+		return;
+	}
+	if (fromPlayer != gMyNetworkPlayerNum && toPlayer != gMyNetworkPlayerNum)
+	{
+		return;
+	}
+
+	uint8_t bytes[64];
+	PangeaNetWriter writer;
+	PangeaNetPacketHeader header;
+	header.magic = PANGEA_NET_MAGIC;
+	header.version = PANGEA_NET_VERSION;
+	header.packetType = kPangeaPacketTagHandoffRequest;
+	header.matchIdLow = gPangeaMatchId;
+	header.matchIdHigh = gPangeaMatchIdHigh;
+	header.tick = gPangeaLocalTick;
+	header.sequence = gPangeaSendSequence++;
+	header.playerIndex = (uint16_t)gMyNetworkPlayerNum;
+	header.reserved = 0;
+	PangeaNetWriter_Init(&writer, bytes, (int)sizeof(bytes));
+	PangeaNet_WriteHeader(&writer, &header);
+	PangeaNetWriter_WriteU8(&writer, (uint8_t)fromPlayer);
+	PangeaNetWriter_WriteU8(&writer, (uint8_t)toPlayer);
+	if (writer.ok)
+	{
+		PangeaNetBridge_SendReliable(bytes, writer.cursor);
+	}
+#else
+	(void)fromPlayer;
+	(void)toPlayer;
 #endif
 }
 

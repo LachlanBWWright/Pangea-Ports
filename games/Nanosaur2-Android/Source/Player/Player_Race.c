@@ -55,6 +55,11 @@ long		c;
 	}
 #endif
 
+	if (gVSMode != VS_MODE_RACE)
+	{
+		return;
+	}
+
 				/********************************/
 				/* SEE IF CROSSED A LINE MARKER */
 				/********************************/
@@ -255,6 +260,11 @@ void CalcPlayerPlaces(void)
 {
 short	p,place,i;
 
+	if (gVSMode != VS_MODE_RACE)
+	{
+		return;
+	}
+
 
 
 	for (p = 0; p < gNumPlayers; p++)
@@ -335,7 +345,6 @@ short	i;
 		StartLevelCompletion(5.0f);
 	}
 }
-
 
 
 

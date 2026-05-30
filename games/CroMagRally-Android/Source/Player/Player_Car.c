@@ -31,6 +31,8 @@ static void DoCPUPOWLogic_BottleRocket(short playerNum);
 static void DoCPUPOWLogic_Mine(short playerNum);
 static void UpdateTireSkidMarks(ObjNode *car);
 static void VehicleHitVehicle(ObjNode *car1, ObjNode *car2);
+static Boolean TryTransferTagBetweenPlayers(short p1, short p2);
+static void SetTaggedPlayer(short playerNum);
 static void AddToTireSkidMarks(ObjNode *car, short playerNum);
 static void MovePlayer_HeadSkeleton(ObjNode *head);
 static void SpewDebrisFromWheel(short p, ObjNode *carObj, ObjNode *wheelObj);
@@ -503,10 +505,8 @@ static void MovePlayer_Car_Multipass(ObjNode *theNode)
 	const Boolean hostAuthoritativeCpu = PangeaNet_IsHostAuthoritativeCpuSimulation(playerNum);
 	if (hostAuthoritativeRemotePlayer)
 	{
-		gCoord = gPlayerInfo[playerNum].coord;
-		gDelta.x = 0.0f;
-		gDelta.y = 0.0f;
-		gDelta.z = 0.0f;
+		gCoord = theNode->Coord;
+		gDelta = theNode->Delta;
 		return;
 	}
             /***********/
@@ -1730,7 +1730,10 @@ Boolean		wasInWater;
 			if (ctype & CTYPE_PLAYER)
 			{
 				if (gIsNetworkClient && PangeaNet_IsHostAuthoritativeRemotePlayer(hitObj->PlayerNum))
+				{
+					TryTransferTagBetweenPlayers(playerNum, hitObj->PlayerNum);
 					continue;
+				}
 				VehicleHitVehicle(vehicle, hitObj);
 			}
 
@@ -1809,6 +1812,100 @@ Boolean		wasInWater;
 
 
 
+/*********************** TRY TRANSFER TAG BETWEEN PLAYERS *****************************/
+
+static Boolean TryTransferTagBetweenPlayers(short p1, short p2)
+{
+Boolean		tagTransferred = false;
+Boolean		onlineTagMode = gIsNetworkHost || gIsNetworkClient;
+short		fromPlayer = -1;
+short		toPlayer = -1;
+
+	if (gGameMode != GAME_MODE_TAG1 && gGameMode != GAME_MODE_TAG2)
+		return false;
+
+	if (onlineTagMode && gDebugMode)
+	{
+		SDL_Log("CroMag tag collision: role=%s p1=%d p2=%d whoIsIt=%d whoWasIt=%d reTag=%.3f p1It=%d p2It=%d",
+			gIsNetworkHost ? "host" : (gIsNetworkClient ? "client" : "local"),
+			p1,
+			p2,
+			gWhoIsIt,
+			gWhoWasIt,
+			gReTagTimer,
+			gPlayerInfo[p1].isIt ? 1 : 0,
+			gPlayerInfo[p2].isIt ? 1 : 0);
+	}
+
+	if (gTrackCompleted)
+		return false;
+
+			/* CAR 1 WAS IT */
+
+	if (gWhoIsIt == p1)
+	{
+		if ((p2 != gWhoWasIt) || (gReTagTimer <= 0.0f))			// see if P2 was "it" last time and we have not timed out, then dont tag
+		{
+			fromPlayer = p1;
+			toPlayer = p2;
+			gWhoWasIt = fromPlayer;
+			SetTaggedPlayer(toPlayer);
+			gReTagTimer = TAG_SPAZ_TIMER;
+			tagTransferred = true;
+		}
+	}
+
+			/* CAR 2 WAS IT */
+	else
+	if (gWhoIsIt == p2)
+	{
+		if ((p1 != gWhoWasIt) || (gReTagTimer <= 0.0f))			// see if P1 was "it" last time and we have not timed out, then dont tag
+		{
+			fromPlayer = p2;
+			toPlayer = p1;
+			gWhoWasIt = fromPlayer;
+			SetTaggedPlayer(toPlayer);
+			gReTagTimer = TAG_SPAZ_TIMER;
+			tagTransferred = true;
+		}
+	}
+
+	if (tagTransferred)
+	{
+		PangeaNet_RequestTagHandoff(gWhoWasIt, gWhoIsIt);
+		PangeaNet_ForceKeyframe();
+		if (onlineTagMode && gDebugMode)
+		{
+			SDL_Log("CroMag tag transfer: role=%s oldIt=%d newIt=%d whoWasIt=%d reTag=%.3f",
+				gIsNetworkHost ? "host" : (gIsNetworkClient ? "client" : "local"),
+				gWhoWasIt,
+				gWhoIsIt,
+				gWhoWasIt,
+				gReTagTimer);
+		}
+	}
+
+	return tagTransferred;
+}
+
+
+
+/*********************** SET TAGGED PLAYER *****************************/
+
+static void SetTaggedPlayer(short playerNum)
+{
+short	i;
+
+	gWhoIsIt = playerNum;
+
+	for (i = 0; i < MAX_PLAYERS; i++)
+	{
+		gPlayerInfo[i].isIt = i == playerNum;
+	}
+}
+
+
+
 /*********************** VEHICLE HIT VEHICLE *****************************/
 //
 // Called from above when two vehicles collide.
@@ -1836,40 +1933,7 @@ short		p2 = car2->PlayerNum;
 
 		case	GAME_MODE_TAG1:
 		case	GAME_MODE_TAG2:
-				if (!gTrackCompleted)
-				{
-
-						/* CAR 1 WAS IT */
-
-					if (gPlayerInfo[p1].isIt)
-					{
-						if ((p2 != gWhoWasIt) || (gReTagTimer <= 0.0f))			// see if P2 was "it" last time and we have not timed out, then dont tag
-						{
-							gWhoWasIt = p1;
-							gWhoIsIt = p2;
-							gPlayerInfo[p1].isIt = false;
-							gPlayerInfo[p2].isIt = true;
-							gReTagTimer = TAG_SPAZ_TIMER;
-
-
-						}
-					}
-
-						/* CAR 2 WAS IT */
-					else
-					if (gPlayerInfo[p2].isIt)
-					{
-						if ((p1 != gWhoWasIt) || (gReTagTimer <= 0.0f))			// see if P1 was "it" last time and we have not timed out, then dont tag
-						{
-							gWhoWasIt = p2;
-							gWhoIsIt = p1;
-							gPlayerInfo[p1].isIt = true;
-							gPlayerInfo[p2].isIt = false;
-							gReTagTimer = TAG_SPAZ_TIMER;
-
-						}
-					}
-				}
+				TryTransferTagBetweenPlayers(p1, p2);
 				break;
 
 
@@ -3585,14 +3649,6 @@ new_group:
 
 
 }
-
-
-
-
-
-
-
-
 
 
 

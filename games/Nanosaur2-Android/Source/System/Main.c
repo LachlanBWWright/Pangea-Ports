@@ -43,6 +43,7 @@ static void PlayLevel(void);
 static void DrawLevelCallback(void);
 static void MoveTimeDemoOnSpline(ObjNode *theNode);
 static void ShowTimeDemoResults(int numFrames, float numSeconds, float averageFPS);
+static Boolean NS2ShouldProcessDeathTimerForPlayer(int playerIndex);
 
 #ifdef __EMSCRIPTEN__
 static bool PlayLevelTick(void);
@@ -114,6 +115,64 @@ const short gLevelSongs[NUM_LEVELS] =
 	SONG_LEVEL3,				// CAPTURE THE FLAG 1
 	SONG_LEVEL1,				// CAPTURE THE FLAG 2
 };
+
+short GetVSModeForLevel(short levelNum)
+{
+	switch (levelNum)
+	{
+		case LEVEL_NUM_RACE1:
+		case LEVEL_NUM_RACE2:
+			return VS_MODE_RACE;
+
+		case LEVEL_NUM_BATTLE1:
+		case LEVEL_NUM_BATTLE2:
+			return VS_MODE_BATTLE;
+
+		case LEVEL_NUM_FLAG1:
+		case LEVEL_NUM_FLAG2:
+			return VS_MODE_CAPTURETHEFLAG;
+
+		default:
+			return VS_MODE_NONE;
+	}
+}
+
+#if __EMSCRIPTEN__
+static const char* Nanosaur2VSModeName(short vsMode)
+{
+	switch (vsMode)
+	{
+		case VS_MODE_NONE:
+			return "adventure";
+
+		case VS_MODE_RACE:
+			return "race";
+
+		case VS_MODE_BATTLE:
+			return "battle";
+
+		case VS_MODE_CAPTURETHEFLAG:
+			return "capture-the-flag";
+
+		default:
+			return "unknown";
+	}
+}
+#endif
+
+static Boolean NS2ShouldProcessDeathTimerForPlayer(int playerIndex)
+{
+#if __EMSCRIPTEN__
+	if (PangeaNet_IsEnabled() && !PangeaNet_IsHost())
+	{
+		return playerIndex == PangeaNet_GetLocalPlayerIndex();
+	}
+#endif
+
+	(void) playerIndex;
+
+	return true;
+}
 
 
 
@@ -664,6 +723,11 @@ static bool PlayLevelTick(void)
 
 	for (int i = 0; i < gNumPlayers; i++)
 	{
+		if (!NS2ShouldProcessDeathTimerForPlayer(i))
+		{
+			continue;
+		}
+
 		if (gPlayerIsDead[i])
 		{
 			float	oldTimer = gDeathTimer[i];
@@ -892,6 +956,11 @@ float	fps;
 
 		for (int i = 0; i < gNumPlayers; i++)							// check all players
 		{
+			if (!NS2ShouldProcessDeathTimerForPlayer(i))
+			{
+				continue;
+			}
+
 			if (gPlayerIsDead[i])										// is this player dead?
 			{
 				float	oldTimer = gDeathTimer[i];
@@ -1416,7 +1485,17 @@ unsigned long	someLong;
 				networkPlayerCount = MAX_PLAYERS;
 			}
 			gNumPlayers = (Byte) networkPlayerCount;
-			gVSMode = gNumPlayers > 1 ? VS_MODE_RACE : VS_MODE_NONE;
+			if (gVSMode == VS_MODE_NONE)
+			{
+				gVSMode = GetVSModeForLevel(gLevelNum);
+			}
+			SDL_Log(
+				"Nanosaur2 direct network launch level=%d vsMode=%s(%d) players=%d host=%d",
+				gLevelNum,
+				Nanosaur2VSModeName(gVSMode),
+				gVSMode,
+				gNumPlayers,
+				PangeaNet_IsHost());
 		}
 		else
 #endif

@@ -60,10 +60,7 @@ void main()
         // Calculate sphere map coordinates if enabled
         if (uUseSphereMap)
         {
-            // Sphere mapping: use normal to calculate reflection texture coordinates
-            vec3 normal = normalize(vNormal);
-            // Transform normal to view space
-            vec3 viewNormal = normalize(uNormalMatrix * normal);
+            vec3 viewNormal = normalize(vNormal);
             // Calculate sphere map coordinates
             // This is a simplified version - full implementation would use reflected view vector
             texCoord1 = viewNormal.xy * 0.5 + 0.5;
