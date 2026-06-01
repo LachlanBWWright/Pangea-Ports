@@ -668,6 +668,8 @@ static void SubmitFence(int f, float camX, float camZ, uint16_t slot)
 			tmd->vertexNormals[0] = tmd->vertexNormals[1] = tmd->vertexNormals[2] = tmd->vertexNormals[3] = normal;
 		}
 
+		Render_InvalidateMeshCacheForMesh(tmd);
+
 		// Submit this segment
 		Render_SubmitMesh(tmd, nil, &gFenceRenderMods[f], nil, slot);
 	}

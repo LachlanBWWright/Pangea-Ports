@@ -9,6 +9,10 @@
 #include "game.h"
 #include "mytraps.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -301,11 +305,27 @@ Boolean			flag;
 			continue;
 
 		type = itemPtr[i].type;									// get item #
-		if (type > MAX_ITEM_NUM)								// error check!
+#ifdef PANGEA_ENABLE_SCRIPTING
+		const int originalType = (int)type;
+		if (!gNetGameInProgress)
+			type = CroMagScript_RemapTerrainItemType(gTrackNum, originalType);
+#endif
+		if (type < 0 || type > MAX_ITEM_NUM)					// error check!
 		{
 			DoAlert("Illegal Map Item Type!");
 			ShowSystemErr(type);
 		}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!gNetGameInProgress)
+		{
+			if (CroMagScript_OnTerrainItem(&itemPtr[i], gTrackNum, playerNum, originalType, (int)type, x, z))
+			{
+				itemPtr[i].flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
+		}
+#endif
 
 		flag = gTerrainItemAddRoutines[type](&itemPtr[i],itemPtr[i].x, itemPtr[i].y); // call item's ADD routine
 		if (flag)

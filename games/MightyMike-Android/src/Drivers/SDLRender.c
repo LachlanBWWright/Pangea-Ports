@@ -33,6 +33,16 @@ static SDL_Texture*		gSDLTexture			= NULL;
 static color_t*			gFinalFramebuffer	= NULL;
 const char*				gRendererName		= "NULL";
 Boolean					gCanDoHQStretch		= true;
+float					gFramebufferConvertMs = 0;
+float					gFramebufferUpdateTextureMs = 0;
+float					gFramebufferRenderTextureMs = 0;
+float					gFramebufferPresentMs = 0;
+int						gFramebufferUploadBytes = 0;
+
+static float SDLRender_ElapsedMs(uint64_t start, uint64_t end)
+{
+	return (float)((double)(end - start) * 1000.0 / (double)SDL_GetPerformanceFrequency());
+}
 
 Boolean SDLRender_Init(void)
 {
@@ -125,7 +135,10 @@ void SDLRender_PresentFramebuffer(void)
 	//-------------------------------------------------------------------------
 	// Convert indexed to RGBA, with optional post-processing
 
+	uint64_t startTicks = SDL_GetPerformanceCounter();
 	ConvertFramebufferMT(gFinalFramebuffer);
+	uint64_t endTicks = SDL_GetPerformanceCounter();
+	gFramebufferConvertMs = SDLRender_ElapsedMs(startTicks, endTicks);
 
 	//-------------------------------------------------------------------------
 	// Update SDL texture
@@ -135,16 +148,26 @@ void SDLRender_PresentFramebuffer(void)
 	if (gEffectiveScalingType == kScaling_HQStretch)
 		pitch *= 2;
 
+	startTicks = SDL_GetPerformanceCounter();
 	success = SDL_UpdateTexture(gSDLTexture, NULL, gFinalFramebuffer, pitch);
+	endTicks = SDL_GetPerformanceCounter();
+	gFramebufferUpdateTextureMs = SDLRender_ElapsedMs(startTicks, endTicks);
+	gFramebufferUploadBytes = pitch * VISIBLE_HEIGHT * ((gEffectiveScalingType == kScaling_HQStretch) ? 2 : 1);
 	CHECK_SDL_ERROR(success);
 
 	//-------------------------------------------------------------------------
 	// Present it
 
 	SDL_RenderClear(gSDLRenderer);
+	startTicks = SDL_GetPerformanceCounter();
 	success = SDL_RenderTexture(gSDLRenderer, gSDLTexture, NULL, NULL);
+	endTicks = SDL_GetPerformanceCounter();
+	gFramebufferRenderTextureMs = SDLRender_ElapsedMs(startTicks, endTicks);
 	CHECK_SDL_ERROR(success);
+	startTicks = SDL_GetPerformanceCounter();
 	SDL_RenderPresent(gSDLRenderer);
+	endTicks = SDL_GetPerformanceCounter();
+	gFramebufferPresentMs = SDLRender_ElapsedMs(startTicks, endTicks);
 
 #ifdef __EMSCRIPTEN__
 	// Yield control to the browser so it can update the canvas and

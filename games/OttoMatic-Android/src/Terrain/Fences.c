@@ -523,6 +523,8 @@ OGLPoint3D				*nubs;
 		gFenceColors[f][j+1].a = 255.0f * alpha;
 	}
 
+	CompatGL_InvalidateCachePtr(gFenceTriMeshData[f].colorsByte);
+
 
 
 		/*******************/

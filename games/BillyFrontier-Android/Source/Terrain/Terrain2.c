@@ -3,6 +3,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /***************/
 /* EXTERNALS   */
@@ -289,10 +292,22 @@ Boolean			flag;
 			continue;
 			
 		type = itemPtr[i].type;									// get item #
+#ifdef PANGEA_ENABLE_SCRIPTING
+		long originalType = type;
+		type = BillyScript_RemapTerrainItemType(gCurrentArea, (int)type);
+#endif
 		if (type > MAX_ITEM_NUM)								// error check!
 		{
 			DoFatalAlert("Illegal Map Item Type %d!", type);
 		}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (BillyScript_OnTerrainItem(&itemPtr[i], gCurrentArea, (int)originalType, (int)type, x, z))
+		{
+			itemPtr[i].flags |= ITEM_FLAGS_INUSE;
+			continue;
+		}
+#endif
 
 		flag = gTerrainItemAddRoutines[type](&itemPtr[i],itemPtr[i].x, itemPtr[i].y); // call item's ADD routine
 		if (flag)
@@ -714,6 +729,5 @@ float	intersectX, intersectZ;
 	*whichLine = -1;
 	return(false);	
 }
-
 
 

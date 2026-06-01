@@ -278,6 +278,12 @@ SkeletonObjDataType	*currentSkelObjData;
 
 	UpdateSkinnedGeometry_Recurse(0, skelType);											// start @ base
 
+	for (int i = 0; i < gCurrentSkeleton->numDecomposedTriMeshes; i++)
+	{
+		CompatGL_InvalidateCachePtr(gLocalTriMeshesOfSkelType[skelType][i].points);
+		CompatGL_InvalidateCachePtr(gLocalTriMeshesOfSkelType[skelType][i].normals);
+	}
+
 
 				/* BUILD A LOCAL BBOX */
 				//
@@ -527,8 +533,6 @@ long	i,b,j;
 		}
 	}
 }
-
-
 
 
 

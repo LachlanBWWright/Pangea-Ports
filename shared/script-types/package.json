@@ -1,0 +1,35 @@
+{
+  "name": "@pangea-ports/script-types",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/pangea.d.ts",
+      "default": "./dist/pangea.js"
+    },
+    "./games/bugdom2": {
+      "types": "./dist/games/bugdom2.d.ts",
+      "default": "./dist/games/bugdom2.js"
+    },
+    "./games": {
+      "types": "./dist/games/index.d.ts",
+      "default": "./dist/games/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "neverthrow": "^8.2.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

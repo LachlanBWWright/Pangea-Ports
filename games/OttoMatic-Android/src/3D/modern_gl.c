@@ -881,6 +881,7 @@ void ModernGL_EndImmediateMode(void)
     gDrawCallsThisFrame++;
     gVerticesThisFrame += numVertices;
     gBufferUploadsThisFrame++;
+    gBufferUploadBytesThisFrame += numVertices * (3 + 3 + 4 + 2 + 2) * (int)sizeof(GLfloat);
 }
 
 void ModernGL_ImmediateColor(float r, float g, float b, float a)

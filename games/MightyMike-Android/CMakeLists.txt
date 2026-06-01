@@ -21,6 +21,7 @@ project(${GAME_TARGET}
 
 option(BUILD_SDL_FROM_SOURCE "Build SDL from source" OFF)
 option(SDL_STATIC "Static link SDL" OFF)
+option(PANGEA_ENABLE_SCRIPTING "Enable TypeScript-authored scripting support" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 
@@ -116,6 +117,10 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
+if(PANGEA_ENABLE_SCRIPTING)
+	add_subdirectory("${CMAKE_SOURCE_DIR}/../../shared/script" "${CMAKE_BINARY_DIR}/PangeaScript")
+endif()
+
 # OpenGL is not available under Emscripten (WebGL) or Android (GLES3).
 if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)  # only actually required if we want to force GLRENDER
@@ -150,6 +155,12 @@ else()
 endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
+if(PANGEA_ENABLE_SCRIPTING)
+	target_include_directories(${GAME_TARGET} PRIVATE
+		${GAME_SRCDIR}/Scripting
+		${CMAKE_SOURCE_DIR}/../../shared/script
+	)
+endif()
 
 #------------------------------------------------------------------------------
 # COMPILER/LINKER OPTIONS
@@ -164,6 +175,10 @@ add_compile_definitions(
 
 target_compile_definitions(${GAME_TARGET} PRIVATE
 	GL_SILENCE_DEPRECATION)
+
+if(PANGEA_ENABLE_SCRIPTING)
+	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+endif()
 
 if(NOT MSVC)
 	target_compile_options(${GAME_TARGET} PRIVATE
@@ -257,6 +272,10 @@ if(ANDROID)
 	target_link_libraries(${GAME_TARGET} PRIVATE GLESv3 EGL android log)
 endif()
 
+if(PANGEA_ENABLE_SCRIPTING)
+	target_link_libraries(${GAME_TARGET} PRIVATE PangeaScript)
+endif()
+
 # Add required frameworks for KillMacMouseAcceleration
 if(APPLE)
 	target_link_libraries(${GAME_TARGET} PRIVATE "-framework Foundation" "-framework IOKit")
@@ -299,7 +318,8 @@ if(EMSCRIPTEN)
 		"-sASYNCIFY_IMPORTS=['SDL_Delay','emscripten_sleep']"
 		-sDISABLE_EXCEPTION_CATCHING=0
 		"-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
-		"-sEXPORTED_FUNCTIONS=['_main','_Boot_SetDirectLevel','_Boot_SetCustomMapPath','_Cheat_SetFenceCollision','_Cheat_GetFenceCollision']"
+		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_Boot_SetDirectLevel','_Boot_SetCustomMapPath','_Cheat_SetFenceCollision','_Cheat_GetFenceCollision','_PangeaScript_IsEnabled','_PangeaScript_SetStartupScript','_PangeaScript_Reload','_PangeaScript_GetLastError','_PangeaScript_GetErrorCount']>"
+		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_Boot_SetDirectLevel','_Boot_SetCustomMapPath','_Cheat_SetFenceCollision','_Cheat_GetFenceCollision']>"
 		"--embed-file=${GAME_DATADIR}@/Data"
 		-sWASM=1
 		-sUSE_WEBGL2=1

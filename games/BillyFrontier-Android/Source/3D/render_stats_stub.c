@@ -6,4 +6,12 @@
 int gDrawCallsThisFrame = 0;
 int gVerticesThisFrame = 0;
 int gBufferUploadsThisFrame = 0;
+int gBufferUploadBytesThisFrame = 0;
+int gCacheLookupsThisFrame = 0;
+int gCacheHitsThisFrame = 0;
+int gCacheMissesThisFrame = 0;
+int gCacheEvictionsThisFrame = 0;
+int gCacheInvalidationsThisFrame = 0;
+int gIndexScansThisFrame = 0;
+int gIndicesScannedThisFrame = 0;
 #endif

@@ -12,6 +12,10 @@
 #include "game.h"
 #include "profiling.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -55,6 +59,7 @@ static float	sEmscriptenKillDelay;
 #endif
 
 QD3DSetupOutputType		*gGameViewInfoPtr = nil;
+static unsigned int		gScriptFrameNum = 0;
 
 Byte		gDebugMode = 0;
 Boolean		gIsInGame = false;
@@ -247,6 +252,14 @@ static void CleanupLevel(void)
 	QD3D_DisposeWindowSetup(&gGameViewInfoPtr);
 }
 
+static void NotifyScriptLevelCompleteIfNeeded(void)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (gWonGameFlag)
+		NanosaurScript_OnLevelComplete(gStartLevelNum);
+#endif
+}
+
 
 /**************** PLAY LEVEL ************************/
 
@@ -256,15 +269,25 @@ float killDelay = KILL_DELAY;						// time to wait after I'm dead before fading 
 float	fps;
 FSSpec	spec;
 
-			/* INIT LEVEL */
-			
+				/* INIT LEVEL */
+				
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_LoadLevelConfig(gStartLevelNum);
+#endif
 	InitLevel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnLevelLoad(gStartLevelNum);
+#endif
 
 	gGameOverFlag = false;
 	gIsInGame = true;
+	gScriptFrameNum = 0;
 
 	MakeFadeEvent(true);
 	QD3D_CalcFramesPerSecond();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnLevelStart(gStartLevelNum);
+#endif
 		
 
 		/******************/
@@ -281,8 +304,11 @@ FSSpec	spec;
 
 				/* MOVE OBJECTS */
 				
-		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
-		CalcPlayerKeyControls();
+			StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+#ifdef PANGEA_ENABLE_SCRIPTING
+			NanosaurScript_OnFrame(gStartLevelNum, gScriptFrameNum++, gFramesPerSecondFrac, 0.0f);
+#endif
+			CalcPlayerKeyControls();
 		MoveObjects();
 		QD3D_MoveShards();
 
@@ -364,8 +390,12 @@ FSSpec	spec;
 	}
 
 	gIsInGame = false;
+	NotifyScriptLevelCompleteIfNeeded();
 
-			/* CLEANUP */
+				/* CLEANUP */
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnLevelUnload(gStartLevelNum);
+#endif
 	CleanupLevel();
 
 
@@ -410,6 +440,9 @@ unsigned long	someLong;
 				
 	ToolBoxInit();
 	InitProfiling();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_Init();
+#endif
  	 		 	 		
  	InitInput();
 
@@ -425,10 +458,20 @@ unsigned long	someLong;
 #ifdef __EMSCRIPTEN__
 		// In WebAssembly mode: skip menus, go straight to gameplay.
 		// emscripten_set_main_loop_arg (simulate_infinite_loop=1) will not return.
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_LoadLevelConfig(gStartLevelNum);
+#endif
 	InitLevel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnLevelLoad(gStartLevelNum);
+#endif
 	sEmscriptenKillDelay = KILL_DELAY;
+	gScriptFrameNum = 0;
 	MakeFadeEvent(true);
 	QD3D_CalcFramesPerSecond();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnLevelStart(gStartLevelNum);
+#endif
 	emscripten_set_main_loop_arg(EmscriptenGameFrameSafe, NULL, 0, 1);
 #else
 	if (gSkipToLevel)
@@ -464,6 +507,9 @@ void EmscriptenGameFrameImpl(void* arg)
 
 	UpdateInput();
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnFrame(gStartLevelNum, gScriptFrameNum++, gFramesPerSecondFrac, 0.0f);
+#endif
 	CalcPlayerKeyControls();
 	MoveObjects();
 	QD3D_MoveShards();
@@ -506,15 +552,29 @@ void EmscriptenGameFrameImpl(void* arg)
 
 	if (gGameOverFlag)
 	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NotifyScriptLevelCompleteIfNeeded();
+		NanosaurScript_OnLevelUnload(gStartLevelNum);
+#endif
 		CleanupLevel();
 		sEmscriptenKillDelay = KILL_DELAY;
 		gGameOverFlag = false;
 		gPlayerGotKilledFlag = false;
 		gWonGameFlag = false;
 		gScore = 0;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_LoadLevelConfig(gStartLevelNum);
+#endif
 		InitLevel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_OnLevelLoad(gStartLevelNum);
+#endif
 		MakeFadeEvent(true);
 		QD3D_CalcFramesPerSecond();
+		gScriptFrameNum = 0;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_OnLevelStart(gStartLevelNum);
+#endif
 		return;
 	}
 

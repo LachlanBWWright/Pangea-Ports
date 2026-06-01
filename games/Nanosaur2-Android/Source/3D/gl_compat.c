@@ -260,6 +260,7 @@ typedef struct {
 
 static DrawCacheEntry s_draw_cache[DRAW_CACHE_SIZE];
 static uint64_t       s_cache_lru_tick = 0;
+static int            s_force_cache_miss = -1;
 
 // ── Dirty flags for uniform uploading ────────────────────────────────────────
 // Avoid calling ~30 glUniform* functions per draw when nothing has changed.
@@ -584,6 +585,16 @@ static int dc_find_lru(void)
     return best;
 }
 
+static bool force_cache_misses(void)
+{
+    if (s_force_cache_miss < 0)
+    {
+        const char* value = getenv("PANGEA_FORCE_CACHE_MISS");
+        s_force_cache_miss = value && value[0] && value[0] != '0';
+    }
+    return s_force_cache_miss != 0;
+}
+
 // Invalidate any cache entries that reference `ptr` in any pointer field.
 // Call after writing new data to a CPU-side vertex/normal/texcoord array,
 // and before the next draw call that uses that array.
@@ -599,6 +610,8 @@ void COMPAT_GL_InvalidateCachePtr(const void *ptr)
             s_draw_cache[i].t1_ptr  == ptr ||
             s_draw_cache[i].idx_ptr == ptr)
         {
+            if (s_draw_cache[i].valid)
+                gCacheInvalidationsThisFrame++;
             s_draw_cache[i].valid = 0;
         }
     }
@@ -1168,6 +1181,8 @@ static int max_index(GLenum type, const void *indices, GLsizei count) {
 
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices) {
     if (!s_ca_vertex.ptr || count <= 0) return;
+    gIndexScansThisFrame++;
+    gIndicesScannedThisFrame += count;
     int vertex_count = max_index(type, indices, count) + 1;
     glDrawElements_WithVertexCount(mode, count, type, indices, vertex_count);
 }
@@ -1194,8 +1209,13 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
     if (type == GL_UNSIGNED_INT && vertex_count <= 65535) effective_type = GL_UNSIGNED_SHORT;
 #endif
 
-    int cache_idx = dc_find(s_ca_vertex.ptr, vertex_count, n_ptr, c_ptr, t0_ptr, t1_ptr,
+    gCacheLookupsThisFrame++;
+    int cache_idx = -1;
+    if (!force_cache_misses())
+    {
+        cache_idx = dc_find(s_ca_vertex.ptr, vertex_count, n_ptr, c_ptr, t0_ptr, t1_ptr,
                             indices, count, effective_type);
+    }
     if (cache_idx >= 0) {
         // ── Cache HIT: bind cached VBO/IBO and draw ───────────────────────────
         DrawCacheEntry *e = &s_draw_cache[cache_idx];
@@ -1245,6 +1265,8 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
     // Never call glDeleteBuffers at render time — it stalls the pipeline.
     int slot = dc_find_lru();
     DrawCacheEntry *e = &s_draw_cache[slot];
+    if (e->valid)
+        gCacheEvictionsThisFrame++;
 
     const int STRIDE_BYTES = (3+3+4+2+2) * (int)sizeof(float);
     const void *ibo_src = (effective_type == GL_UNSIGNED_SHORT) ? (const void *)s_index_conv_buf : indices;

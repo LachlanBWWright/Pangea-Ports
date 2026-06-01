@@ -21,6 +21,7 @@
 #endif
 #include <stddef.h>   // offsetof
 #include <stdio.h>    // printf fallback
+#include "../Headers/profiling.h"
 
 // Pull in our own constant/type definitions without the macros
 // (gles3compat.h is NOT included here; this file is the implementation
@@ -221,6 +222,7 @@ typedef struct {
 
 static B2DrawCacheEntry sB2DC[B2_DRAW_CACHE_SIZE];
 static uint64_t sB2DCTick = 0;
+static int sForceCacheMiss = -1;
 
 //=============================================================
 // Matrix stack (software, column-major like OpenGL)
@@ -336,6 +338,16 @@ static int          gClientActiveUnit   = 0;  // texture unit for ClientActiveTe
 // Vertex count hint set by callers via GLES3_SetVertexCount() to avoid O(count)
 // index scan in GLES3_DrawElements.
 static GLsizei      gVertexCountHint    = 0;
+
+static bool ForceCacheMisses(void)
+{
+    if (sForceCacheMiss < 0)
+    {
+        const char* value = getenv("PANGEA_FORCE_CACHE_MISS");
+        sForceCacheMiss = value && value[0] && value[0] != '0';
+    }
+    return sForceCacheMiss != 0;
+}
 
 //=============================================================
 // Immediate mode
@@ -723,6 +735,7 @@ void GLES3_InvalidateCachePtr(const void *ptr)
                 sB2DC[i].texc_ptr  == ptr ||
                 sB2DC[i].idx_ptr   == ptr))
         {
+            gCacheInvalidationsThisFrame++;
             sB2DC[i].valid = 0;
         }
     }
@@ -743,6 +756,8 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         nVerts = (int)gVertexCountHint;
         gVertexCountHint = 0;
     } else {
+        gIndexScansThisFrame++;
+        gIndicesScannedThisFrame += count;
         if (type == GL_UNSIGNED_INT) {
             const GLuint* idx = (const GLuint*)indices;
             for (GLsizei i = 0; i < count; i++)
@@ -770,21 +785,26 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     GLint  colorSize = (attribMask & (1u<<2)) ? gColorArraySize : 0;
 
     // ── Draw-cache lookup ─────────────────────────────────────────────
+    bool forceCacheMiss = ForceCacheMisses();
+    gCacheLookupsThisFrame++;
     int cacheIdx = -1;
-    for (int ci = 0; ci < B2_DRAW_CACHE_SIZE; ci++)
+    if (!forceCacheMiss)
     {
-        B2DrawCacheEntry *e = &sB2DC[ci];
-        if (e->valid &&
-            e->vert_ptr    == vertPtr   && e->norm_ptr   == normPtr  &&
-            e->color_ptr   == colorPtr  && e->texc_ptr   == texcPtr  &&
-            e->idx_ptr     == indices   &&
-            e->nVerts      == nVerts    && e->nIdx       == (int)count &&
-            e->idx_type    == type      &&
-            e->attrib_mask == attribMask &&
-            e->color_type  == colorType && e->color_size == colorSize)
+        for (int ci = 0; ci < B2_DRAW_CACHE_SIZE; ci++)
         {
-            cacheIdx = ci;
-            break;
+            B2DrawCacheEntry *e = &sB2DC[ci];
+            if (e->valid &&
+                e->vert_ptr    == vertPtr   && e->norm_ptr   == normPtr  &&
+                e->color_ptr   == colorPtr  && e->texc_ptr   == texcPtr  &&
+                e->idx_ptr     == indices   &&
+                e->nVerts      == nVerts    && e->nIdx       == (int)count &&
+                e->idx_type    == type      &&
+                e->attrib_mask == attribMask &&
+                e->color_type  == colorType && e->color_size == colorSize)
+            {
+                cacheIdx = ci;
+                break;
+            }
         }
     }
 
@@ -795,6 +815,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         // ── Cache HIT: rebind cached VBO/EBO, skip all uploads ────────
         B2DrawCacheEntry *e = &sB2DC[cacheIdx];
         e->lru_tick = ++sB2DCTick;
+        gCacheHitsThisFrame++;
 
         offVert  = e->offVert;
         offNorm  = e->offNorm;
@@ -806,6 +827,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     }
     else
     {
+        gCacheMissesThisFrame++;
         // ── Cache MISS: evict LRU slot and upload ─────────────────────
         int evict = 0;
         uint64_t oldest = UINT64_MAX;
@@ -819,6 +841,8 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
             }
         }
         B2DrawCacheEntry *e = &sB2DC[evict];
+        if (e->valid)
+            gCacheEvictionsThisFrame++;
 
         if (!e->vbo) glGenBuffers(1, &e->vbo);
         if (!e->ebo) glGenBuffers(1, &e->ebo);
@@ -848,11 +872,14 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
             if (normBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offNorm,  (GLsizeiptr)normBytes,  normPtr);
             if (colorBytes) glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offColor, (GLsizeiptr)colorBytes, colorPtr);
             if (texcBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offTexc,  (GLsizeiptr)texcBytes,  texcPtr);
+            gBytesUploadedThisFrame += (int)totalSize;
         }
 
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
+        gBytesUploadedThisFrame += (int)indexSize;
+        gVerticesUploadedThisFrame += nVerts;
 
         // Store cache entry
         e->vert_ptr    = vertPtr;
@@ -913,6 +940,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     UploadUniforms();
 
     glDrawElements(mode, count, type, 0);
+    gDrawCallsThisFrame++;
 
     // Reset the client active texture unit to 0 after every draw.
     // Multi-texture (sphere-map) objects activate unit 1 at the end of their

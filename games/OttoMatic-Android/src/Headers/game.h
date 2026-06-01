@@ -220,6 +220,14 @@ extern	float					gLoopRenderTimeMs;
 extern	int						gDrawCallsThisFrame;
 extern	int						gVerticesThisFrame;
 extern	int						gBufferUploadsThisFrame;
+extern	int						gBufferUploadBytesThisFrame;
+extern	int						gCacheLookupsThisFrame;
+extern	int						gCacheHitsThisFrame;
+extern	int						gCacheMissesThisFrame;
+extern	int						gCacheEvictionsThisFrame;
+extern	int						gCacheInvalidationsThisFrame;
+extern	int						gIndexScansThisFrame;
+extern	int						gIndicesScannedThisFrame;
 extern	float					gGammaFadeFrac;
 extern	float					gGlobalTransparency;
 extern	float					gGravity;
@@ -286,4 +294,3 @@ extern	uint16_t				gTileAttribFlags;
 #ifdef __cplusplus
 };
 #endif
-

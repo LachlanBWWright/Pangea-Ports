@@ -37,15 +37,25 @@ extern ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 // These are reset by ResetGLCounters() at the START of each frame in OGL_DrawScene.
 // Previous-frame snapshots are kept in gGL*LastFrame variables for display.
 extern int gDrawCallsThisFrame;         // total glDrawElements/glDrawArrays calls
+extern int gCacheLookupsThisFrame;      // indexed draw cache lookups
 extern int gCacheHitsThisFrame;         // draw cache hits (geometry reused from VBO cache)
 extern int gCacheMissesThisFrame;       // draw cache misses (geometry re-uploaded)
+extern int gCacheEvictionsThisFrame;    // valid cache slots reused for a different draw key
+extern int gCacheInvalidationsThisFrame;// valid cache entries invalidated after CPU-side mutation
+extern int gIndexScansThisFrame;        // draw calls that had to scan indices for vertex count
+extern int gIndicesScannedThisFrame;    // number of indices visited by vertex-count scans
 extern int gVerticesUploadedThisFrame;  // total vertex count uploaded to GPU
 extern int gBytesUploadedThisFrame;     // total bytes sent via glBufferData
 
 // Previous-frame snapshots (stable values for display)
 extern int gDrawCallsLastFrame;
+extern int gCacheLookupsLastFrame;
 extern int gCacheHitsLastFrame;
 extern int gCacheMissesLastFrame;
+extern int gCacheEvictionsLastFrame;
+extern int gCacheInvalidationsLastFrame;
+extern int gIndexScansLastFrame;
+extern int gIndicesScannedLastFrame;
 extern int gVerticesUploadedLastFrame;
 extern int gBytesUploadedLastFrame;
 

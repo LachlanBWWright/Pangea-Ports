@@ -73,4 +73,11 @@ void CompatGL_InvalidateCachePtr(const void *ptr);
 
 // Note: glClientActiveTextureARB is already handled in OGL_Functions.c
 
+#else
+
+static inline void CompatGL_InvalidateCachePtr(const void *ptr)
+{
+    (void) ptr;
+}
+
 #endif // __EMSCRIPTEN__ || __ANDROID__

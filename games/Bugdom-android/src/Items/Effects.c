@@ -700,6 +700,9 @@ static const TQ3Vector3D up = {0,1,0};
 		tm->bBox.max.y = maxY;
 		tm->bBox.max.z = maxZ;
 
+		Render_InvalidateMeshCachePtr(tm->points);
+		Render_InvalidateMeshCachePtr(tm->vertexColors);
+
 					/* DRAW IT */
 
 				Render_SubmitMesh(tm, nil, &kParticleGroupRenderingMods, nil, 0);
@@ -820,4 +823,3 @@ TQ3Point3D	pt;
 	pt.z = z;
 	PlayEffect_Parms3D(EFFECT_SPLASH, &pt, kMiddleC, volume);
 }
-

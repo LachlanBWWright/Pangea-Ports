@@ -714,6 +714,8 @@ OGLBoundingBox	bbox;
 
 		geoData->numTriangles = n*2;
 		geoData->numPoints = n*4;
+		CompatGL_InvalidateCachePtr(geoData->points);
+		CompatGL_InvalidateCachePtr(geoData->colorsByte);
 
 		bbox.min.x = minX;									// build bbox for culling test
 		bbox.min.y = minY;
@@ -1805,4 +1807,3 @@ static const Boolean	glow[] =
 		}
 	}
 }
-

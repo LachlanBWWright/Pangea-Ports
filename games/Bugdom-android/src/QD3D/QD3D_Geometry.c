@@ -513,6 +513,8 @@ void QD3D_ScrollUVs(TQ3TriMeshData* mesh, float du, float dv)
 		mesh->vertexUVs[j].u += du;
 		mesh->vertexUVs[j].v += dv;
 	}
+
+	Render_InvalidateMeshCachePtr(mesh->vertexUVs);
 }
 
 

@@ -66,6 +66,16 @@ static GLint gMaxTextureSize = 0;
 
 const char* gRendererName = "NULL";
 Boolean gCanDoHQStretch = true;
+float gFramebufferConvertMs = 0;
+float gFramebufferUpdateTextureMs = 0;
+float gFramebufferRenderTextureMs = 0;
+float gFramebufferPresentMs = 0;
+int gFramebufferUploadBytes = 0;
+
+static float GLRender_ElapsedMs(uint64_t start, uint64_t end)
+{
+	return (float)((double)(end - start) * 1000.0 / (double)SDL_GetPerformanceFrequency());
+}
 
 #if _DEBUG
 #define CHECK_GL_ERROR()												\
@@ -340,7 +350,10 @@ void GLRender_PresentFramebuffer(void)
 	GAME_ASSERT(mappedBuffer);
 
 	// now write data into the buffer, possibly in another thread
+	uint64_t startTicks = SDL_GetPerformanceCounter();
 	ConvertFramebufferMT(mappedBuffer);
+	uint64_t endTicks = SDL_GetPerformanceCounter();
+	gFramebufferConvertMs = GLRender_ElapsedMs(startTicks, endTicks);
 
 	glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
 	CHECK_GL_ERROR();
@@ -368,7 +381,11 @@ void GLRender_PresentFramebuffer(void)
 
 #if !DEFERRED_TEX_UPDATE
 	// Update the texture
+	startTicks = SDL_GetPerformanceCounter();
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, zvw, zvh, kFramePixelFormat, kFramePixelType, NULL);
+	endTicks = SDL_GetPerformanceCounter();
+	gFramebufferUpdateTextureMs = GLRender_ElapsedMs(startTicks, endTicks);
+	gFramebufferUploadBytes = numBytes;
 	CHECK_GL_ERROR();
 #endif
 
@@ -382,19 +399,28 @@ void GLRender_PresentFramebuffer(void)
 	glTexCoord2f(umax, vmax); glVertex3f(vw, vh, 0);
 	glTexCoord2f(umax,    0); glVertex3f(vw,  0, 0);
 	glTexCoord2f(   0,    0); glVertex3f( 0,  0, 0);
+	startTicks = SDL_GetPerformanceCounter();
 	glEnd();
+	endTicks = SDL_GetPerformanceCounter();
+	gFramebufferRenderTextureMs = GLRender_ElapsedMs(startTicks, endTicks);
 	CHECK_GL_ERROR();
 
+	startTicks = SDL_GetPerformanceCounter();
 	SDL_GL_SwapWindow(gSDLWindow);
+	endTicks = SDL_GetPerformanceCounter();
+	gFramebufferPresentMs = GLRender_ElapsedMs(startTicks, endTicks);
 
 #if DEFERRED_TEX_UPDATE
 	//-------------------------------------------------------------------------
 	// Update texture
 
+	startTicks = SDL_GetPerformanceCounter();
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, zvw, zvh, kFramePixelFormat, kFramePixelType, NULL);
+	endTicks = SDL_GetPerformanceCounter();
+	gFramebufferUpdateTextureMs = GLRender_ElapsedMs(startTicks, endTicks);
+	gFramebufferUploadBytes = numBytes;
 	CHECK_GL_ERROR();
 #endif
 }
 
 #endif // GLRENDER
-

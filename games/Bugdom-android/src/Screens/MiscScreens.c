@@ -133,6 +133,7 @@ int curState = kPauseChoice_Resume;
 	gPauseQuad->vertexUVs[1].u = gPauseQuad->vertexUVs[2].u = 200.0f / POTCeil32(200);
 	gPauseQuad->vertexUVs[0].v = gPauseQuad->vertexUVs[1].v = 152.0f / POTCeil32(152);
 #endif
+	Render_InvalidateMeshCacheForMesh(gPauseQuad);
 
 			/*******************/
 			/* LET USER SELECT */

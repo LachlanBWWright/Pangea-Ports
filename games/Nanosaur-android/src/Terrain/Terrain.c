@@ -846,6 +846,10 @@ SuperTileMemoryType	*superTilePtr;
 
 	UpdateSuperTileTexture(superTilePtr);
 
+	COMPAT_GL_InvalidateCachePtr(triMeshPtr->points);
+	COMPAT_GL_InvalidateCachePtr(triMeshPtr->vertexNormals);
+	COMPAT_GL_InvalidateCachePtr(triMeshPtr->triangles);
+
 
 	return(superTileNum);
 }
@@ -915,6 +919,9 @@ TQ3PlaneEquation	planeEq;
 				/* UPDATE TEXTURE */
 
 	UpdateSuperTileTexture(superTilePtr);
+
+	COMPAT_GL_InvalidateCachePtr(triMeshPtr->points);
+	COMPAT_GL_InvalidateCachePtr(triMeshPtr->triangles);
 }
 
 #endif // !(HQ_TERRAIN)
@@ -2347,7 +2354,6 @@ UInt16	tile;
 	}
 	return(0);
 }
-
 
 
 

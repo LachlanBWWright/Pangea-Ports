@@ -1205,6 +1205,9 @@ float	oneOverWaveLength,r,rw,dampenRatio;
 
 	CalculateSupertileVertexNormals(superTile->meshData, startRow, startCol);
 
+	CompatGL_InvalidateCachePtr(superTile->meshData->points);
+	CompatGL_InvalidateCachePtr(superTile->meshData->normals);
+
 
 }
 
@@ -1979,7 +1982,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
 
 
 

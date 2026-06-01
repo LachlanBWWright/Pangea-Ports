@@ -147,6 +147,9 @@ TQ3TriMeshData* TextMesh_SetMesh(const TextMeshDef* def, const char* text, TQ3Tr
 	}
 
 	GAME_ASSERT(p == mesh->numPoints);
+	COMPAT_GL_InvalidateCachePtr(mesh->points);
+	COMPAT_GL_InvalidateCachePtr(mesh->vertexUVs);
+	COMPAT_GL_InvalidateCachePtr(mesh->triangles);
 
 	return mesh;
 }

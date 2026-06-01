@@ -12,6 +12,9 @@
 
 #include "game.h"
 #include "profiling.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -173,6 +176,10 @@ static void PlayGame(void)
 {
 	extern int gStartLevel;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_Init();
+#endif
+
 			/***********************/
 			/* GAME INITIALIZATION */
 			/***********************/
@@ -187,6 +194,9 @@ static void PlayGame(void)
 
 	for (; gLevelNum < NUM_LEVELS; gLevelNum++)		// assume gLevelNum was initially set from menu
 	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_LoadLevelConfig(gLevelNum);
+#endif
 		LoadSoundBank(kLevelSoundBanks[gLevelNum]);
 		PlaySong(kLevelSongs[gLevelNum], true);
 
@@ -203,6 +213,9 @@ static void PlayGame(void)
 	        /* LOAD ALL OF THE ART & STUFF */
 
 		InitArea();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_OnLevelLoad(gLevelNum);
+#endif
 
 
 			/***********/
@@ -210,12 +223,18 @@ static void PlayGame(void)
 	        /***********/
 
 		gInGameNow = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_OnLevelStart(gLevelNum);
+#endif
 		PlayArea();
 
 			/* CLEANUP LEVEL */
 
 		gInGameNow = false;
 		MyFlushEvents();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_OnLevelUnload(gLevelNum);
+#endif
 		CleanupLevel();
 		DisposeSoundBank(kLevelSoundBanks[gLevelNum]);
 
@@ -280,6 +299,10 @@ static void PlayArea(void)
 				if (!gGameOver)
 					OGL_FadeOutScene(DrawObjects, KeepTerrainAlive);
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_Shutdown();
+#endif
 }
 
 
@@ -308,6 +331,9 @@ static void PlayArea_Terrain(void)
 				/* MOVE OBJECTS */
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gGameLevelTimer);
+#endif
 		MoveEverything();
 
 
@@ -984,6 +1010,9 @@ void StartLevelCompletion(float coolDownTimer)
 	{
 		gLevelCompleted = true;
 		gLevelCompletedCoolDownTimer = coolDownTimer;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_OnLevelComplete(gLevelNum);
+#endif
 	}
 }
 

@@ -484,7 +484,7 @@ void PresentIndexedFramebuffer(void)
 			float fps = 1000 * gDebugTextFrameAccumulator / (float)ticksElapsed;
 			SDL_snprintf(
 					gDebugTextBuffer, sizeof(gDebugTextBuffer),
-					"Mike%s %s scl:%c thr:%d fps:%d obj:%ld x:%ld y:%ld",
+					"Mike%s %s scl:%c thr:%d fps:%d obj:%ld x:%ld y:%ld fb:%.1f/%.1f/%.1f/%.1fms %dK",
 					GAME_VERSION,
 					gRendererName,
 					'A' + gEffectiveScalingType,
@@ -492,7 +492,12 @@ void PresentIndexedFramebuffer(void)
 					(int)roundf(fps),
 					NumObjects,
 					gMyX,
-					gMyY
+					gMyY,
+					gFramebufferConvertMs,
+					gFramebufferUpdateTextureMs,
+					gFramebufferRenderTextureMs,
+					gFramebufferPresentMs,
+					gFramebufferUploadBytes / 1024
 			);
 			SDL_SetWindowTitle(gSDLWindow, gDebugTextBuffer);
 		}

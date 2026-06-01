@@ -8,6 +8,9 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -284,6 +287,17 @@ Boolean			flag;
 			continue;
 
 		type = itemPtr[i].type;									// get item #
+#ifdef PANGEA_ENABLE_SCRIPTING
+		{
+			int remappedType = Bugdom2Script_RemapTerrainItemType(gLevelNum, type);
+			if (Bugdom2Script_OnTerrainItem(&itemPtr[i], gLevelNum, type, remappedType, x, z))
+			{
+				itemPtr[i].flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
+			type = remappedType;
+		}
+#endif
 		if (type > MAX_ITEM_NUM)								// error check!
 		{
 			DoFatalAlert("Illegal Map Item Type! %d", type);
@@ -748,6 +762,5 @@ float	intersectX, intersectZ;
 	*whichLine = -1;
 	return(false);
 }
-
 
 

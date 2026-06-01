@@ -11,6 +11,9 @@
 
 #include "game.h"
 #include "profiling.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -122,6 +125,10 @@ uint32_t	oldScore;
 
 	gGameOver = gWonGame = gLostGame = false;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_Init();
+#endif
+
 
 			/***********************/
 			/* GAME INITIALIZATION */
@@ -160,7 +167,12 @@ uint32_t	oldScore;
 				/* DID WE LOSE THE DUEL OR ABORT? */
 					
 			if (gGameOver)
+			{
+#ifdef PANGEA_ENABLE_SCRIPTING
+				BillyScript_Shutdown();
+#endif
 				return;
+			}
 
 				/* DID WE LOSE A LIFE? */
 				
@@ -250,6 +262,10 @@ next:;
 			
 	if (gWonGame || gLostGame)
 		NewScore(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_Shutdown();
+#endif
 }
 
 

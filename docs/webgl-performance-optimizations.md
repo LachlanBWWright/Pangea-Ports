@@ -102,12 +102,12 @@ performance without sacrificing visual quality.
 
 ---
 
-### Billy Frontier & Cro-Mag Rally
+### Billy Frontier, Cro-Mag Rally & Otto Matic
 
 #### 128-entry LRU draw cache (vertex_array_compat.c)
 
-Both games share an identical `vertex_array_compat.c` structure.  A 128-entry LRU
-draw cache has been added to `CompatGL_DrawElements` (the index-based draw path).
+These games share the same `vertex_array_compat.c` cache family.  A 128-entry LRU
+draw cache is used by `CompatGL_DrawElements` (the index-based draw path).
 
 **Cache structure (`DrawCacheEntry`):**
 
@@ -129,9 +129,39 @@ On a **cache miss** data is uploaded once to per-entry VBOs using
 `CompatGL_DrawArrays` (used for immediate-mode geometry, inherently dynamic) is
 not cached.
 
-**Invalidation:** `CompatGL_InvalidateCachePtr(ptr)` is declared in
+**Invalidation:** `CompatGL_InvalidateCachePtr(ptr)` is declared in each game's
 `vertex_array_compat.h` and is available for any source file that modifies a
-fixed-address vertex array in-place before drawing.
+fixed-address vertex array in-place before drawing. Terrain rebuilds, fence
+colour changes, water UV scrolling, text meshes, skeleton deformation, and
+particle buffers invalidate close to the mutation site.
+
+Otto Matic also uses `CompatGL_SetVertexCount` in the BG3D draw path so static
+model draws can avoid scanning the index buffer just to infer the vertex count.
+
+Cro-Mag Rally's native no-op `CompatGL_InvalidateCachePtr` is outside the active
+Emscripten/Android block, so it does not override the active cache invalidation
+implementation.
+
+---
+
+### Nanosaur
+
+#### QD3D draw cache (gl_compat.c)
+
+Original Nanosaur now mirrors the Nanosaur 2 compatibility-layer strategy. Its
+indexed client-array draws are cached by client-array pointers, vertex count,
+index count, and effective index type.
+
+On a cache miss the wrapper builds the existing interleaved CPU buffer, uploads
+it once into a cached VBO/EBO pair, and records the entry for reuse. Draw-array
+and immediate-style paths remain streaming because those paths are dynamic by
+construction.
+
+`glDrawElements_WithVertexCount` is used where the renderer already knows the
+mesh point count, avoiding unnecessary index scans on static model draws.
+
+Invalidation is wired into terrain supertile rebuilds, skeleton deformation,
+text meshes, debug/pillarbox meshes, and other fixed-address mesh mutations.
 
 ---
 
@@ -159,6 +189,63 @@ VBOs.
 
 ---
 
+### Bugdom
+
+#### Renderer-level mesh cache (Renderer.c)
+
+Bugdom has a custom QD3D renderer rather than a generic OpenGL 1.x wrapper, so it
+caches at the `TQ3TriMeshData` level. Each cache entry is keyed by the mesh
+pointer plus the current points, normals, vertex colours, UVs, triangle pointer,
+point count, and triangle count.
+
+Static meshes reuse per-entry VBOs/EBOs. Dynamic pass-specific data still streams:
+reflection UVs and alpha-baked colour buffers are intentionally uploaded on the
+draws that need them.
+
+Invalidation is wired into terrain, fences, water/liquids, skeleton deformation,
+player-ball mesh edits, effects/particles, lens flares, text meshes, debug UI,
+pause quads, pillarbox geometry, and generic UV-scroll helpers.
+
+---
+
+### Mighty Mike
+
+Mighty Mike does not benefit from geometry caching because the main path presents
+a CPU-rendered framebuffer. Its SDL and GL renderers instead expose timing around
+the framebuffer pipeline:
+
+| Metric | Meaning |
+|--------|---------|
+| `convert` | Indexed framebuffer conversion time |
+| `upload` | `SDL_UpdateTexture` or `glTexSubImage2D` time |
+| `render` | Texture draw time |
+| `present` | Swap/present time |
+| `bytes` | Framebuffer upload bytes |
+
+Those values are included in the debug title so texture-upload work can be
+separated from simulation and normal frame pacing.
+
+---
+
+## Cache-disabled validation mode
+
+Set `PANGEA_FORCE_CACHE_MISS=1` to force cache misses every indexed draw while
+keeping the normal upload and draw path active. This mode is implemented in the
+3D cache layers:
+
+| Game | Cache path |
+|------|------------|
+| Nanosaur 2 | `Source/3D/gl_compat.c` |
+| Bugdom 2 | `Source/3D/GLES3Compat.c` |
+| Cro-Mag Rally | `Source/3D/vertex_array_compat.c` |
+| Billy Frontier | `Source/3D/vertex_array_compat.c` |
+| Otto Matic | `src/3D/vertex_array_compat.c` |
+| Nanosaur | `src/QD3D/gl_compat.c` |
+| Bugdom | `src/QD3D/Renderer.c` |
+
+Use this for visual parity checks: a scene should render identically with the
+cache enabled and with forced misses, except for expected performance counters.
+
 ## How to add invalidation for new dynamic geometry
 
 If you add a new system that writes new vertex data into a **persistent
@@ -168,9 +255,12 @@ you must call the game's invalidation function after the write:
 | Game | Function |
 |------|----------|
 | Nanosaur 2 | `COMPAT_GL_InvalidateCachePtr(ptr)` |
+| Nanosaur | `COMPAT_GL_InvalidateCachePtr(ptr)` |
 | Billy Frontier | `CompatGL_InvalidateCachePtr(ptr)` |
 | Cro-Mag Rally | `CompatGL_InvalidateCachePtr(ptr)` |
+| Otto Matic | `CompatGL_InvalidateCachePtr(ptr)` |
 | Bugdom 2 | `GLES3_InvalidateCachePtr(ptr)` |
+| Bugdom | `Render_InvalidateMeshCachePtr(ptr)` or `Render_InvalidateMeshCacheForMesh(mesh)` |
 
 Pass the pointer that was registered with `glVertexPointer`, `glNormalPointer`,
 `glColorPointer`, or `glTexCoordPointer`.

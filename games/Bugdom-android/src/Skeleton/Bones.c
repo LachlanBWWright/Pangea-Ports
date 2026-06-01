@@ -229,6 +229,8 @@ void UpdateSkinnedGeometry(ObjNode *theNode)
 	for (int i = 0; i < theNode->NumMeshes; i++)
 	{
 		theNode->MeshList[i]->bBox = gBBox;				// apply to local copy of trimesh
+		Render_InvalidateMeshCachePtr(theNode->MeshList[i]->points);
+		Render_InvalidateMeshCachePtr(theNode->MeshList[i]->vertexNormals);
 	}
 }
 
@@ -467,7 +469,6 @@ long	i,b,j;
 		}
 	}
 }
-
 
 
 

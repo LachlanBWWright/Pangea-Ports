@@ -7,6 +7,7 @@
 /****************************/
 
 #include "game.h"
+#include "vertex_array_compat.h"
 #include <ctype.h>
 
 /****************************/

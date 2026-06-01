@@ -814,6 +814,8 @@ void QD3D_DrawPillarbox(void)
 		gPillarboxMesh->points[7] = (TQ3Point3D){ 0, wh, 0 };
 	}
 
+	COMPAT_GL_InvalidateCachePtr(gPillarboxMesh->points);
+
 
 	Render_SetViewport(0, 0, gWindowWidth, gWindowHeight);
 	Render_Enter2D_NativeResolution();

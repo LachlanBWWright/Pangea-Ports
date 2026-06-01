@@ -1024,6 +1024,11 @@ static TQ3Vector3D	faceNormal[NUM_TRIS_IN_SUPERTILE];
 		// Calc radius of supertile bounding sphere
 		superTilePtr->radius[layer] = 0.5f * Q3Point3D_Distance(&triMeshData->bBox.min, &triMeshData->bBox.max);
 
+		Render_InvalidateMeshCachePtr(triMeshData->points);
+		Render_InvalidateMeshCachePtr(triMeshData->vertexNormals);
+		Render_InvalidateMeshCachePtr(triMeshData->vertexColors);
+		Render_InvalidateMeshCachePtr(triMeshData->triangles);
+
 	}	// j (layer)
 									
 	return(superTileNum);
@@ -2229,4 +2234,3 @@ float	y0,y1,y2,y3;
 
 
 }
-

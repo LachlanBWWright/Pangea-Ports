@@ -26,6 +26,9 @@ extern void PangeaNet_ClientApplySnapshot(void);
 #endif
 #include "profiling.h"
 #include "uieffects.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -268,6 +271,10 @@ static void PlayGame_Adventure(void)
 {
 			/* GAME INITIALIZATION */
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_Init();
+#endif
+
 	InitPlayerInfo_Game();					// init player info for entire game
 
 
@@ -296,7 +303,15 @@ static void PlayGame_Adventure(void)
 
 	        /* LOAD ALL OF THE ART & STUFF */
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_LoadLevelConfig(gLevelNum);
+#endif
+
 		InitLevel();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_OnLevelLoad(gLevelNum);
+#endif
 
 
 			/***********/
@@ -304,6 +319,12 @@ static void PlayGame_Adventure(void)
 	        /***********/
 
 		PlayLevel();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (gLevelCompleted)
+			Nanosaur2Script_OnLevelComplete(gLevelNum);
+		Nanosaur2Script_OnLevelUnload(gLevelNum);
+#endif
 
 		gPlayingFromSavedGame = false;		// once we've completed a level after restoring, we're not really playing from a saved game anymore
 
@@ -333,6 +354,10 @@ static void PlayGame_Adventure(void)
 
 
 	gPlayingFromSavedGame = false;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_Shutdown();
+#endif
 }
 
 
@@ -690,8 +715,11 @@ static bool PlayLevelTick(void)
 
 			/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
-	StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
-	MoveEverything();
+		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gGameLevelTimer);
+#endif
+		MoveEverything();
 	PangeaNet_DebugLogEarlyFramePhase("after-move-everything");
 
 #if __EMSCRIPTEN__
@@ -831,6 +859,10 @@ static void PlayLevel(void)
 
 	MakeFadeEvent(kFadeFlags_In, 1.0);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnLevelStart(gLevelNum);
+#endif
+
 	GrabMouse(true);
 
 	// With ASYNCIFY, OGL_DrawScene -> SDL_GL_SwapWindow -> emscripten_sleep(0)
@@ -858,9 +890,13 @@ float	fps;
 	CalcFramesPerSecond();
 	CalcFramesPerSecond();
 
-	MakeFadeEvent(kFadeFlags_In, 1.0);
+		MakeFadeEvent(kFadeFlags_In, 1.0);
 
-	if (gTimeDemo)
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnLevelStart(gLevelNum);
+#endif
+
+		if (gTimeDemo)
 	{
 		gTimeDemoStartTime = TickCount();
 	}
@@ -923,9 +959,12 @@ float	fps;
 		}
 #endif
 
-				/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
+			/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gGameLevelTimer);
+#endif
 		MoveEverything();
 
 #if __EMSCRIPTEN__

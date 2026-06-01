@@ -25,6 +25,28 @@ typedef struct {
 // Global array of profiling phases
 extern ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 
+extern int gDrawCallsThisFrame;
+extern int gCacheLookupsThisFrame;
+extern int gCacheHitsThisFrame;
+extern int gCacheMissesThisFrame;
+extern int gCacheEvictionsThisFrame;
+extern int gCacheInvalidationsThisFrame;
+extern int gIndexScansThisFrame;
+extern int gIndicesScannedThisFrame;
+extern int gVerticesUploadedThisFrame;
+extern int gBytesUploadedThisFrame;
+
+extern int gDrawCallsLastFrame;
+extern int gCacheLookupsLastFrame;
+extern int gCacheHitsLastFrame;
+extern int gCacheMissesLastFrame;
+extern int gCacheEvictionsLastFrame;
+extern int gCacheInvalidationsLastFrame;
+extern int gIndexScansLastFrame;
+extern int gIndicesScannedLastFrame;
+extern int gVerticesUploadedLastFrame;
+extern int gBytesUploadedLastFrame;
+
 // Initialize all profiling phases
 void InitProfiling(void);
 

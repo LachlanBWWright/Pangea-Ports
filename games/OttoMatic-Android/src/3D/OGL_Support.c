@@ -717,7 +717,9 @@ do_anaglyph:
 			"tris:\t\t%d\n"
 			"draws:\t\t%d\n"
 			"verts:\t\t%d\n"
-			"uploads:\t%d\n"
+			"uploads:\t%d, %dK\n"
+			"cache:\t\t%d/%d/%d e%d i%d\n"
+			"idx scan:\t%d/%d\n"
 			"\n"
 			"input x:\t%.3f\n"
 			"input y:\t%.3f\n"
@@ -775,6 +777,14 @@ do_anaglyph:
 			gDrawCallsThisFrame,
 			gVerticesThisFrame,
 			gBufferUploadsThisFrame,
+			gBufferUploadBytesThisFrame / 1024,
+			gCacheHitsThisFrame,
+			gCacheMissesThisFrame,
+			gCacheLookupsThisFrame,
+			gCacheEvictionsThisFrame,
+			gCacheInvalidationsThisFrame,
+			gIndexScansThisFrame,
+			gIndicesScannedThisFrame,
 			gPlayerInfo.analogControlX,
 			gPlayerInfo.analogControlZ,
 			(180/PI) * ( atan2f(gPlayerInfo.analogControlZ,gPlayerInfo.analogControlX) ),

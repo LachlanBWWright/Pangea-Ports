@@ -11,6 +11,9 @@
 
 #include "game.h"
 #include "profiling.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -81,6 +84,14 @@ float				gLoopRenderTimeMs = 0;
 int					gDrawCallsThisFrame = 0;
 int					gVerticesThisFrame = 0;
 int					gBufferUploadsThisFrame = 0;
+int					gBufferUploadBytesThisFrame = 0;
+int					gCacheLookupsThisFrame = 0;
+int					gCacheHitsThisFrame = 0;
+int					gCacheMissesThisFrame = 0;
+int					gCacheEvictionsThisFrame = 0;
+int					gCacheInvalidationsThisFrame = 0;
+int					gIndexScansThisFrame = 0;
+int					gIndicesScannedThisFrame = 0;
 
 Boolean				gPlayingFromSavedGame = false;
 Boolean				gGameOver = false;
@@ -177,6 +188,10 @@ static void PlayGame(void)
 
 	gDoDeathExit = false;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_Init();
+#endif
+
 	InitPlayerInfo_Game();					// init player info for entire game
 	InitHelpMessages();						// init all help messages
 
@@ -201,7 +216,15 @@ static void PlayGame(void)
 
 	        /* LOAD ALL OF THE ART & STUFF */
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_LoadLevelConfig(gLevelNum);
+#endif
+
 		InitArea();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_OnLevelLoad(gLevelNum);
+#endif
 
 
 			/***********/
@@ -209,6 +232,12 @@ static void PlayGame(void)
 	        /***********/
 
 		PlayArea();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (gLevelCompleted)
+			OttoScript_OnLevelComplete(gLevelNum);
+		OttoScript_OnLevelUnload(gLevelNum);
+#endif
 
 			/* CLEANUP LEVEL */
 
@@ -243,9 +272,13 @@ static void PlayGame(void)
 	}
 
 
-			/* DO HIGH SCORES */
+		/* DO HIGH SCORES */
 
 	NewScore();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_Shutdown();
+#endif
 }
 
 
@@ -271,6 +304,10 @@ static void PlayArea(void)
 
 	MakeFadeEvent(true, 1.0);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnLevelStart(gLevelNum);
+#endif
+
 		/******************/
 		/* MAIN GAME LOOP */
 		/******************/
@@ -287,9 +324,21 @@ static void PlayArea(void)
 		gDrawCallsThisFrame = 0;		// reset per-frame profiling counters
 		gVerticesThisFrame = 0;
 		gBufferUploadsThisFrame = 0;
+		gBufferUploadBytesThisFrame = 0;
+		gCacheLookupsThisFrame = 0;
+		gCacheHitsThisFrame = 0;
+		gCacheMissesThisFrame = 0;
+		gCacheEvictionsThisFrame = 0;
+		gCacheInvalidationsThisFrame = 0;
+		gIndexScansThisFrame = 0;
+		gIndicesScannedThisFrame = 0;
 
 		StartProfilePhase(PROFILE_PHASE_INPUT);
 		UpdateInput();									// read local keys
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, 0.0f);
+#endif
 
 				/* MOVE OBJECTS */
 
@@ -316,7 +365,6 @@ static void PlayArea(void)
 
 		{
 			OGL_DrawScene(DrawObjects);
-			uint64_t t1 = SDL_GetPerformanceCounter();
 			// gLoopRenderTimeMs will be set inside OGL_DrawScene for better accuracy if needed, 
 			// but we can also just use the contiguous profiling.
 		}
@@ -330,11 +378,13 @@ static void PlayArea(void)
 		{
 			emscripten_log(EM_LOG_CONSOLE,
 				"[perf] fps=%d  frame=%.1fms  update=%.1fms  terrain=%.1fms  render=%.1fms  "
-				"draws=%d  verts=%d  uploads=%d  tris=%d",
+				"draws=%d  verts=%d  uploads=%d/%dK  cache=%d/%d/%d  tris=%d",
 				(int)(gFramesPerSecond + .5f),
 				(gFramesPerSecond > 0.0f ? 1000.0f / gFramesPerSecond : 0.0f),
 				gLoopUpdateTimeMs, gLoopTerrainTimeMs, gLoopRenderTimeMs,
 				gDrawCallsThisFrame, gVerticesThisFrame, gBufferUploadsThisFrame,
+				gBufferUploadBytesThisFrame / 1024,
+				gCacheHitsThisFrame, gCacheMissesThisFrame, gCacheLookupsThisFrame,
 				gPolysThisFrame);
 		}
 #endif
@@ -1115,6 +1165,3 @@ void GameMain(void)
 	}
 
 }
-
-
-

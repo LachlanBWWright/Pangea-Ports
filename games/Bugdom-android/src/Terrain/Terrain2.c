@@ -9,6 +9,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -259,25 +263,33 @@ long			realX,realZ;
 
 	while ((itemPtr->x >= minX) && (itemPtr->x <= maxX)) 		// check all items in this column range
 	{
-		if ((itemPtr->y >= minY) && (itemPtr->y <= maxY))		// & this row range
-		{
-					/* ADD AN ITEM */
-
-			if (itemPtr->flags&ITEM_FLAGS_INUSE)				// see if item available
-				goto skip;
-				
-			type = itemPtr->type;								// get item #
-			if (type > MAX_ITEM_NUM)							// error check!
+			if ((itemPtr->y >= minY) && (itemPtr->y <= maxY))		// & this row range
 			{
-				DoAlert("Illegal Map Item Type! (%d)", type);
-			}
+						/* ADD AN ITEM */
 
-			realX = itemPtr->x * MAP2UNIT_VALUE;				// calc & pass 3-space coords
-			realZ = itemPtr->y * MAP2UNIT_VALUE;
-	
-			flag = gTerrainItemAddRoutines[type](itemPtr,realX, realZ); // call item's ADD routine
-			if (flag)
-				itemPtr->flags |= ITEM_FLAGS_INUSE;				// set in-use flag
+				if (itemPtr->flags&ITEM_FLAGS_INUSE)				// see if item available
+					goto skip;
+					
+				type = itemPtr->type;								// get item #
+				realX = itemPtr->x * MAP2UNIT_VALUE;				// calc & pass 3-space coords
+				realZ = itemPtr->y * MAP2UNIT_VALUE;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				long remappedType = BugdomScript_RemapTerrainItemType(gRealLevel, (int)type);
+				if (BugdomScript_OnTerrainItem(itemPtr, gRealLevel, (int)type, (int)remappedType, (float)realX, (float)realZ))
+				{
+					itemPtr->flags |= ITEM_FLAGS_INUSE;
+					goto skip;
+				}
+				type = remappedType;
+#endif
+				if (type > MAX_ITEM_NUM)							// error check!
+				{
+					DoAlert("Illegal Map Item Type! (%d)", type);
+				}
+
+				flag = gTerrainItemAddRoutines[type](itemPtr,realX, realZ); // call item's ADD routine
+				if (flag)
+					itemPtr->flags |= ITEM_FLAGS_INUSE;				// set in-use flag
 				
 			n++;												// inc counter
 		}
@@ -674,8 +686,6 @@ Byte				**shadowFlags;
 	Free2DArray((void**) shadowFlags);
 	shadowFlags = nil;
 }
-
-
 
 
 

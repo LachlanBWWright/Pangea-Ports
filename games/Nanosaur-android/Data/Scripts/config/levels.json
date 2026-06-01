@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "levels": {
+    "0": {
+      "script": "Data/Scripts/dist/main.js",
+      "extraNativeItems": [
+        "nanosaur.powerup",
+        "nanosaur.egg",
+        "nanosaur.crystal"
+      ],
+      "itemOverrides": []
+    }
+  }
+}

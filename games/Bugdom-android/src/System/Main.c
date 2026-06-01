@@ -12,6 +12,10 @@
 #include "game.h"
 #include "profiling.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -82,6 +86,7 @@ Boolean		gGameOverFlag,gAreaCompleted;
 Boolean		gPlayerGotKilledFlag,gWonGameFlag,gRestoringSavedGame = false;
 
 QD3DSetupOutputType		*gGameViewInfoPtr = nil;
+static unsigned int		gScriptFrameNum = 0;
 
 PrefsType	gGamePrefs;
 
@@ -259,6 +264,9 @@ void InitPrefs(void)
 
 static void PlayGame(void)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_Init();
+#endif
 
 			/***********************/
 			/* GAME INITIALIZATION */
@@ -294,6 +302,9 @@ static void PlayGame(void)
 
 		gLevelType = gLevelTable[gRealLevel].levelType;
 		gAreaNum = gLevelTable[gRealLevel].areaNum;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_LoadLevelConfig(gRealLevel);
+#endif
 		
 
 		/* PLAY THIS AREA */
@@ -303,15 +314,23 @@ static void PlayGame(void)
 		else
 			StartLevelMusicForCurrentArea();
 		InitArea();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_OnLevelLoad(gRealLevel);
+#endif
 
 		gRestoringSavedGame = false;				// we dont need this anymore
 		
 		PlayArea();
 
 
-			/* CLEANUP LEVEL */
+		/* CLEANUP LEVEL */
 
 		GammaFadeOut(true);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (gAreaCompleted)
+			BugdomScript_OnLevelComplete(gRealLevel);
+		BugdomScript_OnLevelUnload(gRealLevel);
+#endif
 		CleanupLevel();
 		GameScreenToBlack();		
 		
@@ -337,6 +356,9 @@ game_over:
 		DoLoseScreen();
 
 	ShowHighScoresScreen(gScore);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_Shutdown();
+#endif
 }
 
 static void StartLevelMusicForCurrentArea(void)
@@ -379,6 +401,7 @@ float killDelay = KILL_DELAY;						// time to wait after I'm dead before fading 
 float fps;
 
 	gIsInGame = true;
+	gScriptFrameNum = 0;
 	CaptureMouse(true);
 	
 	UpdateInput();
@@ -390,6 +413,9 @@ float fps;
 	gGammaFadeFactor = 0.0f;
 	QD3D_DrawScene(gGameViewInfoPtr,DrawTerrain);
 	MakeFadeEvent(true);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_OnLevelStart(gRealLevel);
+#endif
 
 	ResetInputState();
 
@@ -404,6 +430,9 @@ float fps;
 		UpdateInput();
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_OnFrame(gRealLevel, gScriptFrameNum++, gFramesPerSecondFrac, 0.0f);
+#endif
 				/* SPECIFIC MAINTENANCE */
 
 		CheckPlayerMorph();				
@@ -914,4 +943,3 @@ unsigned long	someLong;
 	
 	return(0);
 }
-

@@ -236,4 +236,9 @@ extern	Handle					gOffScreenHandle;
 extern	Handle					gPFBufferHandle;
 extern	uint8_t					*gRowDitherStrides;			// for dithering filter
 extern	const char				*gRendererName;
+extern	float					gFramebufferConvertMs;
+extern	float					gFramebufferUpdateTextureMs;
+extern	float					gFramebufferRenderTextureMs;
+extern	float					gFramebufferPresentMs;
+extern	int						gFramebufferUploadBytes;
 extern	Boolean					gCanDoHQStretch;

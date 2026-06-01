@@ -27,6 +27,9 @@
 #include "enemy5.h"
 #include "racecar.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -882,14 +885,29 @@ Boolean		flag;
 
 			if (!(itemPtr->type&ITEM_IN_USE))						// see if item available
 			{
-				type = itemPtr->type&ITEM_NUM;						// mask out status bits 15..12
-				if (type > MAX_ITEM_NUM)							// error check!
-					DoFatalAlert("Illegal Map Item Type!");
-				else
-				{
-					flag = gItemAddPtrs[type](itemPtr);				// call item's ADD routine
-					if (flag)
-						itemPtr->type |= ITEM_IN_USE;				// set in-use flag
+					type = itemPtr->type&ITEM_NUM;						// mask out status bits 15..12
+#ifdef PANGEA_ENABLE_SCRIPTING
+					long originalType = type;
+					type = MikeScript_RemapMapItemType(gSceneNum, gAreaNum, (int)type);
+#endif
+					if (type > MAX_ITEM_NUM)							// error check!
+						DoFatalAlert("Illegal Map Item Type!");
+					else
+					{
+#ifdef PANGEA_ENABLE_SCRIPTING
+						if (MikeScript_OnMapItem(itemPtr, gSceneNum, gAreaNum, (int)originalType))
+						{
+							itemPtr->type |= ITEM_IN_USE;
+							itemPtr++;
+							if ((Ptr) itemPtr > gMaxItemAddress)
+								break;
+							continue;
+						}
+						itemPtr->type = (itemPtr->type & (ITEM_IN_USE | ITEM_MEMORY)) | (type & ITEM_NUM);
+#endif
+						flag = gItemAddPtrs[type](itemPtr);				// call item's ADD routine
+						if (flag)
+							itemPtr->type |= ITEM_IN_USE;				// set in-use flag
 				}
 			}
 		}
@@ -1652,4 +1670,3 @@ unsigned long 	origRow,origCol;
 		}
 	}
 }
-

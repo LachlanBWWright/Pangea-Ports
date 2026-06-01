@@ -469,6 +469,9 @@ void TextMesh_Update(const char* text, int align, ObjNode* textNode)
 	}
 
 	GAME_ASSERT(p == mesh->numPoints);
+	CompatGL_InvalidateCachePtr(mesh->points);
+	CompatGL_InvalidateCachePtr(mesh->uvs[0]);
+	CompatGL_InvalidateCachePtr(mesh->triangles);
 }
 
 /***************************************************************/

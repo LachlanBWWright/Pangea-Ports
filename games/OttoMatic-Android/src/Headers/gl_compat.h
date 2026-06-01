@@ -6,10 +6,10 @@
 #pragma once
 
 #include <SDL3/SDL_opengl.h>
+#include "vertex_array_compat.h"
 
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #include "modern_gl.h"
-#include "vertex_array_compat.h"
 #include "state_compat.h"
 
 // Immediate mode emulation

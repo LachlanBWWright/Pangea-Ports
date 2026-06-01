@@ -21,6 +21,7 @@ project(${GAME_TARGET}
 
 option(BUILD_SDL_FROM_SOURCE "Build SDL from source" OFF)
 option(SDL_STATIC "Static link SDL" OFF)
+option(PANGEA_ENABLE_SCRIPTING "Enable TypeScript-authored scripting support" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 
@@ -105,6 +106,10 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
+if(PANGEA_ENABLE_SCRIPTING)
+	add_subdirectory("${CMAKE_SOURCE_DIR}/../../shared/script" "${CMAKE_BINARY_DIR}/PangeaScript")
+endif()
+
 if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)
 endif()
@@ -138,6 +143,12 @@ else()
 endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
+if(PANGEA_ENABLE_SCRIPTING)
+	target_include_directories(${GAME_TARGET} PRIVATE
+		${GAME_SRCDIR}/Scripting
+		${CMAKE_SOURCE_DIR}/../../shared/script
+	)
+endif()
 
 #------------------------------------------------------------------------------
 # COMPILER/LINKER OPTIONS
@@ -149,6 +160,10 @@ add_compile_definitions(
 
 target_compile_definitions(${GAME_TARGET} PRIVATE
 	GL_SILENCE_DEPRECATION)
+
+if(PANGEA_ENABLE_SCRIPTING)
+	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+endif()
 
 if(NOT MSVC)
 	target_compile_options(${GAME_TARGET} PRIVATE
@@ -239,6 +254,10 @@ endif()
 # Android-specific libraries
 if(ANDROID)
 	target_link_libraries(${GAME_TARGET} PRIVATE GLESv3 EGL android log)
+endif()
+
+if(PANGEA_ENABLE_SCRIPTING)
+	target_link_libraries(${GAME_TARGET} PRIVATE PangeaScript)
 endif()
 
 # Add required frameworks for KillMacMouseAcceleration
@@ -376,7 +395,8 @@ if(EMSCRIPTEN)
 		"-s DISABLE_EXCEPTION_CATCHING=0"
 		# Export the C functions callable from JavaScript
 		"-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
-		"-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath','_PangeaGame_SetNetworkMatchConfig','_PangeaGame_StartNetworkMatch','_PangeaNet_IsEnabled','_PangeaNet_IsHost','_PangeaNet_GetLocalPlayerIndex','_PangeaNet_GetPlayerCount','_PangeaNet_SendReliable','_PangeaNet_SendUnreliable','_PangeaNet_PollMessage','_PangeaNet_NowMilliseconds','_PangeaNet_ReportDesync','_PangeaNet_ReportMatchEnded','_PangeaGame_DebugGetFrameNumber','_PangeaGame_DebugGetLocalPlayerIndex','_PangeaGame_DebugGetPlayerCount','_PangeaGame_DebugIsNetworkMatchRunning','_PangeaGame_DebugHasDesync','_PangeaGame_DebugGetLastSyncHash','_PangeaGame_DebugGetLastMatchEndReason','_PangeaGame_DebugHasMatchResult','_PangeaGame_DebugGetPlayerPosition','_PangeaGame_DebugSetInputScript']"
+		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath','_PangeaGame_SetNetworkMatchConfig','_PangeaGame_StartNetworkMatch','_PangeaNet_IsEnabled','_PangeaNet_IsHost','_PangeaNet_GetLocalPlayerIndex','_PangeaNet_GetPlayerCount','_PangeaNet_SendReliable','_PangeaNet_SendUnreliable','_PangeaNet_PollMessage','_PangeaNet_NowMilliseconds','_PangeaNet_ReportDesync','_PangeaNet_ReportMatchEnded','_PangeaGame_DebugGetFrameNumber','_PangeaGame_DebugGetLocalPlayerIndex','_PangeaGame_DebugGetPlayerCount','_PangeaGame_DebugIsNetworkMatchRunning','_PangeaGame_DebugHasDesync','_PangeaGame_DebugGetLastSyncHash','_PangeaGame_DebugGetLastMatchEndReason','_PangeaGame_DebugHasMatchResult','_PangeaGame_DebugGetPlayerPosition','_PangeaGame_DebugSetInputScript','_PangeaScript_IsEnabled','_PangeaScript_SetStartupScript','_PangeaScript_Reload','_PangeaScript_GetLastError','_PangeaScript_GetErrorCount']>"
+		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath','_PangeaGame_SetNetworkMatchConfig','_PangeaGame_StartNetworkMatch','_PangeaNet_IsEnabled','_PangeaNet_IsHost','_PangeaNet_GetLocalPlayerIndex','_PangeaNet_GetPlayerCount','_PangeaNet_SendReliable','_PangeaNet_SendUnreliable','_PangeaNet_PollMessage','_PangeaNet_NowMilliseconds','_PangeaNet_ReportDesync','_PangeaNet_ReportMatchEnded','_PangeaGame_DebugGetFrameNumber','_PangeaGame_DebugGetLocalPlayerIndex','_PangeaGame_DebugGetPlayerCount','_PangeaGame_DebugIsNetworkMatchRunning','_PangeaGame_DebugHasDesync','_PangeaGame_DebugGetLastSyncHash','_PangeaGame_DebugGetLastMatchEndReason','_PangeaGame_DebugHasMatchResult','_PangeaGame_DebugGetPlayerPosition','_PangeaGame_DebugSetInputScript']>"
 		# Embed the game data (Data/ directory) into the wasm bundle
 		"--preload-file ${GAME_DATADIR}@/Data"
 		# Use requestAnimationFrame for the main loop (vsync, battery-efficient)

@@ -8,6 +8,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -221,18 +225,31 @@ long			realX,realZ;
 
 			if (!(itemPtr->flags&ITEM_FLAGS_INUSE))				// see if item available
 			{
-				type = itemPtr->type;							// get item #
-				if (type > MAX_ITEM_NUM)						// error check!
-				{
-					DoAlert("Illegal Map Item Type!");
+					type = itemPtr->type;							// get item #
+#ifdef PANGEA_ENABLE_SCRIPTING
+					realX = itemPtr->x * MAP2UNIT_VALUE;
+					realZ = itemPtr->y * MAP2UNIT_VALUE;
+					long remappedType = NanosaurScript_RemapTerrainItemType(gStartLevelNum, (int)type);
+					if (NanosaurScript_OnTerrainItem(itemPtr, gStartLevelNum, (int)type, (int)remappedType, (float)realX, (float)realZ))
+					{
+						itemPtr->flags |= ITEM_FLAGS_INUSE;
+						continue;
+					}
+					type = remappedType;
+#endif
+					if (type > MAX_ITEM_NUM)						// error check!
+					{
+						DoAlert("Illegal Map Item Type!");
 					ShowSystemErr(type);
 				}
-				else
-				{
-					realX = itemPtr->x * MAP2UNIT_VALUE;		// calc & pass 3-space coords
-					realZ = itemPtr->y * MAP2UNIT_VALUE;
-			
-					flag = gTerrainItemAddRoutines[type](itemPtr,realX, realZ); 	// call item's ADD routine
+					else
+					{
+#ifndef PANGEA_ENABLE_SCRIPTING
+						realX = itemPtr->x * MAP2UNIT_VALUE;		// calc & pass 3-space coords
+						realZ = itemPtr->y * MAP2UNIT_VALUE;
+#endif
+				
+						flag = gTerrainItemAddRoutines[type](itemPtr,realX, realZ); 	// call item's ADD routine
 					if (flag)
 						itemPtr->flags |= ITEM_FLAGS_INUSE;		// set in-use flag
 				}

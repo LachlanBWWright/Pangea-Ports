@@ -7,15 +7,25 @@ static ProfilePhaseType gCurrentPhase = -1;
 
 // Per-frame GL counters
 int gDrawCallsThisFrame         = 0;
+int gCacheLookupsThisFrame      = 0;
 int gCacheHitsThisFrame         = 0;
 int gCacheMissesThisFrame       = 0;
+int gCacheEvictionsThisFrame    = 0;
+int gCacheInvalidationsThisFrame= 0;
+int gIndexScansThisFrame        = 0;
+int gIndicesScannedThisFrame    = 0;
 int gVerticesUploadedThisFrame  = 0;
 int gBytesUploadedThisFrame     = 0;
 
 // Previous-frame snapshots (stable for display)
 int gDrawCallsLastFrame         = 0;
+int gCacheLookupsLastFrame      = 0;
 int gCacheHitsLastFrame         = 0;
 int gCacheMissesLastFrame       = 0;
+int gCacheEvictionsLastFrame    = 0;
+int gCacheInvalidationsLastFrame= 0;
+int gIndexScansLastFrame        = 0;
+int gIndicesScannedLastFrame    = 0;
 int gVerticesUploadedLastFrame  = 0;
 int gBytesUploadedLastFrame     = 0;
 
@@ -97,14 +107,24 @@ void ResetProfilingForFrame(void) {
 // previous frame's GL counters into gGL*LastFrame and zero the current counters.
 void ResetGLCounters(void) {
     gDrawCallsLastFrame        = gDrawCallsThisFrame;
+    gCacheLookupsLastFrame     = gCacheLookupsThisFrame;
     gCacheHitsLastFrame        = gCacheHitsThisFrame;
     gCacheMissesLastFrame      = gCacheMissesThisFrame;
+    gCacheEvictionsLastFrame   = gCacheEvictionsThisFrame;
+    gCacheInvalidationsLastFrame = gCacheInvalidationsThisFrame;
+    gIndexScansLastFrame       = gIndexScansThisFrame;
+    gIndicesScannedLastFrame   = gIndicesScannedThisFrame;
     gVerticesUploadedLastFrame = gVerticesUploadedThisFrame;
     gBytesUploadedLastFrame    = gBytesUploadedThisFrame;
 
     gDrawCallsThisFrame        = 0;
+    gCacheLookupsThisFrame     = 0;
     gCacheHitsThisFrame        = 0;
     gCacheMissesThisFrame      = 0;
+    gCacheEvictionsThisFrame   = 0;
+    gCacheInvalidationsThisFrame = 0;
+    gIndexScansThisFrame       = 0;
+    gIndicesScannedThisFrame   = 0;
     gVerticesUploadedThisFrame = 0;
     gBytesUploadedThisFrame    = 0;
 }

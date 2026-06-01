@@ -136,6 +136,7 @@ float	rotY;
 			data->points[p].z += zoff;
 		}		
 		Q3BoundingBox_SetFromPoints3D(&data->bBox, data->points, data->numPoints, sizeof(TQ3Point3D));	// recalc bbox
+		Render_InvalidateMeshCachePtr(data->points);
 	}
 
 				/* PUT TRIMESHES INTO STATIC DISPLAY GROUP */
@@ -490,7 +491,6 @@ new_pgroup:
 			goto new_pgroup;
 	}
 }
-
 
 
 

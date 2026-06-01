@@ -30,6 +30,9 @@
 #include "version.h"
 #include "externs.h"
 #include "framebufferfilter.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include <SDL3/SDL.h>
 
 /****************************/
@@ -364,9 +367,17 @@ void PlayArea(void)
 
 	gTimeSinceSim = GAME_SPEED_SDL;						// force simulation to run once when we enter this function
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_OnAreaStart(gSceneNum, gAreaNum);
+#endif
+
 	do
 	{
-					/* UPDATE SIMULATION & RENDER FRAME(S) */
+				/* UPDATE SIMULATION & RENDER FRAME(S) */
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_OnAreaFrame(gSceneNum, gAreaNum, (unsigned int)gFrames, 1.0f / 32.0f);
+#endif
 
 		if (gGamePrefs.uncappedFramerate)
 			UpdateSimAndRenderTweenedFrames();
@@ -409,6 +420,10 @@ void PlayArea(void)
 	} while (!gGlobFlag_MeDoneDead && !gAbortGameFlag && !gFinishedArea && !gAbortDemoFlag);
 
 	gIsInGame = false;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_OnAreaUnload(gSceneNum, gAreaNum);
+#endif
 }
 
 
@@ -1020,8 +1035,14 @@ short	maxScenes;
 			if (gAbortDemoFlag)
 				goto game_over;
 
+			#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_LoadAreaConfig(gSceneNum, gAreaNum);
+			#endif
 			InitArea();											// init the area
-retry_area:	PlayArea();											// PLAY IT
+			#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_OnAreaLoad(gSceneNum, gAreaNum);
+			#endif
+	retry_area:	PlayArea();											// PLAY IT
 
 			SetScreenOffsetFor640x480();						// reset global offset
 
@@ -1038,13 +1059,16 @@ retry_area:	PlayArea();											// PLAY IT
 					ReviveMe();
 					goto retry_area;							// try again
 				}
-				else
-					goto game_over;								// out of lives, so game is OVER
-			}
+					else
+						goto game_over;								// out of lives, so game is OVER
+				}
 
-					/* FINISHED AREA */
+						/* FINISHED AREA */
 
-			FadeOutGameCLUT();
+				#ifdef PANGEA_ENABLE_SCRIPTING
+				MikeScript_OnAreaComplete(gSceneNum, gAreaNum);
+				#endif
+				FadeOutGameCLUT();
 			ShowBonusScreen();
 			OptimizeMemory();
 		}
@@ -1403,6 +1427,10 @@ void GameMain(void)
 	SetMyRandomSeed(someLong);
 	LoadHighScores();
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_Init();
+#endif
+
 #if 0												// Source port TEMP: in debug mode, boot straight to game
 	SDL_Log("WARNING: DEBUG MODE: Jumping straight to game");
 	gSceneNum = 0;	// 0...4
@@ -1418,8 +1446,14 @@ void GameMain(void)
 	}
 
 	//Do1PlayerGame();
-	InitArea();
-	PlayArea();
+		#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_LoadAreaConfig(gSceneNum, gAreaNum);
+		#endif
+		InitArea();
+		#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_OnAreaLoad(gSceneNum, gAreaNum);
+		#endif
+		PlayArea();
 #endif
 
 	if (gSkipMenus)
@@ -1468,5 +1502,3 @@ loop:
 
 	goto loop;								// go back to main menu
 }
-
-

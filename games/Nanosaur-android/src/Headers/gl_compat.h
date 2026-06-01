@@ -214,7 +214,11 @@ void glTexCoord2fv(const GLfloat *v);
 
 // Draw call intercepts (set up shader + VBOs, then call real glDrawElements/Arrays)
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices);
+void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count);
 void glDrawArrays(GLenum mode, GLint first, GLsizei count);
+
+// Draw cache management
+void COMPAT_GL_InvalidateCachePtr(const void *ptr);
 
 // Enable/Disable intercepted for lighting/fog/alpha-test/texgen state tracking
 void glEnable(GLenum cap);
@@ -250,5 +254,18 @@ void glGetDoublev_stub(GLenum pname, GLdouble *params);
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+#else
+
+static inline void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count)
+{
+	(void) vertex_count;
+	glDrawElements(mode, count, type, indices);
+}
+
+static inline void COMPAT_GL_InvalidateCachePtr(const void *ptr)
+{
+	(void) ptr;
+}
 
 #endif // __EMSCRIPTEN__ || __ANDROID__

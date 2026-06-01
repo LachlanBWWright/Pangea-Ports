@@ -47,7 +47,7 @@ static void UpdateDebugStats(void)
 				"ui: %.2fms\n"
 				"swap: %.2fms\n"
 				"total: %.2fms\n"
-				"tris: %d\nmeshes: %d+%d\ntiles: %ld/%ld%s\nnodes: %d\nheap: %dK, %dp\n\nx: %d\nz: %d\ny: %.3f %s%s\n%s\n%s\n%s\n\n\n\n\n\n\n\n\n"
+				"tris: %d\nmeshes: %d+%d\ncache: %d/%d/%d e%d i%d\nuploads: %d, %dK\ntiles: %ld/%ld%s\nnodes: %d\nheap: %dK, %dp\n\nx: %d\nz: %d\ny: %.3f %s%s\n%s\n%s\n%s\n\n\n\n\n\n\n\n\n"
 				"Bugdom %s - SDL %s\nOpenGL %s, %s @ %dx%d",
 				(int)roundf(fps),
 				inputMs,
@@ -59,6 +59,13 @@ static void UpdateDebugStats(void)
 				gRenderStats.triangles,
 				gRenderStats.meshesPass1,
 				gRenderStats.meshesPass2,
+				gRenderStats.cacheHits,
+				gRenderStats.cacheMisses,
+				gRenderStats.cacheLookups,
+				gRenderStats.cacheEvictions,
+				gRenderStats.cacheInvalidations,
+				gRenderStats.bufferUploadCalls,
+				gRenderStats.bufferUploadBytes / 1024,
 				gSupertileBudget - gNumFreeSupertiles,
 				gSupertileBudget,
 				gSuperTileMemoryListExists ? "" : " (no terrain)",

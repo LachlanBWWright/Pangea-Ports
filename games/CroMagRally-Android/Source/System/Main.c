@@ -16,6 +16,10 @@
 #include "pangea_net.h"
 #include <SDL3/SDL.h>
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -1108,6 +1112,10 @@ static void PlayArea(void)
 #endif
 
 		gGameFrameNum++;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!gNetGameInProgress)
+			CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, (float)gGameFrameNum * gFramesPerSecondFrac);
+#endif
 
 
 				/* SEE IF TRACK IS COMPLETED */
@@ -1141,6 +1149,10 @@ static void PlayArea(void)
 	}
 
 	gIsInGame = false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!gNetGameInProgress && gTrackCompleted)
+		CroMagScript_OnRaceComplete(gTrackNum);
+#endif
 }
 
 
@@ -1185,6 +1197,14 @@ static void InitArea(void)
 {
 OGLSetupInputType	viewDef;
 short				numPanes;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!gNetGameInProgress)
+	{
+		CroMagScript_LoadTrackConfig(gTrackNum);
+		CroMagScript_OnRaceLoad(gTrackNum);
+	}
+#endif
 
 
 	switch(gTrackNum)
@@ -1469,6 +1489,10 @@ short				numPanes;
 			/* INIT CAMERAS */
 
 	InitCameras();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!gNetGameInProgress)
+		CroMagScript_OnRaceStart(gTrackNum);
+#endif
  }
 
 
@@ -1476,6 +1500,10 @@ short				numPanes;
 
 static void CleanupLevel(void)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!gNetGameInProgress)
+		CroMagScript_OnRaceUnload(gTrackNum);
+#endif
 	EndNetworkGame();
 	StopAllEffectChannels();
  	EmptySplineObjectList();
@@ -1709,6 +1737,9 @@ void GameMain(void)
 			/* INIT MORE MY STUFF */
 
 	InitObjectManager();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_Init();
+#endif
 
 	{
 		unsigned long someLong;
@@ -2012,6 +2043,10 @@ void GameMain_RunFrame(void)
 
 	CalcFramesPerSecond();
 	gGameFrameNum++;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!gNetGameInProgress)
+		CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, (float)gGameFrameNum * gFramesPerSecondFrac);
+#endif
 	gDisableHiccupTimer = false;
 
 			/* CHECK EXIT CONDITIONS */
@@ -2033,6 +2068,10 @@ void GameMain_RunFrame(void)
 		{
 			gEmscriptenGameDone = true;
 			gIsInGame = false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (!gNetGameInProgress)
+				CroMagScript_OnRaceComplete(gTrackNum);
+#endif
 			// Note: FadeOutArea() is not called here as it uses a blocking render loop.
 			CleanupLevel();
 			emscripten_cancel_main_loop();

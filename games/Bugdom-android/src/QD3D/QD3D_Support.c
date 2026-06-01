@@ -599,6 +599,7 @@ void QD3D_UpdateDebugTextMesh(const char* text)
 
 	// Lay out the text
 	TextMesh_SetMesh(nil, text, gDebugTextMesh);
+	Render_InvalidateMeshCacheForMesh(gDebugTextMesh);
 }
 
 /************ SUBMIT DEBUG TEXT MESH FOR DRAWING *****************/
@@ -683,6 +684,7 @@ void QD3D_DrawPillarbox(void)
 		gPillarboxMesh->points[7] = (TQ3Point3D){ 0, wh, 0 };
 	}
 
+	Render_InvalidateMeshCachePtr(gPillarboxMesh->points);
 
 	Render_SetViewport(0, 0, gWindowWidth, gWindowHeight);
 	Render_Enter2D_NativeResolution();

@@ -21,6 +21,13 @@ typedef struct RenderStats
 	int			triangles;
 	int			meshesPass1;
 	int			meshesPass2;
+	int			cacheLookups;
+	int			cacheHits;
+	int			cacheMisses;
+	int			cacheEvictions;
+	int			cacheInvalidations;
+	int			bufferUploadCalls;
+	int			bufferUploadBytes;
 } RenderStats;
 
 typedef struct RenderModifiers
@@ -185,6 +192,10 @@ void Render_SubmitMesh(
 		const RenderModifiers* mods,
 		const TQ3Point3D* centerCoord,
 		uint16_t slot);
+
+void Render_InvalidateMeshCachePtr(const void* ptr);
+
+void Render_InvalidateMeshCacheForMesh(const TQ3TriMeshData* mesh);
 
 #pragma mark -
 

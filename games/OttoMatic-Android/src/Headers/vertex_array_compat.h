@@ -57,8 +57,10 @@ void CompatGL_NormalPointer(GLenum type, GLsizei stride, const void* pointer);
 void CompatGL_ColorPointer(GLint size, GLenum type, GLsizei stride, const void* pointer);
 void CompatGL_TexCoordPointer(GLint size, GLenum type, GLsizei stride, const void* pointer);
 void CompatGL_ClientActiveTexture(GLenum texture);
+void CompatGL_SetVertexCount(GLsizei n);
 void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
 void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count);
+void CompatGL_InvalidateCachePtr(const void *ptr);
 
 // Macro redirects
 #define glEnableClientState CompatGL_EnableClientState
@@ -71,5 +73,17 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count);
 #define glDrawArrays CompatGL_DrawArrays
 
 // Note: glClientActiveTextureARB is already handled in OGL_Functions.c
+
+#else
+
+static inline void CompatGL_SetVertexCount(int n)
+{
+#pragma unused(n)
+}
+
+static inline void CompatGL_InvalidateCachePtr(const void *ptr)
+{
+#pragma unused(ptr)
+}
 
 #endif // __EMSCRIPTEN__ || __ANDROID__

@@ -1,0 +1,20 @@
+#pragma once
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+
+#include <Pomme.h>
+#include "structures.h"
+#include "pangea_script.h"
+
+void MikeScript_Init(void);
+void MikeScript_Shutdown(void);
+void MikeScript_LoadAreaConfig(int sceneNum, int areaNum);
+void MikeScript_OnAreaLoad(int sceneNum, int areaNum);
+void MikeScript_OnAreaStart(int sceneNum, int areaNum);
+void MikeScript_OnAreaFrame(int sceneNum, int areaNum, unsigned int frameNum, float deltaSeconds);
+void MikeScript_OnAreaComplete(int sceneNum, int areaNum);
+void MikeScript_OnAreaUnload(int sceneNum, int areaNum);
+int MikeScript_RemapMapItemType(int sceneNum, int areaNum, int itemType);
+Boolean MikeScript_OnMapItem(ObjectEntryType* itemPtr, int sceneNum, int areaNum, int itemType);
+
+#endif

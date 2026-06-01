@@ -11,6 +11,9 @@
 
 #include "game.h"
 #include "profiling.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -65,11 +68,19 @@ int			gDustMagicNum, gDustParticleGroup;
 
 void PlayStampede(void)
 {
-		/*******************************/
-        /* LOAD ALL OF THE ART & STUFF */
-		/*******************************/
+	/*******************************/
+    /* LOAD ALL OF THE ART & STUFF */
+	/*******************************/
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_LoadAreaConfig(gCurrentArea);
+#endif
 
 	InitStampedeArea();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_OnAreaLoad(gCurrentArea);
+#endif
 
 
 			/* PREP STUFF */
@@ -83,6 +94,10 @@ void PlayStampede(void)
 	gIsInGame = true;
 	MakeFadeEvent(true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_OnAreaStart(gCurrentArea);
+#endif
+
 		/******************/
 		/* MAIN GAME LOOP */
 		/******************/
@@ -93,6 +108,10 @@ void PlayStampede(void)
 
 		StartProfilePhase(PROFILE_PHASE_INPUT);
 		ReadKeyboard();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_OnAreaFrame(gCurrentArea, gGameFrameNum, gFramesPerSecondFrac, 0.0f);
+#endif
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_Stampede();
@@ -128,6 +147,12 @@ void PlayStampede(void)
 	}
 
 		/* CLEANUP LEVEL */
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (gLevelCompleted && !gPlayerIsDead)
+		BillyScript_OnAreaComplete(gCurrentArea);
+	BillyScript_OnAreaUnload(gCurrentArea);
+#endif
 
 	OGL_FadeOutScene(DrawObjects, KeepTerrainAlive);
 	MyFlushEvents();

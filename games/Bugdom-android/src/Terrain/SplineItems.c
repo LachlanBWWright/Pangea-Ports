@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -135,11 +139,18 @@ Boolean			flag;
 		HLockHi((Handle)spline->itemList);						// make sure this is permanently locked down
 		for (i = 0; i < spline->numItems; i++)
 		{
-			itemPtr = &(*spline->itemList)[i];					// point to this item
-			type = itemPtr->type;								// get item type
-			GAME_ASSERT(type <= MAX_SPLINE_ITEM_NUM);
+				itemPtr = &(*spline->itemList)[i];					// point to this item
+				type = itemPtr->type;								// get item type
+				GAME_ASSERT(type <= MAX_SPLINE_ITEM_NUM);
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (BugdomScript_OnSplineItem(itemPtr, gRealLevel, (int)s))
+				{
+					itemPtr->flags |= ITEM_FLAGS_INUSE;
+					continue;
+				}
+#endif
 
-			flag = gSplineItemPrimeRoutines[type](s,itemPtr); 	// call item's Prime routine
+				flag = gSplineItemPrimeRoutines[type](s,itemPtr); 	// call item's Prime routine
 			if (flag)
 				itemPtr->flags |= ITEM_FLAGS_INUSE;				// set in-use flag	
 		}

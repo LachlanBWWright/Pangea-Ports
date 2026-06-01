@@ -19,6 +19,7 @@
 extern int gDrawCallsThisFrame;
 extern int gVerticesThisFrame;
 extern int gBufferUploadsThisFrame;
+extern int gBufferUploadBytesThisFrame;
 
 // IMPORTANT: #undef macros that redirect to the compat layer, so this file
 // can call the REAL GLES2 functions.  Without this, ModernGL_DrawGeometry
@@ -887,6 +888,7 @@ void ModernGL_EndImmediateMode(void)
     gDrawCallsThisFrame++;
     gVerticesThisFrame += numVertices;
     gBufferUploadsThisFrame++;
+    gBufferUploadBytesThisFrame += numVertices * (3 + 3 + 4 + 2 + 2) * (int)sizeof(GLfloat);
 }
 
 void ModernGL_ImmediateColor(float r, float g, float b, float a)

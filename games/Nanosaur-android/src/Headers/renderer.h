@@ -31,6 +31,17 @@ typedef struct RenderStats
 	int			meshesPass1;
 	int			meshesPass2;
 	int 		batchedStateChanges;
+	int			drawCalls;
+	int			cacheLookups;
+	int			cacheHits;
+	int			cacheMisses;
+	int			cacheEvictions;
+	int			cacheInvalidations;
+	int			indexScans;
+	int			indicesScanned;
+	int			bufferUploadCalls;
+	int			bufferUploadBytes;
+	int			verticesUploaded;
 } RenderStats;
 
 typedef struct RenderModifiers

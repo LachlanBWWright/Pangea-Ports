@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "levels": {
+    "0": {
+      "script": "Data/Scripts/dist/main.js",
+      "extraNativeItems": [
+        "bugdom2.powerup"
+      ],
+      "itemOverrides": []
+    }
+  }
+}

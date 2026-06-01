@@ -21,6 +21,7 @@ project(${GAME_TARGET}
 
 option(BUILD_SDL_FROM_SOURCE "Build SDL from source" OFF)
 option(SDL_STATIC "Static link SDL" OFF)
+option(PANGEA_ENABLE_SCRIPTING "Enable TypeScript-authored scripting support" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 
@@ -148,6 +149,9 @@ endif()
 #------------------------------------------------------------------------------
 
 add_subdirectory(extern/Pomme)
+if(PANGEA_ENABLE_SCRIPTING)
+	add_subdirectory("${CMAKE_SOURCE_DIR}/../../shared/script" "${CMAKE_BINARY_DIR}/PangeaScript")
+endif()
 
 if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)
@@ -182,6 +186,12 @@ else()
 endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
+if(PANGEA_ENABLE_SCRIPTING)
+	target_include_directories(${GAME_TARGET} PRIVATE
+		${GAME_SRCDIR}/Scripting
+		${CMAKE_SOURCE_DIR}/../../shared/script
+	)
+endif()
 
 #------------------------------------------------------------------------------
 # COMPILER/LINKER OPTIONS
@@ -195,6 +205,10 @@ target_compile_definitions(${GAME_TARGET} PRIVATE
 	HQ_TERRAIN=1
 	ENABLE_LOADING_SCREEN=0
 	GL_SILENCE_DEPRECATION)
+
+if(PANGEA_ENABLE_SCRIPTING)
+	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+endif()
 
 if(NOT MSVC)
 	target_compile_options(${GAME_TARGET} PRIVATE
@@ -278,6 +292,9 @@ if(EMSCRIPTEN OR ANDROID)
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme)
 else()
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+endif()
+if(PANGEA_ENABLE_SCRIPTING)
+	target_link_libraries(${GAME_TARGET} PRIVATE PangeaScript)
 endif()
 
 # Android-specific libraries
@@ -415,7 +432,8 @@ if(EMSCRIPTEN)
 		# Preload entire Data directory into the virtual filesystem
 		"--preload-file=${GAME_DATADIR}@/Data"
 		# Export cheat-interface functions so JS can call them
-		"-sEXPORTED_FUNCTIONS=_main,_WASM_SetFenceCollision,_WASM_GetFenceCollision,_PangeaGame_SetNetworkMatchConfig,_PangeaGame_StartNetworkMatch,_PangeaNet_IsEnabled,_PangeaNet_IsHost,_PangeaNet_GetLocalPlayerIndex,_PangeaNet_GetPlayerCount,_PangeaNet_SendReliable,_PangeaNet_SendUnreliable,_PangeaNet_PollMessage,_PangeaNet_NowMilliseconds,_PangeaNet_ReportDesync,_PangeaNet_ReportMatchEnded,_PangeaGame_DebugGetFrameNumber,_PangeaGame_DebugGetLocalPlayerIndex,_PangeaGame_DebugGetPlayerCount,_PangeaGame_DebugIsNetworkMatchRunning,_PangeaGame_DebugHasDesync,_PangeaGame_DebugGetLastSyncHash,_PangeaGame_DebugGetLastMatchEndReason,_PangeaGame_DebugHasMatchResult,_PangeaGame_DebugGetPlayerPosition,_PangeaGame_DebugSetInputScript"
+		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:-sEXPORTED_FUNCTIONS=_main,_WASM_SetFenceCollision,_WASM_GetFenceCollision,_PangeaGame_SetNetworkMatchConfig,_PangeaGame_StartNetworkMatch,_PangeaNet_IsEnabled,_PangeaNet_IsHost,_PangeaNet_GetLocalPlayerIndex,_PangeaNet_GetPlayerCount,_PangeaNet_SendReliable,_PangeaNet_SendUnreliable,_PangeaNet_PollMessage,_PangeaNet_NowMilliseconds,_PangeaNet_ReportDesync,_PangeaNet_ReportMatchEnded,_PangeaGame_DebugGetFrameNumber,_PangeaGame_DebugGetLocalPlayerIndex,_PangeaGame_DebugGetPlayerCount,_PangeaGame_DebugIsNetworkMatchRunning,_PangeaGame_DebugHasDesync,_PangeaGame_DebugGetLastSyncHash,_PangeaGame_DebugGetLastMatchEndReason,_PangeaGame_DebugHasMatchResult,_PangeaGame_DebugGetPlayerPosition,_PangeaGame_DebugSetInputScript,_PangeaScript_IsEnabled,_PangeaScript_SetStartupScript,_PangeaScript_Reload,_PangeaScript_GetLastError,_PangeaScript_GetErrorCount>"
+		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:-sEXPORTED_FUNCTIONS=_main,_WASM_SetFenceCollision,_WASM_GetFenceCollision,_PangeaGame_SetNetworkMatchConfig,_PangeaGame_StartNetworkMatch,_PangeaNet_IsEnabled,_PangeaNet_IsHost,_PangeaNet_GetLocalPlayerIndex,_PangeaNet_GetPlayerCount,_PangeaNet_SendReliable,_PangeaNet_SendUnreliable,_PangeaNet_PollMessage,_PangeaNet_NowMilliseconds,_PangeaNet_ReportDesync,_PangeaNet_ReportMatchEnded,_PangeaGame_DebugGetFrameNumber,_PangeaGame_DebugGetLocalPlayerIndex,_PangeaGame_DebugGetPlayerCount,_PangeaGame_DebugIsNetworkMatchRunning,_PangeaGame_DebugHasDesync,_PangeaGame_DebugGetLastSyncHash,_PangeaGame_DebugGetLastMatchEndReason,_PangeaGame_DebugHasMatchResult,_PangeaGame_DebugGetPlayerPosition,_PangeaGame_DebugSetInputScript>"
 		-sEXPORTED_RUNTIME_METHODS=ccall,cwrap
 		# Custom HTML shell page
 		"--shell-file=${WASM_SHELL_FILE}"

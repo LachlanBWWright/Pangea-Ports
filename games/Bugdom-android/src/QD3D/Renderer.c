@@ -25,6 +25,7 @@
 
 #include <QD3D.h>
 #include <string.h>
+#include <stdlib.h>
 
 #pragma mark -
 
@@ -108,14 +109,40 @@ static bool                 gFrameStarted = false;
 static float                gBackupVertexColors[4*65536];
 
 #ifdef __EMSCRIPTEN__
-// WebGL requires VBOs — client-side vertex arrays are not supported.
-// Each vertex attribute gets its own streaming VBO so that uploading data for
-// one attribute does not overwrite the previously-uploaded data for another.
-// (A single shared VBO would be overwritten by each glBufferData call, causing
-// all glVertexAttribPointer(offset=0) calls to read the *last* uploaded array.)
 enum { VBO_ATTRIB_POS=0, VBO_ATTRIB_NORM=1, VBO_ATTRIB_COLOR=2, VBO_ATTRIB_TC=3, VBO_ATTRIB_COUNT=4 };
+enum { MESH_CACHE_SIZE = 256 };
+
+typedef struct MeshGpuCacheEntry
+{
+bool                    valid;
+uint32_t                lru;
+const TQ3TriMeshData*   mesh;
+const void*             points;
+const void*             normals;
+const void*             colors;
+const void*             uvs;
+const void*             triangles;
+int                     numPoints;
+int                     numTriangles;
+GLuint                  vbo[VBO_ATTRIB_COUNT];
+GLuint                  ebo;
+} MeshGpuCacheEntry;
+
 static GLuint               s_attrVBO[VBO_ATTRIB_COUNT] = {0,0,0,0};
 static GLuint               s_streamEBO = 0;
+static MeshGpuCacheEntry    s_meshCache[MESH_CACHE_SIZE];
+static uint32_t             s_meshCacheTick = 1;
+static int                  s_forceCacheMiss = -1;
+
+static bool ForceMeshCacheMisses(void)
+{
+	if (s_forceCacheMiss < 0)
+	{
+		const char* value = getenv("PANGEA_FORCE_CACHE_MISS");
+		s_forceCacheMiss = value && value[0] && value[0] != '0';
+	}
+	return s_forceCacheMiss != 0;
+}
 #endif
 
 static int DrawOrderComparator(void const* a_void, void const* b_void);
@@ -127,25 +154,168 @@ static void PrepareAlphaShading(const MeshQueueEntry* entry);
 static void SendGeometry(const MeshQueueEntry* entry);
 
 #ifdef __EMSCRIPTEN__
-// WebGL does not support client-side vertex arrays — all data must live in GPU buffers.
-// VertexAttribVBO uploads a flat array of floats to the per-attribute VBO and sets up
-// the vertex attribute pointer.  Each attribute has its own VBO so uploads for different
-// attributes do not overwrite each other.
 static void VertexAttribVBO(GLint attribLoc, GLint attrIdx, GLint components, GLsizei numVerts, const GLfloat* data)
 {
 	glBindBuffer(GL_ARRAY_BUFFER, s_attrVBO[attrIdx]);
-	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(numVerts * components * sizeof(GLfloat)), data, GL_STREAM_DRAW);
+	GLsizeiptr byteCount = (GLsizeiptr)(numVerts * components * sizeof(GLfloat));
+	glBufferData(GL_ARRAY_BUFFER, byteCount, data, GL_STREAM_DRAW);
+	gRenderStats.bufferUploadCalls++;
+	gRenderStats.bufferUploadBytes += (int) byteCount;
 	glVertexAttribPointer(attribLoc, components, GL_FLOAT, GL_FALSE, 0, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
-// DrawElementsVBO uploads an index array to the streaming EBO and issues the draw call.
+
 static void DrawElementsVBO(GLenum mode, GLsizei count, const TQ3TriMeshTriangleData* triangles)
 {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_streamEBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(GLuint)), triangles, GL_STREAM_DRAW);
+	GLsizeiptr byteCount = (GLsizeiptr)(count * sizeof(GLuint));
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, byteCount, triangles, GL_STREAM_DRAW);
+	gRenderStats.bufferUploadCalls++;
+	gRenderStats.bufferUploadBytes += (int) byteCount;
 	glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
+
+static bool MeshCacheEntryMatches(const MeshGpuCacheEntry* entry, const TQ3TriMeshData* mesh)
+{
+	return entry->valid
+		&& entry->mesh == mesh
+		&& entry->points == mesh->points
+		&& entry->normals == (mesh->hasVertexNormals ? mesh->vertexNormals : NULL)
+		&& entry->colors == (mesh->hasVertexColors ? mesh->vertexColors : NULL)
+		&& entry->uvs == mesh->vertexUVs
+		&& entry->triangles == mesh->triangles
+		&& entry->numPoints == mesh->numPoints
+		&& entry->numTriangles == mesh->numTriangles;
+}
+
+static MeshGpuCacheEntry* GetMeshCacheEntry(const TQ3TriMeshData* mesh)
+{
+	MeshGpuCacheEntry* lruEntry = &s_meshCache[0];
+	bool forceCacheMiss = ForceMeshCacheMisses();
+	gRenderStats.cacheLookups++;
+
+	for (int i = 0; i < MESH_CACHE_SIZE; i++)
+	{
+		MeshGpuCacheEntry* entry = &s_meshCache[i];
+
+		if (!forceCacheMiss && MeshCacheEntryMatches(entry, mesh))
+		{
+			entry->lru = s_meshCacheTick++;
+			gRenderStats.cacheHits++;
+			return entry;
+		}
+
+		if (!entry->valid)
+		{
+			lruEntry = entry;
+			break;
+		}
+
+		if (entry->lru < lruEntry->lru)
+			lruEntry = entry;
+	}
+
+	gRenderStats.cacheMisses++;
+	if (lruEntry->valid)
+		gRenderStats.cacheEvictions++;
+
+	if (!lruEntry->vbo[VBO_ATTRIB_POS])
+		glGenBuffers(VBO_ATTRIB_COUNT, lruEntry->vbo);
+
+	if (!lruEntry->ebo)
+		glGenBuffers(1, &lruEntry->ebo);
+
+	lruEntry->valid = true;
+	lruEntry->lru = s_meshCacheTick++;
+	lruEntry->mesh = mesh;
+	lruEntry->points = mesh->points;
+	lruEntry->normals = mesh->hasVertexNormals ? mesh->vertexNormals : NULL;
+	lruEntry->colors = mesh->hasVertexColors ? mesh->vertexColors : NULL;
+	lruEntry->uvs = mesh->vertexUVs;
+	lruEntry->triangles = mesh->triangles;
+	lruEntry->numPoints = mesh->numPoints;
+	lruEntry->numTriangles = mesh->numTriangles;
+
+	GLsizeiptr byteCount = (GLsizeiptr)(mesh->numPoints * sizeof(mesh->points[0]));
+	glBindBuffer(GL_ARRAY_BUFFER, lruEntry->vbo[VBO_ATTRIB_POS]);
+	glBufferData(GL_ARRAY_BUFFER, byteCount, mesh->points, GL_STATIC_DRAW);
+	gRenderStats.bufferUploadCalls++;
+	gRenderStats.bufferUploadBytes += (int) byteCount;
+
+	if (mesh->hasVertexNormals)
+	{
+		byteCount = (GLsizeiptr)(mesh->numPoints * sizeof(mesh->vertexNormals[0]));
+		glBindBuffer(GL_ARRAY_BUFFER, lruEntry->vbo[VBO_ATTRIB_NORM]);
+		glBufferData(GL_ARRAY_BUFFER, byteCount, mesh->vertexNormals, GL_STATIC_DRAW);
+		gRenderStats.bufferUploadCalls++;
+		gRenderStats.bufferUploadBytes += (int) byteCount;
+	}
+
+	if (mesh->hasVertexColors)
+	{
+		byteCount = (GLsizeiptr)(mesh->numPoints * sizeof(mesh->vertexColors[0]));
+		glBindBuffer(GL_ARRAY_BUFFER, lruEntry->vbo[VBO_ATTRIB_COLOR]);
+		glBufferData(GL_ARRAY_BUFFER, byteCount, mesh->vertexColors, GL_STATIC_DRAW);
+		gRenderStats.bufferUploadCalls++;
+		gRenderStats.bufferUploadBytes += (int) byteCount;
+	}
+
+	if (mesh->vertexUVs)
+	{
+		byteCount = (GLsizeiptr)(mesh->numPoints * sizeof(mesh->vertexUVs[0]));
+		glBindBuffer(GL_ARRAY_BUFFER, lruEntry->vbo[VBO_ATTRIB_TC]);
+		glBufferData(GL_ARRAY_BUFFER, byteCount, mesh->vertexUVs, GL_STATIC_DRAW);
+		gRenderStats.bufferUploadCalls++;
+		gRenderStats.bufferUploadBytes += (int) byteCount;
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	byteCount = (GLsizeiptr)(mesh->numTriangles * sizeof(mesh->triangles[0]));
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lruEntry->ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, byteCount, mesh->triangles, GL_STATIC_DRAW);
+	gRenderStats.bufferUploadCalls++;
+	gRenderStats.bufferUploadBytes += (int) byteCount;
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	return lruEntry;
+}
+
+static void CachedVertexAttrib(GLint attribLoc, const MeshGpuCacheEntry* entry, GLint attrIdx, GLint components)
+{
+	glBindBuffer(GL_ARRAY_BUFFER, entry->vbo[attrIdx]);
+	glVertexAttribPointer(attribLoc, components, GL_FLOAT, GL_FALSE, 0, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+static void DrawCachedElements(const MeshGpuCacheEntry* entry)
+{
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ebo);
+	glDrawElements(GL_TRIANGLES, entry->numTriangles * 3, GL_UNSIGNED_INT, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+static void DeleteMeshCacheBuffers(void)
+{
+	for (int i = 0; i < MESH_CACHE_SIZE; i++)
+	{
+		if (s_meshCache[i].vbo[VBO_ATTRIB_POS])
+		{
+			glDeleteBuffers(VBO_ATTRIB_COUNT, s_meshCache[i].vbo);
+			SDL_memset(s_meshCache[i].vbo, 0, sizeof(s_meshCache[i].vbo));
+		}
+
+		if (s_meshCache[i].ebo)
+		{
+			glDeleteBuffers(1, &s_meshCache[i].ebo);
+			s_meshCache[i].ebo = 0;
+		}
+
+		s_meshCache[i].valid = false;
+	}
+}
+
 #define ATTRIB_VBO(loc, vboIdx, components, mesh, field) VertexAttribVBO((loc), (vboIdx), (components), (mesh)->numPoints, (const GLfloat*)(mesh)->field)
 #define DRAW_ELEMENTS_VBO(mesh) DrawElementsVBO(GL_TRIANGLES, (mesh)->numTriangles * 3, (mesh)->triangles)
 #else
@@ -494,9 +664,9 @@ void Render_DeleteContext(void)
 if (gGLContext)
 {
 #ifdef __EMSCRIPTEN__
-// Free streaming VBOs/EBO before destroying the GL context.
 if (s_attrVBO[0]) { glDeleteBuffers(VBO_ATTRIB_COUNT, s_attrVBO); for (int i=0;i<VBO_ATTRIB_COUNT;i++) s_attrVBO[i]=0; }
 if (s_streamEBO) { glDeleteBuffers(1, &s_streamEBO); s_streamEBO = 0; }
+DeleteMeshCacheBuffers();
 #endif
 SDL_GL_DestroyContext(gGLContext);
 gGLContext = NULL;
@@ -625,12 +795,57 @@ gFullscreenQuad = MakeQuadMesh_UI(0, 0, GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT, 0, 0,
 }
 
 #ifdef __EMSCRIPTEN__
-// WebGL requires all vertex data in GPU buffers — create streaming VBO/EBO.
 if (!s_attrVBO[0]) { glGenBuffers(VBO_ATTRIB_COUNT, s_attrVBO); }
 if (!s_streamEBO) { glGenBuffers(1, &s_streamEBO); }
 #endif
 
 CHECK_GL_ERROR();
+}
+
+void Render_InvalidateMeshCachePtr(const void* ptr)
+{
+#ifdef __EMSCRIPTEN__
+	if (!ptr)
+		return;
+
+	for (int i = 0; i < MESH_CACHE_SIZE; i++)
+	{
+		MeshGpuCacheEntry* entry = &s_meshCache[i];
+
+		if (entry->points == ptr
+			|| entry->normals == ptr
+			|| entry->colors == ptr
+			|| entry->uvs == ptr
+			|| entry->triangles == ptr)
+		{
+			if (entry->valid)
+				gRenderStats.cacheInvalidations++;
+			entry->valid = false;
+		}
+	}
+#else
+	(void) ptr;
+#endif
+}
+
+void Render_InvalidateMeshCacheForMesh(const TQ3TriMeshData* mesh)
+{
+#ifdef __EMSCRIPTEN__
+	if (!mesh)
+		return;
+
+	for (int i = 0; i < MESH_CACHE_SIZE; i++)
+	{
+		if (s_meshCache[i].mesh == mesh)
+		{
+			if (s_meshCache[i].valid)
+				gRenderStats.cacheInvalidations++;
+			s_meshCache[i].valid = false;
+		}
+	}
+#else
+	(void) mesh;
+#endif
 }
 
 void Render_EndScene(void)
@@ -1320,6 +1535,9 @@ static void SendGeometry(const MeshQueueEntry* entry)
 {
 uint32_t statusBits = entry->mods->statusBits;
 const TQ3TriMeshData* mesh = entry->mesh;
+#ifdef __EMSCRIPTEN__
+const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
+#endif
 
 // Cull backfaces unless explicitly kept
 SetState(GL_CULL_FACE, !(statusBits & STATUS_BIT_KEEPBACKFACES));
@@ -1329,7 +1547,11 @@ if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 glCullFace(GL_FRONT);       // pass 1: draw backfaces
 
 // Submit vertex positions
+#ifdef __EMSCRIPTEN__
+CachedVertexAttrib(gState.loc_a_Position, cacheEntry, VBO_ATTRIB_POS, 3);
+#else
 ATTRIB_VBO(gState.loc_a_Position, VBO_ATTRIB_POS, 3, mesh, points);
+#endif
 
 // Upload combined modelview if the per-object transform changed
 if (gState.currentTransform != entry->transform)
@@ -1349,14 +1571,22 @@ UploadMatrix3x3NormalFromMV(&gCurrentModelView);
 gState.currentTransform = entry->transform;
 }
 
+#ifdef __EMSCRIPTEN__
+DrawCachedElements(cacheEntry);
+#else
 DRAW_ELEMENTS_VBO(mesh);
+#endif
 CHECK_GL_ERROR();
 
 // Pass 2: draw frontfaces (improves look of translucent spheres etc.)
 if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 {
 glCullFace(GL_BACK);        // pass 2: draw frontfaces
+#ifdef __EMSCRIPTEN__
+DrawCachedElements(cacheEntry);
+#else
 DRAW_ELEMENTS_VBO(mesh);
+#endif
 CHECK_GL_ERROR();
 }
 }
@@ -1364,6 +1594,9 @@ CHECK_GL_ERROR();
 static void BeginDepthPass(const MeshQueueEntry* entry)
 {
 const TQ3TriMeshData* mesh = entry->mesh;
+#ifdef __EMSCRIPTEN__
+const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
+#endif
 
 GAME_ASSERT(!(entry->mods->statusBits & STATUS_BIT_NOZWRITE));
 
@@ -1388,7 +1621,11 @@ SetUniformBool(gState.loc_u_TextureEnabled,   &gState.textureEnabled,   true);
 SetUniformBool(gState.loc_u_AlphaTestEnabled, &gState.alphaTestEnabled, true);
 EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
+#ifdef __EMSCRIPTEN__
+CachedVertexAttrib(gState.loc_a_TexCoord, cacheEntry, VBO_ATTRIB_TC, 2);
+#else
 ATTRIB_VBO(gState.loc_a_TexCoord, VBO_ATTRIB_TC, 2, mesh, vertexUVs);
+#endif
 CHECK_GL_ERROR();
 }
 else
@@ -1403,6 +1640,9 @@ static void BeginShadingPass(const MeshQueueEntry* entry)
 {
 const TQ3TriMeshData* mesh = entry->mesh;
 uint32_t statusBits = entry->mods->statusBits;
+#ifdef __EMSCRIPTEN__
+const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
+#endif
 
 // Always write to color buffer in this pass
 SetColorMask(GL_TRUE);
@@ -1429,7 +1669,10 @@ EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
 const float* uvs = (const float*)(statusBits & STATUS_BIT_REFLECTIONMAP ? gEnvMapUVs : mesh->vertexUVs);
 #ifdef __EMSCRIPTEN__
+if (statusBits & STATUS_BIT_REFLECTIONMAP)
 VertexAttribVBO(gState.loc_a_TexCoord, VBO_ATTRIB_TC, 2, mesh->numPoints, uvs);
+else
+CachedVertexAttrib(gState.loc_a_TexCoord, cacheEntry, VBO_ATTRIB_TC, 2);
 #else
 glVertexAttribPointer(gState.loc_a_TexCoord, 2, GL_FLOAT, GL_FALSE, 0, uvs);
 #endif
@@ -1445,7 +1688,11 @@ DisableAttrib(TexCoord);
 if (mesh->hasVertexNormals && wantLighting)
 {
 EnableAttrib(Normal);
+#ifdef __EMSCRIPTEN__
+CachedVertexAttrib(gState.loc_a_Normal, cacheEntry, VBO_ATTRIB_NORM, 3);
+#else
 ATTRIB_VBO(gState.loc_a_Normal, VBO_ATTRIB_NORM, 3, mesh, vertexNormals);
+#endif
 }
 else
 {
@@ -1458,6 +1705,9 @@ static void PrepareOpaqueShading(const MeshQueueEntry* entry)
 const TQ3TriMeshData* mesh = entry->mesh;
 const uint32_t statusBits  = entry->mods->statusBits;
 TQ3TexturingMode texMode   = (mesh->texturingMode & kQ3TexturingModeExt_OpacityModeMask);
+#ifdef __EMSCRIPTEN__
+const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
+#endif
 
 SetFlag(glDepthMask, !(statusBits & STATUS_BIT_NOZWRITE));
 
@@ -1468,7 +1718,11 @@ if (mesh->hasVertexColors)
 {
 SetUniformBool(gState.loc_u_UseVertexColors, &gState.useVertexColors, true);
 EnableAttrib(Color);
+#ifdef __EMSCRIPTEN__
+CachedVertexAttrib(gState.loc_a_Color, cacheEntry, VBO_ATTRIB_COLOR, 4);
+#else
 ATTRIB_VBO(gState.loc_a_Color, VBO_ATTRIB_COLOR, 4, mesh, vertexColors);
+#endif
 }
 else
 {

@@ -369,6 +369,9 @@ float	ud1, uv1, ud2, uv2;
 			gWaterUVs2[f][i].v 	-= uv2;
 		}
 
+		CompatGL_InvalidateCachePtr(gWaterTriMeshData[f].uvs[0]);
+		CompatGL_InvalidateCachePtr(gWaterTriMeshData[f].uvs[1]);
+
 	}
 
 	gGlobalTransparency = 1.0;
@@ -446,7 +449,6 @@ int	i;
 	*y = 0;
 	return(false);
 }
-
 
 
 

@@ -595,6 +595,8 @@ TQ3Point3D		*p;
 	tmd->vertexUVs[7].u = gWaterUVOffset2.u + patchW * (1.0 / 3.0);
 	tmd->vertexUVs[7].v = gWaterUVOffset2.v + patchD * (1.0 / 3.0);
 
+	Render_InvalidateMeshCachePtr(tmd->vertexUVs);
+
 			/*************/
 			/* SUBMIT IT */
 			/*************/
@@ -733,6 +735,7 @@ TQ3TriMeshTriangleData	*t;
 	}
 	tmd->numTriangles = i;						// set # triangles in geometry
 
+	Render_InvalidateMeshCacheForMesh(tmd);
 
 			/*************/
 			/* SUBMIT IT */
@@ -1035,6 +1038,7 @@ TQ3TriMeshTriangleData	*t;
 	}
 	tmd->numTriangles = i;						// set # triangles in geometry
 
+	Render_InvalidateMeshCacheForMesh(tmd);
 
 			/*************/
 			/* SUBMIT IT */

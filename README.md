@@ -79,6 +79,41 @@ Current level-skip status:
 
 The repo-level metadata used by CI is stored in [`scripts/ports.py`](./scripts/ports.py).
 
+## Local build workflows
+
+From the repository root that contains `scripts/build-pangea-ports.sh`:
+
+```bash
+scripts/build-pangea-ports.sh --list
+scripts/build-pangea-ports.sh --target wasm
+scripts/build-pangea-ports.sh --target wasm --game ottomatic
+scripts/build-pangea-ports.sh --target native --game Nanosaur-android
+scripts/build-pangea-ports.sh --target android --dry-run
+```
+
+Supported targets are `wasm`, `native`/`desktop`, and `android`. WASM output is
+staged under `frontend/public/generated/pangea-ports/wasm/<game>/`. Native builds
+use each port's existing CMake build directory. Android builds run the checked-in
+Gradle wrapper under each game that has an `android/` project and write APKs under
+that project's normal `app/build/outputs/apk/` directory.
+
+Use `--dry-run` to print the planned commands and output paths without building,
+`--verbose` for shell tracing, and `--check-env` to validate the toolchain for a
+target. WASM builds require an active Emscripten SDK (`emcc` and `emcmake`);
+without `--check-env`, the script can bootstrap `emsdk` into `.emsdk` when `emcc`
+is missing. Android checks require Java plus `ANDROID_HOME` or `ANDROID_SDK_ROOT`;
+an explicit NDK environment variable is recommended.
+
+Profiling and cache-parity scenarios are documented in
+[`docs/wasm-performance-profiling.md`](./docs/wasm-performance-profiling.md).
+Set `PANGEA_FORCE_CACHE_MISS=1` in the game runtime environment to compare cached
+rendering against the streaming miss path.
+
+TypeScript-authored game scripting is documented in
+[`docs/typescript-scripting.md`](./docs/typescript-scripting.md). The first
+adapter is Bugdom 2 behind `PANGEA_ENABLE_SCRIPTING=ON`; the default build keeps
+scripting disabled.
+
 ## GitHub Pages layout
 
 The build workflow assembles a single Pages site with one subdirectory per game:

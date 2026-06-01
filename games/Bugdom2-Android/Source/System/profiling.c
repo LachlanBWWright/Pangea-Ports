@@ -5,6 +5,28 @@ ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 static uint64_t gPerformanceFrequency;
 static ProfilePhaseType gCurrentPhase = -1;
 
+int gDrawCallsThisFrame = 0;
+int gCacheLookupsThisFrame = 0;
+int gCacheHitsThisFrame = 0;
+int gCacheMissesThisFrame = 0;
+int gCacheEvictionsThisFrame = 0;
+int gCacheInvalidationsThisFrame = 0;
+int gIndexScansThisFrame = 0;
+int gIndicesScannedThisFrame = 0;
+int gVerticesUploadedThisFrame = 0;
+int gBytesUploadedThisFrame = 0;
+
+int gDrawCallsLastFrame = 0;
+int gCacheLookupsLastFrame = 0;
+int gCacheHitsLastFrame = 0;
+int gCacheMissesLastFrame = 0;
+int gCacheEvictionsLastFrame = 0;
+int gCacheInvalidationsLastFrame = 0;
+int gIndexScansLastFrame = 0;
+int gIndicesScannedLastFrame = 0;
+int gVerticesUploadedLastFrame = 0;
+int gBytesUploadedLastFrame = 0;
+
 void InitProfiling(void) {
     gPerformanceFrequency = SDL_GetPerformanceFrequency();
     for (int i = 0; i < NUM_PROFILE_PHASES; ++i) {
@@ -69,4 +91,26 @@ void ResetProfilingForFrame(void) {
         gProfilePhases[i].samples = 0;
         gProfilePhases[i].start_tick = 0;
     }
+
+    gDrawCallsLastFrame = gDrawCallsThisFrame;
+    gCacheLookupsLastFrame = gCacheLookupsThisFrame;
+    gCacheHitsLastFrame = gCacheHitsThisFrame;
+    gCacheMissesLastFrame = gCacheMissesThisFrame;
+    gCacheEvictionsLastFrame = gCacheEvictionsThisFrame;
+    gCacheInvalidationsLastFrame = gCacheInvalidationsThisFrame;
+    gIndexScansLastFrame = gIndexScansThisFrame;
+    gIndicesScannedLastFrame = gIndicesScannedThisFrame;
+    gVerticesUploadedLastFrame = gVerticesUploadedThisFrame;
+    gBytesUploadedLastFrame = gBytesUploadedThisFrame;
+
+    gDrawCallsThisFrame = 0;
+    gCacheLookupsThisFrame = 0;
+    gCacheHitsThisFrame = 0;
+    gCacheMissesThisFrame = 0;
+    gCacheEvictionsThisFrame = 0;
+    gCacheInvalidationsThisFrame = 0;
+    gIndexScansThisFrame = 0;
+    gIndicesScannedThisFrame = 0;
+    gVerticesUploadedThisFrame = 0;
+    gBytesUploadedThisFrame = 0;
 }

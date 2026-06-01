@@ -6,6 +6,9 @@
 
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /***************/
 /* EXTERNALS   */
@@ -202,6 +205,14 @@ SplinePointType	*points;
 			type = itemPtr->type;								// get item type
 			if (type > MAX_SPLINE_ITEM_NUM)
 				DoFatalAlert("PrimeSplines: type > MAX_SPLINE_ITEM_NUM");
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (OttoScript_OnSplineItem(itemPtr, gLevelNum, (int)s))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
+#endif
 
 			flag = gSplineItemPrimeRoutines[type](s,itemPtr); 	// call item's Prime routine
 			if (flag)
@@ -939,4 +950,3 @@ void PatchSplineLoop(SplineDefType* spline)
 	SafeDisposePtr((Ptr) pointsPerSpan_wrapping);
 	SafeDisposePtr((Ptr) nubList_wrapping);
 }
-

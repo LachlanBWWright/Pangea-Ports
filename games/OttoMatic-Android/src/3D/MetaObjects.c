@@ -904,6 +904,7 @@ go_here:
 			/***********/
 
 //	glLockArraysEXT(0, data->numPoints);
+	CompatGL_SetVertexCount(data->numPoints);
 	glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
 
 	if (OGL_CheckError())
@@ -1764,7 +1765,6 @@ MOVertexArrayObject	*vObj;
 		uvPtr[i].v += dv;
 	}
 }
-
 
 
 

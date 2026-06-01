@@ -21,6 +21,7 @@ project(${GAME_TARGET}
 
 option(BUILD_SDL_FROM_SOURCE "Build SDL from source" OFF)
 option(SDL_STATIC "Static link SDL" OFF)
+option(PANGEA_ENABLE_SCRIPTING "Enable TypeScript-authored scripting support" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 
@@ -105,6 +106,10 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
+if(PANGEA_ENABLE_SCRIPTING)
+	add_subdirectory("${CMAKE_SOURCE_DIR}/../../shared/script" "${CMAKE_BINARY_DIR}/PangeaScript")
+endif()
+
 if(NOT EMSCRIPTEN AND NOT ANDROID)
 	find_package(OpenGL REQUIRED)
 endif()
@@ -142,6 +147,12 @@ else()
 endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
+if(PANGEA_ENABLE_SCRIPTING)
+	target_include_directories(${GAME_TARGET} PRIVATE
+		${GAME_SRCDIR}/Scripting
+		${CMAKE_SOURCE_DIR}/../../shared/script
+	)
+endif()
 
 #------------------------------------------------------------------------------
 # COMPILER/LINKER OPTIONS
@@ -153,6 +164,10 @@ add_compile_definitions(
 
 target_compile_definitions(${GAME_TARGET} PRIVATE
 	GL_SILENCE_DEPRECATION)
+
+if(PANGEA_ENABLE_SCRIPTING)
+	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+endif()
 
 if(NOT MSVC)
 	target_compile_options(${GAME_TARGET} PRIVATE
@@ -235,6 +250,10 @@ else()
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
 endif()
 
+if(PANGEA_ENABLE_SCRIPTING)
+	target_link_libraries(${GAME_TARGET} PRIVATE PangeaScript)
+endif()
+
 # Android-specific libraries
 if(ANDROID)
 	target_link_libraries(${GAME_TARGET} PRIVATE GLESv3 EGL android log)
@@ -277,7 +296,8 @@ if(EMSCRIPTEN)
 		# Optimize for web-only delivery (removes Node.js compatibility shims)
 		-sENVIRONMENT=web
 		# Export C functions callable from JavaScript
-		"-sEXPORTED_FUNCTIONS=_main,_SetFenceCollisionEnabled,_GetFenceCollisionEnabled,_SetPlayerHealth,_SetPlayerLives,_FullHeal,_WinLevel,_SetStartLevel"
+		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:-sEXPORTED_FUNCTIONS=_main,_SetFenceCollisionEnabled,_GetFenceCollisionEnabled,_SetPlayerHealth,_SetPlayerLives,_FullHeal,_WinLevel,_SetStartLevel,_PangeaScript_IsEnabled,_PangeaScript_SetStartupScript,_PangeaScript_Reload,_PangeaScript_GetLastError,_PangeaScript_GetErrorCount>"
+		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:-sEXPORTED_FUNCTIONS=_main,_SetFenceCollisionEnabled,_GetFenceCollisionEnabled,_SetPlayerHealth,_SetPlayerLives,_FullHeal,_WinLevel,_SetStartLevel>"
 		"-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,FS,callMain"
 		# Custom HTML shell with game canvas and JS API
 		--shell-file "${EMSCRIPTEN_SHELL}"
