@@ -903,6 +903,23 @@ go_here:
 			/* DRAW IT */
 			/***********/
 
+	if (data->numMaterials < 0)
+	{
+		CompatGL_InvalidateCachePtr(data->points);
+		if (data->normals)
+			CompatGL_InvalidateCachePtr(data->normals);
+		if (data->colorsFloat)
+			CompatGL_InvalidateCachePtr(data->colorsFloat);
+		if (data->colorsByte)
+			CompatGL_InvalidateCachePtr(data->colorsByte);
+		for (int i = 0; i < MAX_MATERIAL_LAYERS; i++)
+		{
+			if (data->uvs[i])
+				CompatGL_InvalidateCachePtr(data->uvs[i]);
+		}
+		CompatGL_InvalidateCachePtr(data->triangles);
+	}
+
 //	glLockArraysEXT(0, data->numPoints);
 	CompatGL_SetVertexCount(data->numPoints);
 	glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
@@ -1765,7 +1782,6 @@ MOVertexArrayObject	*vObj;
 		uvPtr[i].v += dv;
 	}
 }
-
 
 
 

@@ -20,12 +20,15 @@
 
 #include <SDL3/SDL.h>
 #include "gl_compat.h"
+#include "renderer.h"
 
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+
+extern RenderStats gRenderStats;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 #define MAX_FILL_LIGHTS   4

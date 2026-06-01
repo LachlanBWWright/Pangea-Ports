@@ -466,7 +466,7 @@ float	size,dist;
 
 	GAME_ASSERT(gVaporTrails[i].numSegments <= MAX_TRAIL_SEGMENTS);
 
-	gSmokeColumnMesh.numPoints 		= 2 * (trail->numSegments-1);
+	gSmokeColumnMesh.numPoints 		= 2 * trail->numSegments;
 	gSmokeColumnMesh.numTriangles 	= 2 * (trail->numSegments-1);
 
 
@@ -520,6 +520,9 @@ float	size,dist;
 
 		OGLPoint3D_Add(&thickened[0], &trail->points[p], &gSmokeColumnPoints[p2]);
 		OGLPoint3D_Add(&thickened[1], &trail->points[p], &gSmokeColumnPoints[p2+1]);
+
+		if (p >= trail->numSegments-1)
+			continue;
 
 			/*******************************************/
 			/* NOW BUILD THE TRIANGLES FROM THE POINTS */
@@ -710,5 +713,4 @@ float	size2 = size * .2f;
 		r += (PI2/(NUM_RING_POINTS-1));
 	}
 }
-
 

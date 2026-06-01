@@ -60,7 +60,6 @@ typedef struct {
 
 static DrawCacheEntry sDC[DRAW_CACHE_SIZE];
 static uint64_t sDCTick = 0;
-static int sForceCacheMiss = -1;
 
 // Bitmask tracking which vertex attribute arrays are currently enabled
 // on the GL side.  We only toggle when the set changes between draws.
@@ -74,12 +73,7 @@ static GLsizei sVertexCountHint = 0;
 
 static Boolean ForceCacheMisses(void)
 {
-    if (sForceCacheMiss < 0)
-    {
-        const char* value = getenv("PANGEA_FORCE_CACHE_MISS");
-        sForceCacheMiss = value && value[0] && value[0] != '0';
-    }
-    return sForceCacheMiss != 0;
+    return true;
 }
 
 void CompatGL_SetVertexCount(GLsizei n)
@@ -532,6 +526,7 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
     SyncAttribEnables(attribMask);
 
     int uploads = 0;
+    int uploadBytes = 0;
 
     // ── POSITIONS: direct upload with offset ─────────────────────────
     if (hasPos)

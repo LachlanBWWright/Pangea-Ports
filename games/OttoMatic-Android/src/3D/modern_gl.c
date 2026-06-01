@@ -604,6 +604,12 @@ void ModernGL_DrawGeometry(ModernGLGeometry* geom, GLenum mode)
     // Bind VBO
     glBindBuffer(GL_ARRAY_BUFFER, geom->vbo);
 
+    glEnableVertexAttribArray(ATTRIB_LOCATION_POSITION);
+    glEnableVertexAttribArray(ATTRIB_LOCATION_NORMAL);
+    glEnableVertexAttribArray(ATTRIB_LOCATION_COLOR);
+    glEnableVertexAttribArray(ATTRIB_LOCATION_TEXCOORD0);
+    glEnableVertexAttribArray(ATTRIB_LOCATION_TEXCOORD1);
+
     // Set up vertex attribute pointers (interleaved format: 14 floats per vertex)
     int stride = 14 * sizeof(GLfloat);
     glVertexAttribPointer(ATTRIB_LOCATION_POSITION, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);

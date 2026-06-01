@@ -372,46 +372,81 @@ if(EMSCRIPTEN)
 	# Use a custom HTML shell from packaging/wasm/
 	set(WASM_SHELL "${CMAKE_SOURCE_DIR}/packaging/wasm/shell.html")
 
-	set(EMSCRIPTEN_LINK_FLAGS
+	set(WASM_EXPORTED_FUNCTIONS
+		"_main"
+		"_Nanosaur2_SetFenceCollisionsEnabled"
+		"_Nanosaur2_GetFenceCollisionsEnabled"
+		"_Nanosaur2_GetCurrentLevel"
+		"_Nanosaur2_SetTerrainOverridePath"
+		"_PangeaGame_SetNetworkMatchConfig"
+		"_PangeaGame_StartNetworkMatch"
+		"_PangeaNet_IsEnabled"
+		"_PangeaNet_IsHost"
+		"_PangeaNet_GetLocalPlayerIndex"
+		"_PangeaNet_GetPlayerCount"
+		"_PangeaNet_SendReliable"
+		"_PangeaNet_SendUnreliable"
+		"_PangeaNet_PollMessage"
+		"_PangeaNet_NowMilliseconds"
+		"_PangeaNet_ReportDesync"
+		"_PangeaNet_ReportMatchEnded"
+		"_PangeaGame_DebugGetFrameNumber"
+		"_PangeaGame_DebugGetLocalPlayerIndex"
+		"_PangeaGame_DebugGetPlayerCount"
+		"_PangeaGame_DebugIsNetworkMatchRunning"
+		"_PangeaGame_DebugHasDesync"
+		"_PangeaGame_DebugGetLastSyncHash"
+		"_PangeaGame_DebugGetLastMatchEndReason"
+		"_PangeaGame_DebugHasMatchResult"
+		"_PangeaGame_DebugGetPlayerPosition"
+		"_PangeaGame_DebugSetInputScript"
+	)
+	if(PANGEA_ENABLE_SCRIPTING)
+		list(APPEND WASM_EXPORTED_FUNCTIONS
+			"_PangeaScript_IsEnabled"
+			"_PangeaScript_SetStartupScript"
+			"_PangeaScript_Reload"
+			"_PangeaScript_GetLastError"
+			"_PangeaScript_GetErrorCount"
+		)
+	endif()
+	list(JOIN WASM_EXPORTED_FUNCTIONS "," WASM_EXPORTED_FUNCTIONS_STR)
+
+	target_link_options(${GAME_TARGET} PRIVATE
 		# Allow the heap to grow as needed (game allocates significant memory)
-		"-s ALLOW_MEMORY_GROWTH=1"
-		"-s MAXIMUM_MEMORY=512mb"
+		"SHELL:-s ALLOW_MEMORY_GROWTH=1"
+		"SHELL:-s MAXIMUM_MEMORY=512mb"
 		# Require a WebGL 2.0 context so UNSIGNED_INT index buffers are available
 		# without emulation.  Falling back to WebGL 1.0 could leave the renderer
 		# stuck before the first frame.
-		"-s MAX_WEBGL_VERSION=2"
-		"-s MIN_WEBGL_VERSION=2"
-		"-s USE_WEBGL2=1"
+		"SHELL:-s MAX_WEBGL_VERSION=2"
+		"SHELL:-s MIN_WEBGL_VERSION=2"
+		"SHELL:-s USE_WEBGL2=1"
 		# ASYNCIFY allows the blocking game-loop / menu-screen architecture to work
 		# in the browser.  emscripten_sleep(0) is called after every SDL_GL_SwapWindow
 		# (in OGL_DrawScene) so that the browser event loop can process input and
 		# repaint between frames.  Without ASYNCIFY all blocking while-loops
 		# (menus, legal screen, warm-up, etc.) would freeze the tab.
-		"-s ASYNCIFY=1"
-		"-s ASYNCIFY_STACK_SIZE=65536"
+		"SHELL:-s ASYNCIFY=1"
+		"SHELL:-s ASYNCIFY_STACK_SIZE=65536"
 		# JS-based C++ exception handling is compatible with ASYNCIFY.
 		# (Native wasm exceptions via -fwasm-exceptions are NOT compatible.)
 		"-fexceptions"
-		"-s DISABLE_EXCEPTION_CATCHING=0"
+		"SHELL:-s DISABLE_EXCEPTION_CATCHING=0"
 		# Export the C functions callable from JavaScript
-		"-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
-		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath','_PangeaGame_SetNetworkMatchConfig','_PangeaGame_StartNetworkMatch','_PangeaNet_IsEnabled','_PangeaNet_IsHost','_PangeaNet_GetLocalPlayerIndex','_PangeaNet_GetPlayerCount','_PangeaNet_SendReliable','_PangeaNet_SendUnreliable','_PangeaNet_PollMessage','_PangeaNet_NowMilliseconds','_PangeaNet_ReportDesync','_PangeaNet_ReportMatchEnded','_PangeaGame_DebugGetFrameNumber','_PangeaGame_DebugGetLocalPlayerIndex','_PangeaGame_DebugGetPlayerCount','_PangeaGame_DebugIsNetworkMatchRunning','_PangeaGame_DebugHasDesync','_PangeaGame_DebugGetLastSyncHash','_PangeaGame_DebugGetLastMatchEndReason','_PangeaGame_DebugHasMatchResult','_PangeaGame_DebugGetPlayerPosition','_PangeaGame_DebugSetInputScript','_PangeaScript_IsEnabled','_PangeaScript_SetStartupScript','_PangeaScript_Reload','_PangeaScript_GetLastError','_PangeaScript_GetErrorCount']>"
-		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:-s EXPORTED_FUNCTIONS=['_main','_Nanosaur2_SetFenceCollisionsEnabled','_Nanosaur2_GetFenceCollisionsEnabled','_Nanosaur2_GetCurrentLevel','_Nanosaur2_SetTerrainOverridePath','_PangeaGame_SetNetworkMatchConfig','_PangeaGame_StartNetworkMatch','_PangeaNet_IsEnabled','_PangeaNet_IsHost','_PangeaNet_GetLocalPlayerIndex','_PangeaNet_GetPlayerCount','_PangeaNet_SendReliable','_PangeaNet_SendUnreliable','_PangeaNet_PollMessage','_PangeaNet_NowMilliseconds','_PangeaNet_ReportDesync','_PangeaNet_ReportMatchEnded','_PangeaGame_DebugGetFrameNumber','_PangeaGame_DebugGetLocalPlayerIndex','_PangeaGame_DebugGetPlayerCount','_PangeaGame_DebugIsNetworkMatchRunning','_PangeaGame_DebugHasDesync','_PangeaGame_DebugGetLastSyncHash','_PangeaGame_DebugGetLastMatchEndReason','_PangeaGame_DebugHasMatchResult','_PangeaGame_DebugGetPlayerPosition','_PangeaGame_DebugSetInputScript']>"
+		"SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
+		"SHELL:-s EXPORTED_FUNCTIONS=[${WASM_EXPORTED_FUNCTIONS_STR}]"
 		# Embed the game data (Data/ directory) into the wasm bundle
-		"--preload-file ${GAME_DATADIR}@/Data"
+		"SHELL:--preload-file ${GAME_DATADIR}@/Data"
 		# Use requestAnimationFrame for the main loop (vsync, battery-efficient)
-		"-s ENVIRONMENT=web"
+		"SHELL:-s ENVIRONMENT=web"
 		# Disable HTML minification: html-minifier-terser can produce nested <script>
 		# tags when a large JS preloader is injected between script blocks.
 		# The WASM and JS are already optimised by emcc -O3; the HTML size is negligible.
-		"-s MINIFY_HTML=0"
+		"SHELL:-s MINIFY_HTML=0"
 		# Custom HTML shell
-		"--shell-file ${WASM_SHELL}"
+		"SHELL:--shell-file ${WASM_SHELL}"
 	)
-
-	# Convert list to space-separated string for linker flags
-	string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})
-	set_target_properties(${GAME_TARGET} PROPERTIES LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}")
 
 	# Also copy the generated .html/.js/.wasm/.data to the dist dir during POST_BUILD
 	add_custom_command(TARGET ${GAME_TARGET} POST_BUILD
