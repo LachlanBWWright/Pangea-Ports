@@ -137,6 +137,10 @@ ObjNode	*player, *leftGun, *rightGun, *hat;
 						
 	gPlayerInfo.objNode 	= player;
 	gPlayerInfo.coord		= player->Coord;		
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_RegisterPlayerObject(player);
+	#endif
 	
 
 	AttachShadowToObject(player, 0, DEFAULT_PLAYER_SHADOW_SCALE,DEFAULT_PLAYER_SHADOW_SCALE, true);

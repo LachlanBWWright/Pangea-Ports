@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "levelId": "level-03",
+  "bindings": [
+    {
+      "id": "terrain-human-012",
+      "target": {
+        "kind": "terrainItem",
+        "index": 12,
+        "nativeType": 4,
+        "nativeName": "Human Scientist",
+        "position": {
+          "x": 1560,
+          "z": -320
+        },
+        "params": {
+          "flags": 0,
+          "p0": 0,
+          "p1": 0,
+          "p2": 0,
+          "p3": 0
+        }
+      },
+      "scriptModule": "ottomatic/humans",
+      "behavior": "humanBob",
+      "hooks": ["object.onFrame"],
+      "tags": ["ottomatic.human", "scripted.preview"],
+      "paramRefs": ["motion.verticalBob", "npc.wavePeriod"]
+    }
+  ]
+}

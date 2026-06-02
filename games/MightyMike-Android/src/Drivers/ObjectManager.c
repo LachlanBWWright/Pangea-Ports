@@ -16,6 +16,10 @@
 #include "shape.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -248,6 +252,14 @@ int numNodesToMove = 0;
 
 			if (node->CType == INVALID_NODE_FLAG)	// move routine may have caused object to kill itself
 				continue;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (node->ScriptObjectID != 0)
+				MikeScript_RunObjectFrame(node);
+
+			if (node->CType == INVALID_NODE_FLAG)
+				continue;
+#endif
 		}
 
 		if (node->AnimFlag)

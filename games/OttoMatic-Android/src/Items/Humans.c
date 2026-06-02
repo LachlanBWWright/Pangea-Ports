@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -26,6 +30,7 @@ static void MoveHuman_ToRocketRamp(ObjNode *human);
 static void MoveHuman_UpRocketRamp(ObjNode *human);
 static void UpdateHumanFromSaucer(ObjNode *theNode);
 static void AbductHuman(ObjNode* theNode);
+static void DeleteHumanObject(ObjNode* human);
 
 
 /****************************/
@@ -73,6 +78,15 @@ static Byte GetSkeletonFromHumanType(Byte humanType)
 			DoFatalAlert("GetSkeletonFromHumanType: who?");
 			return SKELETON_TYPE_FARMER;
 	}
+}
+
+
+static void DeleteHumanObject(ObjNode* human)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_UnregisterHuman(human);
+#endif
+	DeleteObject(human);
 }
 
 
@@ -210,6 +224,13 @@ ObjNode	*newObj;
 				/* MAKE SHADOW */
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 8.0f * gHumanScaleRatio, 8.0f * gHumanScaleRatio, true);
+		newObj->ScriptVisualOffset = (OGLVector3D){0};
+		newObj->ScriptObjectID = 0;
+		newObj->ScriptObjectGeneration = 0;
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_RegisterHuman(newObj);
+	#endif
 
 	return(newObj);
 }
@@ -293,6 +314,13 @@ float			x,z,placement;
 	CreateCollisionBoxFromBoundingBox(newObj,1,1);
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 8.0f * gHumanScaleRatio, 8.0f * gHumanScaleRatio, false);
+	newObj->ScriptVisualOffset = (OGLVector3D){0};
+	newObj->ScriptObjectID = 0;
+	newObj->ScriptObjectGeneration = 0;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterHuman(newObj);
+#endif
 
 
 			/* ADD SPLINE OBJECT TO SPLINE OBJECT LIST */
@@ -418,7 +446,7 @@ int		i;
 		human->ColorFilter.a -= fps * .7f;
 		if (human->ColorFilter.a <= 0.0f)
 		{
-			DeleteObject(human);
+			DeleteHumanObject(human);
 			return(true);
 		}
 
@@ -502,7 +530,16 @@ Boolean DoTrig_Human(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 void UpdateHuman(ObjNode *theNode)
 {
 	if (!(theNode->StatusBits & STATUS_BIT_ONSPLINE))						// don't call update if on spline
+	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_RunHumanObjectFrame(theNode, true);
+#endif
 		UpdateObject(theNode);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_ApplyHumanVisualOffset(theNode);
+#endif
+	}
 
 	if (!theNode->InIce)
 	{
@@ -661,7 +698,7 @@ static	void(*myMoveTable[])(ObjNode *) =
 		{
 			if (gSaucerTarget == theNode)					// see if was a saucer target
 				gSaucerTarget = nil;
-			DeleteObject(theNode);
+			DeleteHumanObject(theNode);
 			return;
 		}
 	}
@@ -692,6 +729,11 @@ Boolean isVisible;
 
 	if (isVisible)
 	{
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_RunHumanObjectFrame(theNode, false);
+#endif
+
 		theNode->Rot.y = CalcYAngleFromPointToPoint(theNode->Rot.y, theNode->OldCoord.x, theNode->OldCoord.z,	// calc y rot aim
 												theNode->Coord.x, theNode->Coord.z);
 
@@ -701,7 +743,12 @@ Boolean isVisible;
 
 		UpdateHuman(theNode);
 		UpdateShadow(theNode);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_ApplyHumanVisualOffset(theNode);
+#endif
 	}
+
 
 			/* NOT VISIBLE */
 	else
@@ -789,7 +836,15 @@ float	fps = gFramesPerSecondFrac;
 
 	theNode->ColorFilter.r = theNode->ColorFilter.b -= fps * .5f;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RunHumanObjectFrame(theNode, true);
+#endif
+
 	UpdateObject(theNode);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_ApplyHumanVisualOffset(theNode);
+#endif
 
 
 			/* UPDATE TELEPORT EFFECT */
@@ -799,13 +854,11 @@ float	fps = gFramesPerSecondFrac;
 
 }
 
-
 /******************** MOVE HUMAN:  TO PLAYER SAUCER *********************/
 
 void MoveHuman_ToPlayerSaucer(ObjNode *theNode)
 {
 float	fps = gFramesPerSecondFrac;
-
 	theNode->ColorFilter.r =
 	theNode->ColorFilter.g =
 	theNode->ColorFilter.b = 1.0;					// make sure bright white
@@ -830,7 +883,7 @@ float	fps = gFramesPerSecondFrac;
 		gNumHumansInSaucer++;											// inc count
 		gNumHumansInTransit--;
 
-		DeleteObject(theNode);
+		DeleteHumanObject(theNode);
 
 		return;
 	}
@@ -982,7 +1035,7 @@ float	fps = gFramesPerSecondFrac;
 
 				PlayEffect3D(EFFECT_TELEPORTHUMAN, &human->Coord);
 
-				DeleteObject(human);
+				DeleteHumanObject(human);
 
 				gPlayerInfo.fuel += .05f;								// get fuel for that
 				if (gPlayerInfo.fuel > 1.0f)							// see if we're now full of fuel
@@ -1015,12 +1068,19 @@ static void UpdateHumanFromSaucer(ObjNode *theNode)
 		UpdatePlayerSparkles(theNode);
 	}
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RunHumanObjectFrame(theNode, true);
+#endif
+
 	UpdateObject(theNode);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_ApplyHumanVisualOffset(theNode);
+#endif
 
 
 
 }
-
 
 #pragma mark -
 

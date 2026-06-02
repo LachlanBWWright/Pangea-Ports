@@ -304,6 +304,9 @@ struct ObjNode
 	int32_t			Special[6];
 	float			SpecialF[6];
 	float			Timer;				// misc use timer
+	OGLVector3D		ScriptVisualOffset;
+	int32_t			ScriptObjectID;
+	uint32_t		ScriptObjectGeneration;
 	
 	float			Health;				// health 0..1
 	float			Damage;				// damage

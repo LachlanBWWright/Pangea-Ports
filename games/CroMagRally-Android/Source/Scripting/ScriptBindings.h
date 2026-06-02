@@ -16,4 +16,14 @@ void CroMagScript_OnRaceUnload(int trackNum);
 int CroMagScript_RemapTerrainItemType(int trackNum, int itemType);
 Boolean CroMagScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int trackNum, int playerNum, int originalType, int remappedType, float x, float z);
 
+// --- Live-object scripting extension ---
+typedef struct ObjNode ObjNode;
+void CroMagScript_ResetObjectRegistry(void);
+void CroMagScript_RegisterPlayerObject(ObjNode* playerObj);
+void CroMagScript_UnregisterPlayerObject(ObjNode* playerObj);
+void CroMagScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
+void CroMagScript_ApplyObjectScripting(ObjNode* obj);
+void CroMagScript_RunObjectFrame(ObjNode* obj);
+
+
 #endif

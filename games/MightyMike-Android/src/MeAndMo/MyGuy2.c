@@ -22,6 +22,10 @@
 #include "input.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -55,6 +59,11 @@ void TurnMeIntoFrog(void)
 
 	gMyNodePtr->DrawFlag = false;			// stop drawing & moving the "real" me
 	gMyNodePtr->MoveFlag = false;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_UnregisterPlayerObject(gMyNodePtr);
+#endif
+
 	gRealMePtr = gMyNodePtr;				// remember me
 
 			/* MAKE FROG OBJECT */
@@ -76,6 +85,10 @@ void TurnMeIntoFrog(void)
 
 	gFrogTimer = FROG_DURATION;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterPlayerObject(gMyNodePtr);
+#endif
+
 
 				/* MAKE SPARKLE */
 
@@ -96,10 +109,20 @@ void DisposeFrog(void)
 {
 	if (gFrogFlag)
 	{
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_UnregisterPlayerObject(gMyNodePtr);
+#endif
+
 		DeleteObject(gMyNodePtr);				// delete frog
 		gMyNodePtr = gRealMePtr;				// restore me
 		gMyNodePtr->DrawFlag = true;
 		gMyNodePtr->MoveFlag = true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_RegisterPlayerObject(gMyNodePtr);
+#endif
+
 		gFrogFlag = false;
 	}
 }
@@ -244,6 +267,11 @@ void TurnMeIntoShip(ObjNode	*shipNode)
 
 	gMyNodePtr->DrawFlag = false;					// stop drawing & moving the "real" me
 	gMyNodePtr->MoveFlag = false;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_UnregisterPlayerObject(gMyNodePtr);
+#endif
+
 	gRealMePtr = gMyNodePtr;						// remember me
 
 			/* MAKE FROG OBJECT */
@@ -255,6 +283,10 @@ void TurnMeIntoShip(ObjNode	*shipNode)
 	gSpaceShipFlag = true;
 
 	gSpaceShipTimer = SPACESHIP_DURATION;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterPlayerObject(gMyNodePtr);
+#endif
 
 	gShipSoundChannelNum = PlaySound(gSoundNum_Ship);
 }
@@ -269,10 +301,20 @@ void DisposeSpaceShip(void)
 {
 	if (gSpaceShipFlag)
 	{
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_UnregisterPlayerObject(gMyNodePtr);
+#endif
+
 		DeleteObject(gMyNodePtr);				// delete ship
 		gMyNodePtr = gRealMePtr;				// restore me
 		gMyNodePtr->DrawFlag = true;
 		gMyNodePtr->MoveFlag = true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_RegisterPlayerObject(gMyNodePtr);
+#endif
+
 		gSpaceShipFlag = false;
 
 		gMyNormalMaxSpeed = MY_WALK_SPEED;		// reset normal speed

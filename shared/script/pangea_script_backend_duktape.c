@@ -11,6 +11,80 @@ struct PangeaScriptBackend
 	PangeaScriptGameInfo gameInfo;
 };
 
+static bool read_number_property(duk_context* ctx, duk_idx_t index, const char* key, double* outValue)
+{
+	if (!duk_is_object(ctx, index))
+		return false;
+
+	if (!duk_get_prop_string(ctx, index, key))
+	{
+		duk_pop(ctx);
+		return false;
+	}
+
+	if (!duk_is_number(ctx, -1))
+	{
+		duk_pop(ctx);
+		return false;
+	}
+
+	*outValue = duk_get_number(ctx, -1);
+	duk_pop(ctx);
+	return true;
+}
+
+static bool read_object_handle(duk_context* ctx, duk_idx_t index, PangeaScriptObjectHandle* outHandle)
+{
+	double id = 0.0;
+	double generation = 0.0;
+	if (!outHandle)
+		return false;
+
+	if (!read_number_property(ctx, index, "id", &id) || !read_number_property(ctx, index, "generation", &generation))
+		return false;
+
+	outHandle->id = (int) id;
+	outHandle->generation = (uint32_t) generation;
+	return true;
+}
+
+static bool read_vector3(duk_context* ctx, duk_idx_t index, PangeaScriptVector3* outVector)
+{
+	double x = 0.0;
+	double y = 0.0;
+	double z = 0.0;
+	if (!outVector)
+		return false;
+
+	if (!read_number_property(ctx, index, "x", &x) || !read_number_property(ctx, index, "y", &y) || !read_number_property(ctx, index, "z", &z))
+		return false;
+
+	outVector->x = (float) x;
+	outVector->y = (float) y;
+	outVector->z = (float) z;
+	return true;
+}
+
+static void push_object_handle(duk_context* ctx, PangeaScriptObjectHandle handle)
+{
+	duk_push_object(ctx);
+	duk_push_int(ctx, handle.id);
+	duk_put_prop_string(ctx, -2, "id");
+	duk_push_uint(ctx, (duk_uint_t) handle.generation);
+	duk_put_prop_string(ctx, -2, "generation");
+}
+
+static void push_vector3(duk_context* ctx, const PangeaScriptVector3* vector)
+{
+	duk_push_object(ctx);
+	duk_push_number(ctx, vector->x);
+	duk_put_prop_string(ctx, -2, "x");
+	duk_push_number(ctx, vector->y);
+	duk_put_prop_string(ctx, -2, "y");
+	duk_push_number(ctx, vector->z);
+	duk_put_prop_string(ctx, -2, "z");
+}
+
 static void copy_error(char* dest, int capacity, const char* message)
 {
 	if (!dest || capacity <= 0)
@@ -54,6 +128,67 @@ static duk_ret_t spawn_scripted(duk_context* ctx)
 	(void) ctx;
 	printf("[PangeaScript warning] pangea.spawn.scripted is not bound for this game yet\n");
 	return 0;
+}
+
+static duk_ret_t player_get(duk_context* ctx)
+{
+	(void) ctx;
+	return 0;
+}
+
+static duk_ret_t object_position(duk_context* ctx)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptVector3 position;
+	if (!read_object_handle(ctx, 0, &handle))
+		return 0;
+
+	if (!PangeaScript_GetObjectPosition(handle, &position))
+		return 0;
+
+	push_vector3(ctx, &position);
+	return 1;
+}
+
+static duk_ret_t object_set_position(duk_context* ctx)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptVector3 position;
+	if (!read_object_handle(ctx, 0, &handle) || !read_vector3(ctx, 1, &position))
+	{
+		duk_push_false(ctx);
+		return 1;
+	}
+
+	duk_push_boolean(ctx, PangeaScript_SetObjectPosition(handle, &position));
+	return 1;
+}
+
+static duk_ret_t object_set_velocity(duk_context* ctx)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptVector3 velocity;
+	if (!read_object_handle(ctx, 0, &handle) || !read_vector3(ctx, 1, &velocity))
+	{
+		duk_push_false(ctx);
+		return 1;
+	}
+
+	duk_push_boolean(ctx, PangeaScript_SetObjectVelocity(handle, &velocity));
+	return 1;
+}
+
+static duk_ret_t object_delete(duk_context* ctx)
+{
+	PangeaScriptObjectHandle handle;
+	if (!read_object_handle(ctx, 0, &handle))
+	{
+		duk_push_false(ctx);
+		return 1;
+	}
+
+	duk_push_boolean(ctx, PangeaScript_DeleteObject(handle));
+	return 1;
 }
 
 static void put_function(duk_context* ctx, const char* name, duk_ret_t (*func)(duk_context*))
@@ -115,6 +250,17 @@ static void install_pangea_api(PangeaScriptBackend* backend)
 	duk_put_prop_string(ctx, -2, "spawn");
 
 	duk_push_object(ctx);
+	put_function(ctx, "get", player_get);
+	duk_put_prop_string(ctx, -2, "player");
+
+	duk_push_object(ctx);
+	put_function(ctx, "position", object_position);
+	put_function(ctx, "setPosition", object_set_position);
+	put_function(ctx, "setVelocity", object_set_velocity);
+	put_function(ctx, "delete", object_delete);
+	duk_put_prop_string(ctx, -2, "object");
+
+	duk_push_object(ctx);
 	put_function(ctx, "log", log_info);
 	put_function(ctx, "warn", log_warn);
 	put_function(ctx, "error", log_error);
@@ -139,6 +285,7 @@ static const char* hook_name(PangeaScriptHook hook)
 		case PANGEA_SCRIPT_HOOK_TERRAIN_ITEM: return "onTerrainItem";
 		case PANGEA_SCRIPT_HOOK_SPLINE_ITEM: return "onSplineItem";
 		case PANGEA_SCRIPT_HOOK_MAP_ITEM: return "onMapItem";
+		case PANGEA_SCRIPT_HOOK_OBJECT_FRAME: return "onObjectFrame";
 	}
 	return "";
 }
@@ -267,6 +414,42 @@ static void push_map_item_context(PangeaScriptBackend* backend, const PangeaScri
 
 	push_params_array(backend->ctx, context->params, context->paramCount);
 	duk_put_prop_string(backend->ctx, -2, "params");
+}
+
+static void push_tags_array(duk_context* ctx, const char* const* tags, int tagCount)
+{
+	duk_push_array(ctx);
+	for (int i = 0; i < tagCount; i++)
+	{
+		duk_push_string(ctx, tags[i]);
+		duk_put_prop_index(ctx, -2, (duk_uint_t) i);
+	}
+}
+
+static void push_object_frame_context(PangeaScriptBackend* backend, const PangeaScriptObjectFrameContext* context)
+{
+	PangeaScriptLevelContext levelContext =
+	{
+		.levelNum = context->levelNum,
+		.levelName = NULL,
+	};
+	push_level_context(backend, &levelContext);
+
+	duk_push_int(backend->ctx, (duk_int_t) context->frameNum);
+	duk_put_prop_string(backend->ctx, -2, "frameNum");
+	duk_push_number(backend->ctx, context->deltaSeconds);
+	duk_put_prop_string(backend->ctx, -2, "deltaSeconds");
+	duk_push_number(backend->ctx, context->levelTimeSeconds);
+	duk_put_prop_string(backend->ctx, -2, "levelTimeSeconds");
+
+	push_object_handle(backend->ctx, context->object);
+	duk_put_prop_string(backend->ctx, -2, "object");
+
+	push_vector3(backend->ctx, &context->position);
+	duk_put_prop_string(backend->ctx, -2, "position");
+
+	push_tags_array(backend->ctx, context->tags, context->tagCount);
+	duk_put_prop_string(backend->ctx, -2, "tags");
 }
 
 static PangeaScriptStatus call_function_on_top(PangeaScriptBackend* backend, char* error, int errorCapacity)
@@ -445,6 +628,45 @@ PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* back
 	}
 	duk_pop(backend->ctx);
 	return status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* backend, const PangeaScriptObjectFrameContext* context, PangeaScriptObjectFrameResult* result, char* error, int errorCapacity)
+{
+	if (!backend || !context || !result)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	if (!push_global_hook(backend, "onObjectFrame"))
+		return PANGEA_SCRIPT_OK;
+
+	push_object_frame_context(backend, context);
+	PangeaScriptStatus status = call_function_on_top(backend, error, errorCapacity);
+	if (status != PANGEA_SCRIPT_OK)
+	{
+		duk_pop(backend->ctx);
+		return status;
+	}
+
+	result->hasPositionOffset = false;
+	result->positionOffset.x = 0.0f;
+	result->positionOffset.y = 0.0f;
+	result->positionOffset.z = 0.0f;
+
+	if (duk_is_object(backend->ctx, -1))
+	{
+		if (duk_get_prop_string(backend->ctx, -1, "positionOffset") && duk_is_object(backend->ctx, -1))
+		{
+			PangeaScriptVector3 offset;
+			if (read_vector3(backend->ctx, -1, &offset))
+			{
+				result->hasPositionOffset = true;
+				result->positionOffset = offset;
+			}
+		}
+		duk_pop(backend->ctx);
+	}
+
+	duk_pop(backend->ctx);
+	return PANGEA_SCRIPT_OK;
 }
 
 	duk_context* ctx = backend->ctx;

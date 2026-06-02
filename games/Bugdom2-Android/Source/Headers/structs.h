@@ -362,8 +362,13 @@ struct ObjNode
 
 			/* POOL INDEX */
 
-	int					pooledIndex;
-};
+	int				pooledIndex;
+
+	// --- Live-object scripting extension ---
+	OGLVector3D	ScriptVisualOffset;
+	int			ScriptObjectID;
+	int			ScriptObjectGeneration;
+	};
 typedef struct ObjNode ObjNode;
 
 

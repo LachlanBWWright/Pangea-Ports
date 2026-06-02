@@ -31,6 +31,136 @@ static const PangeaScriptNativeItem kNativeItems[] =
 	},
 };
 
+static PangeaScriptFrameContext gCurrentFrameContext;
+static ObjNode* gCurrentScriptObject;
+static Boolean gCurrentScriptObjectUsesGlobals;
+
+static const char* const kHumanFarmerTags[] =
+{
+	"ottomatic.human",
+	"ottomatic.human.farmer",
+};
+
+static const char* const kHumanBeewomanTags[] =
+{
+	"ottomatic.human",
+	"ottomatic.human.beewoman",
+};
+
+static const char* const kHumanScientistTags[] =
+{
+	"ottomatic.human",
+	"ottomatic.human.scientist",
+};
+
+static const char* const kHumanSkirtladyTags[] =
+{
+	"ottomatic.human",
+	"ottomatic.human.skirtlady",
+};
+
+static const char* const* GetHumanTags(int humanType, int* outTagCount)
+{
+	if (!outTagCount)
+		return NULL;
+
+	*outTagCount = 2;
+	switch (humanType)
+	{
+		case HUMAN_TYPE_FARMER:
+			return kHumanFarmerTags;
+
+		case HUMAN_TYPE_BEEWOMAN:
+			return kHumanBeewomanTags;
+
+		case HUMAN_TYPE_SCIENTIST:
+			return kHumanScientistTags;
+
+		case HUMAN_TYPE_SKIRTLADY:
+		default:
+			return kHumanSkirtladyTags;
+	}
+}
+
+static bool OttoHumanGetPosition(void* nativeObject, PangeaScriptVector3* outPosition)
+{
+	ObjNode* human = (ObjNode*) nativeObject;
+	if (!human || !outPosition)
+		return false;
+
+	if (human == gCurrentScriptObject && gCurrentScriptObjectUsesGlobals)
+	{
+		outPosition->x = gCoord.x;
+		outPosition->y = gCoord.y;
+		outPosition->z = gCoord.z;
+		return true;
+	}
+
+	outPosition->x = human->Coord.x;
+	outPosition->y = human->Coord.y;
+	outPosition->z = human->Coord.z;
+	return true;
+}
+
+static bool OttoHumanSetPosition(void* nativeObject, const PangeaScriptVector3* position)
+{
+	ObjNode* human = (ObjNode*) nativeObject;
+	if (!human || !position)
+		return false;
+
+	human->Coord.x = position->x;
+	human->Coord.y = position->y;
+	human->Coord.z = position->z;
+
+	if (human == gCurrentScriptObject && gCurrentScriptObjectUsesGlobals)
+	{
+		gCoord.x = position->x;
+		gCoord.y = position->y;
+		gCoord.z = position->z;
+	}
+
+	return true;
+}
+
+static bool OttoHumanSetVelocity(void* nativeObject, const PangeaScriptVector3* velocity)
+{
+	ObjNode* human = (ObjNode*) nativeObject;
+	if (!human || !velocity)
+		return false;
+
+	human->Delta.x = velocity->x;
+	human->Delta.y = velocity->y;
+	human->Delta.z = velocity->z;
+
+	if (human == gCurrentScriptObject && gCurrentScriptObjectUsesGlobals)
+	{
+		gDelta.x = velocity->x;
+		gDelta.y = velocity->y;
+		gDelta.z = velocity->z;
+	}
+
+	return true;
+}
+
+static bool OttoHumanDelete(void* nativeObject)
+{
+	ObjNode* human = (ObjNode*) nativeObject;
+	if (!human || human == gCurrentScriptObject)
+		return false;
+
+	OttoScript_UnregisterHuman(human);
+	DeleteObject(human);
+	return true;
+}
+
+static const PangeaScriptObjectOps kOttoHumanObjectOps =
+{
+	.getPosition = OttoHumanGetPosition,
+	.setPosition = OttoHumanSetPosition,
+	.setVelocity = OttoHumanSetVelocity,
+	.deleteObject = OttoHumanDelete,
+};
+
 static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 {
 	static Boolean runtimeUnavailableLogged = false;
@@ -57,6 +187,9 @@ void OttoScript_Init(void)
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	LogScriptStatus("init", status);
+	gCurrentFrameContext = (PangeaScriptFrameContext){0};
+	gCurrentScriptObject = NULL;
+	gCurrentScriptObjectUsesGlobals = false;
 
 	status = PangeaScript_RegisterNativeItems(kNativeItems, (int)(sizeof(kNativeItems) / sizeof(kNativeItems[0])));
 	LogScriptStatus("native item registration", status);
@@ -67,6 +200,9 @@ void OttoScript_Init(void)
 
 void OttoScript_Shutdown(void)
 {
+	gCurrentFrameContext = (PangeaScriptFrameContext){0};
+	gCurrentScriptObject = NULL;
+	gCurrentScriptObjectUsesGlobals = false;
 	PangeaScript_Shutdown();
 }
 
@@ -90,6 +226,13 @@ static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* actio
 
 void OttoScript_OnLevelLoad(int levelNum)
 {
+	PangeaScript_ResetObjects();
+	gCurrentFrameContext = (PangeaScriptFrameContext)
+	{
+		.levelNum = levelNum,
+	};
+	gCurrentScriptObject = NULL;
+	gCurrentScriptObjectUsesGlobals = false;
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, levelNum, "onLevelLoad");
 }
 
@@ -107,6 +250,7 @@ void OttoScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds,
 		.deltaSeconds = deltaSeconds,
 		.levelTimeSeconds = levelTimeSeconds,
 	};
+	gCurrentFrameContext = context;
 
 	PangeaScriptStatus status = PangeaScript_CallFrameHook(&context);
 	LogScriptStatus("onFrame", status);
@@ -120,6 +264,9 @@ void OttoScript_OnLevelComplete(int levelNum)
 void OttoScript_OnLevelUnload(int levelNum)
 {
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, levelNum, "onLevelUnload");
+	PangeaScript_ResetObjects();
+	gCurrentScriptObject = NULL;
+	gCurrentScriptObjectUsesGlobals = false;
 }
 
 int OttoScript_RemapTerrainItemType(int levelNum, int itemType)
@@ -181,6 +328,128 @@ Boolean OttoScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splin
 	PangeaScriptStatus status = PangeaScript_CallSplineItemHook(&context);
 	LogScriptStatus("onSplineItem", status);
 	return context.handled && context.markInUse;
+}
+
+void OttoScript_RegisterHuman(ObjNode* human)
+{
+	int tagCount = 0;
+	const char* const* tags;
+	PangeaScriptObjectHandle handle = {0};
+	PangeaScriptObjectRegistration registration;
+	PangeaScriptStatus status;
+
+	if (!human)
+		return;
+
+	tags = GetHumanTags(human->HumanType, &tagCount);
+	registration = (PangeaScriptObjectRegistration)
+	{
+		.nativeObject = human,
+		.ops = &kOttoHumanObjectOps,
+		.tags = tags,
+		.tagCount = tagCount,
+	};
+
+	status = PangeaScript_RegisterObject(&registration, &handle);
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		human->ScriptObjectID = handle.id;
+		human->ScriptObjectGeneration = handle.generation;
+	}
+	else
+	{
+		human->ScriptObjectID = 0;
+		human->ScriptObjectGeneration = 0;
+	}
+
+	LogScriptStatus("human registration", status);
+}
+
+void OttoScript_UnregisterHuman(ObjNode* human)
+{
+	PangeaScriptObjectHandle handle;
+
+	if (!human || human->ScriptObjectID <= 0)
+		return;
+
+	handle = (PangeaScriptObjectHandle)
+	{
+		.id = human->ScriptObjectID,
+		.generation = human->ScriptObjectGeneration,
+	};
+
+	(void) PangeaScript_UnregisterObject(handle);
+	human->ScriptObjectID = 0;
+	human->ScriptObjectGeneration = 0;
+	human->ScriptVisualOffset.x = 0.0f;
+	human->ScriptVisualOffset.y = 0.0f;
+	human->ScriptVisualOffset.z = 0.0f;
+
+	if (gCurrentScriptObject == human)
+	{
+		gCurrentScriptObject = NULL;
+		gCurrentScriptObjectUsesGlobals = false;
+	}
+}
+
+void OttoScript_RunHumanObjectFrame(ObjNode* human, Boolean usesGlobals)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptObjectFrameResult result = {0};
+	PangeaScriptStatus status;
+
+	if (!human)
+		return;
+
+	human->ScriptVisualOffset.x = 0.0f;
+	human->ScriptVisualOffset.y = 0.0f;
+	human->ScriptVisualOffset.z = 0.0f;
+
+	if (human->ScriptObjectID <= 0)
+		return;
+
+	handle = (PangeaScriptObjectHandle)
+	{
+		.id = human->ScriptObjectID,
+		.generation = human->ScriptObjectGeneration,
+	};
+
+	gCurrentScriptObject = human;
+	gCurrentScriptObjectUsesGlobals = usesGlobals;
+	status = PangeaScript_CallObjectFrame(handle, &gCurrentFrameContext, &result);
+	gCurrentScriptObject = NULL;
+	gCurrentScriptObjectUsesGlobals = false;
+
+	if (status == PANGEA_SCRIPT_OK && result.hasPositionOffset)
+	{
+		human->ScriptVisualOffset.x = result.positionOffset.x;
+		human->ScriptVisualOffset.y = result.positionOffset.y;
+		human->ScriptVisualOffset.z = result.positionOffset.z;
+	}
+
+	LogScriptStatus("onObjectFrame", status);
+}
+
+void OttoScript_ApplyHumanVisualOffset(ObjNode* human)
+{
+	OGLPoint3D baseCoord;
+
+	if (!human)
+		return;
+
+	if (human->ScriptVisualOffset.x == 0.0f &&
+		human->ScriptVisualOffset.y == 0.0f &&
+		human->ScriptVisualOffset.z == 0.0f)
+	{
+		return;
+	}
+
+	baseCoord = human->Coord;
+	human->Coord.x += human->ScriptVisualOffset.x;
+	human->Coord.y += human->ScriptVisualOffset.y;
+	human->Coord.z += human->ScriptVisualOffset.z;
+	UpdateObjectTransforms(human);
+	human->Coord = baseCoord;
 }
 
 #endif

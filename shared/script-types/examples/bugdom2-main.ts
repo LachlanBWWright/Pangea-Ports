@@ -1,25 +1,24 @@
-import { defineTerrainItem, pangea } from "../src/pangea";
-import type { Bugdom2FrameContext, Bugdom2LevelContext } from "../src/games/bugdom2";
+import type { Bugdom2LifecycleModule } from "../src/games/bugdom2";
+import { hasTag, makeVerticalBobOffset } from "./helpers";
 
-export function onLevelLoad(ctx: Bugdom2LevelContext): void {
-  pangea.log.info(`Loading Bugdom 2 level ${ctx.levelNum}`);
+const PLAYER_TAG = "bugdom2.player";
+const PLAYER_BOB_SPEED = 5;
+const PLAYER_BOB_HEIGHT = 18;
+
+export function isBugdom2Player(tags: readonly string[]): boolean {
+  return hasTag(tags, PLAYER_TAG);
 }
 
-export function onFrame(ctx: Bugdom2FrameContext): void {
-  if (ctx.frameNum % 300 === 0) {
-    pangea.log.info(`Level time: ${ctx.levelTimeSeconds.toFixed(2)}`);
+export const onObjectFrame: NonNullable<
+  Bugdom2LifecycleModule["onObjectFrame"]
+> = (ctx) => {
+  if (!isBugdom2Player(ctx.tags)) {
+    return;
   }
-}
 
-export const bouncingHealth = defineTerrainItem({
-  id: "custom.bouncingHealth",
-  nativeType: 240,
-  onSpawn(item) {
-    return pangea.spawn.scripted("custom.bouncingPickup", item.position, {
-      amount: item.params[0] + 10,
-    })
-      ? { handled: true, markInUse: true }
-      : { handled: false };
-  },
-});
-
+  return makeVerticalBobOffset(
+    ctx.levelTimeSeconds,
+    PLAYER_BOB_SPEED,
+    PLAYER_BOB_HEIGHT,
+  );
+};

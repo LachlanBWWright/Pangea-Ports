@@ -246,6 +246,11 @@ short	j,i;
 	if (gTimeDemo)
 		HidePlayer(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+    Nanosaur2Script_RegisterPlayerObject(newObj);
+#endif
+
+
 }
 
 

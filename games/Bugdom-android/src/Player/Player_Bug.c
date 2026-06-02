@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -165,6 +169,10 @@ ObjNode	*newObj;
 	gNitroParticleGroup = -1;
 	
 	gInfobarUpdateBits |= UPDATE_HANDS;	
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterPlayerObject(newObj);
+#endif
 	
 	return(newObj);
 }

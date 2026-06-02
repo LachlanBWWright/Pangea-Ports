@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -276,6 +280,10 @@ static const float shadowScale[NUM_LAND_CAR_TYPES] =
 				/* MAKE SHADOW */
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CAR_MAMMOTH + carType, shadowScale[carType], shadowScale[carType], true);
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		CroMagScript_RegisterPlayerObject(newObj);
+	#endif
 
 
 	return(newObj);

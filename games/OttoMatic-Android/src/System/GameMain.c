@@ -24,6 +24,10 @@ static void CleanupLevel(void);
 static void PlayArea(void);
 static void PlayGame(void);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+static float gScriptLevelTimeSeconds = 0.0f;
+#endif
+
 
 /****************************/
 /*    CONSTANTS             */
@@ -305,6 +309,7 @@ static void PlayArea(void)
 	MakeFadeEvent(true, 1.0);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+	gScriptLevelTimeSeconds = 0.0f;
 	OttoScript_OnLevelStart(gLevelNum);
 #endif
 
@@ -337,7 +342,8 @@ static void PlayArea(void)
 		UpdateInput();									// read local keys
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-		OttoScript_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, 0.0f);
+		OttoScript_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gScriptLevelTimeSeconds);
+		gScriptLevelTimeSeconds += gFramesPerSecondFrac;
 #endif
 
 				/* MOVE OBJECTS */

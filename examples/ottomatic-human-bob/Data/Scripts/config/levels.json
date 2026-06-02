@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "levels": [
+    {
+      "levelId": "level-03",
+      "route": {
+        "levelNumber": 3
+      },
+      "enabled": true,
+      "sourceScript": "Data/Scripts/src/ottomatic/humans.ts",
+      "compiledScript": "Data/Scripts/dist/ottomatic/humans.js",
+      "hooks": ["level.onLoad", "level.onTick"]
+    }
+  ]
+}

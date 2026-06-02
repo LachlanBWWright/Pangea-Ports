@@ -38,7 +38,12 @@ Editor injection should write compiled JavaScript into the Emscripten virtual
 filesystem before game boot, then call:
 
 ```js
-Module.ccall("PangeaScript_SetStartupScript", "number", ["string"], ["Data/Scripts/dist/dev.js"]);
+Module.ccall(
+  "PangeaScript_SetStartupScript",
+  "number",
+  ["string"],
+  ["Data/Scripts/dist/dev.js"],
+);
 Module.ccall("PangeaScript_Reload", "number", [], []);
 ```
 
@@ -46,26 +51,26 @@ Module.ccall("PangeaScript_Reload", "number", [], []);
 
 When `PANGEA_ENABLE_SCRIPTING=ON`, WebAssembly builds export:
 
-| Export | Purpose |
-|--------|---------|
-| `_PangeaScript_IsEnabled` | Returns whether the scripting host is compiled and initialized |
-| `_PangeaScript_SetStartupScript` | Sets the compiled JavaScript startup script path |
-| `_PangeaScript_Reload` | Reloads the startup script |
-| `_PangeaScript_GetLastError` | Returns the latest scripting error string |
-| `_PangeaScript_GetErrorCount` | Returns accumulated non-fatal errors |
+| Export                           | Purpose                                                        |
+| -------------------------------- | -------------------------------------------------------------- |
+| `_PangeaScript_IsEnabled`        | Returns whether the scripting host is compiled and initialized |
+| `_PangeaScript_SetStartupScript` | Sets the compiled JavaScript startup script path               |
+| `_PangeaScript_Reload`           | Reloads the startup script                                     |
+| `_PangeaScript_GetLastError`     | Returns the latest scripting error string                      |
+| `_PangeaScript_GetErrorCount`    | Returns accumulated non-fatal errors                           |
 
 ## Bugdom 2 Hooks
 
 Bugdom 2 currently calls:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | after `InitArea` |
-| `onLevelStart` | immediately before `PlayArea` |
-| `onFrame` | once per terrain gameplay frame before `MoveEverything` |
-| `onLevelComplete` | when `StartLevelCompletion` first fires |
-| `onLevelUnload` | before `CleanupLevel` |
-| `onTerrainItem` | before native terrain item dispatch |
+| Hook              | Call site                                               |
+| ----------------- | ------------------------------------------------------- |
+| `onLevelLoad`     | after `InitArea`                                        |
+| `onLevelStart`    | immediately before `PlayArea`                           |
+| `onFrame`         | once per terrain gameplay frame before `MoveEverything` |
+| `onLevelComplete` | when `StartLevelCompletion` first fires                 |
+| `onLevelUnload`   | before `CleanupLevel`                                   |
+| `onTerrainItem`   | before native terrain item dispatch                     |
 
 Terrain item config remapping is loaded from `levels.json` and applied before the
 native terrain item table dispatch.
@@ -74,15 +79,15 @@ native terrain item table dispatch.
 
 Bugdom currently calls:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | after `InitArea` |
-| `onLevelStart` | immediately before gameplay begins |
-| `onFrame` | once per gameplay frame before object movement |
+| Hook              | Call site                                         |
+| ----------------- | ------------------------------------------------- |
+| `onLevelLoad`     | after `InitArea`                                  |
+| `onLevelStart`    | immediately before gameplay begins                |
+| `onFrame`         | once per gameplay frame before object movement    |
 | `onLevelComplete` | when `gAreaCompleted` is set during level cleanup |
-| `onLevelUnload` | before `CleanupLevel` |
-| `onTerrainItem` | before native terrain item dispatch |
-| `onSplineItem` | before native spline item dispatch |
+| `onLevelUnload`   | before `CleanupLevel`                             |
+| `onTerrainItem`   | before native terrain item dispatch               |
+| `onSplineItem`    | before native spline item dispatch                |
 
 Terrain item config remapping is loaded from `levels.json` before `InitArea` so
 initial terrain priming sees script remaps.
@@ -91,14 +96,14 @@ initial terrain priming sees script remaps.
 
 Nanosaur currently calls:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | after `InitLevel` completes |
-| `onLevelStart` | immediately before gameplay begins |
-| `onFrame` | once per gameplay frame before object movement |
-| `onLevelComplete` | when the game ends in the win state |
-| `onLevelUnload` | before `CleanupLevel` |
-| `onTerrainItem` | before native terrain item dispatch |
+| Hook              | Call site                                      |
+| ----------------- | ---------------------------------------------- |
+| `onLevelLoad`     | after `InitLevel` completes                    |
+| `onLevelStart`    | immediately before gameplay begins             |
+| `onFrame`         | once per gameplay frame before object movement |
+| `onLevelComplete` | when the game ends in the win state            |
+| `onLevelUnload`   | before `CleanupLevel`                          |
+| `onTerrainItem`   | before native terrain item dispatch            |
 
 Terrain item config remapping is loaded from `levels.json` before level
 initialization so initial terrain priming sees script remaps.
@@ -107,15 +112,15 @@ initialization so initial terrain priming sees script remaps.
 
 Otto Matic currently calls:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | after `InitArea` |
-| `onLevelStart` | immediately before gameplay begins |
-| `onFrame` | once per gameplay frame before object movement |
+| Hook              | Call site                                          |
+| ----------------- | -------------------------------------------------- |
+| `onLevelLoad`     | after `InitArea`                                   |
+| `onLevelStart`    | immediately before gameplay begins                 |
+| `onFrame`         | once per gameplay frame before object movement     |
 | `onLevelComplete` | when `gLevelCompleted` is set before level cleanup |
-| `onLevelUnload` | before `CleanupLevel` |
-| `onTerrainItem` | before native terrain item dispatch |
-| `onSplineItem` | before native spline item dispatch |
+| `onLevelUnload`   | before `CleanupLevel`                              |
+| `onTerrainItem`   | before native terrain item dispatch                |
+| `onSplineItem`    | before native spline item dispatch                 |
 
 Terrain item config remapping is loaded from `levels.json` before `InitArea` so
 initial terrain priming sees script remaps.
@@ -124,15 +129,15 @@ initial terrain priming sees script remaps.
 
 Billy Frontier currently calls:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | after each mode-specific area init |
-| `onLevelStart` | immediately before each mode loop begins |
-| `onFrame` | once per area frame before mode object movement |
+| Hook              | Call site                                           |
+| ----------------- | --------------------------------------------------- |
+| `onLevelLoad`     | after each mode-specific area init                  |
+| `onLevelStart`    | immediately before each mode loop begins            |
+| `onFrame`         | once per area frame before mode object movement     |
 | `onLevelComplete` | when a mode exits completed and the player is alive |
-| `onLevelUnload` | before mode cleanup |
-| `onTerrainItem` | before native terrain item dispatch |
-| `onSplineItem` | before native spline item dispatch |
+| `onLevelUnload`   | before mode cleanup                                 |
+| `onTerrainItem`   | before native terrain item dispatch                 |
+| `onSplineItem`    | before native spline item dispatch                  |
 
 Billy uses area numbers as the `levelNum` in shared script contexts. Terrain item
 config remapping is loaded from `levels.json` before each mode-specific area init
@@ -142,15 +147,15 @@ so initial terrain priming sees script remaps.
 
 Nanosaur 2 currently calls these hooks for local adventure mode:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | after `InitLevel` |
-| `onLevelStart` | immediately before gameplay begins |
-| `onFrame` | once per gameplay frame before object movement |
-| `onLevelComplete` | when `gLevelCompleted` is set before cleanup |
-| `onLevelUnload` | before `CleanupLevel` |
-| `onTerrainItem` | before native terrain item dispatch |
-| `onSplineItem` | before native spline item dispatch |
+| Hook              | Call site                                      |
+| ----------------- | ---------------------------------------------- |
+| `onLevelLoad`     | after `InitLevel`                              |
+| `onLevelStart`    | immediately before gameplay begins             |
+| `onFrame`         | once per gameplay frame before object movement |
+| `onLevelComplete` | when `gLevelCompleted` is set before cleanup   |
+| `onLevelUnload`   | before `CleanupLevel`                          |
+| `onTerrainItem`   | before native terrain item dispatch            |
+| `onSplineItem`    | before native spline item dispatch             |
 
 Versus/network modes do not initialize the script host in this first adapter.
 Terrain item config remapping is loaded from `levels.json` before `InitLevel` so
@@ -160,14 +165,14 @@ initial terrain priming sees script remaps.
 
 Mighty Mike currently calls:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | after `InitArea` |
-| `onLevelStart` | immediately before each `PlayArea` loop |
-| `onFrame` | once per 2D simulation frame before the area update/render path |
-| `onLevelComplete` | when a one-player area is completed |
-| `onLevelUnload` | after each `PlayArea` loop exits |
-| `onMapItem` | before native 2D map item dispatch |
+| Hook              | Call site                                                       |
+| ----------------- | --------------------------------------------------------------- |
+| `onLevelLoad`     | after `InitArea`                                                |
+| `onLevelStart`    | immediately before each `PlayArea` loop                         |
+| `onFrame`         | once per 2D simulation frame before the area update/render path |
+| `onLevelComplete` | when a one-player area is completed                             |
+| `onLevelUnload`   | after each `PlayArea` loop exits                                |
+| `onMapItem`       | before native 2D map item dispatch                              |
 
 Mighty Mike uses `scene * 3 + area` as the shared `levelNum` and also passes
 `sceneNum`/`areaNum` on map-item contexts.
@@ -176,15 +181,28 @@ Mighty Mike uses `scene * 3 + area` as the shared `levelNum` and also passes
 
 Cro-Mag Rally currently calls these hooks for local race modes only:
 
-| Hook | Call site |
-|------|-----------|
-| `onLevelLoad` | before `InitArea` race setup |
-| `onLevelStart` | after `InitArea` finishes camera/player setup |
-| `onFrame` | once per race frame after frame accounting |
+| Hook              | Call site                                        |
+| ----------------- | ------------------------------------------------ |
+| `onLevelLoad`     | before `InitArea` race setup                     |
+| `onLevelStart`    | after `InitArea` finishes camera/player setup    |
+| `onFrame`         | once per race frame after frame accounting       |
 | `onLevelComplete` | when a local race exits through track completion |
-| `onLevelUnload` | before `CleanupLevel` |
-| `onTerrainItem` | before native terrain item dispatch |
+| `onLevelUnload`   | before `CleanupLevel`                            |
+| `onTerrainItem`   | before native terrain item dispatch              |
 
 Cro-Mag uses track numbers as the shared `levelNum`. Terrain item contexts also
 include `playerNum` and `networked`; the initial adapter only calls scripting
 when `networked` is false.
+
+## Sample Scripts
+
+The shared authoring package now includes example scripts under
+`shared/script-types/examples/`:
+
+- `bugdom2-main.ts`: minimal Bugdom 2 `onObjectFrame` sample for the tagged player object.
+- `ottomatic-humans.ts`: Otto Matic human hover sample using the new live-object hook.
+- `mightymike-player-sway.ts`: Mighty Mike player sway sample showing the same hook on the 2D adapter.
+
+These samples only use hooks that are implemented today. They avoid runtime
+surfaces that are still stubbed in the native host, such as scripted spawning
+or `player.get`, so they are safe starting points for real content.

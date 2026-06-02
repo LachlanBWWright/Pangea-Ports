@@ -324,6 +324,9 @@ struct ObjNode
 	OGLPoint3D		SpecialPt[3];
 	struct ObjNode*	SpecialObjPtr[3];
 	float			Timer;				// misc use timer
+	OGLVector3D		ScriptVisualOffset;
+	uint32_t		ScriptObjectID;
+	uint32_t		ScriptObjectGeneration;
 	
 	float			Health;				// health 0..1
 	float			Damage;				// damage

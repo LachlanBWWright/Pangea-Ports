@@ -132,6 +132,10 @@ struct ObjNode
 	struct ObjNode  *OwnerToMessageNode;	// ptr to owner's message
 	struct ObjNode  *MessageToOwnerNode;	// ptr to message's owner
 	long			MessageTimer;		// time to display message
+	int32_t			ScriptVisualOffsetX;
+	int32_t			ScriptVisualOffsetY;
+	uint32_t		ScriptObjectID;
+	uint32_t		ScriptObjectGeneration;
 
 	long			Worth;				// "worth" of object / # coins to give
 	long		InjuryThreshold;	// threshold for weapon to do damage to enemy

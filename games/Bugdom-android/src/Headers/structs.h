@@ -299,6 +299,11 @@ struct ObjNode
 
 	short				EffectChannel;			// effect sound channel index (-1 = none)
 	int32_t				ParticleGroup;
+
+		// --- Live-object scripting extension ---
+		TQ3Vector3D	ScriptVisualOffset;
+		int			ScriptObjectID;
+		int			ScriptObjectGeneration;
 };
 typedef struct ObjNode ObjNode;
 

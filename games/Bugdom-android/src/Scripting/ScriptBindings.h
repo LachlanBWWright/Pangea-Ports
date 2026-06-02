@@ -17,4 +17,13 @@ int BugdomScript_RemapTerrainItemType(int levelNum, int itemType);
 Boolean BugdomScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
 Boolean BugdomScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splineNum);
 
+// --- Live-object scripting extension ---
+typedef struct ObjNode ObjNode;
+void BugdomScript_ResetObjectRegistry(void);
+void BugdomScript_RegisterPlayerObject(ObjNode* playerObj);
+void BugdomScript_UnregisterPlayerObject(ObjNode* playerObj);
+void BugdomScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
+void BugdomScript_ApplyObjectScripting(ObjNode* obj);
+void BugdomScript_RunObjectFrame(ObjNode* obj);
+
 #endif

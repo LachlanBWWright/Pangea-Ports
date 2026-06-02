@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +32,21 @@ typedef enum PangeaScriptHook
 	PANGEA_SCRIPT_HOOK_TERRAIN_ITEM,
 	PANGEA_SCRIPT_HOOK_SPLINE_ITEM,
 	PANGEA_SCRIPT_HOOK_MAP_ITEM,
+	PANGEA_SCRIPT_HOOK_OBJECT_FRAME,
 } PangeaScriptHook;
+
+typedef struct PangeaScriptVector3
+{
+	float x;
+	float y;
+	float z;
+} PangeaScriptVector3;
+
+typedef struct PangeaScriptObjectHandle
+{
+	int id;
+	uint32_t generation;
+} PangeaScriptObjectHandle;
 
 typedef struct PangeaScriptGameInfo
 {
@@ -95,6 +110,40 @@ typedef struct PangeaScriptMapItemContext
 	bool markInUse;
 } PangeaScriptMapItemContext;
 
+typedef struct PangeaScriptObjectOps
+{
+	bool (*getPosition)(void* nativeObject, PangeaScriptVector3* outPosition);
+	bool (*setPosition)(void* nativeObject, const PangeaScriptVector3* position);
+	bool (*setVelocity)(void* nativeObject, const PangeaScriptVector3* velocity);
+	bool (*deleteObject)(void* nativeObject);
+} PangeaScriptObjectOps;
+
+typedef struct PangeaScriptObjectRegistration
+{
+	void* nativeObject;
+	const PangeaScriptObjectOps* ops;
+	const char* const* tags;
+	int tagCount;
+} PangeaScriptObjectRegistration;
+
+typedef struct PangeaScriptObjectFrameContext
+{
+	int levelNum;
+	unsigned int frameNum;
+	float deltaSeconds;
+	float levelTimeSeconds;
+	PangeaScriptObjectHandle object;
+	PangeaScriptVector3 position;
+	const char* const* tags;
+	int tagCount;
+} PangeaScriptObjectFrameContext;
+
+typedef struct PangeaScriptObjectFrameResult
+{
+	bool hasPositionOffset;
+	PangeaScriptVector3 positionOffset;
+} PangeaScriptObjectFrameResult;
+
 typedef struct PangeaScriptNativeItem
 {
 	const char* id;
@@ -125,6 +174,15 @@ PangeaScriptStatus PangeaScript_CallFrameHook(const PangeaScriptFrameContext* co
 PangeaScriptStatus PangeaScript_CallTerrainItemHook(PangeaScriptTerrainItemContext* context);
 PangeaScriptStatus PangeaScript_CallSplineItemHook(PangeaScriptSplineItemContext* context);
 PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* context);
+PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult);
+
+void PangeaScript_ResetObjects(void);
+PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistration* registration, PangeaScriptObjectHandle* outHandle);
+bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle);
+bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition);
+bool PangeaScript_SetObjectPosition(PangeaScriptObjectHandle handle, const PangeaScriptVector3* position);
+bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const PangeaScriptVector3* velocity);
+bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle);
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count);
 PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z);

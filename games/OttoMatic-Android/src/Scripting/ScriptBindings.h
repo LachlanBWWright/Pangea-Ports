@@ -16,5 +16,9 @@ void OttoScript_OnLevelUnload(int levelNum);
 int OttoScript_RemapTerrainItemType(int levelNum, int itemType);
 Boolean OttoScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
 Boolean OttoScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splineNum);
+void OttoScript_RegisterHuman(ObjNode* human);
+void OttoScript_UnregisterHuman(ObjNode* human);
+void OttoScript_RunHumanObjectFrame(ObjNode* human, Boolean usesGlobals);
+void OttoScript_ApplyHumanVisualOffset(ObjNode* human);
 
 #endif

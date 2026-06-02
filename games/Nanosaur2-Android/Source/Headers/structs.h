@@ -347,6 +347,10 @@ struct ObjNode
 	float			Health;				// health 0..1
 	float			Damage;				// damage
 
+	// --- Live-object scripting extension ---
+	OGLVector3D ScriptVisualOffset;
+	uint32_t ScriptObjectID;
+	uint32_t ScriptObjectGeneration;
 
 			/* 3D CALCULATION STUFF */
 

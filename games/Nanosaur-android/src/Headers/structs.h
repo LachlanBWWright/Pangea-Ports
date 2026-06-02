@@ -236,6 +236,9 @@ struct ObjNode
 	long			Special[6];
 	float			SpecialF[6];
 	struct ObjNode	*SpecialRef[6];		// source port addition for 64-bit compat
+	TQ3Vector3D		ScriptVisualOffset;
+	uint32_t		ScriptObjectID;
+	uint32_t		ScriptObjectGeneration;
 	float			Health;				// health 0..1
 	float			Damage;				// damage
 	

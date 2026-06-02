@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -372,6 +376,11 @@ ObjNode		*thisNodePtr;
 		{
 			KeepOldCollisionBoxes(thisNodePtr);				// keep old boxes & other stuff
 			thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+				Bugdom2Script_RunObjectFrame(thisNodePtr);
+#endif
 		}
 
 next:

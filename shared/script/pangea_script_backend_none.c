@@ -72,3 +72,13 @@ PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* back
 		error[0] = '\0';
 	return PANGEA_SCRIPT_RUNTIME_ERROR;
 }
+
+PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* backend, const PangeaScriptObjectFrameContext* context, PangeaScriptObjectFrameResult* result, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	(void) result;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}

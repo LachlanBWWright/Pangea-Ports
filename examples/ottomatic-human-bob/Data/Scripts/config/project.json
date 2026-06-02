@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "game": "Otto Matic",
+  "runtime": "duktape",
+  "configRoot": "Data/Scripts/config",
+  "sourceRoot": "Data/Scripts/src",
+  "distRoot": "Data/Scripts/dist",
+  "features": {
+    "nativeBindings": true,
+    "customPlacements": true,
+    "parameterSchemas": true
+  }
+}

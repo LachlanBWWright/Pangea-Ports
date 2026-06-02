@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "objects": [
+    {
+      "id": "custom.repairDrone",
+      "name": "Repair Drone",
+      "modelFormat": "bg3d",
+      "modelPath": "Data/Scripts/assets/models/repair-drone.bg3d",
+      "scriptModule": "ottomatic/humans",
+      "behavior": "repairDroneHover",
+      "collision": "capsule",
+      "tags": ["ottomatic.custom", "scripted.preview"],
+      "defaultParamRefs": ["motion.verticalBob", "drone.scanRadius"]
+    }
+  ]
+}

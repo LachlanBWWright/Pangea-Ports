@@ -10,6 +10,10 @@
 /****************************/
 
 #include "game.h"
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include <SDL3/SDL_scancode.h>
 
 /****************************/
@@ -109,6 +113,10 @@ ObjNode			*newObj;
 
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CAR_SUBMARINE, 13, 13, false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterPlayerObject(newObj);
+#endif
 
 
 	return(newObj);

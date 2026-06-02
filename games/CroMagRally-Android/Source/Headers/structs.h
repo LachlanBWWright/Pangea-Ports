@@ -336,6 +336,11 @@ struct ObjNode
 	uint32_t			ParticleMagicNum;
 
 	OGLColorRGBA		ColorFilter;
+
+		// --- Live-object scripting extension ---
+		OGLVector3D	ScriptVisualOffset;
+		int			ScriptObjectID;
+		int			ScriptObjectGeneration;
 };
 typedef struct ObjNode ObjNode;
 

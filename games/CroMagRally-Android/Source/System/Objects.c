@@ -14,6 +14,10 @@
 #include "profiling.h"
 #include <stddef.h>
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 extern int gMyState_ProjectionType;
 
 
@@ -422,6 +426,11 @@ ObjNode		*thisNodePtr;
 		if ((!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE)) &&	(thisNodePtr->MoveCall != nil))
 		{
 			thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+				CroMagScript_RunObjectFrame(thisNodePtr);
+#endif
 		}
 
 next:

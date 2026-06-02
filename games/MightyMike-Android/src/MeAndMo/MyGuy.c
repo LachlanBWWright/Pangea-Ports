@@ -28,6 +28,10 @@
 #include "input.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -226,6 +230,10 @@ void InitMe(void)
 
 	gMyMode = MY_MODE_BASICSTAND;				// set my MODE
 
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterPlayerObject(gMyNodePtr);
+#endif
 }
 
 

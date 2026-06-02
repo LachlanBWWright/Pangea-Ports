@@ -16,5 +16,14 @@ void Bugdom2Script_OnLevelUnload(int levelNum);
 int Bugdom2Script_RemapTerrainItemType(int levelNum, int itemType);
 Boolean Bugdom2Script_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
 
+// --- Live-object scripting extension ---
+typedef struct ObjNode ObjNode;
+void Bugdom2Script_ResetObjectRegistry(void);
+void Bugdom2Script_RegisterPlayerObject(ObjNode* playerObj);
+void Bugdom2Script_UnregisterPlayerObject(ObjNode* playerObj);
+void Bugdom2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx);
+void Bugdom2Script_ApplyObjectScripting(ObjNode* obj);
+void Bugdom2Script_RunObjectFrame(ObjNode* obj);
+
 #endif
 

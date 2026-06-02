@@ -17,4 +17,14 @@ int BillyScript_RemapTerrainItemType(int areaNum, int itemType);
 Boolean BillyScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int areaNum, int originalType, int remappedType, float x, float z);
 Boolean BillyScript_OnSplineItem(SplineItemType* itemPtr, int areaNum, int splineNum);
 
+// --- Live-object scripting extension ---
+typedef struct ObjNode ObjNode;
+void BillyScript_ResetObjectRegistry(void);
+void BillyScript_RegisterPlayerObject(ObjNode* playerObj);
+void BillyScript_UnregisterPlayerObject(ObjNode* playerObj);
+void BillyScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
+void BillyScript_ApplyObjectScripting(ObjNode* obj);
+// Utility for MoveObjects loop
+void BillyScript_RunObjectFrame(ObjNode* obj);
+
 #endif

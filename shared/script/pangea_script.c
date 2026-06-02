@@ -10,6 +10,8 @@
 #define PANGEA_SCRIPT_CONFIG_CAPACITY 65536
 #define PANGEA_SCRIPT_MAX_REMAPS 64
 #define PANGEA_SCRIPT_MAX_NATIVE_ITEMS 128
+#define PANGEA_SCRIPT_MAX_OBJECTS 2048
+#define PANGEA_SCRIPT_MAX_OBJECT_TAGS 8
 
 typedef struct ItemRemap
 {
@@ -17,6 +19,16 @@ typedef struct ItemRemap
 	int fromType;
 	int toType;
 } ItemRemap;
+
+typedef struct RegisteredObject
+{
+	bool active;
+	uint32_t generation;
+	void* nativeObject;
+	const PangeaScriptObjectOps* ops;
+	const char* tags[PANGEA_SCRIPT_MAX_OBJECT_TAGS];
+	int tagCount;
+} RegisteredObject;
 
 static PangeaScriptGameInfo gGameInfo;
 static char gStartupScriptPath[PANGEA_SCRIPT_PATH_CAPACITY];
@@ -31,6 +43,55 @@ static ItemRemap gItemRemaps[PANGEA_SCRIPT_MAX_REMAPS];
 static int gItemRemapCount;
 static PangeaScriptNativeItem gNativeItems[PANGEA_SCRIPT_MAX_NATIVE_ITEMS];
 static int gNativeItemCount;
+static RegisteredObject gRegisteredObjects[PANGEA_SCRIPT_MAX_OBJECTS];
+
+static void reset_objects(void)
+{
+	memset(gRegisteredObjects, 0, sizeof(gRegisteredObjects));
+}
+
+static void clear_registered_object(RegisteredObject* object)
+{
+	if (!object)
+		return;
+
+	object->active = false;
+	object->nativeObject = NULL;
+	object->ops = NULL;
+	object->tagCount = 0;
+	memset(object->tags, 0, sizeof(object->tags));
+	object->generation++;
+	if (object->generation == 0)
+		object->generation = 1;
+}
+
+static RegisteredObject* resolve_object(PangeaScriptObjectHandle handle)
+{
+	if (handle.id <= 0 || handle.id > PANGEA_SCRIPT_MAX_OBJECTS)
+		return NULL;
+
+	RegisteredObject* object = &gRegisteredObjects[handle.id - 1];
+	if (!object->active)
+		return NULL;
+
+	if (object->generation != handle.generation)
+		return NULL;
+
+	return object;
+}
+
+static void configure_registered_object(RegisteredObject* object, const PangeaScriptObjectRegistration* registration)
+{
+	object->active = true;
+	object->nativeObject = registration->nativeObject;
+	object->ops = registration->ops;
+	object->tagCount = registration->tagCount;
+	memset(object->tags, 0, sizeof(object->tags));
+	for (int i = 0; i < registration->tagCount; i++)
+		object->tags[i] = registration->tags[i];
+	if (object->generation == 0)
+		object->generation = 1;
+}
 
 static void set_error(PangeaScriptStatus status, const char* message)
 {
@@ -232,6 +293,7 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 	gScriptLoaded = false;
 	gErrorCount = 0;
 	gItemRemapCount = 0;
+	reset_objects();
 	set_error(PANGEA_SCRIPT_OK, "");
 	return PANGEA_SCRIPT_OK;
 }
@@ -241,6 +303,7 @@ void PangeaScript_Shutdown(void)
 	gInitialized = false;
 	gScriptLoaded = false;
 	gItemRemapCount = 0;
+	reset_objects();
 	if (gBackend)
 	{
 		PangeaScriptBackend_Destroy(gBackend);
@@ -482,6 +545,146 @@ PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* cont
 	if (status != PANGEA_SCRIPT_OK)
 		set_backend_error(status, backendError);
 	return status;
+}
+
+PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult)
+{
+	if (!frameContext || !outResult)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	outResult->hasPositionOffset = false;
+	outResult->positionOffset.x = 0.0f;
+	outResult->positionOffset.y = 0.0f;
+	outResult->positionOffset.z = 0.0f;
+
+	if (!gInitialized)
+		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (!gScriptLoaded)
+		return PANGEA_SCRIPT_FILE_NOT_FOUND;
+	if (!gBackend)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !object->ops || !object->ops->getPosition)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	PangeaScriptVector3 position;
+	if (!object->ops->getPosition(object->nativeObject, &position))
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	const PangeaScriptObjectFrameContext context =
+	{
+		.levelNum = frameContext->levelNum,
+		.frameNum = frameContext->frameNum,
+		.deltaSeconds = frameContext->deltaSeconds,
+		.levelTimeSeconds = frameContext->levelTimeSeconds,
+		.object = handle,
+		.position = position,
+		.tags = object->tags,
+		.tagCount = object->tagCount,
+	};
+
+	char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
+	backendError[0] = '\0';
+	PangeaScriptStatus status = PangeaScriptBackend_CallObjectFrameHook(gBackend, &context, outResult, backendError, (int)sizeof(backendError));
+	if (status != PANGEA_SCRIPT_OK)
+		set_backend_error(status, backendError);
+	return status;
+}
+
+void PangeaScript_ResetObjects(void)
+{
+	reset_objects();
+}
+
+PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistration* registration, PangeaScriptObjectHandle* outHandle)
+{
+	if (!registration || !registration->nativeObject || !registration->ops || !registration->ops->getPosition)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	if (registration->tagCount < 0 || registration->tagCount > PANGEA_SCRIPT_MAX_OBJECT_TAGS)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	int freeIndex = -1;
+	for (int i = 0; i < PANGEA_SCRIPT_MAX_OBJECTS; i++)
+	{
+		RegisteredObject* object = &gRegisteredObjects[i];
+		if (object->active)
+		{
+			if (object->nativeObject == registration->nativeObject)
+			{
+				configure_registered_object(object, registration);
+				if (outHandle)
+				{
+					outHandle->id = i + 1;
+					outHandle->generation = object->generation;
+				}
+				return PANGEA_SCRIPT_OK;
+			}
+			continue;
+		}
+
+		if (freeIndex < 0)
+			freeIndex = i;
+	}
+
+	if (freeIndex < 0)
+		return PANGEA_SCRIPT_BUDGET_EXCEEDED;
+
+	RegisteredObject* object = &gRegisteredObjects[freeIndex];
+	configure_registered_object(object, registration);
+	if (outHandle)
+	{
+		outHandle->id = freeIndex + 1;
+		outHandle->generation = object->generation;
+	}
+	return PANGEA_SCRIPT_OK;
+}
+
+bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object)
+		return false;
+
+	clear_registered_object(object);
+	return true;
+}
+
+bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !outPosition || !object->ops || !object->ops->getPosition)
+		return false;
+
+	return object->ops->getPosition(object->nativeObject, outPosition);
+}
+
+bool PangeaScript_SetObjectPosition(PangeaScriptObjectHandle handle, const PangeaScriptVector3* position)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !position || !object->ops || !object->ops->setPosition)
+		return false;
+
+	return object->ops->setPosition(object->nativeObject, position);
+}
+
+bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const PangeaScriptVector3* velocity)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !velocity || !object->ops || !object->ops->setVelocity)
+		return false;
+
+	return object->ops->setVelocity(object->nativeObject, velocity);
+}
+
+bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !object->ops || !object->ops->deleteObject)
+		return false;
+
+	return object->ops->deleteObject(object->nativeObject);
 }
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count)

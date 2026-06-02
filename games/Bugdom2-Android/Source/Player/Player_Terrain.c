@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -169,6 +173,10 @@ ObjNode	*newObj;
 		PutPlayerInBalsaPlane(newObj);
 	else
 		AttachShadowToObject(newObj, 0, DEFAULT_PLAYER_SHADOW_SCALE,DEFAULT_PLAYER_SHADOW_SCALE * .8f, true);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterPlayerObject(newObj);
+#endif
 
 }
 

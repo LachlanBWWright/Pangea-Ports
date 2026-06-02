@@ -17,4 +17,13 @@ int Nanosaur2Script_RemapTerrainItemType(int levelNum, int itemType);
 Boolean Nanosaur2Script_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
 Boolean Nanosaur2Script_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splineNum);
 
+// --- Live-object scripting extension ---
+typedef struct ObjNode ObjNode;
+void Nanosaur2Script_ResetObjectRegistry(void);
+void Nanosaur2Script_RegisterPlayerObject(ObjNode* playerObj);
+void Nanosaur2Script_UnregisterPlayerObject(ObjNode* playerObj);
+void Nanosaur2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx);
+void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj);
+void Nanosaur2Script_RunObjectFrame(ObjNode* obj);
+
 #endif

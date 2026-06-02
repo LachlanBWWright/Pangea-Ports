@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -131,6 +135,10 @@ float	y;
 				/* MAKE SHADOW */
 				
 	AttachShadowToObject(newObj, .9, .9*2.5);
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_RegisterPlayerObject(newObj);
+	#endif
 				
 
 			/* MAKE APPEARANCE TIME PORTAL */

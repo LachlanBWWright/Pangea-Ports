@@ -496,6 +496,8 @@ const uint8_t*	srcPtr;
 	frameNum = theNodePtr->CurrentFrame;			// get frame #
 	x = (theNodePtr->X.Int);						// get short x coord
 	y = (theNodePtr->Y.Int);						// get short y coord
+	x += theNodePtr->ScriptVisualOffsetX / 65536;
+	y += theNodePtr->ScriptVisualOffsetY / 65536;
 
 					/* CALC ADDRESS OF FRAME TO DRAW */
 
@@ -653,6 +655,8 @@ int32_t	x, y;
 					/* GET OBJECT POSITION (INTERPOLATED IN FRAMERATE-INDEPENDENT MODE)  */
 
 	TweenObjectPosition(theNodePtr, &x, &y);
+	x += theNodePtr->ScriptVisualOffsetX / 65536;
+	y += theNodePtr->ScriptVisualOffsetY / 65536;
 
 					/* CALC ADDRESS OF FRAME TO DRAW */
 

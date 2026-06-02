@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "params": [
+    {
+      "id": "motion.verticalBob",
+      "label": "Vertical Bob Height",
+      "kind": "number",
+      "description": "Amplitude for the human and repair-drone hover offset.",
+      "defaultValue": 80,
+      "enumOptions": []
+    },
+    {
+      "id": "npc.wavePeriod",
+      "label": "Wave Period",
+      "kind": "number",
+      "description": "Seconds between hand-wave loops for Otto humans.",
+      "defaultValue": 1.5,
+      "enumOptions": []
+    },
+    {
+      "id": "drone.scanRadius",
+      "label": "Scan Radius",
+      "kind": "number",
+      "description": "Distance in world units before the repair drone shifts into scan mode.",
+      "defaultValue": 420,
+      "enumOptions": []
+    }
+  ]
+}
