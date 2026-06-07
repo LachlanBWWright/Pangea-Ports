@@ -169,6 +169,7 @@ if args.configure:
 
     call(["emcmake", "cmake", "-S", ".", "-B", build_dir,
           "-DCMAKE_BUILD_TYPE=Release",
+          "-DPANGEA_ENABLE_SCRIPTING=ON",
           f"-DSDL3_DIR={sdl3_cmake_dir}"])
 
 # ---- STEP 3: Build ----

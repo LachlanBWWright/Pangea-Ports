@@ -4,15 +4,19 @@ set(PANGEA_SCRIPT_SOURCES
 	pangea_script.c
 )
 
-if(PANGEA_SCRIPT_USE_DUKTAPE AND NOT EMSCRIPTEN AND NOT ANDROID)
+if(EMSCRIPTEN)
+	list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_emscripten.c)
+elseif(PANGEA_SCRIPT_USE_DUKTAPE AND NOT ANDROID)
 	find_library(PANGEA_SCRIPT_DUKTAPE_LIBRARY NAMES duktape libduktape.so.207)
 	find_path(PANGEA_SCRIPT_DUKTAPE_INCLUDE_DIR NAMES duktape.h)
 endif()
 
-if(PANGEA_SCRIPT_DUKTAPE_LIBRARY AND PANGEA_SCRIPT_DUKTAPE_INCLUDE_DIR)
-	list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_duktape.c)
-else()
-	list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_none.c)
+if(NOT EMSCRIPTEN)
+	if(PANGEA_SCRIPT_DUKTAPE_LIBRARY AND PANGEA_SCRIPT_DUKTAPE_INCLUDE_DIR)
+		list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_duktape.c)
+	else()
+		list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_none.c)
+	endif()
 endif()
 
 add_library(PangeaScript STATIC ${PANGEA_SCRIPT_SOURCES})

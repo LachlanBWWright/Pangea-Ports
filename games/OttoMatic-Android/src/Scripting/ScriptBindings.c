@@ -3,6 +3,9 @@
 #include "game.h"
 #include "ScriptBindings.h"
 
+#include <stdio.h>
+#include <string.h>
+
 static const PangeaScriptNativeItem kNativeItems[] =
 {
 	{
@@ -163,18 +166,26 @@ static const PangeaScriptObjectOps kOttoHumanObjectOps =
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 {
-	static Boolean runtimeUnavailableLogged = false;
+	static PangeaScriptStatus lastStatus = PANGEA_SCRIPT_OK;
+	static char lastAction[64];
+	static char lastError[256];
+	const char* error;
 
 	if (status == PANGEA_SCRIPT_OK || status == PANGEA_SCRIPT_FILE_NOT_FOUND || status == PANGEA_SCRIPT_NOT_ENABLED)
 		return;
 
-	if (status == PANGEA_SCRIPT_RUNTIME_ERROR && runtimeUnavailableLogged)
+	error = PangeaScript_GetLastError();
+	if (!error)
+		error = "";
+
+	if (status == lastStatus && strcmp(action, lastAction) == 0 && strcmp(error, lastError) == 0)
 		return;
 
-	if (status == PANGEA_SCRIPT_RUNTIME_ERROR)
-		runtimeUnavailableLogged = true;
+	lastStatus = status;
+	snprintf(lastAction, sizeof(lastAction), "%s", action);
+	snprintf(lastError, sizeof(lastError), "%s", error);
 
-	SDL_Log("Otto Matic scripting %s failed: %s", action, PangeaScript_GetLastError());
+	SDL_Log("Otto Matic scripting %s failed: %s", action, error);
 }
 
 void OttoScript_Init(void)
@@ -417,6 +428,25 @@ void OttoScript_RunHumanObjectFrame(ObjNode* human, Boolean usesGlobals)
 	gCurrentScriptObject = human;
 	gCurrentScriptObjectUsesGlobals = usesGlobals;
 	status = PangeaScript_CallObjectFrame(handle, &gCurrentFrameContext, &result);
+
+	const char* error = PangeaScript_GetLastError();
+	if (status == PANGEA_SCRIPT_BAD_ARGUMENT && error && strstr(error, "stale object handle"))
+	{
+		human->ScriptObjectID = 0;
+		human->ScriptObjectGeneration = 0;
+		OttoScript_RegisterHuman(human);
+
+		if (human->ScriptObjectID > 0)
+		{
+			handle = (PangeaScriptObjectHandle)
+			{
+				.id = human->ScriptObjectID,
+				.generation = human->ScriptObjectGeneration,
+			};
+			status = PangeaScript_CallObjectFrame(handle, &gCurrentFrameContext, &result);
+		}
+	}
+
 	gCurrentScriptObject = NULL;
 	gCurrentScriptObjectUsesGlobals = false;
 

@@ -479,6 +479,7 @@ class EmscriptenProject(Project):
             "-DCMAKE_BUILD_TYPE=Release",
             "-DBUILD_SDL_FROM_SOURCE=ON",
             "-DSDL_STATIC=ON",              # Emscripten only supports static libs
+            "-DPANGEA_ENABLE_SCRIPTING=ON",
             f"-DSDL3_DIR={sdl_source_dir}",
         ])
 

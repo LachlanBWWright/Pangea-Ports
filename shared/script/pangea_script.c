@@ -550,7 +550,10 @@ PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* cont
 PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult)
 {
 	if (!frameContext || !outResult)
+	{
+		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "PangeaScript_CallObjectFrame received an incomplete frame context or result pointer");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	}
 
 	outResult->hasPositionOffset = false;
 	outResult->positionOffset.x = 0.0f;
@@ -565,12 +568,24 @@ PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle,
 		return PANGEA_SCRIPT_RUNTIME_ERROR;
 
 	RegisteredObject* object = resolve_object(handle);
-	if (!object || !object->ops || !object->ops->getPosition)
+	if (!object)
+	{
+		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "PangeaScript_CallObjectFrame received an unknown or stale object handle");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	}
+
+	if (!object->ops || !object->ops->getPosition)
+	{
+		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "PangeaScript_CallObjectFrame received an object without position access");
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	}
 
 	PangeaScriptVector3 position;
 	if (!object->ops->getPosition(object->nativeObject, &position))
+	{
+		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "PangeaScript_CallObjectFrame could not read the object's current position");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	}
 
 	const PangeaScriptObjectFrameContext context =
 	{
