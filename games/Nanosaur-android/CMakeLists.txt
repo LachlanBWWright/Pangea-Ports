@@ -400,6 +400,15 @@ if(EMSCRIPTEN)
 			"_PangeaScript_Reload"
 			"_PangeaScript_GetLastError"
 			"_PangeaScript_GetErrorCount"
+			"_PangeaScript_GetStatusEnabled"
+			"_PangeaScript_GetStatusConfigLoaded"
+			"_PangeaScript_GetStatusBundleLoaded"
+			"_PangeaScript_GetStatusActiveScriptPath"
+			"_PangeaScript_GetStatusLastError"
+			"_PangeaScript_GetStatusErrorCount"
+			"_PangeaScript_GetStatusBudgetExceededCount"
+			"_PangeaScript_GetStatusHooksCalledCount"
+			"_PangeaScript_GetStatusScriptsDisabled"
 		)
 	endif()
 	list(JOIN WASM_EXPORTED_FUNCTIONS "," WASM_EXPORTED_FUNCTIONS_STR)

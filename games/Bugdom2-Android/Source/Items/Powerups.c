@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -585,7 +589,12 @@ OGLPoint3D	where;
 
 	pow = MakePOW(itemPtr->parm[0], &where);
 	if (pow)
+	{
 		pow->TerrainItemPtr = itemPtr;			// keep ptr to item list
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_RegisterObject(pow, "bugdom2.powerup", "powerup");
+#endif
+	}
 
 	return(true);
 }

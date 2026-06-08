@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -136,6 +140,9 @@ short	weaponType = itemPtr->parm[0];
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 5, 2, true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.weaponPow", "pickup");
+#endif
 
 	return(true);													// item was added
 }
@@ -322,6 +329,9 @@ Boolean AddHealthPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 4, 1.5, true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.healthPow", "pickup");
+#endif
 
 	return(true);													// item was added
 }

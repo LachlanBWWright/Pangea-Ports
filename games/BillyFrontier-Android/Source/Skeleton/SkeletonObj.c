@@ -12,6 +12,10 @@
 #include "game.h"
 #include "bones.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -159,6 +163,62 @@ int		type;
 	UpdateSkinnedGeometry(newNode);								// prime the trimesh
 
 	CalcObjectRadiusFromBBox(newNode);							// set correct bounding sphere for fence collision
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newNode)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		switch (newObjDef->type)
+		{
+			case SKELETON_TYPE_BILLY:
+				nativeId = "billy.player";
+				category = "player";
+				break;
+			case SKELETON_TYPE_BANDITO:
+				nativeId = "billy.enemy.bandito";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_RYGAR:
+				nativeId = "billy.enemy.rygar";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_SHORTY:
+				nativeId = "billy.enemy.shorty";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_KANGACOW:
+				nativeId = "billy.enemy.kangacow";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_KANGAREX:
+				nativeId = "billy.enemy.kangarex";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_WALKER:
+				nativeId = "billy.enemy.walker";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_TREMORALIEN:
+				nativeId = "billy.enemy.tremoralien";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_TREMORGHOST:
+				nativeId = "billy.enemy.tremorghost";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_FROGMAN:
+				nativeId = "billy.enemy.frogman";
+				category = "enemy";
+				break;
+		}
+
+		if (nativeId && category)
+		{
+			BillyScript_RegisterObject(newNode, nativeId, category);
+		}
+	}
+#endif
 
 	return(newNode);
 }

@@ -22,6 +22,8 @@ typedef struct ObjNode ObjNode;
 void BugdomScript_ResetObjectRegistry(void);
 void BugdomScript_RegisterPlayerObject(ObjNode* playerObj);
 void BugdomScript_UnregisterPlayerObject(ObjNode* playerObj);
+void BugdomScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category);
+void BugdomScript_UnregisterObject(ObjNode* obj);
 void BugdomScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void BugdomScript_ApplyObjectScripting(ObjNode* obj);
 void BugdomScript_RunObjectFrame(ObjNode* obj);

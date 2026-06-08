@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -175,6 +179,53 @@ TQ3BoundingBox *bbox;
 	}
 	newNode->Radius = max;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newNode)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		if (newObjDef->slot == 0) // PLAYER_SLOT is 0 in Nanosaur
+		{
+			nativeId = "nanosaur.player";
+			category = "player";
+		}
+		else
+		{
+			switch (sourceSkeletonNum)
+			{
+				case SKELETON_TYPE_PTERA:
+					nativeId = "nanosaur.enemy.pterodactyl";
+					category = "enemy";
+					break;
+				case SKELETON_TYPE_REX:
+					nativeId = "nanosaur.enemy.trex";
+					category = "enemy";
+					break;
+				case SKELETON_TYPE_STEGO:
+					nativeId = "nanosaur.enemy.stegosaurus";
+					category = "enemy";
+					break;
+				case SKELETON_TYPE_DEINON:
+					nativeId = "nanosaur.enemy.raptor";
+					category = "enemy";
+					break;
+				case SKELETON_TYPE_TRICER:
+					nativeId = "nanosaur.enemy.triceratops";
+					category = "enemy";
+					break;
+				case SKELETON_TYPE_SPITTER:
+					nativeId = "nanosaur.enemy.spitter";
+					category = "enemy";
+					break;
+			}
+		}
+
+		if (nativeId && category)
+		{
+			NanosaurScript_RegisterObject(newNode, nativeId, category);
+		}
+	}
+#endif
 
 	return(newNode);
 }

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /*******************/
 /*   PROTOTYPES    */
 /*******************/
@@ -241,6 +245,9 @@ float			heightOff;
 	SetObjectCollisionBounds(newObj, 300, 0, -150, 150, 150, -150);		// make collision box
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 9, 4, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.pow", "pickup");
+#endif
 
 	return(true);							// item was added
 }
@@ -404,10 +411,11 @@ OGLPoint3D		where;
 
 
 
-			/* MAKE SHADOW */
-
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 12, 5, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.token", "pickup");
+#endif
 
 	return(true);							// item was added
 }

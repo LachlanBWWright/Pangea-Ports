@@ -118,12 +118,22 @@ typedef struct PangeaScriptObjectOps
 	bool (*deleteObject)(void* nativeObject);
 } PangeaScriptObjectOps;
 
+typedef enum PangeaScriptCapabilityLevel
+{
+	PANGEA_SCRIPT_CAPABILITY_DEFAULT = 0,
+	PANGEA_SCRIPT_CAPABILITY_UNSUPPORTED,
+	PANGEA_SCRIPT_CAPABILITY_READ_ONLY,
+	PANGEA_SCRIPT_CAPABILITY_BASE,
+	PANGEA_SCRIPT_CAPABILITY_FULL
+} PangeaScriptCapabilityLevel;
+
 typedef struct PangeaScriptObjectRegistration
 {
 	void* nativeObject;
 	const PangeaScriptObjectOps* ops;
 	const char* const* tags;
 	int tagCount;
+	PangeaScriptCapabilityLevel capabilityLevel;
 } PangeaScriptObjectRegistration;
 
 typedef struct PangeaScriptObjectFrameContext
@@ -186,6 +196,39 @@ bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle);
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count);
 PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z);
+
+typedef enum PangeaScriptLogLevel
+{
+	PANGEA_LOG_INFO = 0,
+	PANGEA_LOG_WARN,
+	PANGEA_LOG_ERROR
+} PangeaScriptLogLevel;
+
+typedef struct PangeaScriptStatusInfo
+{
+	bool enabled;
+	bool configLoaded;
+	bool bundleLoaded;
+	char activeScriptPath[256];
+	char lastError[256];
+	int errorCount;
+	int budgetExceededCount;
+	int hooksCalledCount;
+	bool scriptsDisabled;
+} PangeaScriptStatusInfo;
+
+void PangeaScript_Log(PangeaScriptLogLevel level, const char* source, const char* message);
+void PangeaScript_GetStatusInfo(PangeaScriptStatusInfo* outInfo);
+
+bool PangeaScript_GetStatusEnabled(void);
+bool PangeaScript_GetStatusConfigLoaded(void);
+bool PangeaScript_GetStatusBundleLoaded(void);
+const char* PangeaScript_GetStatusActiveScriptPath(void);
+const char* PangeaScript_GetStatusLastError(void);
+int PangeaScript_GetStatusErrorCount(void);
+int PangeaScript_GetStatusBudgetExceededCount(void);
+int PangeaScript_GetStatusHooksCalledCount(void);
+bool PangeaScript_GetStatusScriptsDisabled(void);
 
 #ifdef __cplusplus
 }

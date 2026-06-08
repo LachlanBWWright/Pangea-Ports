@@ -16,6 +16,11 @@
 #include "shape.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "objecttypes.h"
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -108,6 +113,106 @@ int32_t	offset;
 	AnimateASprite(newSpritePtr);							// initialize anim by calling it
 
 	gMostRecentShape = newSpritePtr;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newSpritePtr)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		if (groupNum == GROUP_MAIN)
+		{
+			if (type == ObjType_MyGuy)
+			{
+				nativeId = "mightymike.player";
+				category = "player";
+			}
+			else if (type == ObjType_Bunny)
+			{
+				nativeId = "mightymike.bunny";
+				category = "pickup";
+			}
+		}
+		else if (groupNum == GROUP_AREA_SPECIFIC)
+		{
+			if (gSceneNum == SCENE_JURASSIC)
+			{
+				if (type == ObjType_Caveman) { nativeId = "mightymike.enemy.caveman"; category = "enemy"; }
+				else if (type == ObjType_Triceratops) { nativeId = "mightymike.enemy.triceratops"; category = "enemy"; }
+				else if (type == ObjType_Turtle) { nativeId = "mightymike.enemy.turtle"; category = "enemy"; }
+			}
+			else if (gSceneNum == SCENE_CANDY)
+			{
+				if (type == ObjType_ChocBunny) { nativeId = "mightymike.enemy.chocbunny"; category = "enemy"; }
+				else if (type == ObjType_GBread) { nativeId = "mightymike.enemy.gingerbread"; category = "enemy"; }
+			}
+			else if (gSceneNum == SCENE_FAIRY)
+			{
+				if (type == ObjType_Witch) { nativeId = "mightymike.enemy.witch"; category = "enemy"; }
+				else if (type == ObjType_Dragon) { nativeId = "mightymike.enemy.dragon"; category = "enemy"; }
+				else if (type == ObjType_Giant) { nativeId = "mightymike.enemy.giant"; category = "enemy"; }
+				else if (type == ObjType_BBWolf) { nativeId = "mightymike.enemy.bbwolf"; category = "enemy"; }
+			}
+			else if (gSceneNum == SCENE_CLOWN)
+			{
+				if (type == ObjType_Clown) { nativeId = "mightymike.enemy.clown"; category = "enemy"; }
+				else if (type == ObjType_MagicHat) { nativeId = "mightymike.enemy.magichat"; category = "enemy"; }
+			}
+			else if (gSceneNum == SCENE_BARGAIN)
+			{
+				if (type == ObjType_8Ball) { nativeId = "mightymike.enemy.8ball"; category = "enemy"; }
+				else if (type == ObjType_BadBattery) { nativeId = "mightymike.enemy.battery"; category = "enemy"; }
+				else if (type == ObjType_Slinky) { nativeId = "mightymike.enemy.slinky"; category = "enemy"; }
+				else if (type == ObjType_BargainHealth) { nativeId = "mightymike.healthPow"; category = "pickup"; }
+			}
+		}
+		else if (groupNum == GROUP_AREA_SPECIFIC2)
+		{
+			if (gSceneNum == SCENE_JURASSIC)
+			{
+				if (type == ObjType_BabyDino) { nativeId = "mightymike.enemy.babydino"; category = "enemy"; }
+				else if (type == ObjType_Rex) { nativeId = "mightymike.enemy.rex"; category = "enemy"; }
+				else if (type == ObjType_DinoEgg) { nativeId = "mightymike.enemy.dinoegg"; category = "enemy"; }
+				else if (type == ObjType_JurassicHealth) { nativeId = "mightymike.healthPow"; category = "pickup"; }
+				else if (type == ObjType_JurassicKeys) { nativeId = "mightymike.key"; category = "pickup"; }
+			}
+			else if (gSceneNum == SCENE_CANDY)
+			{
+				if (type == ObjType_RedGummy) { nativeId = "mightymike.enemy.gummybear"; category = "enemy"; }
+				else if (type == ObjType_Carmel) { nativeId = "mightymike.enemy.caramel"; category = "enemy"; }
+				else if (type == ObjType_LemonDrop) { nativeId = "mightymike.enemy.lemondrop"; category = "enemy"; }
+				else if (type == ObjType_CandyHealth) { nativeId = "mightymike.healthPow"; category = "pickup"; }
+				else if (type == ObjType_CandyKeys) { nativeId = "mightymike.key"; category = "pickup"; }
+				else if (type == ObjType_Mint) { nativeId = "mightymike.enemy.mint"; category = "enemy"; }
+			}
+			else if (gSceneNum == SCENE_FAIRY)
+			{
+				if (type == ObjType_Spider) { nativeId = "mightymike.enemy.spider"; category = "enemy"; }
+				else if (type == ObjType_Soldier) { nativeId = "mightymike.enemy.soldier"; category = "enemy"; }
+				else if (type == ObjType_FairyHealth) { nativeId = "mightymike.healthPow"; category = "pickup"; }
+				else if (type == ObjType_FairyKeys) { nativeId = "mightymike.key"; category = "pickup"; }
+			}
+			else if (gSceneNum == SCENE_CLOWN)
+			{
+				if (type == ObjType_FlowerClown) { nativeId = "mightymike.enemy.flowerclown"; category = "enemy"; }
+				else if (type == ObjType_ClownHealth) { nativeId = "mightymike.healthPow"; category = "pickup"; }
+				else if (type == ObjType_ClownKeys) { nativeId = "mightymike.key"; category = "pickup"; }
+				else if (type == ObjType_ClownCar) { nativeId = "mightymike.enemy.clowncar"; category = "enemy"; }
+			}
+			else if (gSceneNum == SCENE_BARGAIN)
+			{
+				if (type == ObjType_Robot) { nativeId = "mightymike.enemy.robot"; category = "enemy"; }
+				else if (type == ObjType_Doggy) { nativeId = "mightymike.enemy.doggy"; category = "enemy"; }
+				else if (type == ObjType_BargainKeys) { nativeId = "mightymike.key"; category = "pickup"; }
+				else if (type == ObjType_Top) { nativeId = "mightymike.enemy.top"; category = "enemy"; }
+			}
+		}
+
+		if (nativeId && category)
+		{
+			MikeScript_RegisterObject(newSpritePtr, nativeId, category);
+		}
+	}
+#endif
 
 	return (newSpritePtr);									// return ptr to new sprite node
 }

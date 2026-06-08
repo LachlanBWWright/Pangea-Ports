@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -672,6 +676,10 @@ ObjNode	*newObj;
 	newObj->CType 		= CTYPE_MISC | CTYPE_BLOCKCAMERA | CTYPE_BLOCKSHADOW;
 	newObj->CBits			= CBITS_ALLSOLID;
 	CreateCollisionBoxFromBoundingBox(newObj,1,1);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.dcell", "pickup");
+#endif
 
 	return(true);
 }

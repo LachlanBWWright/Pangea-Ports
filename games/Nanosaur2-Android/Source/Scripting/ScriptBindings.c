@@ -52,7 +52,7 @@ static bool Nanosaur2Script_DeleteObject(void* nativeObject)
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
 		return false;
 
-	Nanosaur2Script_UnregisterPlayerObject(obj);
+	Nanosaur2Script_UnregisterObject(obj);
 	DeleteObject(obj);
 	return true;
 }
@@ -77,54 +77,78 @@ void Nanosaur2Script_ResetObjectRegistry(void)
 	PangeaScript_ResetObjects();
 }
 
-void Nanosaur2Script_RegisterPlayerObject(ObjNode* playerObj)
+void Nanosaur2Script_RegisterObject(ObjNode* obj, const char* nativeId, const char* category)
 {
 	PangeaScriptObjectRegistration registration;
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptStatus status;
+	const char* tags[2];
+	int tagCount = 0;
 
-	if (!playerObj)
+	if (!obj)
 		return;
+
+	if (obj->ScriptObjectID > 0)
+		return;
+
+	if (nativeId)
+	{
+		tags[tagCount++] = nativeId;
+	}
+	if (category)
+	{
+		tags[tagCount++] = category;
+	}
 
 	registration = (PangeaScriptObjectRegistration)
 	{
-		.nativeObject = playerObj,
+		.nativeObject = obj,
 		.ops = &kNanosaur2PlayerObjectOps,
-		.tags = kNanosaur2PlayerTags,
-		.tagCount = 1,
+		.tags = tags,
+		.tagCount = tagCount,
 	};
 
 	status = PangeaScript_RegisterObject(&registration, &handle);
-	playerObj->ScriptVisualOffset = (OGLVector3D){0};
+	obj->ScriptVisualOffset = (OGLVector3D){0};
 	if (status == PANGEA_SCRIPT_OK)
 	{
-		playerObj->ScriptObjectID = handle.id;
-		playerObj->ScriptObjectGeneration = handle.generation;
+		obj->ScriptObjectID = handle.id;
+		obj->ScriptObjectGeneration = handle.generation;
 	}
 	else
 	{
-		playerObj->ScriptObjectID = 0;
-		playerObj->ScriptObjectGeneration = 0;
+		obj->ScriptObjectID = 0;
+		obj->ScriptObjectGeneration = 0;
 	}
-	LogScriptStatus("player registration", status);
+	LogScriptStatus("object registration", status);
 }
 
-void Nanosaur2Script_UnregisterPlayerObject(ObjNode* playerObj)
+void Nanosaur2Script_UnregisterObject(ObjNode* obj)
 {
 	PangeaScriptObjectHandle handle;
 
-	if (!playerObj || playerObj->ScriptObjectID == 0)
+	if (!obj || obj->ScriptObjectID == 0)
 		return;
 
 	handle = (PangeaScriptObjectHandle)
 	{
-		.id = (int) playerObj->ScriptObjectID,
-		.generation = playerObj->ScriptObjectGeneration,
+		.id = (int) obj->ScriptObjectID,
+		.generation = obj->ScriptObjectGeneration,
 	};
 	(void) PangeaScript_UnregisterObject(handle);
-	playerObj->ScriptObjectID = 0;
-	playerObj->ScriptObjectGeneration = 0;
-	playerObj->ScriptVisualOffset = (OGLVector3D){0};
+	obj->ScriptObjectID = 0;
+	obj->ScriptObjectGeneration = 0;
+	obj->ScriptVisualOffset = (OGLVector3D){0};
+}
+
+void Nanosaur2Script_RegisterPlayerObject(ObjNode* playerObj)
+{
+	Nanosaur2Script_RegisterObject(playerObj, "nanosaur2.player", "player");
+}
+
+void Nanosaur2Script_UnregisterPlayerObject(ObjNode* playerObj)
+{
+	Nanosaur2Script_UnregisterObject(playerObj);
 }
 
 void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj)

@@ -363,10 +363,15 @@ GLuint Render_LoadTexture(
 	// WebGL 1 does not support GL_BGRA, GL_UNSIGNED_INT_8_8_8_8, GL_UNSIGNED_INT_8_8_8_8_REV
 	// or GL_UNSIGNED_SHORT_1_5_5_5_REV — we must convert to GL_RGBA + GL_UNSIGNED_BYTE.
 	// Also force CLAMP_TO_EDGE: GL_REPEAT on NPOT textures renders black in WebGL 1.
-	if (!(flags & kRendererTextureFlags_ClampU))
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	if (!(flags & kRendererTextureFlags_ClampV))
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	// Only force CLAMP_TO_EDGE for NPOT textures; POT textures may legitimately use GL_REPEAT.
+	{
+		bool npotW = (width  & (width  - 1)) != 0;
+		bool npotH = (height & (height - 1)) != 0;
+		if ((npotW || npotH) && !(flags & kRendererTextureFlags_ClampU))
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		if ((npotW || npotH) && !(flags & kRendererTextureFlags_ClampV))
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	}
 
 	void* converted = NULL;
 	GLenum glFormat = GL_RGBA;
@@ -487,8 +492,16 @@ void Render_Load3DMFTextures(TQ3MetaFile* metaFile, GLuint* outTextureNames)
 		{
 			if (metaFile->meshes[j]->internalTextureID == i)
 			{
-				metaFile->meshes[j]->glTextureName = outTextureNames[i];
-				metaFile->meshes[j]->texturingMode = meshTexturingMode;
+				if (metaFile->meshes[j]->vertexUVs)
+				{
+					metaFile->meshes[j]->glTextureName = outTextureNames[i];
+					metaFile->meshes[j]->texturingMode = meshTexturingMode;
+				}
+				else
+				{
+					metaFile->meshes[j]->glTextureName = 0;
+					metaFile->meshes[j]->texturingMode = kQ3TexturingModeOff;
+				}
 			}
 		}
 	}

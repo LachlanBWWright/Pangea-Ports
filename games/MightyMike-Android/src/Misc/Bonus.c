@@ -9,6 +9,10 @@
 /*    EXTERNALS             */
 /****************************/
 #include "myglobals.h"
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include "window.h"
 #include "enemy.h"
 #include "object.h"
@@ -175,10 +179,11 @@ ObjNode		*newObj;
 	newObj->DZ = -(BUNNY_BOUNCE_FACTOR);				// start bouncing up
 
 
-			/* MAKE SHADOW */
-
 	newObj->ShadowIndex = MakeShadow(newObj,SHADOWSIZE_MEDIUM);	// allocate shadow
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.bunny", "pickup");
+#endif
 
 	return(true);									// was added
 }
@@ -401,6 +406,10 @@ Byte	group,type;
 	newObj->RightOff = 14;
 	CalcObjectBox2(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.healthPow", "pickup");
+#endif
+
 	return(true);									// was added
 }
 
@@ -465,6 +474,10 @@ short	group,type;
 	newObj->LeftOff = -10;
 	newObj->RightOff = 10;
 	CalcObjectBox2(newObj);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.key", "pickup");
+#endif
 
 	return(true);									// was added
 }

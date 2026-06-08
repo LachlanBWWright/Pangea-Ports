@@ -51,7 +51,7 @@ static bool CroMagScript_DeleteObject(void* nativeObject)
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
 		return false;
 
-	CroMagScript_UnregisterPlayerObject(obj);
+	CroMagScript_UnregisterObject(obj);
 	DeleteObject(obj);
 	return true;
 }
@@ -76,54 +76,78 @@ void CroMagScript_ResetObjectRegistry(void)
 	PangeaScript_ResetObjects();
 }
 
-void CroMagScript_RegisterPlayerObject(ObjNode* playerObj)
+void CroMagScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category)
 {
 	PangeaScriptObjectRegistration registration;
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptStatus status;
+	const char* tags[2];
+	int tagCount = 0;
 
-	if (!playerObj)
+	if (!obj)
 		return;
+
+	if (obj->ScriptObjectID > 0)
+		return;
+
+	if (nativeId)
+	{
+		tags[tagCount++] = nativeId;
+	}
+	if (category)
+	{
+		tags[tagCount++] = category;
+	}
 
 	registration = (PangeaScriptObjectRegistration)
 	{
-		.nativeObject = playerObj,
+		.nativeObject = obj,
 		.ops = &kCroMagPlayerObjectOps,
-		.tags = kCroMagPlayerTags,
-		.tagCount = 1,
+		.tags = tags,
+		.tagCount = tagCount,
 	};
 
 	status = PangeaScript_RegisterObject(&registration, &handle);
-	playerObj->ScriptVisualOffset = (OGLVector3D){0};
+	obj->ScriptVisualOffset = (OGLVector3D){0};
 	if (status == PANGEA_SCRIPT_OK)
 	{
-		playerObj->ScriptObjectID = handle.id;
-		playerObj->ScriptObjectGeneration = (int) handle.generation;
+		obj->ScriptObjectID = handle.id;
+		obj->ScriptObjectGeneration = (int) handle.generation;
 	}
 	else
 	{
-		playerObj->ScriptObjectID = 0;
-		playerObj->ScriptObjectGeneration = 0;
+		obj->ScriptObjectID = 0;
+		obj->ScriptObjectGeneration = 0;
 	}
-	LogScriptStatus("player registration", status);
+	LogScriptStatus("object registration", status);
 }
 
-void CroMagScript_UnregisterPlayerObject(ObjNode* playerObj)
+void CroMagScript_UnregisterObject(ObjNode* obj)
 {
 	PangeaScriptObjectHandle handle;
 
-	if (!playerObj || playerObj->ScriptObjectID == 0)
+	if (!obj || obj->ScriptObjectID == 0)
 		return;
 
 	handle = (PangeaScriptObjectHandle)
 	{
-		.id = playerObj->ScriptObjectID,
-		.generation = (uint32_t) playerObj->ScriptObjectGeneration,
+		.id = obj->ScriptObjectID,
+		.generation = (uint32_t) obj->ScriptObjectGeneration,
 	};
 	(void) PangeaScript_UnregisterObject(handle);
-	playerObj->ScriptObjectID = 0;
-	playerObj->ScriptObjectGeneration = 0;
-	playerObj->ScriptVisualOffset = (OGLVector3D){0};
+	obj->ScriptObjectID = 0;
+	obj->ScriptObjectGeneration = 0;
+	obj->ScriptVisualOffset = (OGLVector3D){0};
+}
+
+void CroMagScript_RegisterPlayerObject(ObjNode* playerObj)
+{
+	CroMagScript_RegisterObject(playerObj, "cromag.player", "player");
+}
+
+void CroMagScript_UnregisterPlayerObject(ObjNode* playerObj)
+{
+	CroMagScript_UnregisterObject(playerObj);
 }
 
 void CroMagScript_ApplyObjectScripting(ObjNode* obj)

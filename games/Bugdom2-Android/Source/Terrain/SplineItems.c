@@ -8,6 +8,9 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -152,6 +155,14 @@ void PrimeSplines(void)
 			SplineItemType* itemPtr = &spline->itemList[i];				// point to this item
 			int type = itemPtr->type;									// get item type
 			GAME_ASSERT(type <= MAX_SPLINE_ITEM_NUM);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (Bugdom2Script_OnSplineItem(itemPtr, gLevelNum, s))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
+#endif
 
 			Boolean flag = gSplineItemPrimeRoutines[type](s,itemPtr); 	// call item's Prime routine
 			if (flag)

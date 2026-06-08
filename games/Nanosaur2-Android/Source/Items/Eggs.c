@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -213,9 +217,11 @@ short	eggColor = itemPtr->parm[0];
 
 		if (gNumEggs < MAX_NET_EGGS)
 			gEggObjs[gNumEggs++] = egg;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_RegisterObject(egg, "nanosaur2.egg", "pickup");
+#endif
 	}
-
-
 
 	return(true);													// item was added
 }

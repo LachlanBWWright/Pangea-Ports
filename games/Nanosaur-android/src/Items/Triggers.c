@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /*******************/
 /*   PROTOTYPES    */
@@ -275,6 +279,10 @@ short	n;
 
 	newObj->Kind = n;							// remember which POW kind this is
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.powerup", "powerup");
+#endif
+
 	return(true);							// item was added
 }
 
@@ -400,9 +408,11 @@ float	scale;
 	newObj->TriggerType = TRIGTYPE_CRYSTAL;
 
 
-			/* SET COLLISION INFO */
-			
 	SetObjectCollisionBounds(newObj,70.0f*scale,0,-34.0f*scale,34.0f*scale,34.0f*scale,-34.0f*scale);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.crystal", "pickup");
+#endif
 
 	return(true);							// item was added
 }

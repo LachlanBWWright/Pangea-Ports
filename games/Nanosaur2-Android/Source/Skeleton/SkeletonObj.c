@@ -12,6 +12,10 @@
 #include "game.h"
 #include "profiling.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -153,6 +157,50 @@ int		type;
 
 
 	newNode->VertexArrayMode = VERTEX_ARRAY_RANGE_TYPE_SKELETONS;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newNode)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		switch (type)
+		{
+			case SKELETON_TYPE_PLAYER:
+				nativeId = "nanosaur2.player";
+				category = "player";
+				break;
+			case SKELETON_TYPE_WORMHOLE:
+				nativeId = "nanosaur2.wormhole";
+				category = "trigger";
+				break;
+			case SKELETON_TYPE_RAPTOR:
+				nativeId = "nanosaur2.enemy.raptor";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_BONUSWORMHOLE:
+				nativeId = "nanosaur2.bonuswormhole";
+				category = "trigger";
+				break;
+			case SKELETON_TYPE_BRACH:
+				nativeId = "nanosaur2.enemy.brachiosaurus";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_WORM:
+				nativeId = "nanosaur2.enemy.worm";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_RAMPHOR:
+				nativeId = "nanosaur2.enemy.pterodactyl";
+				category = "enemy";
+				break;
+		}
+
+		if (nativeId && category)
+		{
+			Nanosaur2Script_RegisterObject(newNode, nativeId, category);
+		}
+	}
+#endif
 
 	return(newNode);
 }

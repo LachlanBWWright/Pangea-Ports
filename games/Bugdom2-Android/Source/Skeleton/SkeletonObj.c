@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -177,6 +181,114 @@ ObjNode	*newNode;
 	UpdateSkinnedGeometry(newNode);								// prime the trimesh
 
 	newNode->BoundingSphereRadius =  fabs(newNode->BBox.min.z);	// set correct bounding sphere for fence collision
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newNode)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		switch (newObjDef->type)
+		{
+			case SKELETON_TYPE_MOUSE:
+				nativeId = "bugdom2.player";
+				category = "player";
+				break;
+			case SKELETON_TYPE_SNAIL:
+				nativeId = "bugdom2.enemy.snail";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_GNOME:
+				nativeId = "bugdom2.enemy.gnome";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_HOUSEFLY:
+				nativeId = "bugdom2.enemy.housefly";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_EVILPLANT:
+				nativeId = "bugdom2.enemy.evilplant";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_CHIPMUNK:
+				nativeId = "bugdom2.buddy.chipmunk";
+				category = "buddy";
+				break;
+			case SKELETON_TYPE_SNAKEHEAD:
+				nativeId = "bugdom2.enemy.snake";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_BUDDYBUG:
+				nativeId = "bugdom2.buddy.buddybug";
+				category = "buddy";
+				break;
+			case SKELETON_TYPE_CHECKPOINT:
+				nativeId = "bugdom2.checkpoint";
+				category = "trigger";
+				break;
+			case SKELETON_TYPE_FLEA:
+				nativeId = "bugdom2.enemy.flea";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_TICK:
+				nativeId = "bugdom2.enemy.tick";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_MOUSETRAP:
+				nativeId = "bugdom2.enemy.mousetrap";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_TOYSOLDIER:
+				nativeId = "bugdom2.enemy.toysoldier";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_OTTO:
+				nativeId = "bugdom2.enemy.otto";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_BUMBLEBEE:
+				nativeId = "bugdom2.enemy.bumblebee";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_HOBOBAG:
+				nativeId = "bugdom2.hobobag";
+				category = "pickup";
+				break;
+			case SKELETON_TYPE_DRAGONFLY:
+				nativeId = "bugdom2.ride.dragonfly";
+				category = "buddy";
+				break;
+			case SKELETON_TYPE_FROG:
+				nativeId = "bugdom2.enemy.frog";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_MOTH:
+				nativeId = "bugdom2.enemy.moth";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_COMPUTERBUG:
+				nativeId = "bugdom2.enemy.computerbug";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_ROACH:
+				nativeId = "bugdom2.enemy.roach";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_ANT:
+				nativeId = "bugdom2.enemy.ant";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_FISH:
+				nativeId = "bugdom2.enemy.fish";
+				category = "enemy";
+				break;
+		}
+
+		if (nativeId && category)
+		{
+			Bugdom2Script_RegisterObject(newNode, nativeId, category);
+		}
+	}
+#endif
 
 	return(newNode);
 }

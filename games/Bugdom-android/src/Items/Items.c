@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -186,6 +190,10 @@ float	s;
 	SetObjectCollisionBounds(newObj,2100.0f*s,0,
 							-200.0f*s,200.0f*s,
 							200.0f*s,-200.0f*s);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.clover", "pickup");
+#endif
 
 	return(true);													// item was added
 }

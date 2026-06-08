@@ -21,4 +21,9 @@ void OttoScript_UnregisterHuman(ObjNode* human);
 void OttoScript_RunHumanObjectFrame(ObjNode* human, Boolean usesGlobals);
 void OttoScript_ApplyHumanVisualOffset(ObjNode* human);
 
+void OttoScript_RegisterObjectNode(ObjNode* theNode, PangeaScriptCapabilityLevel capabilityLevel, const char* const* tags, int tagCount);
+void OttoScript_UnregisterObjectNode(ObjNode* theNode);
+void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals);
+void OttoScript_ApplyObjectVisualOffset(ObjNode* theNode);
+
 #endif

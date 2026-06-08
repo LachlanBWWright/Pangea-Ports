@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /*******************/
 /*   PROTOTYPES    */
@@ -298,6 +302,9 @@ Boolean			canBlow;
 			
 	AttachShadowToObject(newObj, 5, 5, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.nut", "pickup");
+#endif
 
 	return(true);							// item was added
 }

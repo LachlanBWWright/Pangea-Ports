@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -93,7 +97,10 @@ ObjNode	*newObj;
 			
 	if (itemPtr->parm[3] & 1)
 		MakeNest(x,z);
-			
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.egg", "pickup");
+#endif
 
 	return(true);								// item was added
 }

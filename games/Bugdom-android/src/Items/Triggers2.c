@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /*******************/
 /*   PROTOTYPES    */
@@ -135,6 +139,11 @@ int		checkpointNum = itemPtr->parm[0];
 		straw->ChainNode = droplet;								// link drop to straw
 		droplet->ChainHead = straw;
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(straw, "bugdom.checkpoint", "trigger");
+#endif
+
 	return(true);											// item was added
 }
 

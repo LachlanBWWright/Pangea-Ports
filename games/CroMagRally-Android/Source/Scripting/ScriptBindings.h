@@ -21,6 +21,8 @@ typedef struct ObjNode ObjNode;
 void CroMagScript_ResetObjectRegistry(void);
 void CroMagScript_RegisterPlayerObject(ObjNode* playerObj);
 void CroMagScript_UnregisterPlayerObject(ObjNode* playerObj);
+void CroMagScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category);
+void CroMagScript_UnregisterObject(ObjNode* obj);
 void CroMagScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void CroMagScript_ApplyObjectScripting(ObjNode* obj);
 void CroMagScript_RunObjectFrame(ObjNode* obj);

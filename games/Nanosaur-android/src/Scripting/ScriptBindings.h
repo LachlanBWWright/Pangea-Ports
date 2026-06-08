@@ -21,6 +21,8 @@ typedef struct ObjNode ObjNode;
 void NanosaurScript_ResetObjectRegistry(void);
 void NanosaurScript_RegisterPlayerObject(ObjNode* playerObj);
 void NanosaurScript_UnregisterPlayerObject(ObjNode* playerObj);
+void NanosaurScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category);
+void NanosaurScript_UnregisterObject(ObjNode* obj);
 void NanosaurScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void NanosaurScript_ApplyObjectScripting(ObjNode* obj);
 void NanosaurScript_RunObjectFrame(ObjNode* obj);

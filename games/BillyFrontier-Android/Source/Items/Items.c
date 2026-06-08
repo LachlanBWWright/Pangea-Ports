@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -710,6 +714,10 @@ ObjNode	*newObj;
 									
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.freeLifePow", "pickup");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -795,6 +803,10 @@ ObjNode	*newObj;
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->Delta.x = newObj->Delta.y = newObj->Delta.z = 0;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.peso", "pickup");
+#endif
 
 	return(true);													// item was added
 }

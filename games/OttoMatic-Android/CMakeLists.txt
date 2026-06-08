@@ -194,7 +194,7 @@ if(EMSCRIPTEN)
 		"SHELL:-sALLOW_MEMORY_GROWTH=1"
 		"SHELL:-sINITIAL_MEMORY=268435456"
 		"SHELL:--preload-file ${CMAKE_SOURCE_DIR}/Data@/Data"
-		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_OttoMatic_SetFenceCollisions','_OttoMatic_SetTerrainPath','_PangeaScript_IsEnabled','_PangeaScript_SetStartupScript','_PangeaScript_Reload','_PangeaScript_GetLastError','_PangeaScript_GetErrorCount']>"
+		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_OttoMatic_SetFenceCollisions','_OttoMatic_SetTerrainPath','_PangeaScript_IsEnabled','_PangeaScript_SetStartupScript','_PangeaScript_Reload','_PangeaScript_GetLastError','_PangeaScript_GetErrorCount','_PangeaScript_GetStatusEnabled','_PangeaScript_GetStatusConfigLoaded','_PangeaScript_GetStatusBundleLoaded','_PangeaScript_GetStatusActiveScriptPath','_PangeaScript_GetStatusLastError','_PangeaScript_GetStatusErrorCount','_PangeaScript_GetStatusBudgetExceededCount','_PangeaScript_GetStatusHooksCalledCount','_PangeaScript_GetStatusScriptsDisabled']>"
 		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_OttoMatic_SetFenceCollisions','_OttoMatic_SetTerrainPath']>"
 		"SHELL:-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
 		"SHELL:--shell-file ${CMAKE_SOURCE_DIR}/docs/shell.html"

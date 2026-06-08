@@ -4,6 +4,7 @@
 #include "ScriptBindings.h"
 
 #include "structs.h"
+#include "items.h"
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
@@ -52,7 +53,7 @@ static bool Bugdom2Script_DeleteObject(void* nativeObject)
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
 		return false;
 
-	Bugdom2Script_UnregisterPlayerObject(obj);
+	Bugdom2Script_UnregisterObject(obj);
 	DeleteObject(obj);
 	return true;
 }
@@ -77,54 +78,103 @@ void Bugdom2Script_ResetObjectRegistry(void)
 	PangeaScript_ResetObjects();
 }
 
-void Bugdom2Script_RegisterPlayerObject(ObjNode* playerObj)
+void Bugdom2Script_RegisterObject(ObjNode* obj, const char* nativeId, const char* category)
 {
 	PangeaScriptObjectRegistration registration;
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptStatus status;
+	const char* tags[4];
+	int tagCount = 0;
 
-	if (!playerObj)
+	if (!obj)
 		return;
+
+	if (obj->ScriptObjectID > 0)
+		return;
+
+	if (nativeId)
+	{
+		tags[tagCount++] = nativeId;
+	}
+	if (category)
+	{
+		tags[tagCount++] = category;
+	}
+
+	Boolean isCollectible = false;
+	if (nativeId && (strcmp(nativeId, "bugdom2.dcell") == 0 ||
+	                 strcmp(nativeId, "bugdom2.gliderPart") == 0 ||
+	                 strcmp(nativeId, "bugdom2.hobobag") == 0))
+	{
+		isCollectible = true;
+	}
+	else if (obj->Kind == PICKUP_KIND_POW)
+	{
+		if (obj->POWKind == POW_KIND_GREENCLOVER ||
+		    obj->POWKind == POW_KIND_BLUECLOVER ||
+		    obj->POWKind == POW_KIND_GOLDCLOVER ||
+		    obj->POWKind == POW_KIND_REDKEY ||
+		    obj->POWKind == POW_KIND_GREENKEY ||
+		    obj->POWKind == POW_KIND_BLUEKEY)
+		{
+			isCollectible = true;
+		}
+	}
+
+	if (isCollectible)
+	{
+		tags[tagCount++] = "bugdom2.collectible";
+	}
 
 	registration = (PangeaScriptObjectRegistration)
 	{
-		.nativeObject = playerObj,
+		.nativeObject = obj,
 		.ops = &kBugdom2PlayerObjectOps,
-		.tags = kBugdom2PlayerTags,
-		.tagCount = 1,
+		.tags = tags,
+		.tagCount = tagCount,
 	};
 
 	status = PangeaScript_RegisterObject(&registration, &handle);
-	playerObj->ScriptVisualOffset = (OGLVector3D){0};
+	obj->ScriptVisualOffset = (OGLVector3D){0};
 	if (status == PANGEA_SCRIPT_OK)
 	{
-		playerObj->ScriptObjectID = handle.id;
-		playerObj->ScriptObjectGeneration = (int) handle.generation;
+		obj->ScriptObjectID = handle.id;
+		obj->ScriptObjectGeneration = (int) handle.generation;
 	}
 	else
 	{
-		playerObj->ScriptObjectID = 0;
-		playerObj->ScriptObjectGeneration = 0;
+		obj->ScriptObjectID = 0;
+		obj->ScriptObjectGeneration = 0;
 	}
-	LogScriptStatus("player registration", status);
+	LogScriptStatus("object registration", status);
 }
 
-void Bugdom2Script_UnregisterPlayerObject(ObjNode* playerObj)
+void Bugdom2Script_UnregisterObject(ObjNode* obj)
 {
 	PangeaScriptObjectHandle handle;
 
-	if (!playerObj || playerObj->ScriptObjectID == 0)
+	if (!obj || obj->ScriptObjectID == 0)
 		return;
 
 	handle = (PangeaScriptObjectHandle)
 	{
-		.id = playerObj->ScriptObjectID,
-		.generation = (uint32_t) playerObj->ScriptObjectGeneration,
+		.id = obj->ScriptObjectID,
+		.generation = (uint32_t) obj->ScriptObjectGeneration,
 	};
 	(void) PangeaScript_UnregisterObject(handle);
-	playerObj->ScriptObjectID = 0;
-	playerObj->ScriptObjectGeneration = 0;
-	playerObj->ScriptVisualOffset = (OGLVector3D){0};
+	obj->ScriptObjectID = 0;
+	obj->ScriptObjectGeneration = 0;
+	obj->ScriptVisualOffset = (OGLVector3D){0};
+}
+
+void Bugdom2Script_RegisterPlayerObject(ObjNode* playerObj)
+{
+	Bugdom2Script_RegisterObject(playerObj, "bugdom2.player", "player");
+}
+
+void Bugdom2Script_UnregisterPlayerObject(ObjNode* playerObj)
+{
+	Bugdom2Script_UnregisterObject(playerObj);
 }
 
 void Bugdom2Script_ApplyObjectScripting(ObjNode* obj)
@@ -322,6 +372,33 @@ Boolean Bugdom2Script_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum,
 
 	PangeaScriptStatus status = PangeaScript_CallTerrainItemHook(&context);
 	LogScriptStatus("onTerrainItem", status);
+	return context.handled && context.markInUse;
+}
+
+Boolean Bugdom2Script_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splineNum)
+{
+	const unsigned char params[] =
+	{
+		itemPtr->parm[0],
+		itemPtr->parm[1],
+		itemPtr->parm[2],
+		itemPtr->parm[3],
+	};
+
+	PangeaScriptSplineItemContext context =
+	{
+		.levelNum = levelNum,
+		.itemType = itemPtr->type,
+		.splineNum = splineNum,
+		.placement = itemPtr->placement,
+		.params = params,
+		.paramCount = (int)(sizeof(params) / sizeof(params[0])),
+		.handled = false,
+		.markInUse = false,
+	};
+
+	PangeaScriptStatus status = PangeaScript_CallSplineItemHook(&context);
+	LogScriptStatus("onSplineItem", status);
 	return context.handled && context.markInUse;
 }
 

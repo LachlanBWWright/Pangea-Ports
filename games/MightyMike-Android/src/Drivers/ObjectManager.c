@@ -441,6 +441,13 @@ Rect	box;
 	if (theNode == nil)								// see if passed a bogus node
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (theNode->ScriptObjectID != 0)
+	{
+		MikeScript_UnregisterObject(theNode);
+	}
+#endif
+
 	if (theNode->CType == INVALID_NODE_FLAG)		// see if already deleted
 	{
 		DoAlert("Attempted to Double Delete an Object.  Object was already deleted!");

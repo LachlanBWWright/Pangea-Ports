@@ -22,6 +22,8 @@ typedef struct ObjNode ObjNode;
 void BillyScript_ResetObjectRegistry(void);
 void BillyScript_RegisterPlayerObject(ObjNode* playerObj);
 void BillyScript_UnregisterPlayerObject(ObjNode* playerObj);
+void BillyScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category);
+void BillyScript_UnregisterObject(ObjNode* obj);
 void BillyScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void BillyScript_ApplyObjectScripting(ObjNode* obj);
 // Utility for MoveObjects loop

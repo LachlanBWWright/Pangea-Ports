@@ -28,6 +28,7 @@ typedef struct RegisteredObject
 	const PangeaScriptObjectOps* ops;
 	const char* tags[PANGEA_SCRIPT_MAX_OBJECT_TAGS];
 	int tagCount;
+	PangeaScriptCapabilityLevel capabilityLevel;
 } RegisteredObject;
 
 static PangeaScriptGameInfo gGameInfo;
@@ -44,6 +45,10 @@ static int gItemRemapCount;
 static PangeaScriptNativeItem gNativeItems[PANGEA_SCRIPT_MAX_NATIVE_ITEMS];
 static int gNativeItemCount;
 static RegisteredObject gRegisteredObjects[PANGEA_SCRIPT_MAX_OBJECTS];
+static int gBudgetExceededCount;
+static int gHooksCalledCount;
+static int gConsecutiveHookFailures;
+static bool gScriptsDisabled;
 
 static void reset_objects(void)
 {
@@ -86,6 +91,14 @@ static void configure_registered_object(RegisteredObject* object, const PangeaSc
 	object->nativeObject = registration->nativeObject;
 	object->ops = registration->ops;
 	object->tagCount = registration->tagCount;
+	if (registration->capabilityLevel == PANGEA_SCRIPT_CAPABILITY_DEFAULT)
+	{
+		object->capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL;
+	}
+	else
+	{
+		object->capabilityLevel = registration->capabilityLevel;
+	}
 	memset(object->tags, 0, sizeof(object->tags));
 	for (int i = 0; i < registration->tagCount; i++)
 		object->tags[i] = registration->tags[i];
@@ -97,7 +110,23 @@ static void set_error(PangeaScriptStatus status, const char* message)
 {
 	gLastStatus = status;
 	if (status != PANGEA_SCRIPT_OK && status != PANGEA_SCRIPT_FILE_NOT_FOUND)
+	{
 		gErrorCount++;
+		gConsecutiveHookFailures++;
+		if (status == PANGEA_SCRIPT_BUDGET_EXCEEDED)
+		{
+			gBudgetExceededCount++;
+		}
+		if (gConsecutiveHookFailures >= 5)
+		{
+			gScriptsDisabled = true;
+			PangeaScript_Log(PANGEA_LOG_ERROR, "Native", "Disabling scripting host: exceeded maximum consecutive hook failures (5)");
+		}
+	}
+	else
+	{
+		gConsecutiveHookFailures = 0;
+	}
 
 	if (!message)
 	{
@@ -173,105 +202,377 @@ static char* read_text_file(const char* path, long* outSize)
 	return bytes;
 }
 
-static const char* find_level_block(const char* json, int levelNum)
-{
-	char key[32];
-	snprintf(key, sizeof(key), "\"%d\"", levelNum);
-	return strstr(json, key);
+typedef enum {
+	JSON_TOKEN_ERROR,
+	JSON_TOKEN_EOF,
+	JSON_TOKEN_LBRACE,
+	JSON_TOKEN_RBRACE,
+	JSON_TOKEN_LBRACKET,
+	JSON_TOKEN_RBRACKET,
+	JSON_TOKEN_COLON,
+	JSON_TOKEN_COMMA,
+	JSON_TOKEN_STRING,
+	JSON_TOKEN_NUMBER,
+	JSON_TOKEN_TRUE,
+	JSON_TOKEN_FALSE,
+	JSON_TOKEN_NULL
+} JsonTokenType;
+
+typedef struct {
+	const char* start;
+	const char* end;
+	JsonTokenType type;
+	union {
+		double number_value;
+		char string_value[512];
+	};
+} JsonToken;
+
+static const char* skip_whitespace(const char* cursor) {
+	while (*cursor && (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n')) {
+		cursor++;
+	}
+	return cursor;
 }
 
-static bool parse_int_after_key(const char* start, const char* key, int* outValue)
-{
-	const char* keyPos = strstr(start, key);
-	if (!keyPos)
-		return false;
+static const char* next_token(const char* cursor, JsonToken* token) {
+	cursor = skip_whitespace(cursor);
+	if (!*cursor) {
+		token->type = JSON_TOKEN_EOF;
+		return cursor;
+	}
 
-	const char* colon = strchr(keyPos, ':');
-	if (!colon)
-		return false;
+	char c = *cursor;
+	token->start = cursor;
+	if (c == '{') { token->type = JSON_TOKEN_LBRACE; return cursor + 1; }
+	if (c == '}') { token->type = JSON_TOKEN_RBRACE; return cursor + 1; }
+	if (c == '[') { token->type = JSON_TOKEN_LBRACKET; return cursor + 1; }
+	if (c == ']') { token->type = JSON_TOKEN_RBRACKET; return cursor + 1; }
+	if (c == ':') { token->type = JSON_TOKEN_COLON; return cursor + 1; }
+	if (c == ',') { token->type = JSON_TOKEN_COMMA; return cursor + 1; }
 
-	char* end = NULL;
-	long value = strtol(colon + 1, &end, 10);
-	if (end == colon + 1)
-		return false;
+	if (c == '"') {
+		const char* end = strchr(cursor + 1, '"');
+		if (!end) {
+			token->type = JSON_TOKEN_ERROR;
+			return cursor;
+		}
+		size_t len = (size_t)(end - (cursor + 1));
+		if (len >= sizeof(token->string_value)) {
+			token->type = JSON_TOKEN_ERROR;
+			return cursor;
+		}
+		memcpy(token->string_value, cursor + 1, len);
+		token->string_value[len] = '\0';
+		token->type = JSON_TOKEN_STRING;
+		return end + 1;
+	}
 
-	*outValue = (int)value;
-	return true;
+	if ((c >= '0' && c <= '9') || c == '-') {
+		char* end = NULL;
+		token->number_value = strtod(cursor, &end);
+		if (end == cursor) {
+			token->type = JSON_TOKEN_ERROR;
+			return cursor;
+		}
+		token->type = JSON_TOKEN_NUMBER;
+		return end;
+	}
+
+	if (strncmp(cursor, "true", 4) == 0) { token->type = JSON_TOKEN_TRUE; return cursor + 4; }
+	if (strncmp(cursor, "false", 5) == 0) { token->type = JSON_TOKEN_FALSE; return cursor + 5; }
+	if (strncmp(cursor, "null", 4) == 0) { token->type = JSON_TOKEN_NULL; return cursor + 4; }
+
+	token->type = JSON_TOKEN_ERROR;
+	return cursor;
 }
 
-static bool parse_string_after_key(const char* start, const char* key, char* outValue, size_t outValueSize)
-{
-	const char* keyPos = strstr(start, key);
-	if (!keyPos || !outValue || outValueSize == 0)
+static bool parse_levels_json(const char* json, int targetLevelNum, char* outScriptPath, size_t outScriptPathSize, PangeaScriptStatus* outStatus, char* outErrorMsg, size_t outErrorSize) {
+	const char* cursor = json;
+	JsonToken token;
+	cursor = next_token(cursor, &token);
+	if (token.type != JSON_TOKEN_LBRACE) {
+		*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+		snprintf(outErrorMsg, outErrorSize, "Config is not a JSON object");
 		return false;
+	}
 
-	const char* colon = strchr(keyPos, ':');
-	if (!colon)
-		return false;
+	int version = -1;
+	bool foundLevel = false;
 
-	const char* quote = strchr(colon + 1, '"');
-	if (!quote)
-		return false;
-
-	quote++;
-	const char* end = strchr(quote, '"');
-	if (!end || end == quote)
-		return false;
-
-	size_t length = (size_t)(end - quote);
-	if (length >= outValueSize)
-		return false;
-
-	memcpy(outValue, quote, length);
-	outValue[length] = '\0';
-	return true;
-}
-
-static void parse_item_remaps_for_level(const char* json, int levelNum)
-{
-	const char* level = find_level_block(json, levelNum);
-	if (!level)
-		return;
-
-	const char* itemOverrides = strstr(level, "\"itemOverrides\"");
-	if (!itemOverrides)
-		return;
-
-	const char* cursor = itemOverrides;
-	while (gItemRemapCount < PANGEA_SCRIPT_MAX_REMAPS)
-	{
-		const char* fromKey = strstr(cursor, "\"from\"");
-		if (!fromKey)
+	while (true) {
+		cursor = next_token(cursor, &token);
+		if (token.type == JSON_TOKEN_RBRACE) {
 			break;
+		}
+		if (token.type != JSON_TOKEN_STRING) {
+			*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+			snprintf(outErrorMsg, outErrorSize, "Expected string key in object");
+			return false;
+		}
+		char key[256];
+		snprintf(key, sizeof(key), "%s", token.string_value);
 
-		const char* toKey = strstr(fromKey, "\"to\"");
-		if (!toKey)
-			break;
+		cursor = next_token(cursor, &token);
+		if (token.type != JSON_TOKEN_COLON) {
+			*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+			snprintf(outErrorMsg, outErrorSize, "Expected colon after key");
+			return false;
+		}
 
-		int fromType = 0;
-		int toType = 0;
-		if (!parse_int_after_key(fromKey, "\"from\"", &fromType) ||
-			!parse_int_after_key(toKey, "\"to\"", &toType))
-		{
-			cursor = toKey + 1;
+		if (strcmp(key, "version") == 0) {
+			cursor = next_token(cursor, &token);
+			if (token.type != JSON_TOKEN_NUMBER) {
+				*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+				snprintf(outErrorMsg, outErrorSize, "version must be a number");
+				return false;
+			}
+			version = (int)token.number_value;
+			if (version != 1) {
+				*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+				snprintf(outErrorMsg, outErrorSize, "Unknown schema version: %d", version);
+				return false;
+			}
+		} else if (strcmp(key, "levels") == 0) {
+			cursor = next_token(cursor, &token);
+			if (token.type != JSON_TOKEN_LBRACE) {
+				*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+				snprintf(outErrorMsg, outErrorSize, "levels must be an object");
+				return false;
+			}
+			// Parse levels object
+			while (true) {
+				cursor = next_token(cursor, &token);
+				if (token.type == JSON_TOKEN_RBRACE) {
+					break;
+				}
+				if (token.type != JSON_TOKEN_STRING) {
+					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+					snprintf(outErrorMsg, outErrorSize, "Expected string level key");
+					return false;
+				}
+				char levelKey[64];
+				snprintf(levelKey, sizeof(levelKey), "%s", token.string_value);
+				int levelKeyNum = atoi(levelKey);
+
+				cursor = next_token(cursor, &token);
+				if (token.type != JSON_TOKEN_COLON) {
+					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+					snprintf(outErrorMsg, outErrorSize, "Expected colon after level key");
+					return false;
+				}
+
+				cursor = next_token(cursor, &token);
+				if (token.type != JSON_TOKEN_LBRACE) {
+					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+					snprintf(outErrorMsg, outErrorSize, "level config must be an object");
+					return false;
+				}
+
+				bool isTargetLevel = (levelKeyNum == targetLevelNum || strcmp(levelKey, "current") == 0);
+				if (isTargetLevel) {
+					foundLevel = true;
+				}
+
+				// Parse individual level config
+				while (true) {
+					cursor = next_token(cursor, &token);
+					if (token.type == JSON_TOKEN_RBRACE) {
+						break;
+					}
+					if (token.type != JSON_TOKEN_STRING) {
+						*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+						snprintf(outErrorMsg, outErrorSize, "Expected string key in level config");
+						return false;
+					}
+					char subKey[256];
+					snprintf(subKey, sizeof(subKey), "%s", token.string_value);
+
+					cursor = next_token(cursor, &token);
+					if (token.type != JSON_TOKEN_COLON) {
+						*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+						snprintf(outErrorMsg, outErrorSize, "Expected colon in level config");
+						return false;
+					}
+
+					if (strcmp(subKey, "script") == 0) {
+						cursor = next_token(cursor, &token);
+						if (token.type != JSON_TOKEN_STRING) {
+							*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+							snprintf(outErrorMsg, outErrorSize, "script path must be a string");
+							return false;
+						}
+						if (isTargetLevel) {
+							snprintf(outScriptPath, outScriptPathSize, "%s", token.string_value);
+						}
+					} else if (strcmp(subKey, "itemOverrides") == 0) {
+						cursor = next_token(cursor, &token);
+						if (token.type != JSON_TOKEN_LBRACKET) {
+							*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+							snprintf(outErrorMsg, outErrorSize, "itemOverrides must be an array");
+							return false;
+						}
+						while (true) {
+							cursor = next_token(cursor, &token);
+							if (token.type == JSON_TOKEN_RBRACKET) {
+								break;
+							}
+							if (token.type != JSON_TOKEN_LBRACE) {
+								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+								snprintf(outErrorMsg, outErrorSize, "override item must be an object");
+								return false;
+							}
+							int fromType = -1;
+							int toType = -1;
+							while (true) {
+								cursor = next_token(cursor, &token);
+								if (token.type == JSON_TOKEN_RBRACE) {
+									break;
+								}
+								if (token.type != JSON_TOKEN_STRING) {
+									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+									snprintf(outErrorMsg, outErrorSize, "Expected string key in override item");
+									return false;
+								}
+								char overrideKey[64];
+								snprintf(overrideKey, sizeof(overrideKey), "%s", token.string_value);
+
+								cursor = next_token(cursor, &token);
+								if (token.type != JSON_TOKEN_COLON) {
+									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+									snprintf(outErrorMsg, outErrorSize, "Expected colon in override item");
+									return false;
+								}
+
+								cursor = next_token(cursor, &token);
+								if (token.type != JSON_TOKEN_NUMBER) {
+									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+									snprintf(outErrorMsg, outErrorSize, "override values must be numbers");
+									return false;
+								}
+								if (strcmp(overrideKey, "from") == 0) {
+									fromType = (int)token.number_value;
+								} else if (strcmp(overrideKey, "to") == 0) {
+									toType = (int)token.number_value;
+								}
+
+								cursor = next_token(cursor, &token);
+								if (token.type == JSON_TOKEN_COMMA) {
+									// continue parsing keys
+								} else if (token.type == JSON_TOKEN_RBRACE) {
+									break;
+								} else {
+									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+									snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in override item");
+									return false;
+								}
+							}
+							if (isTargetLevel && fromType != -1 && toType != -1 && gItemRemapCount < PANGEA_SCRIPT_MAX_REMAPS) {
+								gItemRemaps[gItemRemapCount].levelNum = targetLevelNum;
+								gItemRemaps[gItemRemapCount].fromType = fromType;
+								gItemRemaps[gItemRemapCount].toType = toType;
+								gItemRemapCount++;
+							}
+							cursor = next_token(cursor, &token);
+							if (token.type == JSON_TOKEN_COMMA) {
+								// continue array
+							} else if (token.type == JSON_TOKEN_RBRACKET) {
+								break;
+							} else {
+								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+								snprintf(outErrorMsg, outErrorSize, "Expected comma or closing bracket in itemOverrides array");
+								return false;
+							}
+						}
+					} else {
+						// Skip unknown field value
+						int braceCount = 0;
+						int bracketCount = 0;
+						while (true) {
+							cursor = next_token(cursor, &token);
+							if (token.type == JSON_TOKEN_LBRACE) braceCount++;
+							else if (token.type == JSON_TOKEN_RBRACE) {
+								if (braceCount == 0) {
+									break;
+								}
+								braceCount--;
+							}
+							else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
+							else if (token.type == JSON_TOKEN_RBRACKET) {
+								bracketCount--;
+							}
+							if (braceCount == 0 && bracketCount == 0 && (token.type == JSON_TOKEN_COMMA || token.type == JSON_TOKEN_RBRACE)) {
+								break;
+							}
+						}
+						if (token.type == JSON_TOKEN_RBRACE) {
+							break;
+						}
+						continue;
+					}
+
+					cursor = next_token(cursor, &token);
+					if (token.type == JSON_TOKEN_COMMA) {
+						// continue level config fields
+					} else if (token.type == JSON_TOKEN_RBRACE) {
+						break;
+					} else {
+						*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+						snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in level config");
+						return false;
+					}
+				}
+
+				cursor = next_token(cursor, &token);
+				if (token.type == JSON_TOKEN_COMMA) {
+					// continue parsing levels
+				} else if (token.type == JSON_TOKEN_RBRACE) {
+					break;
+				} else {
+					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+					snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in levels object");
+					return false;
+				}
+			}
+		} else {
+			// Skip unknown property value
+			int braceCount = 0;
+			int bracketCount = 0;
+			while (true) {
+				cursor = next_token(cursor, &token);
+				if (token.type == JSON_TOKEN_LBRACE) braceCount++;
+				else if (token.type == JSON_TOKEN_RBRACE) braceCount--;
+				else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
+				else if (token.type == JSON_TOKEN_RBRACKET) bracketCount--;
+				if (braceCount <= 0 && bracketCount <= 0 && (token.type == JSON_TOKEN_COMMA || token.type == JSON_TOKEN_RBRACE)) {
+					break;
+				}
+			}
+			if (token.type == JSON_TOKEN_RBRACE) {
+				break;
+			}
 			continue;
 		}
 
-		gItemRemaps[gItemRemapCount].levelNum = levelNum;
-		gItemRemaps[gItemRemapCount].fromType = fromType;
-		gItemRemaps[gItemRemapCount].toType = toType;
-		gItemRemapCount++;
-		cursor = toKey + 1;
+		cursor = next_token(cursor, &token);
+		if (token.type == JSON_TOKEN_COMMA) {
+			// continue object properties
+		} else if (token.type == JSON_TOKEN_RBRACE) {
+			break;
+		} else {
+			*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+			snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in config object");
+			return false;
+		}
 	}
-}
 
-static bool parse_script_path_for_level(const char* json, int levelNum, char* outPath, size_t outPathSize)
-{
-	const char* level = find_level_block(json, levelNum);
-	if (!level)
+	if (version == -1) {
+		*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+		snprintf(outErrorMsg, outErrorSize, "Missing required field: version");
 		return false;
+	}
 
-	return parse_string_after_key(level, "\"script\"", outPath, outPathSize);
+	return foundLevel;
 }
 
 PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
@@ -293,6 +594,10 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 	gScriptLoaded = false;
 	gErrorCount = 0;
 	gItemRemapCount = 0;
+	gBudgetExceededCount = 0;
+	gHooksCalledCount = 0;
+	gConsecutiveHookFailures = 0;
+	gScriptsDisabled = false;
 	reset_objects();
 	set_error(PANGEA_SCRIPT_OK, "");
 	return PANGEA_SCRIPT_OK;
@@ -303,6 +608,10 @@ void PangeaScript_Shutdown(void)
 	gInitialized = false;
 	gScriptLoaded = false;
 	gItemRemapCount = 0;
+	gBudgetExceededCount = 0;
+	gHooksCalledCount = 0;
+	gConsecutiveHookFailures = 0;
+	gScriptsDisabled = false;
 	reset_objects();
 	if (gBackend)
 	{
@@ -425,10 +734,35 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
 
-	parse_item_remaps_for_level(config, levelNum);
 	char scriptPath[PANGEA_SCRIPT_PATH_CAPACITY];
-	if (parse_script_path_for_level(config, levelNum, scriptPath, sizeof(scriptPath)))
+	scriptPath[0] = '\0';
+	PangeaScriptStatus parseStatus = PANGEA_SCRIPT_OK;
+	char errorMsg[256];
+	errorMsg[0] = '\0';
+
+	bool found = parse_levels_json(config, levelNum, scriptPath, sizeof(scriptPath), &parseStatus, errorMsg, sizeof(errorMsg));
+	if (parseStatus != PANGEA_SCRIPT_OK)
 	{
+		free(config);
+		set_error(parseStatus, errorMsg);
+		return parseStatus;
+	}
+
+	if (found && scriptPath[0])
+	{
+		if (strncmp(scriptPath, "Data/Scripts/", 13) != 0)
+		{
+			free(config);
+			set_error(PANGEA_SCRIPT_CONFIG_ERROR, "Invalid script path: must be within Data/Scripts/");
+			return PANGEA_SCRIPT_CONFIG_ERROR;
+		}
+		if (strstr(scriptPath, "..") != NULL || strchr(scriptPath, '\\') != NULL)
+		{
+			free(config);
+			set_error(PANGEA_SCRIPT_CONFIG_ERROR, "Invalid script path: path traversal detected");
+			return PANGEA_SCRIPT_CONFIG_ERROR;
+		}
+
 		copy_string(gStartupScriptPath, sizeof(gStartupScriptPath), scriptPath);
 		PangeaScriptStatus reloadStatus = PangeaScript_Reload();
 		if (reloadStatus != PANGEA_SCRIPT_OK && reloadStatus != PANGEA_SCRIPT_FILE_NOT_FOUND)
@@ -459,6 +793,9 @@ PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const Pange
 	(void) context;
 	if (!gInitialized)
 		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (gScriptsDisabled)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	gHooksCalledCount++;
 	if (!gScriptLoaded)
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	if (!gBackend)
@@ -477,6 +814,9 @@ PangeaScriptStatus PangeaScript_CallFrameHook(const PangeaScriptFrameContext* co
 	(void) context;
 	if (!gInitialized)
 		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (gScriptsDisabled)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	gHooksCalledCount++;
 	if (!gScriptLoaded)
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	if (!gBackend)
@@ -496,6 +836,9 @@ PangeaScriptStatus PangeaScript_CallTerrainItemHook(PangeaScriptTerrainItemConte
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	if (!gInitialized)
 		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (gScriptsDisabled)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	gHooksCalledCount++;
 	if (!gScriptLoaded)
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	if (!gBackend)
@@ -515,6 +858,9 @@ PangeaScriptStatus PangeaScript_CallSplineItemHook(PangeaScriptSplineItemContext
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	if (!gInitialized)
 		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (gScriptsDisabled)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	gHooksCalledCount++;
 	if (!gScriptLoaded)
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	if (!gBackend)
@@ -534,6 +880,9 @@ PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* cont
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	if (!gInitialized)
 		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (gScriptsDisabled)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	gHooksCalledCount++;
 	if (!gScriptLoaded)
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	if (!gBackend)
@@ -562,6 +911,9 @@ PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle,
 
 	if (!gInitialized)
 		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (gScriptsDisabled)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	gHooksCalledCount++;
 	if (!gScriptLoaded)
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	if (!gBackend)
@@ -672,6 +1024,12 @@ bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScrip
 	if (!object || !outPosition || !object->ops || !object->ops->getPosition)
 		return false;
 
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_READ_ONLY)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks read capability level");
+		return false;
+	}
+
 	return object->ops->getPosition(object->nativeObject, outPosition);
 }
 
@@ -680,6 +1038,12 @@ bool PangeaScript_SetObjectPosition(PangeaScriptObjectHandle handle, const Pange
 	RegisteredObject* object = resolve_object(handle);
 	if (!object || !position || !object->ops || !object->ops->setPosition)
 		return false;
+
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_BASE)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks transform/position capability level");
+		return false;
+	}
 
 	return object->ops->setPosition(object->nativeObject, position);
 }
@@ -690,6 +1054,12 @@ bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const Pange
 	if (!object || !velocity || !object->ops || !object->ops->setVelocity)
 		return false;
 
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_FULL)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks movable/velocity capability level");
+		return false;
+	}
+
 	return object->ops->setVelocity(object->nativeObject, velocity);
 }
 
@@ -698,6 +1068,12 @@ bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
 	RegisteredObject* object = resolve_object(handle);
 	if (!object || !object->ops || !object->ops->deleteObject)
 		return false;
+
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_FULL)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks deletion/cleanup-safe capability level");
+		return false;
+	}
 
 	return object->ops->deleteObject(object->nativeObject);
 }
@@ -730,3 +1106,92 @@ PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, fl
 
 	return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
 }
+
+void PangeaScript_Log(PangeaScriptLogLevel level, const char* source, const char* message)
+{
+	const char* levelStr = "INFO";
+	FILE* out = stdout;
+	if (level == PANGEA_LOG_WARN)
+	{
+		levelStr = "WARNING";
+		out = stderr;
+	}
+	else if (level == PANGEA_LOG_ERROR)
+	{
+		levelStr = "ERROR";
+		out = stderr;
+	}
+
+	fprintf(out, "[PangeaScript %s] [%s] %s\n", levelStr, source ? source : "Native", message ? message : "");
+	fflush(out);
+}
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+EMSCRIPTEN_KEEPALIVE
+void PangeaScript_LogJS(int level, const char* message)
+{
+	PangeaScript_Log((PangeaScriptLogLevel)level, "JS", message);
+}
+#endif
+
+void PangeaScript_GetStatusInfo(PangeaScriptStatusInfo* outInfo)
+{
+	if (!outInfo)
+		return;
+
+	outInfo->enabled = gInitialized;
+	outInfo->configLoaded = gConfigPath[0] != '\0';
+	outInfo->bundleLoaded = gScriptLoaded;
+	snprintf(outInfo->activeScriptPath, sizeof(outInfo->activeScriptPath), "%s", gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js");
+	snprintf(outInfo->lastError, sizeof(outInfo->lastError), "%s", gLastError);
+	outInfo->errorCount = gErrorCount;
+	outInfo->budgetExceededCount = gBudgetExceededCount;
+	outInfo->hooksCalledCount = gHooksCalledCount;
+	outInfo->scriptsDisabled = gScriptsDisabled;
+}
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+bool PangeaScript_GetStatusEnabled(void) { return gInitialized; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+bool PangeaScript_GetStatusConfigLoaded(void) { return gConfigPath[0] != '\0'; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+bool PangeaScript_GetStatusBundleLoaded(void) { return gScriptLoaded; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+const char* PangeaScript_GetStatusActiveScriptPath(void) { return gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js"; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+const char* PangeaScript_GetStatusLastError(void) { return gLastError; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+int PangeaScript_GetStatusErrorCount(void) { return gErrorCount; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+int PangeaScript_GetStatusBudgetExceededCount(void) { return gBudgetExceededCount; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+int PangeaScript_GetStatusHooksCalledCount(void) { return gHooksCalledCount; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+bool PangeaScript_GetStatusScriptsDisabled(void) { return gScriptsDisabled; }

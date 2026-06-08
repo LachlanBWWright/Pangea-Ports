@@ -1371,6 +1371,13 @@ int		i;
 	if (theNode == nil)								// see if passed a bogus node
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (theNode->ScriptObjectID != 0)
+	{
+		Nanosaur2Script_UnregisterObject(theNode);
+	}
+#endif
+
 	extern ObjNode* gCyclorama;
 	if (theNode == gCyclorama)
 		gCyclorama = nil;

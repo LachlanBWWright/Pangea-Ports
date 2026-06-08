@@ -296,7 +296,7 @@ if(EMSCRIPTEN)
 		# Optimize for web-only delivery (removes Node.js compatibility shims)
 		-sENVIRONMENT=web
 		# Export C functions callable from JavaScript
-		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:-sEXPORTED_FUNCTIONS=_main,_SetFenceCollisionEnabled,_GetFenceCollisionEnabled,_SetPlayerHealth,_SetPlayerLives,_FullHeal,_WinLevel,_SetStartLevel,_PangeaScript_IsEnabled,_PangeaScript_SetStartupScript,_PangeaScript_Reload,_PangeaScript_GetLastError,_PangeaScript_GetErrorCount>"
+		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:-sEXPORTED_FUNCTIONS=_main,_SetFenceCollisionEnabled,_GetFenceCollisionEnabled,_SetPlayerHealth,_SetPlayerLives,_FullHeal,_WinLevel,_SetStartLevel,_PangeaScript_IsEnabled,_PangeaScript_SetStartupScript,_PangeaScript_Reload,_PangeaScript_GetLastError,_PangeaScript_GetErrorCount,_PangeaScript_GetStatusEnabled,_PangeaScript_GetStatusConfigLoaded,_PangeaScript_GetStatusBundleLoaded,_PangeaScript_GetStatusActiveScriptPath,_PangeaScript_GetStatusLastError,_PangeaScript_GetStatusErrorCount,_PangeaScript_GetStatusBudgetExceededCount,_PangeaScript_GetStatusHooksCalledCount,_PangeaScript_GetStatusScriptsDisabled>"
 		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:-sEXPORTED_FUNCTIONS=_main,_SetFenceCollisionEnabled,_GetFenceCollisionEnabled,_SetPlayerHealth,_SetPlayerLives,_FullHeal,_WinLevel,_SetStartLevel>"
 		"-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,FS,callMain"
 		# Custom HTML shell with game canvas and JS API

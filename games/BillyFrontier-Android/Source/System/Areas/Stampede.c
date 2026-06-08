@@ -1207,6 +1207,9 @@ ObjNode	*newObj;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 1, 2, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.boost", "pickup");
+#endif
 
 	return(true);													// item was added
 }

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -168,6 +172,110 @@ float	scale;
 	newNode->BoundingSphere.origin.y = gSkeletonBoundingSpheres[type].origin.y * scale;
 	newNode->BoundingSphere.origin.z = gSkeletonBoundingSpheres[type].origin.z * scale;
 	newNode->BoundingSphere.radius = gSkeletonBoundingSpheres[type].radius * scale;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newNode)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		switch (type)
+		{
+			case SKELETON_TYPE_ME:
+				nativeId = "bugdom.player";
+				category = "player";
+				break;
+			case SKELETON_TYPE_LADYBUG:
+				nativeId = "bugdom.buddy.ladybug";
+				category = "buddy";
+				break;
+			case SKELETON_TYPE_BUDDY:
+				nativeId = "bugdom.buddy";
+				category = "buddy";
+				break;
+			case SKELETON_TYPE_WATERBUG:
+				nativeId = "bugdom.ride.waterbug";
+				category = "buddy";
+				break;
+			case SKELETON_TYPE_DRAGONFLY:
+				nativeId = "bugdom.ride.dragonfly";
+				category = "buddy";
+				break;
+			case SKELETON_TYPE_ANT:
+				nativeId = "bugdom.enemy.ant";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_SPIDER:
+				nativeId = "bugdom.enemy.spider";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_FLYINGBEE:
+				nativeId = "bugdom.enemy.bee";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_WORKERBEE:
+				nativeId = "bugdom.enemy.workerbee";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_QUEENBEE:
+				nativeId = "bugdom.enemy.queenbee";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_KINGANT:
+				nativeId = "bugdom.enemy.kingant";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_FIREANT:
+				nativeId = "bugdom.enemy.fireant";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_ROACH:
+				nativeId = "bugdom.enemy.roach";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_MOSQUITO:
+				nativeId = "bugdom.enemy.mosquito";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_SKIPPY:
+				nativeId = "bugdom.enemy.skippy";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_LARVA:
+				nativeId = "bugdom.enemy.larva";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_SLUG:
+				nativeId = "bugdom.enemy.slug";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_PONDFISH:
+				nativeId = "bugdom.enemy.fish";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_CATERPILLER:
+				nativeId = "bugdom.enemy.caterpillar";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_BOXERFLY:
+				nativeId = "bugdom.enemy.boxerfly";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_BAT:
+				nativeId = "bugdom.enemy.bat";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_FOOT:
+				nativeId = "bugdom.enemy.foot";
+				category = "enemy";
+				break;
+		}
+
+		if (nativeId && category)
+		{
+			BugdomScript_RegisterObject(newNode, nativeId, category);
+		}
+	}
+#endif
 
 	return(newNode);
 }

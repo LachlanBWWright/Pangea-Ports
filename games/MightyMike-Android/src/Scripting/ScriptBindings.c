@@ -79,7 +79,7 @@ static bool MikeScript_DeletePlayerObject(void* nativeObject)
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
 		return false;
 
-	MikeScript_UnregisterPlayerObject(obj);
+	MikeScript_UnregisterObject(obj);
 	DeleteObject(obj);
 	return true;
 }
@@ -147,56 +147,80 @@ void MikeScript_ResetObjectRegistry(void)
 	PangeaScript_ResetObjects();
 }
 
-void MikeScript_RegisterPlayerObject(ObjNode* playerObj)
+void MikeScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category)
 {
 	PangeaScriptObjectRegistration registration;
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptStatus status;
+	const char* tags[2];
+	int tagCount = 0;
 
-	if (!playerObj)
+	if (!obj)
 		return;
+
+	if (obj->ScriptObjectID > 0)
+		return;
+
+	if (nativeId)
+	{
+		tags[tagCount++] = nativeId;
+	}
+	if (category)
+	{
+		tags[tagCount++] = category;
+	}
 
 	registration = (PangeaScriptObjectRegistration)
 	{
-		.nativeObject = playerObj,
+		.nativeObject = obj,
 		.ops = &kMikePlayerObjectOps,
-		.tags = kMikePlayerTags,
-		.tagCount = 1,
+		.tags = tags,
+		.tagCount = tagCount,
 	};
 
 	status = PangeaScript_RegisterObject(&registration, &handle);
-	playerObj->ScriptVisualOffsetX = 0;
-	playerObj->ScriptVisualOffsetY = 0;
+	obj->ScriptVisualOffsetX = 0;
+	obj->ScriptVisualOffsetY = 0;
 	if (status == PANGEA_SCRIPT_OK)
 	{
-		playerObj->ScriptObjectID = handle.id;
-		playerObj->ScriptObjectGeneration = handle.generation;
+		obj->ScriptObjectID = handle.id;
+		obj->ScriptObjectGeneration = handle.generation;
 	}
 	else
 	{
-		playerObj->ScriptObjectID = 0;
-		playerObj->ScriptObjectGeneration = 0;
+		obj->ScriptObjectID = 0;
+		obj->ScriptObjectGeneration = 0;
 	}
-	LogScriptStatus("player registration", status);
+	LogScriptStatus("object registration", status);
 }
 
-void MikeScript_UnregisterPlayerObject(ObjNode* playerObj)
+void MikeScript_UnregisterObject(ObjNode* obj)
 {
 	PangeaScriptObjectHandle handle;
 
-	if (!playerObj || playerObj->ScriptObjectID == 0)
+	if (!obj || obj->ScriptObjectID == 0)
 		return;
 
 	handle = (PangeaScriptObjectHandle)
 	{
-		.id = (int) playerObj->ScriptObjectID,
-		.generation = playerObj->ScriptObjectGeneration,
+		.id = (int) obj->ScriptObjectID,
+		.generation = obj->ScriptObjectGeneration,
 	};
 	(void) PangeaScript_UnregisterObject(handle);
-	playerObj->ScriptObjectID = 0;
-	playerObj->ScriptObjectGeneration = 0;
-	playerObj->ScriptVisualOffsetX = 0;
-	playerObj->ScriptVisualOffsetY = 0;
+	obj->ScriptObjectID = 0;
+	obj->ScriptObjectGeneration = 0;
+	obj->ScriptVisualOffsetX = 0;
+	obj->ScriptVisualOffsetY = 0;
+}
+
+void MikeScript_RegisterPlayerObject(ObjNode* playerObj)
+{
+	MikeScript_RegisterObject(playerObj, "mightymike.player", "player");
+}
+
+void MikeScript_UnregisterPlayerObject(ObjNode* playerObj)
+{
+	MikeScript_UnregisterObject(playerObj);
 }
 
 void MikeScript_RunObjectFrame(ObjNode* obj)

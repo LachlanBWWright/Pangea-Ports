@@ -1262,6 +1262,13 @@ int		i;
 	if (theNode == nil)								// see if passed a bogus node
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (theNode->ScriptObjectID != 0)
+	{
+		BillyScript_UnregisterObject(theNode);
+	}
+#endif
+
 	if (theNode->CType == INVALID_NODE_FLAG)		// see if already deleted
 	{
 #if 0	

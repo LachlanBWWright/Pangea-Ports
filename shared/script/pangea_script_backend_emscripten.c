@@ -77,9 +77,39 @@ EM_JS(void, pangea_script_install_game_info_js, (const char* gameIdJson, const c
 	globalThis.pangea.api = { version: 1 };
 	globalThis.pangea.game = { id: gameId, name: gameName };
 	globalThis.pangea.log = globalThis.pangea.log || {
-		info: (message) => console.info(`[PangeaScript] ${String(message)}`),
-		warn: (message) => console.warn(`[PangeaScript warning] ${String(message)}`),
-		error: (message) => console.error(`[PangeaScript error] ${String(message)}`),
+		info: (message) => {
+			console.info(`[PangeaScript] ${String(message)}`);
+			if (typeof _PangeaScript_LogJS === "function") {
+				const str = String(message);
+				const len = lengthBytesUTF8(str) + 1;
+				const ptr = _malloc(len);
+				stringToUTF8(str, ptr, len);
+				_PangeaScript_LogJS(0, ptr);
+				_free(ptr);
+			}
+		},
+		warn: (message) => {
+			console.warn(`[PangeaScript warning] ${String(message)}`);
+			if (typeof _PangeaScript_LogJS === "function") {
+				const str = String(message);
+				const len = lengthBytesUTF8(str) + 1;
+				const ptr = _malloc(len);
+				stringToUTF8(str, ptr, len);
+				_PangeaScript_LogJS(1, ptr);
+				_free(ptr);
+			}
+		},
+		error: (message) => {
+			console.error(`[PangeaScript error] ${String(message)}`);
+			if (typeof _PangeaScript_LogJS === "function") {
+				const str = String(message);
+				const len = lengthBytesUTF8(str) + 1;
+				const ptr = _malloc(len);
+				stringToUTF8(str, ptr, len);
+				_PangeaScript_LogJS(2, ptr);
+				_free(ptr);
+			}
+		},
 	};
 	globalThis.pangea.level = globalThis.pangea.level || { current: () => null };
 	globalThis.pangea.spawn = globalThis.pangea.spawn || {

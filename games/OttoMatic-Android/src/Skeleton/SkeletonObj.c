@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -156,6 +160,137 @@ ObjNode	*newNode;
 	UpdateSkinnedGeometry(newNode);								// prime the trimesh
 
 	newNode->BoundingSphereRadius =  fabs(newNode->BBox.min.z);	// set correct bounding sphere for fence collision
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newNode)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		switch (newObjDef->type)
+		{
+			case SKELETON_TYPE_OTTO:
+				nativeId = "ottomatic.player";
+				category = "player";
+				break;
+			case SKELETON_TYPE_FARMER:
+				nativeId = "ottomatic.human.farmer";
+				category = "human";
+				break;
+			case SKELETON_TYPE_BEEWOMAN:
+				nativeId = "ottomatic.human.beewoman";
+				category = "human";
+				break;
+			case SKELETON_TYPE_SCIENTIST:
+				nativeId = "ottomatic.human.scientist";
+				category = "human";
+				break;
+			case SKELETON_TYPE_SKIRTLADY:
+				nativeId = "ottomatic.human.skirtlady";
+				category = "human";
+				break;
+			case SKELETON_TYPE_BRAINALIEN:
+				nativeId = "ottomatic.enemy.brainalien";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_ONION:
+				nativeId = "ottomatic.enemy.onion";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_CORN:
+				nativeId = "ottomatic.enemy.corn";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_TOMATO:
+				nativeId = "ottomatic.enemy.tomato";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_BLOB:
+				nativeId = "ottomatic.enemy.blob";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_SLIMETREE:
+				nativeId = "ottomatic.enemy.slimetree";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_SQUOOSHY:
+				nativeId = "ottomatic.enemy.squooshy";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_FLAMESTER:
+				nativeId = "ottomatic.enemy.flamester";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_GIANTLIZARD:
+				nativeId = "ottomatic.enemy.giantlizard";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_FLYTRAP:
+				nativeId = "ottomatic.enemy.flytrap";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_MANTIS:
+				nativeId = "ottomatic.enemy.mantis";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_TURTLE:
+				nativeId = "ottomatic.enemy.turtle";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_PODWORM:
+				nativeId = "ottomatic.enemy.podworm";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_MUTANT:
+				nativeId = "ottomatic.enemy.mutant";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_MUTANTROBOT:
+				nativeId = "ottomatic.enemy.mutantrobot";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_PITCHERPLANT:
+				nativeId = "ottomatic.enemy.pitcherplant";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_CLOWN:
+				nativeId = "ottomatic.enemy.clown";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_CLOWNFISH:
+				nativeId = "ottomatic.enemy.clownfish";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_STRONGMAN:
+				nativeId = "ottomatic.enemy.strongman";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_ICECUBE:
+				nativeId = "ottomatic.enemy.icecube";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_ELITEBRAINALIEN:
+				nativeId = "ottomatic.enemy.elitebrainalien";
+				category = "enemy";
+				break;
+		}
+
+		if (nativeId && category)
+		{
+			const char* tags[2];
+			int tagCount = 0;
+			tags[tagCount++] = nativeId;
+			if (strcmp(category, "human") == 0)
+			{
+				tags[tagCount++] = "ottomatic.human";
+			}
+			else
+			{
+				tags[tagCount++] = category;
+			}
+			OttoScript_RegisterObjectNode(newNode, PANGEA_SCRIPT_CAPABILITY_FULL, tags, tagCount);
+		}
+	}
+#endif
 
 	return(newNode);
 }

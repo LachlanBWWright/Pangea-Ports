@@ -540,6 +540,13 @@ void DeleteObject(ObjNode	*theNode)
 	if (theNode == nil)								// see if passed a bogus node
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (theNode->ScriptObjectID != 0)
+	{
+		BugdomScript_UnregisterObject(theNode);
+	}
+#endif
+
 	GAME_ASSERT_MESSAGE(							// see if already deleted
 			theNode->CType != INVALID_NODE_FLAG,
 			"Attempted to Double Delete an Object.  Object was already deleted!");

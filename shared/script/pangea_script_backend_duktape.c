@@ -94,19 +94,19 @@ static void copy_error(char* dest, int capacity, const char* message)
 
 static duk_ret_t log_info(duk_context* ctx)
 {
-	printf("[PangeaScript] %s\n", duk_safe_to_lstring(ctx, 0, NULL));
+	PangeaScript_Log(PANGEA_LOG_INFO, "JS", duk_safe_to_lstring(ctx, 0, NULL));
 	return 0;
 }
 
 static duk_ret_t log_warn(duk_context* ctx)
 {
-	printf("[PangeaScript warning] %s\n", duk_safe_to_lstring(ctx, 0, NULL));
+	PangeaScript_Log(PANGEA_LOG_WARN, "JS", duk_safe_to_lstring(ctx, 0, NULL));
 	return 0;
 }
 
 static duk_ret_t log_error(duk_context* ctx)
 {
-	printf("[PangeaScript error] %s\n", duk_safe_to_lstring(ctx, 0, NULL));
+	PangeaScript_Log(PANGEA_LOG_ERROR, "JS", duk_safe_to_lstring(ctx, 0, NULL));
 	return 0;
 }
 
@@ -603,8 +603,25 @@ PangeaScriptStatus PangeaScriptBackend_CallSplineItemHook(PangeaScriptBackend* b
 	PangeaScriptStatus status = call_function_on_top(backend, error, errorCapacity);
 	if (status != PANGEA_SCRIPT_OK)
 	{
-	duk_pop(backend->ctx);
-	return status;
+		duk_pop(backend->ctx);
+		return status;
+	}
+
+	duk_context* ctx = backend->ctx;
+	if (duk_get_top(ctx) <= 0)
+		return PANGEA_SCRIPT_OK;
+
+	if (duk_get_type(ctx, -1) == DUK_TYPE_OBJECT)
+	{
+		if (duk_get_prop_string(ctx, -1, "handled"))
+			context->handled = duk_get_boolean(ctx, -1) != 0;
+		duk_pop(ctx);
+		if (duk_get_prop_string(ctx, -1, "markInUse"))
+			context->markInUse = duk_get_boolean(ctx, -1) != 0;
+		duk_pop(ctx);
+	}
+	duk_pop(ctx);
+	return PANGEA_SCRIPT_OK;
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* backend, PangeaScriptMapItemContext* context, char* error, int errorCapacity)
@@ -666,22 +683,5 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 	}
 
 	duk_pop(backend->ctx);
-	return PANGEA_SCRIPT_OK;
-}
-
-	duk_context* ctx = backend->ctx;
-	if (duk_get_top(ctx) <= 0)
-		return PANGEA_SCRIPT_OK;
-
-	if (duk_get_type(ctx, -1) == DUK_TYPE_OBJECT)
-	{
-		if (duk_get_prop_string(ctx, -1, "handled"))
-			context->handled = duk_get_boolean(ctx, -1) != 0;
-		duk_pop(ctx);
-		if (duk_get_prop_string(ctx, -1, "markInUse"))
-			context->markInUse = duk_get_boolean(ctx, -1) != 0;
-		duk_pop(ctx);
-	}
-	duk_pop(ctx);
 	return PANGEA_SCRIPT_OK;
 }

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -685,6 +689,10 @@ int		part = itemPtr->parm[0];
 	}
 
 	UpdateObjectTransforms(newObj);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.gliderPart", "pickup");
+#endif
 
 	return(true);													// item was added
 }

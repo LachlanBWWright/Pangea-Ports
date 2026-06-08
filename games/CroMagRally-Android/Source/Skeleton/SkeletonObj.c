@@ -12,6 +12,10 @@
 #include "game.h"
 #include "bones.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -166,6 +170,71 @@ ObjNode	*newNode;
 	SetSkeletonAnim(newNode->Skeleton, newObjDef->animNum);
 	UpdateSkeletonAnimation(newNode);
 	UpdateSkinnedGeometry(newNode);								// prime the trimesh
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newNode)
+	{
+		const char* nativeId = NULL;
+		const char* category = NULL;
+		switch (newObjDef->type)
+		{
+			case SKELETON_TYPE_PLAYER_MALE:
+			case SKELETON_TYPE_PLAYER_FEMALE:
+				nativeId = "cromag.player";
+				category = "player";
+				break;
+			case SKELETON_TYPE_YETI:
+				nativeId = "cromag.enemy.yeti";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_BEETLE:
+				nativeId = "cromag.enemy.beetle";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_CAMEL:
+				nativeId = "cromag.enemy.camel";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_CATAPULT:
+				nativeId = "cromag.enemy.catapult";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_SHARK:
+				nativeId = "cromag.enemy.shark";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_DRAGON:
+				nativeId = "cromag.enemy.dragon";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_MUMMY:
+				nativeId = "cromag.enemy.mummy";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_TROLL:
+				nativeId = "cromag.enemy.troll";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_DRUID:
+				nativeId = "cromag.enemy.druid";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_POLARBEAR:
+				nativeId = "cromag.enemy.polarbear";
+				category = "enemy";
+				break;
+			case SKELETON_TYPE_VIKING:
+				nativeId = "cromag.enemy.viking";
+				category = "enemy";
+				break;
+		}
+
+		if (nativeId && category)
+		{
+			CroMagScript_RegisterObject(newNode, nativeId, category);
+		}
+	}
+#endif
 
 	return(newNode);
 }
