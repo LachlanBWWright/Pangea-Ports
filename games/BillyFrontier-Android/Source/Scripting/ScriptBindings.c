@@ -280,7 +280,6 @@ static void CallAreaHook(PangeaScriptHook hook, int areaNum, const char* action)
 
 void BillyScript_OnAreaLoad(int areaNum)
 {
-	PangeaScript_ResetObjects();
 	CallAreaHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, areaNum, "onAreaLoad");
 }
 

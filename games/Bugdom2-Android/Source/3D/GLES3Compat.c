@@ -191,15 +191,28 @@ static GLint uFog, uFogMode, uFogDensity, uFogStart, uFogEnd, uFogColor;
 static GLint uUseTex, uTex;
 static GLint uAlphaTest, uAlphaFunc, uAlphaRef;
 
+#define B2_UDIRTY_MATRIX    (1u << 0)
+#define B2_UDIRTY_COLOR     (1u << 1)
+#define B2_UDIRTY_LIGHTING  (1u << 2)
+#define B2_UDIRTY_FOG       (1u << 3)
+#define B2_UDIRTY_ALPHATEST (1u << 4)
+#define B2_UDIRTY_TEXTURE   (1u << 5)
+#define B2_UDIRTY_ALL       (0xFFu)
+
+static unsigned int gUniformDirty = B2_UDIRTY_ALL;
+
+static float* s_interleave_buf = NULL;
+static int s_interleave_buf_capacity = 0;
+
 //=============================================================
-// Draw cache – 128-entry LRU, keyed by client-array pointers
+// Draw cache – 256-entry LRU, keyed by client-array pointers
 //=============================================================
 // Static geometry (models, tiles) that never changes after loading can be
 // cached on the GPU indefinitely.  Dynamic geometry (skeletons, terrain,
-// water, fences, snake) must call GLES3_InvalidateCachePtr() before each
-// draw to evict stale entries and force a fresh upload.
+// water, fences, snake) marks changed client arrays dirty so only those
+// ranges are refreshed before the next draw.
 
-#define B2_DRAW_CACHE_SIZE 128
+#define B2_DRAW_CACHE_SIZE 256
 
 typedef struct {
     const void *vert_ptr;   // gVertArrayPtr   (NULL if disabled)
@@ -214,15 +227,59 @@ typedef struct {
     GLenum      color_type;   // GL_FLOAT or GL_UNSIGNED_BYTE; 0 = no color
     GLint       color_size;
     uint8_t     valid;
+    GLuint      vao;        // cached vertex array state for WebGL/GLES draws
     GLuint      vbo;        // packed attribute VBO (same interleaved layout)
     GLuint      ebo;        // index EBO
-    size_t      offVert, offNorm, offColor, offTexc;  // byte offsets in vbo
     uint64_t    lru_tick;
 } B2DrawCacheEntry;
 
 static B2DrawCacheEntry sB2DC[B2_DRAW_CACHE_SIZE];
 static uint64_t sB2DCTick = 0;
 static int sForceCacheMiss = -1;
+
+static int B2DrawCacheFind(
+    const void *vertPtr,
+    const void *normPtr,
+    const void *colorPtr,
+    const void *texcPtr,
+    const void *indices,
+    int nVerts,
+    int count,
+    GLenum type,
+    uint8_t attribMask,
+    GLenum colorType,
+    GLint colorSize)
+{
+    for (int i = 0; i < B2_DRAW_CACHE_SIZE; i++) {
+        B2DrawCacheEntry *e = &sB2DC[i];
+        if (e->valid &&
+            e->vert_ptr    == vertPtr   && e->norm_ptr   == normPtr  &&
+            e->color_ptr   == colorPtr  && e->texc_ptr   == texcPtr  &&
+            e->idx_ptr     == indices   &&
+            e->nVerts      == nVerts    && e->nIdx       == count &&
+            e->idx_type    == type      &&
+            e->attrib_mask == attribMask &&
+            e->color_type  == colorType && e->color_size == colorSize)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int B2DrawCacheFindLRU(void)
+{
+    int best = 0;
+    uint64_t best_tick = sB2DC[0].lru_tick;
+    for (int i = 1; i < B2_DRAW_CACHE_SIZE; i++) {
+        if (!sB2DC[i].valid) return i;
+        if (sB2DC[i].lru_tick < best_tick) {
+            best_tick = sB2DC[i].lru_tick;
+            best = i;
+        }
+    }
+    return best;
+}
 
 //=============================================================
 // Matrix stack (software, column-major like OpenGL)
@@ -274,6 +331,7 @@ static void MatMulCur(const float* M)
     float tmp[16];
     MatMul(c, M, tmp);
     memcpy(c, tmp, 16 * sizeof(float));
+    gUniformDirty |= B2_UDIRTY_MATRIX;
 }
 
 //=============================================================
@@ -372,54 +430,65 @@ static GLenum  gIMMode   = 0;
 
 static void UploadUniforms(void)
 {
-    glUniformMatrix4fv(uMV,        1, GL_FALSE, gMVStack[gMVTop]);
-    glUniformMatrix4fv(uProj,      1, GL_FALSE, gProjStack[gProjTop]);
-    glUniformMatrix4fv(uTexMatrix, 1, GL_FALSE, gTexStack[gTexTop]);
+    if (gUniformDirty & B2_UDIRTY_MATRIX) {
+        glUniformMatrix4fv(uMV,        1, GL_FALSE, gMVStack[gMVTop]);
+        glUniformMatrix4fv(uProj,      1, GL_FALSE, gProjStack[gProjTop]);
+        glUniformMatrix4fv(uTexMatrix, 1, GL_FALSE, gTexStack[gTexTop]);
+        gUniformDirty &= ~B2_UDIRTY_MATRIX;
+    }
 
-    // Lighting
-    glUniform1i(uLighting, gLightingEnabled ? 1 : 0);
-    glUniform4fv(uAmbient, 1, gAmbientColor);
+    if (gUniformDirty & B2_UDIRTY_LIGHTING) {
+        glUniform1i(uLighting, gLightingEnabled ? 1 : 0);
+        glUniform4fv(uAmbient, 1, gAmbientColor);
 
-    int n = 0;
-    for (int i = 0; i < 4; i++) {
-        if (gLightEnabled[i]) {
-            glUniform3fv(uLightDir[n],  1, gLightDir[i]);
-            glUniform4fv(uLightDiff[n], 1, gLightDiff[i]);
-            n++;
+        int n = 0;
+        for (int i = 0; i < 4; i++) {
+            if (gLightEnabled[i]) {
+                glUniform3fv(uLightDir[n],  1, gLightDir[i]);
+                glUniform4fv(uLightDiff[n], 1, gLightDiff[i]);
+                n++;
+            }
         }
-    }
-    glUniform1i(uNLights, n);
-
-    // Fog
-    glUniform1i(uFog, gFogEnabled ? 1 : 0);
-    if (gFogEnabled) {
-        int mappedMode = 1; // GL_LINEAR
-        if (gFogMode == GL_EXP)  mappedMode = 2;
-        if (gFogMode == GL_EXP2) mappedMode = 3;
-        glUniform1i(uFogMode, mappedMode);
-        glUniform1f(uFogDensity, gFogDensity);
-        glUniform1f(uFogStart,   gFogStart);
-        glUniform1f(uFogEnd,     gFogEnd);
-        glUniform4fv(uFogColor, 1, gFogColorVal);
+        glUniform1i(uNLights, n);
+        gUniformDirty &= ~B2_UDIRTY_LIGHTING;
     }
 
-    // Texture
-    glUniform1i(uUseTex, gTexture2DEnabled ? 1 : 0);
-    glUniform1i(uTex, 0);
+    if (gUniformDirty & B2_UDIRTY_FOG) {
+        glUniform1i(uFog, gFogEnabled ? 1 : 0);
+        if (gFogEnabled) {
+            int mappedMode = 1; // GL_LINEAR
+            if (gFogMode == GL_EXP)  mappedMode = 2;
+            if (gFogMode == GL_EXP2) mappedMode = 3;
+            glUniform1i(uFogMode, mappedMode);
+            glUniform1f(uFogDensity, gFogDensity);
+            glUniform1f(uFogStart,   gFogStart);
+            glUniform1f(uFogEnd,     gFogEnd);
+            glUniform4fv(uFogColor, 1, gFogColorVal);
+        }
+        gUniformDirty &= ~B2_UDIRTY_FOG;
+    }
 
-    // Alpha test
-    glUniform1i(uAlphaTest, gAlphaTestEnabled ? 1 : 0);
-    if (gAlphaTestEnabled) {
-        int af = 7; // ALWAYS
-        if      (gAlphaFuncVal == GL_NEVER)    af = 0;
-        else if (gAlphaFuncVal == GL_LESS)     af = 1;
-        else if (gAlphaFuncVal == GL_EQUAL)    af = 2;
-        else if (gAlphaFuncVal == GL_LEQUAL)   af = 3;
-        else if (gAlphaFuncVal == GL_GREATER)  af = 4;
-        else if (gAlphaFuncVal == GL_NOTEQUAL) af = 5;
-        else if (gAlphaFuncVal == GL_GEQUAL)   af = 6;
-        glUniform1i(uAlphaFunc, af);
-        glUniform1f(uAlphaRef,  gAlphaRefVal);
+    if (gUniformDirty & B2_UDIRTY_TEXTURE) {
+        glUniform1i(uUseTex, gTexture2DEnabled ? 1 : 0);
+        glUniform1i(uTex, 0);
+        gUniformDirty &= ~B2_UDIRTY_TEXTURE;
+    }
+
+    if (gUniformDirty & B2_UDIRTY_ALPHATEST) {
+        glUniform1i(uAlphaTest, gAlphaTestEnabled ? 1 : 0);
+        if (gAlphaTestEnabled) {
+            int af = 7; // ALWAYS
+            if      (gAlphaFuncVal == GL_NEVER)    af = 0;
+            else if (gAlphaFuncVal == GL_LESS)     af = 1;
+            else if (gAlphaFuncVal == GL_EQUAL)    af = 2;
+            else if (gAlphaFuncVal == GL_LEQUAL)   af = 3;
+            else if (gAlphaFuncVal == GL_GREATER)  af = 4;
+            else if (gAlphaFuncVal == GL_NOTEQUAL) af = 5;
+            else if (gAlphaFuncVal == GL_GEQUAL)   af = 6;
+            glUniform1i(uAlphaFunc, af);
+            glUniform1f(uAlphaRef,  gAlphaRefVal);
+        }
+        gUniformDirty &= ~B2_UDIRTY_ALPHATEST;
     }
 }
 
@@ -531,19 +600,19 @@ void GLES3_Enable(GLenum cap)
         case GL_BLEND:          gBlendEnabled      = true; glEnable(cap); return;
         case GL_CULL_FACE:      gCullFaceEnabled   = true; glEnable(cap); return;
         case GL_DEPTH_TEST:     gDepthTestEnabled  = true; glEnable(cap); return;
-        case GL_LIGHTING:       gLightingEnabled   = true; return;
-        case GL_LIGHT0:         gLightEnabled[0]   = true; return;
-        case GL_LIGHT1:         gLightEnabled[1]   = true; return;
-        case GL_LIGHT2:         gLightEnabled[2]   = true; return;
-        case GL_LIGHT3:         gLightEnabled[3]   = true; return;
-        case GL_FOG:            gFogEnabled        = true; return;
+        case GL_LIGHTING:       gLightingEnabled   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT0:         gLightEnabled[0]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT1:         gLightEnabled[1]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT2:         gLightEnabled[2]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT3:         gLightEnabled[3]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_FOG:            gFogEnabled        = true; gUniformDirty |= B2_UDIRTY_FOG; return;
         case GL_NORMALIZE:      gNormalizeEnabled  = true; return;
         case GL_COLOR_MATERIAL: gColorMaterialEnabled = true; return;
         case GL_TEXTURE_GEN_S:  gTexGenSEnabled    = true; return;
         case GL_TEXTURE_GEN_T:  gTexGenTEnabled    = true; return;
         case GL_RESCALE_NORMAL: return;  // no-op
-        case GL_ALPHA_TEST:     gAlphaTestEnabled  = true; return;
-        case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = true; return;
+        case GL_ALPHA_TEST:     gAlphaTestEnabled  = true; gUniformDirty |= B2_UDIRTY_ALPHATEST; return;
+        case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = true; gUniformDirty |= B2_UDIRTY_TEXTURE; return;
         default: glEnable(cap); break;
     }
 }
@@ -555,19 +624,19 @@ void GLES3_Disable(GLenum cap)
         case GL_BLEND:          gBlendEnabled      = false; glDisable(cap); return;
         case GL_CULL_FACE:      gCullFaceEnabled   = false; glDisable(cap); return;
         case GL_DEPTH_TEST:     gDepthTestEnabled  = false; glDisable(cap); return;
-        case GL_LIGHTING:       gLightingEnabled   = false; return;
-        case GL_LIGHT0:         gLightEnabled[0]   = false; return;
-        case GL_LIGHT1:         gLightEnabled[1]   = false; return;
-        case GL_LIGHT2:         gLightEnabled[2]   = false; return;
-        case GL_LIGHT3:         gLightEnabled[3]   = false; return;
-        case GL_FOG:            gFogEnabled        = false; return;
+        case GL_LIGHTING:       gLightingEnabled   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT0:         gLightEnabled[0]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT1:         gLightEnabled[1]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT2:         gLightEnabled[2]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_LIGHT3:         gLightEnabled[3]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
+        case GL_FOG:            gFogEnabled        = false; gUniformDirty |= B2_UDIRTY_FOG; return;
         case GL_NORMALIZE:      gNormalizeEnabled  = false; return;
         case GL_COLOR_MATERIAL: gColorMaterialEnabled = false; return;
         case GL_TEXTURE_GEN_S:  gTexGenSEnabled    = false; return;
         case GL_TEXTURE_GEN_T:  gTexGenTEnabled    = false; return;
         case GL_RESCALE_NORMAL: return;
-        case GL_ALPHA_TEST:     gAlphaTestEnabled  = false; return;
-        case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = false; return;
+        case GL_ALPHA_TEST:     gAlphaTestEnabled  = false; gUniformDirty |= B2_UDIRTY_ALPHATEST; return;
+        case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = false; gUniformDirty |= B2_UDIRTY_TEXTURE; return;
         default: glDisable(cap); break;
     }
 }
@@ -728,17 +797,155 @@ void GLES3_InvalidateCachePtr(const void *ptr)
 {
     for (int i = 0; i < B2_DRAW_CACHE_SIZE; i++)
     {
-        if (sB2DC[i].valid && (
-                sB2DC[i].vert_ptr  == ptr ||
-                sB2DC[i].norm_ptr  == ptr ||
-                sB2DC[i].color_ptr == ptr ||
-                sB2DC[i].texc_ptr  == ptr ||
-                sB2DC[i].idx_ptr   == ptr))
+        if (sB2DC[i].valid &&
+            (sB2DC[i].vert_ptr  == ptr ||
+             sB2DC[i].norm_ptr  == ptr ||
+             sB2DC[i].color_ptr == ptr ||
+             sB2DC[i].texc_ptr  == ptr ||
+             sB2DC[i].idx_ptr   == ptr))
         {
             gCacheInvalidationsThisFrame++;
             sB2DC[i].valid = 0;
         }
     }
+}
+
+static int BuildInterleaveBuffer(
+    int vertex_count,
+    const void *vertPtr,
+    const void *normPtr,
+    const void *colorPtr,
+    GLenum colorType,
+    GLint colorSize,
+    const void *texcPtr,
+    uint8_t attribMask)
+{
+    const int STRIDE_FLOATS = 12;
+    const int STRIDE_BYTES = STRIDE_FLOATS * sizeof(float);
+    int buf_size = vertex_count * STRIDE_BYTES;
+
+    if (buf_size > s_interleave_buf_capacity) {
+        s_interleave_buf = (float *)realloc(s_interleave_buf, buf_size);
+        s_interleave_buf_capacity = buf_size;
+    }
+    float *buf = s_interleave_buf;
+    if (!buf) return -1;
+
+    const float *v_src = (attribMask & (1u << 0)) ? (const float *)vertPtr : NULL;
+    const float *n_src = (attribMask & (1u << 1)) ? (const float *)normPtr : NULL;
+    const void  *c_src = (attribMask & (1u << 2)) ? colorPtr : NULL;
+    const float *t_src = (attribMask & (1u << 3)) ? (const float *)texcPtr : NULL;
+
+    for (int i = 0; i < vertex_count; i++) {
+        float *dst = buf + i * STRIDE_FLOATS;
+
+        // Position
+        if (v_src) {
+            dst[0] = v_src[i * 3 + 0];
+            dst[1] = v_src[i * 3 + 1];
+            dst[2] = v_src[i * 3 + 2];
+        } else {
+            dst[0] = dst[1] = dst[2] = 0.0f;
+        }
+
+        // Normal
+        if (n_src) {
+            dst[3] = n_src[i * 3 + 0];
+            dst[4] = n_src[i * 3 + 1];
+            dst[5] = n_src[i * 3 + 2];
+        } else {
+            dst[3] = 0.0f;
+            dst[4] = 0.0f;
+            dst[5] = 1.0f;
+        }
+
+        // Color
+        if (c_src) {
+            if (colorType == GL_UNSIGNED_BYTE) {
+                const uint8_t *rgba = ((const uint8_t *)c_src) + i * colorSize;
+                dst[6] = rgba[0] / 255.0f;
+                dst[7] = rgba[1] / 255.0f;
+                dst[8] = rgba[2] / 255.0f;
+                dst[9] = (colorSize == 4) ? (rgba[3] / 255.0f) : 1.0f;
+            } else {
+                const float *rgba = ((const float *)c_src) + i * colorSize;
+                dst[6] = rgba[0];
+                dst[7] = rgba[1];
+                dst[8] = rgba[2];
+                dst[9] = (colorSize == 4) ? rgba[3] : 1.0f;
+            }
+        } else {
+            dst[6] = gCurrentColor[0];
+            dst[7] = gCurrentColor[1];
+            dst[8] = gCurrentColor[2];
+            dst[9] = gCurrentColor[3];
+        }
+
+        // Texcoord
+        if (t_src) {
+            dst[10] = t_src[i * 2 + 0];
+            dst[11] = t_src[i * 2 + 1];
+        } else {
+            dst[10] = 0.0f;
+            dst[11] = 0.0f;
+        }
+    }
+    return buf_size;
+}
+
+static void B2DrawCacheConfigureVAO(
+    B2DrawCacheEntry *entry,
+    uint8_t attribMask)
+{
+    glBindVertexArray(entry->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, entry->vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ebo);
+
+    const GLsizei STRIDE = 12 * sizeof(float);
+
+    // Position (Attrib 0)
+    if (attribMask & (1u << 0)) {
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(0 * sizeof(float)));
+    } else {
+        glDisableVertexAttribArray(0);
+    }
+
+    // Normal (Attrib 1)
+    if (attribMask & (1u << 1)) {
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(3 * sizeof(float)));
+    } else {
+        glDisableVertexAttribArray(1);
+    }
+
+    // Color (Attrib 2)
+    if (attribMask & (1u << 2)) {
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(6 * sizeof(float)));
+    } else {
+        glDisableVertexAttribArray(2);
+    }
+
+    // TexCoord (Attrib 3)
+    if (attribMask & (1u << 3)) {
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(10 * sizeof(float)));
+    } else {
+        glDisableVertexAttribArray(3);
+    }
+}
+
+static void B2DrawCacheSetFallbackAttribs(uint8_t attribMask)
+{
+    if (!(attribMask & (1u<<0)))
+        glVertexAttrib3f(0, 0, 0, 0);
+    if (!(attribMask & (1u<<1)))
+        glVertexAttrib3f(1, gCurrentNormal[0], gCurrentNormal[1], gCurrentNormal[2]);
+    if (!(attribMask & (1u<<2)))
+        glVertexAttrib4f(2, gCurrentColor[0], gCurrentColor[1], gCurrentColor[2], gCurrentColor[3]);
+    if (!(attribMask & (1u<<3)))
+        glVertexAttrib2f(3, gCurrentTexCoord[0], gCurrentTexCoord[1]);
 }
 
 //=============================================================
@@ -790,96 +997,60 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     int cacheIdx = -1;
     if (!forceCacheMiss)
     {
-        for (int ci = 0; ci < B2_DRAW_CACHE_SIZE; ci++)
-        {
-            B2DrawCacheEntry *e = &sB2DC[ci];
-            if (e->valid &&
-                e->vert_ptr    == vertPtr   && e->norm_ptr   == normPtr  &&
-                e->color_ptr   == colorPtr  && e->texc_ptr   == texcPtr  &&
-                e->idx_ptr     == indices   &&
-                e->nVerts      == nVerts    && e->nIdx       == (int)count &&
-                e->idx_type    == type      &&
-                e->attrib_mask == attribMask &&
-                e->color_type  == colorType && e->color_size == colorSize)
-            {
-                cacheIdx = ci;
-                break;
-            }
-        }
+        cacheIdx = B2DrawCacheFind(
+            vertPtr,
+            normPtr,
+            colorPtr,
+            texcPtr,
+            indices,
+            nVerts,
+            (int)count,
+            type,
+            attribMask,
+            colorType,
+            colorSize);
     }
 
-    size_t offVert, offNorm, offColor, offTexc;
+    B2DrawCacheEntry *drawEntry = NULL;
 
     if (cacheIdx >= 0)
     {
         // ── Cache HIT: rebind cached VBO/EBO, skip all uploads ────────
         B2DrawCacheEntry *e = &sB2DC[cacheIdx];
+        drawEntry = e;
         e->lru_tick = ++sB2DCTick;
         gCacheHitsThisFrame++;
 
-        offVert  = e->offVert;
-        offNorm  = e->offNorm;
-        offColor = e->offColor;
-        offTexc  = e->offTexc;
-
-        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
+        glBindVertexArray(e->vao);
     }
     else
     {
         gCacheMissesThisFrame++;
         // ── Cache MISS: evict LRU slot and upload ─────────────────────
-        int evict = 0;
-        uint64_t oldest = UINT64_MAX;
-        for (int ci = 0; ci < B2_DRAW_CACHE_SIZE; ci++)
-        {
-            if (!sB2DC[ci].valid) { evict = ci; oldest = 0; break; }
-            if (sB2DC[ci].lru_tick < oldest)
-            {
-                oldest = sB2DC[ci].lru_tick;
-                evict  = ci;
-            }
-        }
+        int evict = B2DrawCacheFindLRU();
         B2DrawCacheEntry *e = &sB2DC[evict];
+        drawEntry = e;
         if (e->valid)
             gCacheEvictionsThisFrame++;
 
+        if (!e->vao) glGenVertexArrays(1, &e->vao);
         if (!e->vbo) glGenBuffers(1, &e->vbo);
         if (!e->ebo) glGenBuffers(1, &e->ebo);
 
-        // Calculate packed VBO layout (same interleaved-offsets approach)
-        size_t vertBytes  = 0, normBytes = 0, colorBytes = 0, texcBytes = 0;
-        if (attribMask & (1u<<0)) vertBytes  = (size_t)nVerts * 3 * sizeof(float);
-        if (attribMask & (1u<<1)) normBytes  = (size_t)nVerts * 3 * sizeof(float);
-        if (attribMask & (1u<<2)) {
-            colorBytes = (colorType == GL_UNSIGNED_BYTE)
-                ? (size_t)nVerts * (size_t)colorSize * sizeof(GLubyte)
-                : (size_t)nVerts * (size_t)colorSize * sizeof(float);
-        }
-        if (attribMask & (1u<<3)) texcBytes  = (size_t)nVerts * 2 * sizeof(float);
-
-        offVert  = 0;
-        offNorm  = offVert  + vertBytes;
-        offColor = offNorm  + normBytes;
-        offTexc  = offColor + colorBytes;
-        size_t totalSize = offTexc + texcBytes;
+        int vbo_bytes = BuildInterleaveBuffer(nVerts, vertPtr, normPtr, colorPtr, colorType, colorSize, texcPtr, attribMask);
 
         glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
-        if (totalSize > 0)
+        if (vbo_bytes > 0)
         {
-            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)totalSize, NULL, GL_STATIC_DRAW);
-            if (vertBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offVert,  (GLsizeiptr)vertBytes,  vertPtr);
-            if (normBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offNorm,  (GLsizeiptr)normBytes,  normPtr);
-            if (colorBytes) glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offColor, (GLsizeiptr)colorBytes, colorPtr);
-            if (texcBytes)  glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offTexc,  (GLsizeiptr)texcBytes,  texcPtr);
-            gBytesUploadedThisFrame += (int)totalSize;
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vbo_bytes, s_interleave_buf, GL_DYNAMIC_DRAW);
+            gBytesUploadedThisFrame += vbo_bytes;
+            gVerticesUploadedThisFrame += nVerts;
         }
 
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_DYNAMIC_DRAW);
         gBytesUploadedThisFrame += (int)indexSize;
-        gVerticesUploadedThisFrame += nVerts;
 
         // Store cache entry
         e->vert_ptr    = vertPtr;
@@ -893,49 +1064,14 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
         e->attrib_mask = attribMask;
         e->color_type  = colorType;
         e->color_size  = colorSize;
-        e->offVert     = offVert;
-        e->offNorm     = offNorm;
-        e->offColor    = offColor;
-        e->offTexc     = offTexc;
         e->valid       = 1;
         e->lru_tick    = ++sB2DCTick;
+
+        B2DrawCacheConfigureVAO(e, attribMask);
     }
 
-    // ── Set up vertex attribute pointers from cached/uploaded VBO ────
-    if (attribMask & (1u<<0)) {
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offVert);
-    } else {
-        glDisableVertexAttribArray(0);
-        glVertexAttrib3f(0, 0, 0, 0);
-    }
-
-    if (attribMask & (1u<<1)) {
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (const void*)offNorm);
-    } else {
-        glDisableVertexAttribArray(1);
-        glVertexAttrib3f(1, gCurrentNormal[0], gCurrentNormal[1], gCurrentNormal[2]);
-    }
-
-    if (attribMask & (1u<<2)) {
-        glEnableVertexAttribArray(2);
-        if (colorType == GL_UNSIGNED_BYTE)
-            glVertexAttribPointer(2, colorSize, GL_UNSIGNED_BYTE, GL_TRUE, 0, (const void*)offColor);
-        else
-            glVertexAttribPointer(2, colorSize, GL_FLOAT, GL_FALSE, 0, (const void*)offColor);
-    } else {
-        glDisableVertexAttribArray(2);
-        glVertexAttrib4f(2, gCurrentColor[0], gCurrentColor[1], gCurrentColor[2], gCurrentColor[3]);
-    }
-
-    if (attribMask & (1u<<3)) {
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, (const void*)offTexc);
-    } else {
-        glDisableVertexAttribArray(3);
-        glVertexAttrib2f(3, gCurrentTexCoord[0], gCurrentTexCoord[1]);
-    }
+    glBindVertexArray(drawEntry->vao);
+    B2DrawCacheSetFallbackAttribs(attribMask);
 
     UploadUniforms();
 
@@ -958,9 +1094,9 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
 //=============================================================
 
 void glMatrixMode(GLenum mode)    { gMatMode = (int)mode; }
-void glLoadIdentity(void)         { MatIdentity(*CurMat()); }
-void glLoadMatrixf(const GLfloat* m) { memcpy(*CurMat(), m, 16*sizeof(float)); }
-void glMultMatrixf(const GLfloat* m) { MatMulCur(m); }
+void glLoadIdentity(void)         { MatIdentity(*CurMat()); gUniformDirty |= B2_UDIRTY_MATRIX; }
+void glLoadMatrixf(const GLfloat* m) { memcpy(*CurMat(), m, 16*sizeof(float)); gUniformDirty |= B2_UDIRTY_MATRIX; }
+void glMultMatrixf(const GLfloat* m) { MatMulCur(m); gUniformDirty |= B2_UDIRTY_MATRIX; }
 
 void glPushMatrix(void)
 {
@@ -977,6 +1113,7 @@ void glPushMatrix(void)
         memcpy(gMVStack[gMVTop+1], gMVStack[gMVTop], 16*sizeof(float));
         gMVTop++;
     }
+    gUniformDirty |= B2_UDIRTY_MATRIX;
 }
 
 void glPopMatrix(void)
@@ -988,6 +1125,7 @@ void glPopMatrix(void)
     } else {
         if (gMVTop > 0) gMVTop--;
     }
+    gUniformDirty |= B2_UDIRTY_MATRIX;
 }
 
 void glFrustum(double l, double r, double b, double t, double n, double f)
@@ -1093,7 +1231,7 @@ void glLightfv(GLenum light, GLenum pname, const GLfloat* params)
         gLightDiff[idx][2] = params[2];
         gLightDiff[idx][3] = params[3];
     }
-    // Ambient/specular per-light ignored (ambient is handled via LightModel)
+    gUniformDirty |= B2_UDIRTY_LIGHTING;
 }
 
 void glLightModelfv(GLenum pname, const GLfloat* params)
@@ -1103,6 +1241,7 @@ void glLightModelfv(GLenum pname, const GLfloat* params)
         gAmbientColor[1] = params[1];
         gAmbientColor[2] = params[2];
         gAmbientColor[3] = params[3];
+        gUniformDirty |= B2_UDIRTY_LIGHTING;
     }
 }
 
@@ -1124,15 +1263,15 @@ void glMaterialfv(GLenum face, GLenum pname, const GLfloat* params)
 
 void glFogi(GLenum pname, GLint param)
 {
-    if (pname == GL_FOG_MODE) gFogMode = param;
+    if (pname == GL_FOG_MODE) { gFogMode = param; gUniformDirty |= B2_UDIRTY_FOG; }
 }
 
 void glFogf(GLenum pname, GLfloat param)
 {
     switch (pname) {
-        case GL_FOG_DENSITY: gFogDensity = param; break;
-        case GL_FOG_START:   gFogStart   = param; break;
-        case GL_FOG_END:     gFogEnd     = param; break;
+        case GL_FOG_DENSITY: gFogDensity = param; gUniformDirty |= B2_UDIRTY_FOG; break;
+        case GL_FOG_START:   gFogStart   = param; gUniformDirty |= B2_UDIRTY_FOG; break;
+        case GL_FOG_END:     gFogEnd     = param; gUniformDirty |= B2_UDIRTY_FOG; break;
         default: break;
     }
 }
@@ -1144,6 +1283,7 @@ void glFogfv(GLenum pname, const GLfloat* params)
         gFogColorVal[1] = params[1];
         gFogColorVal[2] = params[2];
         gFogColorVal[3] = params[3];
+        gUniformDirty |= B2_UDIRTY_FOG;
     }
 }
 
@@ -1171,6 +1311,7 @@ void glAlphaFunc(GLenum func, GLclampf ref)
 {
     gAlphaFuncVal = (int)func;
     gAlphaRefVal  = (float)ref;
+    gUniformDirty |= B2_UDIRTY_ALPHATEST;
 }
 
 //=============================================================
@@ -1317,6 +1458,14 @@ void glEnd(void)
 
     UploadUniforms();
     glDrawArrays(drawMode, 0, outCount);
+    gDrawCallsThisFrame++;
+    gImmediateDrawsThisFrame++;
+    gImmediateBytesUploadedThisFrame += (int)immBytes;
+    gBytesUploadedThisFrame += (int)immBytes;
+    gVerticesUploadedThisFrame += outCount;
+    ProfileImmediateSource source = ConsumeImmediateDrawSource();
+    gImmediateSourceDrawsThisFrame[source]++;
+    gImmediateSourceBytesThisFrame[source] += (int)immBytes;
 
     gIMCount = 0;
 }

@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 #include "tga.h"
 
 
@@ -354,6 +355,7 @@ void DrawSprite(int	group, int type, float x, float y, float scale, float rot, u
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_INFOBAR);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0,1);	glVertex2f(x, y);
 	glTexCoord2f(1,1);	glVertex2f(x+scale, y);
@@ -370,4 +372,3 @@ void DrawSprite(int	group, int type, float x, float y, float scale, float rot, u
 	gPolysThisFrame += 2;						// 2 tris drawn
 }
 #endif
-

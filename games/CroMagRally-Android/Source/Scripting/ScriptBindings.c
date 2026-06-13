@@ -291,7 +291,6 @@ static void CallRaceHook(PangeaScriptHook hook, int trackNum, const char* action
 
 void CroMagScript_OnRaceLoad(int trackNum)
 {
-	PangeaScript_ResetObjects();
 	CallRaceHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, trackNum, "onRaceLoad");
 }
 

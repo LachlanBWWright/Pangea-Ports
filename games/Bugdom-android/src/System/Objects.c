@@ -366,12 +366,12 @@ ObjNode		*thisNodePtr;
 		if (thisNodePtr->MoveCall != nil)
 		{
 			thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
+		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-			if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
-				BugdomScript_RunObjectFrame(thisNodePtr);
+		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+			BugdomScript_RunObjectFrame(thisNodePtr);
 #endif
-		}
 		thisNodePtr = gNextNode;							// next node
 	}
 	while (thisNodePtr != nil);

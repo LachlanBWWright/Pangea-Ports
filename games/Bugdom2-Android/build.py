@@ -531,7 +531,7 @@ class EmscriptenProject(Project):
               "-DCMAKE_BUILD_TYPE=Release",
               "-DBUILD_SDL_FROM_SOURCE=OFF",
               "-DSDL_STATIC=ON",
-              f"-DSDL3_DIR={sdl3_cmake_dir}"],
+              f"-DSDL3_DIR={sdl3_cmake_dir}"] + self.gen_args,
              env=env)
 
     def build(self):

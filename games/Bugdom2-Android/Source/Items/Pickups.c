@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -328,6 +332,10 @@ int	type = itemPtr->parm[0];
 			/* MAKE SHADOW */
 
 	AttachShadowToObject(newObj, 0, 2,2, true);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.acorn", "pickup");
+#endif
 
 	return(true);
 }

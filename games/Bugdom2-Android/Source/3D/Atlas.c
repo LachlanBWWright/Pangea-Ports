@@ -7,6 +7,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 #include "utf8.h"
 #include "quadmesh.h"
 
@@ -823,6 +824,7 @@ static void DrawExtents(OGLRect extents, float z)
 	glDisable(GL_TEXTURE_2D); //OGL_DisableTexture2D();
 
 	glColor4f(1,1,1,1);
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_LINES);
 	glBegin(GL_LINE_LOOP);
 	glVertex3f(extents.left,		extents.top,	z);
 	glVertex3f(extents.right,		extents.top,	z);
@@ -846,6 +848,7 @@ void TextMesh_DrawExtents(ObjNode* textNode)
 	float z = textNode->Coord.z;
 
 	glColor4f(1,1,1,1);
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_LINES);
 	glBegin(GL_LINE_LOOP);
 	glVertex3f(extents.left,		extents.top,	z);
 	glVertex3f(extents.right,		extents.top,	z);
@@ -888,6 +891,7 @@ void Atlas_ImmediateDraw(int groupNum, const char* text, uint32_t flags)
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_TEXT);
 	glBegin(GL_QUADS);
 	const OGLPoint3D* pt = gImmediateModePoints;
 	const OGLTextureCoord* uv = gImmediateModeUVs;
@@ -932,4 +936,3 @@ void Atlas_DrawString(int groupNum, const char* text, float x, float y, float sc
 
 	OGL_PopState();									// restore state
 }
-

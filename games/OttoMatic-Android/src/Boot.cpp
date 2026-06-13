@@ -53,6 +53,17 @@ static void BuildTerrainOverrideSpec(void)
 }
 
 #ifdef __EMSCRIPTEN__
+// Yield to the browser's event loop via setTimeout(0) so the browser can process
+// input and other events between frames. Frame pacing is handled by SDL_GL_SwapWindow
+// which blocks on requestAnimationFrame when SwapInterval=1 (set below at window creation).
+EM_JS(void, emscripten_fast_yield, (void), {
+	return Asyncify.handleSleep(function(wakeUp) {
+		setTimeout(function() {
+			wakeUp();
+		}, 0);
+	});
+});
+
 // Exported function: set terrain override path from JavaScript
 EMSCRIPTEN_KEEPALIVE extern "C" void OttoMatic_SetTerrainPath(const char* path)
 {
@@ -309,6 +320,10 @@ retryVideo:
 		SDL_SetWindowSize(gSDLWindow, emW, emH);
 		SDL_SyncWindow(gSDLWindow);
 	}
+	// Force vsync on Emscripten: SDL_GL_SwapWindow will block on requestAnimationFrame,
+	// which paces frames to the monitor refresh rate and eliminates rendering stutter.
+	// The in-game vsync preference still applies for native builds via OGL_SetupWindow.
+	SDL_GL_SetSwapInterval(1);
 #endif
 
 	// Init gamepad subsystem

@@ -269,7 +269,7 @@ slow_down:
 	{
 		gFramesPerSecond = performanceFrequency / (float)(deltaTime);
 
-		if (gFramesPerSecond > MAX_FPS)					// keep from going over 100fps (there were problems in 2.0 of frame rate precision loss)
+		if (gFramesPerSecond > MAX_FPS)					// keep from going over 500fps (there were problems in 2.0 of frame rate precision loss)
 		{
 			if (gFramesPerSecond - MAX_FPS > 1000)		// try to sneak in some sleep if we have 1 ms to spare
 			{

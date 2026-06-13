@@ -454,6 +454,34 @@ void PresentIndexedFramebuffer(void)
 		return;
 	}
 
+#ifdef __EMSCRIPTEN__
+	// Limit framerate to 500 FPS to avoid cooking GPU/CPU
+	{
+		static uint64_t lastPresentTime = 0;
+		uint64_t freq = SDL_GetPerformanceFrequency();
+		uint64_t minTicks = freq / 500;
+		uint64_t currTime;
+		while (1)
+		{
+			currTime = SDL_GetPerformanceCounter();
+			if (lastPresentTime == 0)
+			{
+				break;
+			}
+			uint64_t elapsed = currTime - lastPresentTime;
+			if (elapsed >= minTicks)
+			{
+				break;
+			}
+			if (minTicks - elapsed > (freq / 1000))
+			{
+				SDL_Delay(1);
+			}
+		}
+		lastPresentTime = currTime;
+	}
+#endif
+
 #if _DEBUG
 	// Check screenshot key
 	if (GetNewSDLKeyState(SDL_SCANCODE_F12))

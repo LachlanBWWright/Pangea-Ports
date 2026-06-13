@@ -419,13 +419,13 @@ ObjNode		*thisNodePtr;
 			{
 				KeepOldCollisionBoxes(thisNodePtr);					// keep old boxes & other stuff
 				thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
-
-#ifdef PANGEA_ENABLE_SCRIPTING
-				if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
-					BillyScript_RunObjectFrame(thisNodePtr);
-#endif
 			}
 		}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+			BillyScript_RunObjectFrame(thisNodePtr);
+#endif
 		thisNodePtr = gNextNode;							// next node
 	}
 	while (thisNodePtr != nil);

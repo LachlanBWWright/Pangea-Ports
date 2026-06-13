@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -17,6 +18,20 @@
 /****************************/
 
 static void DrawShadow(ObjNode *theNode);
+
+#define MAX_SHADOW_BATCH_TYPES 4
+#define MAX_SHADOW_BATCH_QUADS 256
+
+typedef struct
+{
+	OGLPoint3D	points[MAX_SHADOW_BATCH_QUADS][4];
+	float		alpha[MAX_SHADOW_BATCH_QUADS];
+	int			count;
+} ShadowBatch;
+
+static ShadowBatch gShadowBatches[MAX_SHADOW_BATCH_TYPES];
+
+static void SubmitBatchedShadow(ObjNode *theNode);
 
 
 /****************************/
@@ -571,36 +586,82 @@ Boolean	onBlocker = false;
 
 static void DrawShadow(ObjNode *theNode)
 {
+	SubmitBatchedShadow(theNode);
+}
+
+
+/******************* SUBMIT BATCHED SHADOW ******************/
+
+static void SubmitBatchedShadow(ObjNode *theNode)
+{
 int	shadowType = theNode->Kind;
 
+	if (shadowType < 0 || shadowType >= MAX_SHADOW_BATCH_TYPES)
+		return;
 
-	OGL_PushState();
+	if (gShadowBatches[shadowType].count >= MAX_SHADOW_BATCH_QUADS)
+		FlushBatchedShadows();
 
-			/* SUBMIT THE MATRIX */
+	OGLPoint3D local[4] =
+	{
+		{-20, 0,  20},
+		{ 20, 0,  20},
+		{ 20, 0, -20},
+		{-20, 0, -20},
+	};
 
-	glMultMatrixf(theNode->BaseTransformMatrix.value);
+	ShadowBatch* batch = &gShadowBatches[shadowType];
+	OGLPoint3D_TransformArray(local, &theNode->BaseTransformMatrix, batch->points[batch->count], 4);
+	batch->alpha[batch->count] = theNode->ColorFilter.a;
+	batch->count++;
+}
 
 
-			/* SUBMIT SHADOW TEXTURE */
+/******************* FLUSH BATCHED SHADOWS ******************/
 
-	gGlobalTransparency = theNode->ColorFilter.a;
+void FlushBatchedShadows(void)
+{
+Boolean drewAny = false;
 
-	MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_GLOBAL][GLOBAL_SObjType_Shadow_Circular+shadowType].materialObject);
+	for (int shadowType = 0; shadowType < MAX_SHADOW_BATCH_TYPES; shadowType++)
+	{
+		ShadowBatch* batch = &gShadowBatches[shadowType];
 
+		if (batch->count == 0)
+			continue;
 
-			/* DRAW THE SHADOW */
+		if (!drewAny)
+		{
+			OGL_PushState();
+			glDisable(GL_CULL_FACE);
+			drewAny = true;
+		}
 
-	glDisable(GL_CULL_FACE);
-	glBegin(GL_QUADS);
-	glTexCoord2f(0,0);	glVertex3f(-20, 0, 20);
-	glTexCoord2f(1,0);	glVertex3f(20, 0, 20);
-	glTexCoord2f(1,1);	glVertex3f(20, 0, -20);
-	glTexCoord2f(0,1);	glVertex3f(-20, 0, -20);
-	glEnd();
+		gGlobalTransparency = 1.0f;
+		MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_GLOBAL][GLOBAL_SObjType_Shadow_Circular+shadowType].materialObject);
 
-	OGL_PopState();
-	gGlobalTransparency = 1.0;
+		SetImmediateDrawSource(PROFILE_IMMEDIATE_SHADOW);
+		glBegin(GL_QUADS);
+		for (int i = 0; i < batch->count; i++)
+		{
+			glColor4f(1, 1, 1, batch->alpha[i]);
+			glTexCoord2f(0,0);	glVertex3fv(&batch->points[i][0].x);
+			glTexCoord2f(1,0);	glVertex3fv(&batch->points[i][1].x);
+			glTexCoord2f(1,1);	glVertex3fv(&batch->points[i][2].x);
+			glTexCoord2f(0,1);	glVertex3fv(&batch->points[i][3].x);
+		}
+		glEnd();
 
+		batch->count = 0;
+	}
+
+	if (drewAny)
+	{
+		OGL_PopState();
+		glColor4f(1, 1, 1, 1);
+	}
+
+	gGlobalTransparency = 1.0f;
 }
 
 
@@ -881,11 +942,6 @@ float	x,z;
 		theNode->Speed2D = 0;
 	}
 }
-
-
-
-
-
 
 
 

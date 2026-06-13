@@ -47,11 +47,14 @@ typedef struct {
     const void *tc0_ptr;
     const void *tc1_ptr;
     const void *idx_ptr;
+    GLenum      mode;
+    GLint       first;
     int         vtx_count;
     int         idx_count;
     int         idx_type;
     uint8_t     attrib_mask;
     GLenum      color_type;
+    uint64_t    signature;
     uint8_t     valid;
     GLuint      vbo[5];
     GLuint      ibo;
@@ -60,6 +63,7 @@ typedef struct {
 
 static DrawCacheEntry sDC[DRAW_CACHE_SIZE];
 static uint64_t sDCTick = 0;
+static int sForceCacheMiss = -1;
 
 // Bitmask tracking which vertex attribute arrays are currently enabled
 // on the GL side.  We only toggle when the set changes between draws.
@@ -73,7 +77,69 @@ static GLsizei sVertexCountHint = 0;
 
 static Boolean ForceCacheMisses(void)
 {
-    return true;
+    if (sForceCacheMiss < 0)
+    {
+        const char* value = getenv("PANGEA_FORCE_CACHE_MISS");
+        sForceCacheMiss = value && value[0] && value[0] != '0';
+    }
+    return sForceCacheMiss != 0;
+}
+
+static uint64_t HashBytes(uint64_t hash, const void* data, size_t size)
+{
+    const uint8_t* bytes = (const uint8_t*)data;
+    for (size_t i = 0; i < size; i++)
+    {
+        hash ^= bytes[i];
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+static uint64_t HashDrawArrayData(
+    GLint first,
+    GLsizei count,
+    Boolean hasPos,
+    Boolean hasNorm,
+    Boolean hasColor,
+    Boolean hasTC0,
+    Boolean hasTC1)
+{
+    uint64_t hash = 1469598103934665603ull;
+    if (hasPos)
+    {
+        const GLfloat* src = (const GLfloat*)gVertexArrayState.vertexPointer + first * 3;
+        hash = HashBytes(hash, src, count * 3 * sizeof(GLfloat));
+    }
+    if (hasNorm)
+    {
+        const GLfloat* src = (const GLfloat*)gVertexArrayState.normalPointer + first * 3;
+        hash = HashBytes(hash, src, count * 3 * sizeof(GLfloat));
+    }
+    if (hasColor)
+    {
+        if (gVertexArrayState.colorType == GL_FLOAT)
+        {
+            const GLfloat* src = (const GLfloat*)gVertexArrayState.colorPointer + first * 4;
+            hash = HashBytes(hash, src, count * 4 * sizeof(GLfloat));
+        }
+        else if (gVertexArrayState.colorType == GL_UNSIGNED_BYTE)
+        {
+            const GLubyte* src = (const GLubyte*)gVertexArrayState.colorPointer + first * 4;
+            hash = HashBytes(hash, src, count * 4 * sizeof(GLubyte));
+        }
+    }
+    if (hasTC0)
+    {
+        const GLfloat* src = (const GLfloat*)gVertexArrayState.texCoordPointers[0] + first * 2;
+        hash = HashBytes(hash, src, count * 2 * sizeof(GLfloat));
+    }
+    if (hasTC1)
+    {
+        const GLfloat* src = (const GLfloat*)gVertexArrayState.texCoordPointers[1] + first * 2;
+        hash = HashBytes(hash, src, count * 2 * sizeof(GLfloat));
+    }
+    return hash;
 }
 
 void CompatGL_SetVertexCount(GLsizei n)
@@ -307,6 +373,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
                 e->pos_ptr == posPtr && e->norm_ptr == normPtr &&
                 e->color_ptr == colorPtr && e->tc0_ptr == tc0Ptr &&
                 e->tc1_ptr == tc1Ptr && e->idx_ptr == indices &&
+                e->mode == mode && e->first == 0 &&
                 e->vtx_count == vertexCount && e->idx_count == (int)count &&
                 e->idx_type == (int)type &&
                 e->attrib_mask == attribMask && e->color_type == colorTypeKey)
@@ -464,11 +531,14 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         e->tc0_ptr = tc0Ptr;
         e->tc1_ptr = tc1Ptr;
         e->idx_ptr = indices;
+        e->mode = mode;
+        e->first = 0;
         e->vtx_count = vertexCount;
         e->idx_count = (int)count;
         e->idx_type = (int)type;
         e->attrib_mask = attribMask;
         e->color_type = colorTypeKey;
+        e->signature = 0;
         e->lru_tick = ++sDCTick;
         e->valid = 1;
     }
@@ -523,80 +593,177 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
     if (hasTC0)   attribMask |= (1u << ATTRIB_LOCATION_TEXCOORD0);
     if (hasTC1)   attribMask |= (1u << ATTRIB_LOCATION_TEXCOORD1);
 
+    const void *posPtr   = gVertexArrayState.vertexPointer;
+    const void *normPtr  = hasNorm  ? gVertexArrayState.normalPointer       : NULL;
+    const void *colorPtr = hasColor ? gVertexArrayState.colorPointer        : NULL;
+    const void *tc0Ptr   = hasTC0   ? gVertexArrayState.texCoordPointers[0] : NULL;
+    const void *tc1Ptr   = hasTC1   ? gVertexArrayState.texCoordPointers[1] : NULL;
+    GLenum colorTypeKey = hasColor ? gVertexArrayState.colorType : 0;
+    uint64_t signature = HashDrawArrayData(first, count, hasPos, hasNorm, hasColor, hasTC0, hasTC1);
+
     SyncAttribEnables(attribMask);
 
     int uploads = 0;
     int uploadBytes = 0;
-
-    // ── POSITIONS: direct upload with offset ─────────────────────────
-    if (hasPos)
+    int cacheIdx = -1;
+    Boolean forceCacheMiss = ForceCacheMisses();
+    gCacheLookupsThisFrame++;
+    if (!forceCacheMiss)
     {
-        const GLfloat* src = (const GLfloat*)gVertexArrayState.vertexPointer + first * 3;
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[0]);
-        glBufferData(GL_ARRAY_BUFFER, count * 3 * (GLsizeiptr)sizeof(GLfloat),
-                     src, GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(ATTRIB_LOCATION_POSITION, 3, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
-        uploadBytes += count * 3 * (int)sizeof(GLfloat);
-    }
-
-    // ── NORMALS ──────────────────────────────────────────────────────
-    if (hasNorm)
-    {
-        const GLfloat* src = (const GLfloat*)gVertexArrayState.normalPointer + first * 3;
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[1]);
-        glBufferData(GL_ARRAY_BUFFER, count * 3 * (GLsizeiptr)sizeof(GLfloat),
-                     src, GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(ATTRIB_LOCATION_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
-        uploadBytes += count * 3 * (int)sizeof(GLfloat);
-    }
-
-    // ── COLORS ───────────────────────────────────────────────────────
-    if (hasColor)
-    {
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[2]);
-        if (gVertexArrayState.colorType == GL_FLOAT)
+        for (int ci = 0; ci < DRAW_CACHE_SIZE; ci++)
         {
-            const GLfloat* src = (const GLfloat*)gVertexArrayState.colorPointer + first * 4;
-            glBufferData(GL_ARRAY_BUFFER, count * 4 * (GLsizeiptr)sizeof(GLfloat),
-                         src, GL_DYNAMIC_DRAW);
-            glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
-            uploadBytes += count * 4 * (int)sizeof(GLfloat);
+            DrawCacheEntry *e = &sDC[ci];
+            if (e->valid &&
+                e->idx_ptr == NULL &&
+                e->pos_ptr == posPtr && e->norm_ptr == normPtr &&
+                e->color_ptr == colorPtr && e->tc0_ptr == tc0Ptr &&
+                e->tc1_ptr == tc1Ptr &&
+                e->mode == mode && e->first == first &&
+                e->vtx_count == (int)count && e->idx_count == 0 &&
+                e->idx_type == 0 &&
+                e->attrib_mask == attribMask && e->color_type == colorTypeKey &&
+                e->signature == signature)
+            {
+                cacheIdx = ci;
+                break;
+            }
         }
-        else if (gVertexArrayState.colorType == GL_UNSIGNED_BYTE)
+    }
+
+    if (cacheIdx >= 0)
+    {
+        DrawCacheEntry *e = &sDC[cacheIdx];
+        e->lru_tick = ++sDCTick;
+        gCacheHitsThisFrame++;
+
+        if (hasPos)
         {
-            const GLubyte* src = (const GLubyte*)gVertexArrayState.colorPointer + first * 4;
-            glBufferData(GL_ARRAY_BUFFER, count * 4 * (GLsizeiptr)sizeof(GLubyte),
-                         src, GL_DYNAMIC_DRAW);
-            glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
-            uploadBytes += count * 4 * (int)sizeof(GLubyte);
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[0]);
+            glVertexAttribPointer(ATTRIB_LOCATION_POSITION, 3, GL_FLOAT, GL_FALSE, 0, 0);
         }
-        uploads++;
+        if (hasNorm)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[1]);
+            glVertexAttribPointer(ATTRIB_LOCATION_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
+        }
+        if (hasColor)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[2]);
+            if (colorTypeKey == GL_FLOAT)
+                glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
+            else
+                glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
+        }
+        if (hasTC0)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[3]);
+            glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+        }
+        if (hasTC1)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[4]);
+            glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+        }
     }
-
-    // ── TEXCOORD0 ────────────────────────────────────────────────────
-    if (hasTC0)
+    else
     {
-        const GLfloat* src = (const GLfloat*)gVertexArrayState.texCoordPointers[0] + first * 2;
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[3]);
-        glBufferData(GL_ARRAY_BUFFER, count * 2 * (GLsizeiptr)sizeof(GLfloat),
-                     src, GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
-        uploadBytes += count * 2 * (int)sizeof(GLfloat);
-    }
+        gCacheMissesThisFrame++;
+        int evict = 0;
+        uint64_t oldest = UINT64_MAX;
+        for (int ci = 0; ci < DRAW_CACHE_SIZE; ci++)
+        {
+            if (!sDC[ci].valid) { evict = ci; break; }
+            if (sDC[ci].lru_tick < oldest) { oldest = sDC[ci].lru_tick; evict = ci; }
+        }
 
-    // ── TEXCOORD1 ────────────────────────────────────────────────────
-    if (hasTC1)
-    {
-        const GLfloat* src = (const GLfloat*)gVertexArrayState.texCoordPointers[1] + first * 2;
-        glBindBuffer(GL_ARRAY_BUFFER, sAttrVBO[4]);
-        glBufferData(GL_ARRAY_BUFFER, count * 2 * (GLsizeiptr)sizeof(GLfloat),
-                     src, GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-        uploads++;
-        uploadBytes += count * 2 * (int)sizeof(GLfloat);
+        DrawCacheEntry *e = &sDC[evict];
+        if (e->valid)
+            gCacheEvictionsThisFrame++;
+
+        if (!e->vbo[0]) glGenBuffers(5, e->vbo);
+
+        if (hasPos)
+        {
+            const GLfloat* src = (const GLfloat*)gVertexArrayState.vertexPointer + first * 3;
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[0]);
+            glBufferData(GL_ARRAY_BUFFER, count * 3 * (GLsizeiptr)sizeof(GLfloat),
+                         src, GL_STATIC_DRAW);
+            glVertexAttribPointer(ATTRIB_LOCATION_POSITION, 3, GL_FLOAT, GL_FALSE, 0, 0);
+            uploads++;
+            uploadBytes += count * 3 * (int)sizeof(GLfloat);
+        }
+
+        if (hasNorm)
+        {
+            const GLfloat* src = (const GLfloat*)gVertexArrayState.normalPointer + first * 3;
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[1]);
+            glBufferData(GL_ARRAY_BUFFER, count * 3 * (GLsizeiptr)sizeof(GLfloat),
+                         src, GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(ATTRIB_LOCATION_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
+            uploads++;
+            uploadBytes += count * 3 * (int)sizeof(GLfloat);
+        }
+
+        if (hasColor)
+        {
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[2]);
+            if (gVertexArrayState.colorType == GL_FLOAT)
+            {
+                const GLfloat* src = (const GLfloat*)gVertexArrayState.colorPointer + first * 4;
+                glBufferData(GL_ARRAY_BUFFER, count * 4 * (GLsizeiptr)sizeof(GLfloat),
+                             src, GL_STATIC_DRAW);
+                glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
+                uploadBytes += count * 4 * (int)sizeof(GLfloat);
+            }
+            else if (gVertexArrayState.colorType == GL_UNSIGNED_BYTE)
+            {
+                const GLubyte* src = (const GLubyte*)gVertexArrayState.colorPointer + first * 4;
+                glBufferData(GL_ARRAY_BUFFER, count * 4 * (GLsizeiptr)sizeof(GLubyte),
+                             src, GL_STATIC_DRAW);
+                glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
+                uploadBytes += count * 4 * (int)sizeof(GLubyte);
+            }
+            uploads++;
+        }
+
+        if (hasTC0)
+        {
+            const GLfloat* src = (const GLfloat*)gVertexArrayState.texCoordPointers[0] + first * 2;
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[3]);
+            glBufferData(GL_ARRAY_BUFFER, count * 2 * (GLsizeiptr)sizeof(GLfloat),
+                         src, GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+            uploads++;
+            uploadBytes += count * 2 * (int)sizeof(GLfloat);
+        }
+
+        if (hasTC1)
+        {
+            const GLfloat* src = (const GLfloat*)gVertexArrayState.texCoordPointers[1] + first * 2;
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[4]);
+            glBufferData(GL_ARRAY_BUFFER, count * 2 * (GLsizeiptr)sizeof(GLfloat),
+                         src, GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+            uploads++;
+            uploadBytes += count * 2 * (int)sizeof(GLfloat);
+        }
+
+        e->pos_ptr = posPtr;
+        e->norm_ptr = normPtr;
+        e->color_ptr = colorPtr;
+        e->tc0_ptr = tc0Ptr;
+        e->tc1_ptr = tc1Ptr;
+        e->idx_ptr = NULL;
+        e->mode = mode;
+        e->first = first;
+        e->vtx_count = (int)count;
+        e->idx_count = 0;
+        e->idx_type = 0;
+        e->attrib_mask = attribMask;
+        e->color_type = colorTypeKey;
+        e->signature = signature;
+        e->lru_tick = ++sDCTick;
+        e->valid = 1;
     }
 
     // ── DRAW (no index buffer) ───────────────────────────────────────

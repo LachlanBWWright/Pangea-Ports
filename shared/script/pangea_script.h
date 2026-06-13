@@ -162,6 +162,12 @@ typedef struct PangeaScriptNativeItem
 	const char* dependencySummary;
 } PangeaScriptNativeItem;
 
+typedef struct PangeaScriptAssetDependency
+{
+	char kind[32];
+	char id[96];
+} PangeaScriptAssetDependency;
+
 PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo);
 void PangeaScript_Shutdown(void);
 
@@ -178,6 +184,12 @@ PangeaScriptStatus PangeaScript_GetLastStatus(void);
 
 PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum);
 int PangeaScript_RemapTerrainItemType(int levelNum, int itemType);
+int PangeaScript_GetLevelAssetDependencyCount(void);
+bool PangeaScript_GetLevelAssetDependency(int index, PangeaScriptAssetDependency* outDependency);
+bool PangeaScript_GetLevelFloatSetting(const char* key, float* outValue);
+bool PangeaScript_GetLevelIntSetting(const char* key, int* outValue);
+bool PangeaScript_GetLevelBoolSetting(const char* key, bool* outValue);
+bool PangeaScript_GetLevelStringSetting(const char* key, char* outValue, int capacity);
 
 PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const PangeaScriptLevelContext* context);
 PangeaScriptStatus PangeaScript_CallFrameHook(const PangeaScriptFrameContext* context);

@@ -8,6 +8,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -585,6 +586,7 @@ float			x,y,z,nx,nz;
 
 	for (int i = 0; i < numNubs; i++)
 	{
+		SetImmediateDrawSource(PROFILE_IMMEDIATE_LINES);
 		glBegin(GL_LINES);
 
 		x = nubs[i].x;
@@ -1087,6 +1089,4 @@ Boolean			intersected;
 
 	return(false);
 }
-
-
 

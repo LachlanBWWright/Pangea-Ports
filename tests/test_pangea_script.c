@@ -310,6 +310,106 @@ void test_config_parsing_and_sandbox(void)
 	printf("Config parsing and sandbox tests passed!\n");
 }
 
+void test_level_settings_accessors(void)
+{
+	printf("Testing level settings accessors...\n");
+
+	PangeaScriptGameInfo gameInfo = { "TestGame", "Test Game" };
+	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
+	assert(status == PANGEA_SCRIPT_OK);
+
+	system("mkdir -p Data/Scripts/config");
+	system("mkdir -p Data/Scripts/dist");
+	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
+
+	const char* valid_config =
+		"{\n"
+		"  \"version\": 1,\n"
+		"  \"levels\": {\n"
+		"    \"1\": {\n"
+		"      \"script\": \"Data/Scripts/dist/main.js\",\n"
+		"      \"levelSettings\": {\n"
+		"        \"gravity\": 3900,\n"
+		"        \"debugSplineFlatY\": 500.5,\n"
+		"        \"skipIntro\": true,\n"
+		"        \"song\": \"slimeBoss\",\n"
+		"        \"assetDependencies\": [\n"
+		"          { \"kind\": \"skeleton\", \"id\": \"moth\" },\n"
+		"          { \"kind\": \"spriteGroup\", \"id\": \"Level6_Closet\" }\n"
+		"        ],\n"
+		"        \"ignoredObject\": { \"nested\": true },\n"
+		"        \"ignoredArray\": [1, 2, 3]\n"
+		"      }\n"
+		"    },\n"
+		"    \"2\": {\n"
+		"      \"levelSettings\": {\n"
+		"        \"gravity\": 1200\n"
+		"      }\n"
+		"    }\n"
+		"  }\n"
+		"}\n";
+	write_temp_file("Data/Scripts/config/levels.json", valid_config);
+	PangeaScript_SetConfigPath("Data/Scripts/config/levels.json");
+
+	status = PangeaScript_LoadLevelConfig(1);
+	assert(status == PANGEA_SCRIPT_OK);
+
+	float floatValue = 0.0f;
+	int intValue = 0;
+	bool boolValue = false;
+	char stringValue[32];
+	assert(PangeaScript_GetLevelFloatSetting("gravity", &floatValue));
+	assert(floatValue == 3900.0f);
+	assert(PangeaScript_GetLevelIntSetting("gravity", &intValue));
+	assert(intValue == 3900);
+	assert(PangeaScript_GetLevelFloatSetting("debugSplineFlatY", &floatValue));
+	assert(floatValue == 500.5f);
+	assert(!PangeaScript_GetLevelIntSetting("debugSplineFlatY", &intValue));
+	assert(PangeaScript_GetLevelBoolSetting("skipIntro", &boolValue));
+	assert(boolValue);
+	assert(PangeaScript_GetLevelStringSetting("song", stringValue, (int)sizeof(stringValue)));
+	assert(strcmp(stringValue, "slimeBoss") == 0);
+	assert(!PangeaScript_GetLevelStringSetting("gravity", stringValue, (int)sizeof(stringValue)));
+	assert(!PangeaScript_GetLevelBoolSetting("missing", &boolValue));
+	assert(!PangeaScript_GetLevelBoolSetting("ignoredObject", &boolValue));
+	assert(!PangeaScript_GetLevelIntSetting("ignoredArray", &intValue));
+	assert(PangeaScript_GetLevelAssetDependencyCount() == 2);
+	PangeaScriptAssetDependency dependency;
+	assert(PangeaScript_GetLevelAssetDependency(0, &dependency));
+	assert(strcmp(dependency.kind, "skeleton") == 0);
+	assert(strcmp(dependency.id, "moth") == 0);
+	assert(PangeaScript_GetLevelAssetDependency(1, &dependency));
+	assert(strcmp(dependency.kind, "spriteGroup") == 0);
+	assert(strcmp(dependency.id, "Level6_Closet") == 0);
+	assert(!PangeaScript_GetLevelAssetDependency(2, &dependency));
+
+	status = PangeaScript_LoadLevelConfig(2);
+	assert(status == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_GetLevelIntSetting("gravity", &intValue));
+	assert(intValue == 1200);
+	assert(!PangeaScript_GetLevelStringSetting("song", stringValue, (int)sizeof(stringValue)));
+	assert(PangeaScript_GetLevelAssetDependencyCount() == 0);
+
+	const char* invalid_config =
+		"{\n"
+		"  \"version\": 1,\n"
+		"  \"levels\": {\n"
+		"    \"2\": {\n"
+		"      \"levelSettings\": \"wrong\"\n"
+		"    }\n"
+		"  }\n"
+		"}\n";
+	write_temp_file("Data/Scripts/config/levels.json", invalid_config);
+	status = PangeaScript_LoadLevelConfig(2);
+	assert(status == PANGEA_SCRIPT_CONFIG_ERROR);
+	assert(!PangeaScript_GetLevelIntSetting("gravity", &intValue));
+	assert(PangeaScript_GetLevelAssetDependencyCount() == 0);
+
+	system("rm -rf Data");
+	PangeaScript_Shutdown();
+	printf("Level settings accessor tests passed!\n");
+}
+
 void test_consecutive_failures(void)
 {
 	printf("Testing host shutdown on consecutive hook failures...\n");
@@ -372,6 +472,7 @@ int main(void)
 
 	test_capability_gates();
 	test_config_parsing_and_sandbox();
+	test_level_settings_accessors();
 	test_consecutive_failures();
 
 	printf("========================================\n");

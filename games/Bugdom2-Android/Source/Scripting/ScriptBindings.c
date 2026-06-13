@@ -3,9 +3,6 @@
 #include "game.h"
 #include "ScriptBindings.h"
 
-#include "structs.h"
-#include "items.h"
-
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
 static PangeaScriptFrameContext gScriptFrameContext;
@@ -104,18 +101,19 @@ void Bugdom2Script_RegisterObject(ObjNode* obj, const char* nativeId, const char
 	Boolean isCollectible = false;
 	if (nativeId && (strcmp(nativeId, "bugdom2.dcell") == 0 ||
 	                 strcmp(nativeId, "bugdom2.gliderPart") == 0 ||
-	                 strcmp(nativeId, "bugdom2.hobobag") == 0))
+	                 strcmp(nativeId, "bugdom2.hobobag") == 0 ||
+	                 strcmp(nativeId, "bugdom2.acorn") == 0))
 	{
 		isCollectible = true;
 	}
 	else if (obj->Kind == PICKUP_KIND_POW)
 	{
-		if (obj->POWKind == POW_KIND_GREENCLOVER ||
-		    obj->POWKind == POW_KIND_BLUECLOVER ||
-		    obj->POWKind == POW_KIND_GOLDCLOVER ||
-		    obj->POWKind == POW_KIND_REDKEY ||
-		    obj->POWKind == POW_KIND_GREENKEY ||
-		    obj->POWKind == POW_KIND_BLUEKEY)
+		if (obj->Special[0] == POW_KIND_GREENCLOVER ||
+		    obj->Special[0] == POW_KIND_BLUECLOVER ||
+		    obj->Special[0] == POW_KIND_GOLDCLOVER ||
+		    obj->Special[0] == POW_KIND_REDKEY ||
+		    obj->Special[0] == POW_KIND_GREENKEY ||
+		    obj->Special[0] == POW_KIND_BLUEKEY)
 		{
 			isCollectible = true;
 		}
@@ -245,6 +243,56 @@ static const PangeaScriptNativeItem kNativeItems[] =
 	},
 };
 
+typedef struct Bugdom2NamedAsset
+{
+	const char* id;
+	int nativeId;
+} Bugdom2NamedAsset;
+
+static const Bugdom2NamedAsset kSkeletonDependencies[] =
+{
+	{ "skipExplore", SKELETON_TYPE_SKIP_EXPLORE },
+	{ "skipTunnel", SKELETON_TYPE_SKIP_TUNNEL },
+	{ "skipTitle", SKELETON_TYPE_SKIP_TITLE },
+	{ "snail", SKELETON_TYPE_SNAIL },
+	{ "gnome", SKELETON_TYPE_GNOME },
+	{ "houseFly", SKELETON_TYPE_HOUSEFLY },
+	{ "evilPlant", SKELETON_TYPE_EVILPLANT },
+	{ "chipmunk", SKELETON_TYPE_CHIPMUNK },
+	{ "snakeHead", SKELETON_TYPE_SNAKEHEAD },
+	{ "buddyBug", SKELETON_TYPE_BUDDYBUG },
+	{ "checkpoint", SKELETON_TYPE_CHECKPOINT },
+	{ "flea", SKELETON_TYPE_FLEA },
+	{ "tick", SKELETON_TYPE_TICK },
+	{ "mouseTrap", SKELETON_TYPE_MOUSETRAP },
+	{ "mouse", SKELETON_TYPE_MOUSE },
+	{ "toySoldier", SKELETON_TYPE_TOYSOLDIER },
+	{ "otto", SKELETON_TYPE_OTTO },
+	{ "bumbleBee", SKELETON_TYPE_BUMBLEBEE },
+	{ "hoboBag", SKELETON_TYPE_HOBOBAG },
+	{ "dragonfly", SKELETON_TYPE_DRAGONFLY },
+	{ "frog", SKELETON_TYPE_FROG },
+	{ "moth", SKELETON_TYPE_MOTH },
+	{ "computerBug", SKELETON_TYPE_COMPUTERBUG },
+	{ "roach", SKELETON_TYPE_ROACH },
+	{ "ant", SKELETON_TYPE_ANT },
+	{ "fish", SKELETON_TYPE_FISH },
+};
+
+static int FindNamedAsset(const Bugdom2NamedAsset* assets, int count, const char* id)
+{
+	if (!assets || !id)
+		return -1;
+
+	for (int i = 0; i < count; i++)
+	{
+		if (strcmp(assets[i].id, id) == 0)
+			return assets[i].nativeId;
+	}
+
+	return -1;
+}
+
 static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 {
 	static Boolean runtimeUnavailableLogged = false;
@@ -292,6 +340,44 @@ void Bugdom2Script_LoadLevelConfig(int levelNum)
 	LogScriptStatus("level config load", status);
 }
 
+void Bugdom2Script_LoadLevelAssetDependencies(int levelNum)
+{
+	int dependencyCount = PangeaScript_GetLevelAssetDependencyCount();
+
+	for (int i = 0; i < dependencyCount; i++)
+	{
+		PangeaScriptAssetDependency dependency;
+		if (!PangeaScript_GetLevelAssetDependency(i, &dependency))
+			continue;
+
+		if (strcmp(dependency.kind, "skeleton") == 0)
+		{
+			int skeletonType = FindNamedAsset(kSkeletonDependencies, (int)(sizeof(kSkeletonDependencies) / sizeof(kSkeletonDependencies[0])), dependency.id);
+			if (skeletonType < 0)
+			{
+				SDL_Log("Bugdom2 scripting asset dependency ignored: unknown skeleton '%s' for level %d", dependency.id, levelNum);
+				continue;
+			}
+			LoadASkeleton((Byte)skeletonType);
+			continue;
+		}
+
+		if (strcmp(dependency.kind, "modelGroup") == 0 && strcmp(dependency.id, "foliage") == 0)
+		{
+			if (gBG3DContainerList[MODEL_GROUP_FOLIAGE] == nil)
+				LoadFoliage();
+			continue;
+		}
+
+		if (strcmp(dependency.kind, "modelGroup") == 0 && strcmp(dependency.id, "global") == 0)
+		{
+			continue;
+		}
+
+		SDL_Log("Bugdom2 scripting asset dependency ignored: unsupported %s '%s' for level %d", dependency.kind, dependency.id, levelNum);
+	}
+}
+
 static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* action)
 {
 	const PangeaScriptLevelContext context =
@@ -306,7 +392,6 @@ static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* actio
 
 void Bugdom2Script_OnLevelLoad(int levelNum)
 {
-	PangeaScript_ResetObjects();
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, levelNum, "onLevelLoad");
 }
 

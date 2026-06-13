@@ -946,9 +946,19 @@ Boolean			superTileVisible;
 	/* SCAN THE SUPERTILE GRID AND LOOK FOR USED & VISIBLE SUPERTILES */
 	/******************************************************************/
 
-	for (r = 0; r < gNumSuperTilesDeep; r++)
+	int r0 = gCurrentSuperTileRow;
+	int r1 = r0 + (gSuperTileActiveRange * 2);
+	int c0 = gCurrentSuperTileCol;
+	int c1 = c0 + (gSuperTileActiveRange * 2);
+
+	if (r0 < 0) r0 = 0;
+	if (r1 >= gNumSuperTilesDeep) r1 = gNumSuperTilesDeep - 1;
+	if (c0 < 0) c0 = 0;
+	if (c1 >= gNumSuperTilesWide) c1 = gNumSuperTilesWide - 1;
+
+	for (r = r0; r <= r1; r++)
 	{
-		for (c = 0; c < gNumSuperTilesWide; c++)
+		for (c = c0; c <= c1; c++)
 		{
 			if (gSuperTileStatusGrid[r][c].statusFlags & SUPERTILE_IS_USED_THIS_FRAME)			// see if used
 			{

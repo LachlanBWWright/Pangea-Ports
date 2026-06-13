@@ -360,6 +360,7 @@ float				aspect;
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_INFOBAR);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0,1);	glVertex2f(x, 		y);
 	glTexCoord2f(1,1);	glVertex2f(x+size, 	y);
@@ -390,6 +391,7 @@ float				aspect;
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_INFOBAR);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0,1);	glVertex2f(x, 		y);
 	glTexCoord2f(1,1);	glVertex2f(x+size, 	y);
@@ -418,6 +420,7 @@ float				aspect;
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_INFOBAR);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0,1);	glVertex2f(x, 		y);
 	glTexCoord2f(1,1);	glVertex2f(x+size, 	y);
@@ -448,6 +451,7 @@ float				aspect;
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_INFOBAR);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0,1);	glVertex2f(x, 		y);
 	glTexCoord2f(1,1);	glVertex2f(x+size, 	y);
@@ -490,6 +494,7 @@ OGLMatrix3x3		m;
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_INFOBAR);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0,1);	glVertex2f(p[0].x + x, p[0].y + y);
 	glTexCoord2f(1,1);	glVertex2f(p[1].x + x, p[1].y + y);
@@ -990,5 +995,4 @@ int		i;
 
 	gGlobalTransparency = 1.0f;
 }
-
 

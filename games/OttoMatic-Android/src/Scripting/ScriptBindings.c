@@ -237,7 +237,6 @@ static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* actio
 
 void OttoScript_OnLevelLoad(int levelNum)
 {
-	PangeaScript_ResetObjects();
 	gCurrentFrameContext = (PangeaScriptFrameContext)
 	{
 		.levelNum = levelNum,

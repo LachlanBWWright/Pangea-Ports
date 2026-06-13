@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 extern PFNGLACTIVETEXTUREPROC gGlActiveTextureProc;
 extern PFNGLCLIENTACTIVETEXTUREARBPROC gGlClientActiveTextureProc;
@@ -765,6 +766,7 @@ go_here:
 			SetColor4f(1,1,0,1);
 			for (i = 0; i < data->numPoints; i++)
 			{
+				SetImmediateDrawSource(PROFILE_IMMEDIATE_LINES);
 				glBegin(GL_LINES);
 
 				glVertex3fv((GLfloat *)&data->points[i]);
@@ -1012,6 +1014,7 @@ OGLPoint2D			p[4];
 
 			/* DRAW IT */
 
+	SetImmediateDrawSource(PROFILE_IMMEDIATE_INFOBAR);
 	glBegin(GL_QUADS);
 	glTexCoord2f(0,1);	glVertex2f(p[0].x + x, p[0].y + y);
 	glTexCoord2f(1,1);	glVertex2f(p[1].x + x, p[1].y + y);

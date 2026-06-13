@@ -17,7 +17,7 @@
 /*    CONSTANTS             */
 /****************************/
 
-#define	MAX_FPS				300		// mac original was 190
+#define	MAX_FPS				500		// mac original was 190
 #define	DEFAULT_FPS			13
 
 #define	PTRCOOKIE_SIZE		16

@@ -15,6 +15,10 @@ int gIndexScansThisFrame = 0;
 int gIndicesScannedThisFrame = 0;
 int gVerticesUploadedThisFrame = 0;
 int gBytesUploadedThisFrame = 0;
+int gImmediateDrawsThisFrame = 0;
+int gImmediateBytesUploadedThisFrame = 0;
+int gImmediateSourceDrawsThisFrame[NUM_PROFILE_IMMEDIATE_SOURCES] = {0};
+int gImmediateSourceBytesThisFrame[NUM_PROFILE_IMMEDIATE_SOURCES] = {0};
 
 int gDrawCallsLastFrame = 0;
 int gCacheLookupsLastFrame = 0;
@@ -26,6 +30,12 @@ int gIndexScansLastFrame = 0;
 int gIndicesScannedLastFrame = 0;
 int gVerticesUploadedLastFrame = 0;
 int gBytesUploadedLastFrame = 0;
+int gImmediateDrawsLastFrame = 0;
+int gImmediateBytesUploadedLastFrame = 0;
+int gImmediateSourceDrawsLastFrame[NUM_PROFILE_IMMEDIATE_SOURCES] = {0};
+int gImmediateSourceBytesLastFrame[NUM_PROFILE_IMMEDIATE_SOURCES] = {0};
+
+static ProfileImmediateSource gPendingImmediateSource = PROFILE_IMMEDIATE_OTHER;
 
 void InitProfiling(void) {
     gPerformanceFrequency = SDL_GetPerformanceFrequency();
@@ -82,6 +92,18 @@ float GetProfilePhaseMs(ProfilePhaseType phase_type) {
     return 0.0f;
 }
 
+void SetImmediateDrawSource(ProfileImmediateSource source) {
+    if (source >= 0 && source < NUM_PROFILE_IMMEDIATE_SOURCES) {
+        gPendingImmediateSource = source;
+    }
+}
+
+ProfileImmediateSource ConsumeImmediateDrawSource(void) {
+    ProfileImmediateSource source = gPendingImmediateSource;
+    gPendingImmediateSource = PROFILE_IMMEDIATE_OTHER;
+    return source;
+}
+
 void ResetProfilingForFrame(void) {
     for (int i = 0; i < NUM_PROFILE_PHASES; ++i) {
         gProfilePhases[i].last_frame_ms = gProfilePhases[i].samples > 0
@@ -102,6 +124,12 @@ void ResetProfilingForFrame(void) {
     gIndicesScannedLastFrame = gIndicesScannedThisFrame;
     gVerticesUploadedLastFrame = gVerticesUploadedThisFrame;
     gBytesUploadedLastFrame = gBytesUploadedThisFrame;
+    gImmediateDrawsLastFrame = gImmediateDrawsThisFrame;
+    gImmediateBytesUploadedLastFrame = gImmediateBytesUploadedThisFrame;
+    for (int i = 0; i < NUM_PROFILE_IMMEDIATE_SOURCES; i++) {
+        gImmediateSourceDrawsLastFrame[i] = gImmediateSourceDrawsThisFrame[i];
+        gImmediateSourceBytesLastFrame[i] = gImmediateSourceBytesThisFrame[i];
+    }
 
     gDrawCallsThisFrame = 0;
     gCacheLookupsThisFrame = 0;
@@ -113,4 +141,11 @@ void ResetProfilingForFrame(void) {
     gIndicesScannedThisFrame = 0;
     gVerticesUploadedThisFrame = 0;
     gBytesUploadedThisFrame = 0;
+    gImmediateDrawsThisFrame = 0;
+    gImmediateBytesUploadedThisFrame = 0;
+    for (int i = 0; i < NUM_PROFILE_IMMEDIATE_SOURCES; i++) {
+        gImmediateSourceDrawsThisFrame[i] = 0;
+        gImmediateSourceBytesThisFrame[i] = 0;
+    }
+    gPendingImmediateSource = PROFILE_IMMEDIATE_OTHER;
 }

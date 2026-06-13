@@ -344,13 +344,30 @@ static UnsignedWide time;
 UnsignedWide currTime;
 unsigned long deltaTime;
 
+wait:
 	Microseconds(&currTime);
 	deltaTime = currTime.lo - time.lo;
 
-	gFramesPerSecond = 1000000.0f / deltaTime;
+	if (deltaTime == 0)
+	{
+		gFramesPerSecond = 60.0f;
+	}
+	else
+	{
+		gFramesPerSecond = 1000000.0f / deltaTime;
 
-	if (gFramesPerSecond < MIN_FPS)			// (avoid divide by 0's later)
-		gFramesPerSecond = MIN_FPS;
+		if (gFramesPerSecond > MAX_FPS)
+		{
+			if (gFramesPerSecond - MAX_FPS > 1000)
+			{
+				SDL_Delay(1);
+			}
+			goto wait;
+		}
+
+		if (gFramesPerSecond < MIN_FPS)			// (avoid divide by 0's later)
+			gFramesPerSecond = MIN_FPS;
+	}
 
 #if _DEBUG
 	if (GetKeyState(SDL_SCANCODE_KP_PLUS))		// debug speed-up with KP_PLUS

@@ -606,10 +606,8 @@ do_anaglyph:
 	{
 		int		y = 100;
 		float	totalMs = 0.0f;
-
-		OGL_DrawString("fps:", 20,y);
-		OGL_DrawInt(gFramesPerSecond+.5f, 100,y);
-		y += 15;
+		char	debugText[1024];
+		int		debugTextLen = 0;
 
 		float inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
 		float logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
@@ -618,33 +616,64 @@ do_anaglyph:
 		float swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
 		totalMs = inputMs + logicMs + renderMs + uiMs + swapMs;
 
-		OGL_DrawString("input:", 20,y);
-		OGL_DrawFloat(inputMs, 100,y);
-		y += 15;
+		debugTextLen += SDL_snprintf(
+			debugText + debugTextLen,
+			sizeof(debugText) - debugTextLen,
+			"fps %d total %.2f\n"
+			"ms i/l/r %.2f/%.2f/%.2f\n"
+			"ms ui/s %.2f/%.2f\n"
+			"tris/draws %d/%d\n"
+			"cache H/M/E %d/%d/%d\n"
+			"upload/immKB %d/%d\n"
+			"imm draws: %d\n",
+			(int)(gFramesPerSecond+.5f),
+			totalMs,
+			inputMs,
+			logicMs,
+			renderMs,
+			uiMs,
+			swapMs,
+			gPolysThisFrame,
+			gDrawCallsLastFrame,
+			gCacheHitsLastFrame,
+			gCacheMissesLastFrame,
+			gCacheEvictionsLastFrame,
+			gBytesUploadedLastFrame / 1024,
+			gImmediateBytesUploadedLastFrame / 1024,
+			gImmediateDrawsLastFrame);
 
-		OGL_DrawString("logic:", 20,y);
-		OGL_DrawFloat(logicMs, 100,y);
-		y += 15;
+		debugTextLen += SDL_snprintf(
+			debugText + debugTextLen,
+			sizeof(debugText) - debugTextLen,
+			"imm T/H/S: %d/%d/%d",
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_TEXT],
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_INFOBAR],
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_SHADOW]);
 
-		OGL_DrawString("render:", 20,y);
-		OGL_DrawFloat(renderMs, 100,y);
-		y += 15;
+		debugTextLen += SDL_snprintf(
+			debugText + debugTextLen,
+			sizeof(debugText) - debugTextLen,
+			"\nimm sp/w/l: %d/%d/%d",
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_SPARKLE],
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_WATER],
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_LENS_FLARE]);
 
-		OGL_DrawString("ui:", 20,y);
-		OGL_DrawFloat(uiMs, 100,y);
-		y += 15;
+		debugTextLen += SDL_snprintf(
+			debugText + debugTextLen,
+			sizeof(debugText) - debugTextLen,
+			"\nimm sh/ln/o: %d/%d/%d",
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_SHARDS],
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_LINES],
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_OTHER]);
 
-		OGL_DrawString("swap:", 20,y);
-		OGL_DrawFloat(swapMs, 100,y);
-		y += 15;
+		SDL_snprintf(
+			debugText + debugTextLen,
+			sizeof(debugText) - debugTextLen,
+			"\nidx scans/K %d/%d",
+			gIndexScansLastFrame,
+			gIndicesScannedLastFrame / 1024);
 
-		OGL_DrawString("total:", 20,y);
-		OGL_DrawFloat(totalMs, 100,y);
-		y += 15;
-
-		OGL_DrawString("tris:", 20,y);
-		OGL_DrawInt(gPolysThisFrame, 100,y);
-		y += 15;
+		OGL_DrawString(debugText, 20, y);
 
 
 

@@ -593,7 +593,7 @@ OGLSetupInputType	viewDef;
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
+				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -627,7 +627,7 @@ OGLSetupInputType	viewDef;
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
+				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -655,7 +655,7 @@ OGLSetupInputType	viewDef;
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
+				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -700,7 +700,7 @@ OGLSetupInputType	viewDef;
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
+				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #else
 				if (gG4)												// better range if we can afford it
 					gSuperTileActiveRange = 5;
@@ -717,7 +717,7 @@ OGLSetupInputType	viewDef;
 #if APPSTORE
 				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #elif defined(__EMSCRIPTEN__)
-				gSuperTileActiveRange = 4;								// cap for WebAssembly performance
+				gSuperTileActiveRange = MAX_SUPERTILE_ACTIVE_RANGE;
 #else
 				if (gSlowCPU)
 					gSuperTileActiveRange = 3;
@@ -934,6 +934,9 @@ OGLSetupInputType	viewDef;
 			//
 
 	LoadLevelArt_Explore();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_LoadLevelAssetDependencies(gLevelNum);
+#endif
 	InitInfobar();
 
 			/* INIT OTHER MANAGERS */

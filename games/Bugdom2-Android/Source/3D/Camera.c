@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -267,6 +268,7 @@ const  float	sunFadeSpeed = 8;
 		fx = x / (pw/2) - 1.0f;
 		fy = (ph-y) / (ph/2) - 1.0f;
 
+		SetImmediateDrawSource(PROFILE_IMMEDIATE_LENS_FLARE);
 		glBegin(GL_QUADS);
 		glTexCoord2f(0,0);	glVertex2f(fx - sx, fy - sy);
 		glTexCoord2f(1,0);	glVertex2f(fx + sx, fy - sy);
@@ -945,8 +947,6 @@ const	OGLVector3D up = {0,1,0};
 
 
 }
-
-
 
 
 

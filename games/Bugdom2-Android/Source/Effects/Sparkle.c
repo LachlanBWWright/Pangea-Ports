@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -241,6 +242,7 @@ OGLPoint3D					*cameraLocation;
 			SetColor4fv(&gSparkles[i].color.r);
 
 
+		SetImmediateDrawSource(PROFILE_IMMEDIATE_SPARKLE);
 		glBegin(GL_QUADS);
 		glTexCoord2f(0,0);	glVertex3fv(&tc[0].x);
 		glTexCoord2f(1,0);	glVertex3fv(&tc[1].x);

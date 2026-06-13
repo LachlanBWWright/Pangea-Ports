@@ -4,6 +4,7 @@
 
 
 #include "game.h"
+#include "profiling.h"
 
 /***************/
 /* EXTERNALS   */
@@ -1054,6 +1055,7 @@ float		s,x,y,z;
 		s = gRippleList[i].scale;									// get scale
 		glColor4f(1,1,1,gRippleList[i].alpha);						// get/set alpha
 
+		SetImmediateDrawSource(PROFILE_IMMEDIATE_WATER);
 		glBegin(GL_QUADS);
 		glTexCoord2f(0,1);	glVertex3f(x - s, y, z + s);
 		glTexCoord2f(1,1);	glVertex3f(x + s, y, z + s);

@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -447,6 +448,7 @@ static void DrawShards(ObjNode* theNode)
 
 				/* DRAW THE TRIANGLE */
 
+		SetImmediateDrawSource(PROFILE_IMMEDIATE_SHARDS);
 		glBegin(GL_TRIANGLES);
 		glTexCoord2fv(&gShards[i].uvs[0].u);	glVertex3fv(&gShards[i].points[0].x);
 		glTexCoord2fv(&gShards[i].uvs[1].u);	glVertex3fv(&gShards[i].points[1].x);

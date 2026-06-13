@@ -303,7 +303,6 @@ static void CallAreaHook(PangeaScriptHook hook, int sceneNum, int areaNum, const
 
 void MikeScript_OnAreaLoad(int sceneNum, int areaNum)
 {
-	PangeaScript_ResetObjects();
 	CallAreaHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, sceneNum, areaNum, "onAreaLoad");
 }
 

@@ -93,6 +93,7 @@ void DisposeObjectManager(void);
 extern	ObjNode	*MakeNewObject(NewObjectDefinitionType *newObjDef);
 extern	void MoveObjects(void);
 void DrawObjects(void);
+void FlushBatchedShadows(void);
 
 extern	void DeleteAllObjects(void);
 extern	void DeleteObject(ObjNode	*theNode);
@@ -137,7 +138,6 @@ extern	void KeepOldCollisionBoxes(ObjNode *theNode);
 void AddCollisionBoxToObject(ObjNode *theNode, float top, float bottom, float left,
 							 float right, float front, float back);
 void DoObjectFriction(ObjNode *theNode, float friction);
-
 
 
 

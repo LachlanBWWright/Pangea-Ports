@@ -8,6 +8,7 @@
 void Bugdom2Script_Init(void);
 void Bugdom2Script_Shutdown(void);
 void Bugdom2Script_LoadLevelConfig(int levelNum);
+void Bugdom2Script_LoadLevelAssetDependencies(int levelNum);
 void Bugdom2Script_OnLevelLoad(int levelNum);
 void Bugdom2Script_OnLevelStart(int levelNum);
 void Bugdom2Script_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds);
@@ -29,4 +30,3 @@ void Bugdom2Script_ApplyObjectScripting(ObjNode* obj);
 void Bugdom2Script_RunObjectFrame(ObjNode* obj);
 
 #endif
-

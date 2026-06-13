@@ -9,9 +9,19 @@
 #define PANGEA_SCRIPT_PATH_CAPACITY 260
 #define PANGEA_SCRIPT_CONFIG_CAPACITY 65536
 #define PANGEA_SCRIPT_MAX_REMAPS 64
+#define PANGEA_SCRIPT_MAX_LEVEL_SETTINGS 64
+#define PANGEA_SCRIPT_MAX_ASSET_DEPENDENCIES 64
 #define PANGEA_SCRIPT_MAX_NATIVE_ITEMS 128
 #define PANGEA_SCRIPT_MAX_OBJECTS 2048
 #define PANGEA_SCRIPT_MAX_OBJECT_TAGS 8
+
+typedef enum LevelSettingType
+{
+	LEVEL_SETTING_FLOAT,
+	LEVEL_SETTING_INT,
+	LEVEL_SETTING_BOOL,
+	LEVEL_SETTING_STRING
+} LevelSettingType;
 
 typedef struct ItemRemap
 {
@@ -19,6 +29,19 @@ typedef struct ItemRemap
 	int fromType;
 	int toType;
 } ItemRemap;
+
+typedef struct LevelSetting
+{
+	char key[64];
+	LevelSettingType type;
+	union
+	{
+		float floatValue;
+		int intValue;
+		bool boolValue;
+		char stringValue[256];
+	};
+} LevelSetting;
 
 typedef struct RegisteredObject
 {
@@ -42,6 +65,10 @@ static bool gScriptLoaded;
 static PangeaScriptBackend* gBackend;
 static ItemRemap gItemRemaps[PANGEA_SCRIPT_MAX_REMAPS];
 static int gItemRemapCount;
+static LevelSetting gLevelSettings[PANGEA_SCRIPT_MAX_LEVEL_SETTINGS];
+static int gLevelSettingCount;
+static PangeaScriptAssetDependency gLevelAssetDependencies[PANGEA_SCRIPT_MAX_ASSET_DEPENDENCIES];
+static int gLevelAssetDependencyCount;
 static PangeaScriptNativeItem gNativeItems[PANGEA_SCRIPT_MAX_NATIVE_ITEMS];
 static int gNativeItemCount;
 static RegisteredObject gRegisteredObjects[PANGEA_SCRIPT_MAX_OBJECTS];
@@ -53,6 +80,88 @@ static bool gScriptsDisabled;
 static void reset_objects(void)
 {
 	memset(gRegisteredObjects, 0, sizeof(gRegisteredObjects));
+}
+
+static void clear_level_settings(void)
+{
+	memset(gLevelSettings, 0, sizeof(gLevelSettings));
+	gLevelSettingCount = 0;
+	memset(gLevelAssetDependencies, 0, sizeof(gLevelAssetDependencies));
+	gLevelAssetDependencyCount = 0;
+}
+
+static bool is_integer_number(double value)
+{
+	int intValue = (int)value;
+	return (double)intValue == value;
+}
+
+static void add_level_float_setting(const char* key, float value)
+{
+	if (!key || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
+		return;
+
+	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
+	snprintf(setting->key, sizeof(setting->key), "%s", key);
+	setting->type = LEVEL_SETTING_FLOAT;
+	setting->floatValue = value;
+}
+
+static void add_level_int_setting(const char* key, int value)
+{
+	if (!key || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
+		return;
+
+	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
+	snprintf(setting->key, sizeof(setting->key), "%s", key);
+	setting->type = LEVEL_SETTING_INT;
+	setting->intValue = value;
+}
+
+static void add_level_bool_setting(const char* key, bool value)
+{
+	if (!key || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
+		return;
+
+	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
+	snprintf(setting->key, sizeof(setting->key), "%s", key);
+	setting->type = LEVEL_SETTING_BOOL;
+	setting->boolValue = value;
+}
+
+static void add_level_string_setting(const char* key, const char* value)
+{
+	if (!key || !value || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
+		return;
+
+	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
+	snprintf(setting->key, sizeof(setting->key), "%s", key);
+	setting->type = LEVEL_SETTING_STRING;
+	snprintf(setting->stringValue, sizeof(setting->stringValue), "%s", value);
+}
+
+static const LevelSetting* find_level_setting(const char* key)
+{
+	if (!key || !key[0])
+		return NULL;
+
+	for (int i = 0; i < gLevelSettingCount; i++)
+	{
+		if (strcmp(gLevelSettings[i].key, key) == 0)
+			return &gLevelSettings[i];
+	}
+
+	return NULL;
+}
+
+static void add_level_asset_dependency(const char* kind, const char* id)
+{
+	if (!kind || !kind[0] || !id || !id[0] || gLevelAssetDependencyCount >= PANGEA_SCRIPT_MAX_ASSET_DEPENDENCIES)
+		return;
+
+	PangeaScriptAssetDependency* dependency = &gLevelAssetDependencies[gLevelAssetDependencyCount++];
+	snprintf(dependency->kind, sizeof(dependency->kind), "%s", kind);
+	snprintf(dependency->id, sizeof(dependency->id), "%s", id);
 }
 
 static void clear_registered_object(RegisteredObject* object)
@@ -484,6 +593,168 @@ static bool parse_levels_json(const char* json, int targetLevelNum, char* outScr
 								return false;
 							}
 						}
+					} else if (strcmp(subKey, "levelSettings") == 0) {
+						cursor = next_token(cursor, &token);
+						if (token.type != JSON_TOKEN_LBRACE) {
+							*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+							snprintf(outErrorMsg, outErrorSize, "levelSettings must be an object");
+							return false;
+						}
+
+						while (true) {
+							cursor = next_token(cursor, &token);
+							if (token.type == JSON_TOKEN_RBRACE) {
+								break;
+							}
+							if (token.type != JSON_TOKEN_STRING) {
+								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+								snprintf(outErrorMsg, outErrorSize, "Expected string key in levelSettings");
+								return false;
+							}
+
+							char settingKey[64];
+							snprintf(settingKey, sizeof(settingKey), "%s", token.string_value);
+
+							cursor = next_token(cursor, &token);
+							if (token.type != JSON_TOKEN_COLON) {
+								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+								snprintf(outErrorMsg, outErrorSize, "Expected colon in levelSettings");
+								return false;
+							}
+
+							cursor = next_token(cursor, &token);
+							if (isTargetLevel && token.type == JSON_TOKEN_NUMBER) {
+								if (is_integer_number(token.number_value))
+									add_level_int_setting(settingKey, (int)token.number_value);
+								else
+									add_level_float_setting(settingKey, (float)token.number_value);
+							} else if (isTargetLevel && token.type == JSON_TOKEN_TRUE) {
+								add_level_bool_setting(settingKey, true);
+							} else if (isTargetLevel && token.type == JSON_TOKEN_FALSE) {
+								add_level_bool_setting(settingKey, false);
+							} else if (isTargetLevel && token.type == JSON_TOKEN_STRING) {
+								add_level_string_setting(settingKey, token.string_value);
+							} else if (token.type == JSON_TOKEN_LBRACE) {
+								int braceCount = 1;
+								int bracketCount = 0;
+								while (braceCount > 0 || bracketCount > 0) {
+									cursor = next_token(cursor, &token);
+									if (token.type == JSON_TOKEN_ERROR || token.type == JSON_TOKEN_EOF) {
+										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+										snprintf(outErrorMsg, outErrorSize, "Invalid nested levelSettings value");
+										return false;
+									}
+									if (token.type == JSON_TOKEN_LBRACE) braceCount++;
+									else if (token.type == JSON_TOKEN_RBRACE) braceCount--;
+									else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
+									else if (token.type == JSON_TOKEN_RBRACKET) bracketCount--;
+								}
+							} else if (token.type == JSON_TOKEN_LBRACKET && strcmp(settingKey, "assetDependencies") == 0) {
+								while (true) {
+									cursor = next_token(cursor, &token);
+									if (token.type == JSON_TOKEN_RBRACKET) {
+										break;
+									}
+									if (token.type != JSON_TOKEN_LBRACE) {
+										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+										snprintf(outErrorMsg, outErrorSize, "assetDependencies entries must be objects");
+										return false;
+									}
+
+									char dependencyKind[32];
+									char dependencyId[96];
+									dependencyKind[0] = '\0';
+									dependencyId[0] = '\0';
+									while (true) {
+										cursor = next_token(cursor, &token);
+										if (token.type == JSON_TOKEN_RBRACE) {
+											break;
+										}
+										if (token.type != JSON_TOKEN_STRING) {
+											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+											snprintf(outErrorMsg, outErrorSize, "Expected string key in asset dependency");
+											return false;
+										}
+
+										char dependencyKey[32];
+										snprintf(dependencyKey, sizeof(dependencyKey), "%s", token.string_value);
+
+										cursor = next_token(cursor, &token);
+										if (token.type != JSON_TOKEN_COLON) {
+											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+											snprintf(outErrorMsg, outErrorSize, "Expected colon in asset dependency");
+											return false;
+										}
+
+										cursor = next_token(cursor, &token);
+										if (token.type != JSON_TOKEN_STRING) {
+											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+											snprintf(outErrorMsg, outErrorSize, "asset dependency values must be strings");
+											return false;
+										}
+										if (strcmp(dependencyKey, "kind") == 0) {
+											snprintf(dependencyKind, sizeof(dependencyKind), "%s", token.string_value);
+										} else if (strcmp(dependencyKey, "id") == 0) {
+											snprintf(dependencyId, sizeof(dependencyId), "%s", token.string_value);
+										}
+
+										cursor = next_token(cursor, &token);
+										if (token.type == JSON_TOKEN_COMMA) {
+											// continue dependency fields
+										} else if (token.type == JSON_TOKEN_RBRACE) {
+											break;
+										} else {
+											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+											snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in asset dependency");
+											return false;
+										}
+									}
+									if (isTargetLevel)
+										add_level_asset_dependency(dependencyKind, dependencyId);
+
+									cursor = next_token(cursor, &token);
+									if (token.type == JSON_TOKEN_COMMA) {
+										// continue dependencies
+									} else if (token.type == JSON_TOKEN_RBRACKET) {
+										break;
+									} else {
+										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+										snprintf(outErrorMsg, outErrorSize, "Expected comma or closing bracket in assetDependencies");
+										return false;
+									}
+								}
+							} else if (token.type == JSON_TOKEN_LBRACKET) {
+								int braceCount = 0;
+								int bracketCount = 1;
+								while (braceCount > 0 || bracketCount > 0) {
+									cursor = next_token(cursor, &token);
+									if (token.type == JSON_TOKEN_ERROR || token.type == JSON_TOKEN_EOF) {
+										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+										snprintf(outErrorMsg, outErrorSize, "Invalid nested levelSettings value");
+										return false;
+									}
+									if (token.type == JSON_TOKEN_LBRACE) braceCount++;
+									else if (token.type == JSON_TOKEN_RBRACE) braceCount--;
+									else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
+									else if (token.type == JSON_TOKEN_RBRACKET) bracketCount--;
+								}
+							} else if (token.type == JSON_TOKEN_ERROR || token.type == JSON_TOKEN_EOF) {
+								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+								snprintf(outErrorMsg, outErrorSize, "Invalid levelSettings value");
+								return false;
+							}
+
+							cursor = next_token(cursor, &token);
+							if (token.type == JSON_TOKEN_COMMA) {
+								// continue settings
+							} else if (token.type == JSON_TOKEN_RBRACE) {
+								break;
+							} else {
+								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
+								snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in levelSettings");
+								return false;
+							}
+						}
 					} else {
 						// Skip unknown field value
 						int braceCount = 0;
@@ -594,6 +865,7 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 	gScriptLoaded = false;
 	gErrorCount = 0;
 	gItemRemapCount = 0;
+	clear_level_settings();
 	gBudgetExceededCount = 0;
 	gHooksCalledCount = 0;
 	gConsecutiveHookFailures = 0;
@@ -608,6 +880,7 @@ void PangeaScript_Shutdown(void)
 	gInitialized = false;
 	gScriptLoaded = false;
 	gItemRemapCount = 0;
+	clear_level_settings();
 	gBudgetExceededCount = 0;
 	gHooksCalledCount = 0;
 	gConsecutiveHookFailures = 0;
@@ -718,6 +991,8 @@ PangeaScriptStatus PangeaScript_GetLastStatus(void)
 PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 {
 	gItemRemapCount = 0;
+	clear_level_settings();
+	reset_objects();
 
 	long configSize = 0;
 	char* config = read_text_file(gConfigPath, &configSize);
@@ -730,6 +1005,7 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 	if (configSize > PANGEA_SCRIPT_CONFIG_CAPACITY)
 	{
 		free(config);
+		clear_level_settings();
 		set_error(PANGEA_SCRIPT_CONFIG_ERROR, "Script config file is too large");
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
@@ -744,6 +1020,7 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 	if (parseStatus != PANGEA_SCRIPT_OK)
 	{
 		free(config);
+		clear_level_settings();
 		set_error(parseStatus, errorMsg);
 		return parseStatus;
 	}
@@ -753,12 +1030,14 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		if (strncmp(scriptPath, "Data/Scripts/", 13) != 0)
 		{
 			free(config);
+			clear_level_settings();
 			set_error(PANGEA_SCRIPT_CONFIG_ERROR, "Invalid script path: must be within Data/Scripts/");
 			return PANGEA_SCRIPT_CONFIG_ERROR;
 		}
 		if (strstr(scriptPath, "..") != NULL || strchr(scriptPath, '\\') != NULL)
 		{
 			free(config);
+			clear_level_settings();
 			set_error(PANGEA_SCRIPT_CONFIG_ERROR, "Invalid script path: path traversal detected");
 			return PANGEA_SCRIPT_CONFIG_ERROR;
 		}
@@ -768,6 +1047,7 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		if (reloadStatus != PANGEA_SCRIPT_OK && reloadStatus != PANGEA_SCRIPT_FILE_NOT_FOUND)
 		{
 			free(config);
+			clear_level_settings();
 			return reloadStatus;
 		}
 	}
@@ -785,6 +1065,71 @@ int PangeaScript_RemapTerrainItemType(int levelNum, int itemType)
 			return gItemRemaps[i].toType;
 	}
 	return itemType;
+}
+
+int PangeaScript_GetLevelAssetDependencyCount(void)
+{
+	return gLevelAssetDependencyCount;
+}
+
+bool PangeaScript_GetLevelAssetDependency(int index, PangeaScriptAssetDependency* outDependency)
+{
+	if (!outDependency || index < 0 || index >= gLevelAssetDependencyCount)
+		return false;
+
+	*outDependency = gLevelAssetDependencies[index];
+	return true;
+}
+
+bool PangeaScript_GetLevelFloatSetting(const char* key, float* outValue)
+{
+	const LevelSetting* setting = find_level_setting(key);
+	if (!setting || !outValue)
+		return false;
+
+	if (setting->type == LEVEL_SETTING_FLOAT)
+	{
+		*outValue = setting->floatValue;
+		return true;
+	}
+
+	if (setting->type == LEVEL_SETTING_INT)
+	{
+		*outValue = (float)setting->intValue;
+		return true;
+	}
+
+	return false;
+}
+
+bool PangeaScript_GetLevelIntSetting(const char* key, int* outValue)
+{
+	const LevelSetting* setting = find_level_setting(key);
+	if (!setting || !outValue || setting->type != LEVEL_SETTING_INT)
+		return false;
+
+	*outValue = setting->intValue;
+	return true;
+}
+
+bool PangeaScript_GetLevelBoolSetting(const char* key, bool* outValue)
+{
+	const LevelSetting* setting = find_level_setting(key);
+	if (!setting || !outValue || setting->type != LEVEL_SETTING_BOOL)
+		return false;
+
+	*outValue = setting->boolValue;
+	return true;
+}
+
+bool PangeaScript_GetLevelStringSetting(const char* key, char* outValue, int capacity)
+{
+	const LevelSetting* setting = find_level_setting(key);
+	if (!setting || !outValue || capacity <= 0 || setting->type != LEVEL_SETTING_STRING)
+		return false;
+
+	snprintf(outValue, (size_t)capacity, "%s", setting->stringValue);
+	return true;
 }
 
 PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const PangeaScriptLevelContext* context)
@@ -1195,3 +1540,19 @@ int PangeaScript_GetStatusHooksCalledCount(void) { return gHooksCalledCount; }
 EMSCRIPTEN_KEEPALIVE
 #endif
 bool PangeaScript_GetStatusScriptsDisabled(void) { return gScriptsDisabled; }
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+void* gPangeaScriptPreserveStatus[] = {
+	(void*)PangeaScript_GetStatusEnabled,
+	(void*)PangeaScript_GetStatusConfigLoaded,
+	(void*)PangeaScript_GetStatusBundleLoaded,
+	(void*)PangeaScript_GetStatusActiveScriptPath,
+	(void*)PangeaScript_GetStatusLastError,
+	(void*)PangeaScript_GetStatusErrorCount,
+	(void*)PangeaScript_GetStatusBudgetExceededCount,
+	(void*)PangeaScript_GetStatusHooksCalledCount,
+	(void*)PangeaScript_GetStatusScriptsDisabled,
+	(void*)PangeaScript_LogJS
+};
+#endif

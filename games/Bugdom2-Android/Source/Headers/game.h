@@ -20,7 +20,7 @@
 #define	TWEAKED_CAM			1		// more pleasant camera turning with twin-stick controls; also disables cam locking near CTYPE_LOOKAT objects
 #define TIME_UNIT			1000000				// time unit (microseconds) used in time deltas (CalcFramesPerSecond)
 #define	MIN_FPS				20
-#define	MAX_FPS				300
+#define	MAX_FPS				500
 #define	DEFAULT_FPS			60
 #define STEADY_FPS_WINDOW	16
 #define	COOK_GPU			0

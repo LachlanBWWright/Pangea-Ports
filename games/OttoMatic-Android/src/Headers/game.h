@@ -85,7 +85,14 @@ extern "C"
 // On non-Emscripten builds this is a no-op.
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-#define GAME_YIELD_BROWSER() emscripten_sleep(0)
+#ifdef __cplusplus
+extern "C" {
+#endif
+void emscripten_fast_yield(void);
+#ifdef __cplusplus
+}
+#endif
+#define GAME_YIELD_BROWSER() emscripten_fast_yield()
 #else
 #define GAME_YIELD_BROWSER() ((void)0)
 #endif

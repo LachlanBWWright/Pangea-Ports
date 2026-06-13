@@ -280,7 +280,6 @@ static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* actio
 
 void Nanosaur2Script_OnLevelLoad(int levelNum)
 {
-	PangeaScript_ResetObjects();
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, levelNum, "onLevelLoad");
 }
 
