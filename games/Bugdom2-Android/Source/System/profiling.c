@@ -3,7 +3,7 @@
 
 ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 static uint64_t gPerformanceFrequency;
-static ProfilePhaseType gCurrentPhase = -1;
+static int gCurrentPhase = -1;
 
 int gDrawCallsThisFrame = 0;
 int gCacheLookupsThisFrame = 0;
@@ -34,8 +34,18 @@ int gImmediateDrawsLastFrame = 0;
 int gImmediateBytesUploadedLastFrame = 0;
 int gImmediateSourceDrawsLastFrame[NUM_PROFILE_IMMEDIATE_SOURCES] = {0};
 int gImmediateSourceBytesLastFrame[NUM_PROFILE_IMMEDIATE_SOURCES] = {0};
+float gRenderSectionMsLastFrame[NUM_PROFILE_RENDER_SECTIONS] = {0};
+float gRenderSubphaseMsLastFrame[NUM_PROFILE_RENDER_SUBPHASES] = {0};
+float gSwapSubphaseMsLastFrame[NUM_PROFILE_SWAP_SUBPHASES] = {0};
 
 static ProfileImmediateSource gPendingImmediateSource = PROFILE_IMMEDIATE_OTHER;
+static uint64_t gRenderSectionStartTick[NUM_PROFILE_RENDER_SECTIONS] = {0};
+static uint64_t gRenderSectionTicksThisFrame[NUM_PROFILE_RENDER_SECTIONS] = {0};
+static uint64_t gRenderSubphaseStartTick[NUM_PROFILE_RENDER_SUBPHASES] = {0};
+static uint64_t gRenderSubphaseTicksThisFrame[NUM_PROFILE_RENDER_SUBPHASES] = {0};
+static int gRenderSubphaseDepth[NUM_PROFILE_RENDER_SUBPHASES] = {0};
+static uint64_t gSwapSubphaseStartTick[NUM_PROFILE_SWAP_SUBPHASES] = {0};
+static uint64_t gSwapSubphaseTicksThisFrame[NUM_PROFILE_SWAP_SUBPHASES] = {0};
 
 void InitProfiling(void) {
     gPerformanceFrequency = SDL_GetPerformanceFrequency();
@@ -57,7 +67,7 @@ void InitProfiling(void) {
 void StartProfilePhase(ProfilePhaseType phase_type) {
     // Auto-end the current phase if one is active
     if (gCurrentPhase != -1) {
-        EndProfilePhase(gCurrentPhase);
+        EndProfilePhase((ProfilePhaseType)gCurrentPhase);
     }
 
     if (phase_type >= 0 && phase_type < NUM_PROFILE_PHASES) {
@@ -76,7 +86,7 @@ void EndProfilePhase(ProfilePhaseType phase_type) {
         }
         
         // If we just ended the current tracking phase, mark it as none
-        if (gCurrentPhase == phase_type) {
+        if (gCurrentPhase == (int)phase_type) {
             gCurrentPhase = -1;
         }
     }
@@ -102,6 +112,85 @@ ProfileImmediateSource ConsumeImmediateDrawSource(void) {
     ProfileImmediateSource source = gPendingImmediateSource;
     gPendingImmediateSource = PROFILE_IMMEDIATE_OTHER;
     return source;
+}
+
+void BeginRenderSection(ProfileRenderSection section) {
+    if (section >= 0 && section < NUM_PROFILE_RENDER_SECTIONS) {
+        gRenderSectionStartTick[section] = SDL_GetPerformanceCounter();
+    }
+}
+
+void EndRenderSection(ProfileRenderSection section) {
+    if (section >= 0 && section < NUM_PROFILE_RENDER_SECTIONS) {
+        uint64_t startTick = gRenderSectionStartTick[section];
+        if (startTick != 0) {
+            gRenderSectionTicksThisFrame[section] += SDL_GetPerformanceCounter() - startTick;
+            gRenderSectionStartTick[section] = 0;
+        }
+    }
+}
+
+float GetRenderSectionMs(ProfileRenderSection section) {
+    if (section >= 0 && section < NUM_PROFILE_RENDER_SECTIONS) {
+        return gRenderSectionMsLastFrame[section];
+    }
+    return 0.0f;
+}
+
+void BeginRenderSubphase(ProfileRenderSubphase subphase) {
+    if (subphase >= 0 && subphase < NUM_PROFILE_RENDER_SUBPHASES) {
+        if (gRenderSubphaseDepth[subphase] == 0) {
+            gRenderSubphaseStartTick[subphase] = SDL_GetPerformanceCounter();
+        }
+        gRenderSubphaseDepth[subphase]++;
+    }
+}
+
+void EndRenderSubphase(ProfileRenderSubphase subphase) {
+    if (subphase >= 0 && subphase < NUM_PROFILE_RENDER_SUBPHASES) {
+        if (gRenderSubphaseDepth[subphase] <= 0) {
+            return;
+        }
+
+        gRenderSubphaseDepth[subphase]--;
+        if (gRenderSubphaseDepth[subphase] == 0) {
+            uint64_t startTick = gRenderSubphaseStartTick[subphase];
+            if (startTick != 0) {
+                gRenderSubphaseTicksThisFrame[subphase] += SDL_GetPerformanceCounter() - startTick;
+                gRenderSubphaseStartTick[subphase] = 0;
+            }
+        }
+    }
+}
+
+float GetRenderSubphaseMs(ProfileRenderSubphase subphase) {
+    if (subphase >= 0 && subphase < NUM_PROFILE_RENDER_SUBPHASES) {
+        return gRenderSubphaseMsLastFrame[subphase];
+    }
+    return 0.0f;
+}
+
+void BeginSwapSubphase(ProfileSwapSubphase subphase) {
+    if (subphase >= 0 && subphase < NUM_PROFILE_SWAP_SUBPHASES) {
+        gSwapSubphaseStartTick[subphase] = SDL_GetPerformanceCounter();
+    }
+}
+
+void EndSwapSubphase(ProfileSwapSubphase subphase) {
+    if (subphase >= 0 && subphase < NUM_PROFILE_SWAP_SUBPHASES) {
+        uint64_t startTick = gSwapSubphaseStartTick[subphase];
+        if (startTick != 0) {
+            gSwapSubphaseTicksThisFrame[subphase] += SDL_GetPerformanceCounter() - startTick;
+            gSwapSubphaseStartTick[subphase] = 0;
+        }
+    }
+}
+
+float GetSwapSubphaseMs(ProfileSwapSubphase subphase) {
+    if (subphase >= 0 && subphase < NUM_PROFILE_SWAP_SUBPHASES) {
+        return gSwapSubphaseMsLastFrame[subphase];
+    }
+    return 0.0f;
 }
 
 void ResetProfilingForFrame(void) {
@@ -130,6 +219,15 @@ void ResetProfilingForFrame(void) {
         gImmediateSourceDrawsLastFrame[i] = gImmediateSourceDrawsThisFrame[i];
         gImmediateSourceBytesLastFrame[i] = gImmediateSourceBytesThisFrame[i];
     }
+    for (int i = 0; i < NUM_PROFILE_RENDER_SECTIONS; i++) {
+        gRenderSectionMsLastFrame[i] = (float)(((double)gRenderSectionTicksThisFrame[i] * 1000.0) / (double)gPerformanceFrequency);
+    }
+    for (int i = 0; i < NUM_PROFILE_RENDER_SUBPHASES; i++) {
+        gRenderSubphaseMsLastFrame[i] = (float)(((double)gRenderSubphaseTicksThisFrame[i] * 1000.0) / (double)gPerformanceFrequency);
+    }
+    for (int i = 0; i < NUM_PROFILE_SWAP_SUBPHASES; i++) {
+        gSwapSubphaseMsLastFrame[i] = (float)(((double)gSwapSubphaseTicksThisFrame[i] * 1000.0) / (double)gPerformanceFrequency);
+    }
 
     gDrawCallsThisFrame = 0;
     gCacheLookupsThisFrame = 0;
@@ -146,6 +244,19 @@ void ResetProfilingForFrame(void) {
     for (int i = 0; i < NUM_PROFILE_IMMEDIATE_SOURCES; i++) {
         gImmediateSourceDrawsThisFrame[i] = 0;
         gImmediateSourceBytesThisFrame[i] = 0;
+    }
+    for (int i = 0; i < NUM_PROFILE_RENDER_SECTIONS; i++) {
+        gRenderSectionStartTick[i] = 0;
+        gRenderSectionTicksThisFrame[i] = 0;
+    }
+    for (int i = 0; i < NUM_PROFILE_RENDER_SUBPHASES; i++) {
+        gRenderSubphaseStartTick[i] = 0;
+        gRenderSubphaseTicksThisFrame[i] = 0;
+        gRenderSubphaseDepth[i] = 0;
+    }
+    for (int i = 0; i < NUM_PROFILE_SWAP_SUBPHASES; i++) {
+        gSwapSubphaseStartTick[i] = 0;
+        gSwapSubphaseTicksThisFrame[i] = 0;
     }
     gPendingImmediateSource = PROFILE_IMMEDIATE_OTHER;
 }

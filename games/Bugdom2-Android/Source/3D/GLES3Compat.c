@@ -201,18 +201,19 @@ static GLint uAlphaTest, uAlphaFunc, uAlphaRef;
 
 static unsigned int gUniformDirty = B2_UDIRTY_ALL;
 
-static float* s_interleave_buf = NULL;
-static int s_interleave_buf_capacity = 0;
-
 //=============================================================
-// Draw cache – 256-entry LRU, keyed by client-array pointers
+// Draw cache – LRU, keyed by client-array pointers
 //=============================================================
 // Static geometry (models, tiles) that never changes after loading can be
 // cached on the GPU indefinitely.  Dynamic geometry (skeletons, terrain,
 // water, fences, snake) marks changed client arrays dirty so only those
 // ranges are refreshed before the next draw.
 
+#if defined(__EMSCRIPTEN__)
+#define B2_DRAW_CACHE_SIZE 1024
+#else
 #define B2_DRAW_CACHE_SIZE 256
+#endif
 
 typedef struct {
     const void *vert_ptr;   // gVertArrayPtr   (NULL if disabled)
@@ -228,7 +229,7 @@ typedef struct {
     GLint       color_size;
     uint8_t     valid;
     GLuint      vao;        // cached vertex array state for WebGL/GLES draws
-    GLuint      vbo;        // packed attribute VBO (same interleaved layout)
+    GLuint      vbo[4];     // position, normal, color, texcoord VBOs
     GLuint      ebo;        // index EBO
     uint64_t    lru_tick;
 } B2DrawCacheEntry;
@@ -253,13 +254,13 @@ static int B2DrawCacheFind(
     for (int i = 0; i < B2_DRAW_CACHE_SIZE; i++) {
         B2DrawCacheEntry *e = &sB2DC[i];
         if (e->valid &&
-            e->vert_ptr    == vertPtr   && e->norm_ptr   == normPtr  &&
-            e->color_ptr   == colorPtr  && e->texc_ptr   == texcPtr  &&
-            e->idx_ptr     == indices   &&
-            e->nVerts      == nVerts    && e->nIdx       == count &&
-            e->idx_type    == type      &&
+            e->vert_ptr   == vertPtr   && e->norm_ptr   == normPtr  &&
+            e->color_ptr  == colorPtr  && e->texc_ptr   == texcPtr  &&
+            e->idx_ptr    == indices   &&
+            e->nVerts     == nVerts    && e->nIdx       == count &&
+            e->idx_type   == type      &&
             e->attrib_mask == attribMask &&
-            e->color_type  == colorType && e->color_size == colorSize)
+            e->color_type == colorType && e->color_size == colorSize)
         {
             return i;
         }
@@ -269,6 +270,8 @@ static int B2DrawCacheFind(
 
 static int B2DrawCacheFindLRU(void)
 {
+    if (!sB2DC[0].valid) return 0;
+
     int best = 0;
     uint64_t best_tick = sB2DC[0].lru_tick;
     for (int i = 1; i < B2_DRAW_CACHE_SIZE; i++) {
@@ -405,6 +408,36 @@ static bool ForceCacheMisses(void)
         sForceCacheMiss = value && value[0] && value[0] != '0';
     }
     return sForceCacheMiss != 0;
+}
+
+static void SetNativeCapability(GLenum cap, bool enabled, bool* current)
+{
+    if (*current == enabled)
+    {
+        return;
+    }
+
+    *current = enabled;
+
+    if (enabled)
+    {
+        glEnable(cap);
+    }
+    else
+    {
+        glDisable(cap);
+    }
+}
+
+static void SetUniformFlagCapability(bool enabled, bool* current, unsigned int dirtyFlag)
+{
+    if (*current == enabled)
+    {
+        return;
+    }
+
+    *current = enabled;
+    gUniformDirty |= dirtyFlag;
 }
 
 //=============================================================
@@ -584,7 +617,6 @@ void GLES3Compat_Init(void)
     MatIdentity(gProjStack[0]);
     MatIdentity(gTexStack[0]);
 
-    // Bind our program so the game can start calling legacy GL immediately
     glUseProgram(gProgram);
     glBindVertexArray(gVAO);
 }
@@ -597,22 +629,22 @@ void GLES3_Enable(GLenum cap)
 {
     switch (cap)
     {
-        case GL_BLEND:          gBlendEnabled      = true; glEnable(cap); return;
-        case GL_CULL_FACE:      gCullFaceEnabled   = true; glEnable(cap); return;
-        case GL_DEPTH_TEST:     gDepthTestEnabled  = true; glEnable(cap); return;
-        case GL_LIGHTING:       gLightingEnabled   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT0:         gLightEnabled[0]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT1:         gLightEnabled[1]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT2:         gLightEnabled[2]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT3:         gLightEnabled[3]   = true; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_FOG:            gFogEnabled        = true; gUniformDirty |= B2_UDIRTY_FOG; return;
-        case GL_NORMALIZE:      gNormalizeEnabled  = true; return;
+        case GL_BLEND:          SetNativeCapability(cap, true, &gBlendEnabled); return;
+        case GL_CULL_FACE:      SetNativeCapability(cap, true, &gCullFaceEnabled); return;
+        case GL_DEPTH_TEST:     SetNativeCapability(cap, true, &gDepthTestEnabled); return;
+        case GL_LIGHTING:       SetUniformFlagCapability(true, &gLightingEnabled, B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT0:         SetUniformFlagCapability(true, &gLightEnabled[0], B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT1:         SetUniformFlagCapability(true, &gLightEnabled[1], B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT2:         SetUniformFlagCapability(true, &gLightEnabled[2], B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT3:         SetUniformFlagCapability(true, &gLightEnabled[3], B2_UDIRTY_LIGHTING); return;
+        case GL_FOG:            SetUniformFlagCapability(true, &gFogEnabled, B2_UDIRTY_FOG); return;
+        case GL_NORMALIZE:      gNormalizeEnabled = true; return;
         case GL_COLOR_MATERIAL: gColorMaterialEnabled = true; return;
-        case GL_TEXTURE_GEN_S:  gTexGenSEnabled    = true; return;
-        case GL_TEXTURE_GEN_T:  gTexGenTEnabled    = true; return;
+        case GL_TEXTURE_GEN_S:  gTexGenSEnabled = true; return;
+        case GL_TEXTURE_GEN_T:  gTexGenTEnabled = true; return;
         case GL_RESCALE_NORMAL: return;  // no-op
-        case GL_ALPHA_TEST:     gAlphaTestEnabled  = true; gUniformDirty |= B2_UDIRTY_ALPHATEST; return;
-        case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = true; gUniformDirty |= B2_UDIRTY_TEXTURE; return;
+        case GL_ALPHA_TEST:     SetUniformFlagCapability(true, &gAlphaTestEnabled, B2_UDIRTY_ALPHATEST); return;
+        case GL_TEXTURE_2D_COMPAT: SetUniformFlagCapability(true, &gTexture2DEnabled, B2_UDIRTY_TEXTURE); return;
         default: glEnable(cap); break;
     }
 }
@@ -621,22 +653,22 @@ void GLES3_Disable(GLenum cap)
 {
     switch (cap)
     {
-        case GL_BLEND:          gBlendEnabled      = false; glDisable(cap); return;
-        case GL_CULL_FACE:      gCullFaceEnabled   = false; glDisable(cap); return;
-        case GL_DEPTH_TEST:     gDepthTestEnabled  = false; glDisable(cap); return;
-        case GL_LIGHTING:       gLightingEnabled   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT0:         gLightEnabled[0]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT1:         gLightEnabled[1]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT2:         gLightEnabled[2]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_LIGHT3:         gLightEnabled[3]   = false; gUniformDirty |= B2_UDIRTY_LIGHTING; return;
-        case GL_FOG:            gFogEnabled        = false; gUniformDirty |= B2_UDIRTY_FOG; return;
-        case GL_NORMALIZE:      gNormalizeEnabled  = false; return;
+        case GL_BLEND:          SetNativeCapability(cap, false, &gBlendEnabled); return;
+        case GL_CULL_FACE:      SetNativeCapability(cap, false, &gCullFaceEnabled); return;
+        case GL_DEPTH_TEST:     SetNativeCapability(cap, false, &gDepthTestEnabled); return;
+        case GL_LIGHTING:       SetUniformFlagCapability(false, &gLightingEnabled, B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT0:         SetUniformFlagCapability(false, &gLightEnabled[0], B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT1:         SetUniformFlagCapability(false, &gLightEnabled[1], B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT2:         SetUniformFlagCapability(false, &gLightEnabled[2], B2_UDIRTY_LIGHTING); return;
+        case GL_LIGHT3:         SetUniformFlagCapability(false, &gLightEnabled[3], B2_UDIRTY_LIGHTING); return;
+        case GL_FOG:            SetUniformFlagCapability(false, &gFogEnabled, B2_UDIRTY_FOG); return;
+        case GL_NORMALIZE:      gNormalizeEnabled = false; return;
         case GL_COLOR_MATERIAL: gColorMaterialEnabled = false; return;
-        case GL_TEXTURE_GEN_S:  gTexGenSEnabled    = false; return;
-        case GL_TEXTURE_GEN_T:  gTexGenTEnabled    = false; return;
+        case GL_TEXTURE_GEN_S:  gTexGenSEnabled = false; return;
+        case GL_TEXTURE_GEN_T:  gTexGenTEnabled = false; return;
         case GL_RESCALE_NORMAL: return;
-        case GL_ALPHA_TEST:     gAlphaTestEnabled  = false; gUniformDirty |= B2_UDIRTY_ALPHATEST; return;
-        case GL_TEXTURE_2D_COMPAT: gTexture2DEnabled = false; gUniformDirty |= B2_UDIRTY_TEXTURE; return;
+        case GL_ALPHA_TEST:     SetUniformFlagCapability(false, &gAlphaTestEnabled, B2_UDIRTY_ALPHATEST); return;
+        case GL_TEXTURE_2D_COMPAT: SetUniformFlagCapability(false, &gTexture2DEnabled, B2_UDIRTY_TEXTURE); return;
         default: glDisable(cap); break;
     }
 }
@@ -659,6 +691,11 @@ GLboolean GLES3_IsEnabled(GLenum cap)
 
 void GLES3_BlendFunc(GLenum sfactor, GLenum dfactor)
 {
+    if (gBlendSrcFactor == sfactor && gBlendDstFactor == dfactor)
+    {
+        return;
+    }
+
     gBlendSrcFactor = sfactor;
     gBlendDstFactor = dfactor;
     glBlendFunc(sfactor, dfactor);
@@ -666,7 +703,13 @@ void GLES3_BlendFunc(GLenum sfactor, GLenum dfactor)
 
 void GLES3_DepthMask(GLboolean flag)
 {
-    gDepthWriteEnabled = flag ? true : false;
+    bool enabled = flag ? true : false;
+    if (gDepthWriteEnabled == enabled)
+    {
+        return;
+    }
+
+    gDepthWriteEnabled = enabled;
     glDepthMask(flag);
 }
 
@@ -810,127 +853,45 @@ void GLES3_InvalidateCachePtr(const void *ptr)
     }
 }
 
-static int BuildInterleaveBuffer(
-    int vertex_count,
-    const void *vertPtr,
-    const void *normPtr,
-    const void *colorPtr,
-    GLenum colorType,
-    GLint colorSize,
-    const void *texcPtr,
-    uint8_t attribMask)
-{
-    const int STRIDE_FLOATS = 12;
-    const int STRIDE_BYTES = STRIDE_FLOATS * sizeof(float);
-    int buf_size = vertex_count * STRIDE_BYTES;
-
-    if (buf_size > s_interleave_buf_capacity) {
-        s_interleave_buf = (float *)realloc(s_interleave_buf, buf_size);
-        s_interleave_buf_capacity = buf_size;
-    }
-    float *buf = s_interleave_buf;
-    if (!buf) return -1;
-
-    const float *v_src = (attribMask & (1u << 0)) ? (const float *)vertPtr : NULL;
-    const float *n_src = (attribMask & (1u << 1)) ? (const float *)normPtr : NULL;
-    const void  *c_src = (attribMask & (1u << 2)) ? colorPtr : NULL;
-    const float *t_src = (attribMask & (1u << 3)) ? (const float *)texcPtr : NULL;
-
-    for (int i = 0; i < vertex_count; i++) {
-        float *dst = buf + i * STRIDE_FLOATS;
-
-        // Position
-        if (v_src) {
-            dst[0] = v_src[i * 3 + 0];
-            dst[1] = v_src[i * 3 + 1];
-            dst[2] = v_src[i * 3 + 2];
-        } else {
-            dst[0] = dst[1] = dst[2] = 0.0f;
-        }
-
-        // Normal
-        if (n_src) {
-            dst[3] = n_src[i * 3 + 0];
-            dst[4] = n_src[i * 3 + 1];
-            dst[5] = n_src[i * 3 + 2];
-        } else {
-            dst[3] = 0.0f;
-            dst[4] = 0.0f;
-            dst[5] = 1.0f;
-        }
-
-        // Color
-        if (c_src) {
-            if (colorType == GL_UNSIGNED_BYTE) {
-                const uint8_t *rgba = ((const uint8_t *)c_src) + i * colorSize;
-                dst[6] = rgba[0] / 255.0f;
-                dst[7] = rgba[1] / 255.0f;
-                dst[8] = rgba[2] / 255.0f;
-                dst[9] = (colorSize == 4) ? (rgba[3] / 255.0f) : 1.0f;
-            } else {
-                const float *rgba = ((const float *)c_src) + i * colorSize;
-                dst[6] = rgba[0];
-                dst[7] = rgba[1];
-                dst[8] = rgba[2];
-                dst[9] = (colorSize == 4) ? rgba[3] : 1.0f;
-            }
-        } else {
-            dst[6] = gCurrentColor[0];
-            dst[7] = gCurrentColor[1];
-            dst[8] = gCurrentColor[2];
-            dst[9] = gCurrentColor[3];
-        }
-
-        // Texcoord
-        if (t_src) {
-            dst[10] = t_src[i * 2 + 0];
-            dst[11] = t_src[i * 2 + 1];
-        } else {
-            dst[10] = 0.0f;
-            dst[11] = 0.0f;
-        }
-    }
-    return buf_size;
-}
-
 static void B2DrawCacheConfigureVAO(
     B2DrawCacheEntry *entry,
     uint8_t attribMask)
 {
     glBindVertexArray(entry->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, entry->vbo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entry->ebo);
-
-    const GLsizei STRIDE = 12 * sizeof(float);
 
     // Position (Attrib 0)
     if (attribMask & (1u << 0)) {
+        glBindBuffer(GL_ARRAY_BUFFER, entry->vbo[0]);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(0 * sizeof(float)));
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     } else {
         glDisableVertexAttribArray(0);
     }
 
     // Normal (Attrib 1)
     if (attribMask & (1u << 1)) {
+        glBindBuffer(GL_ARRAY_BUFFER, entry->vbo[1]);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(3 * sizeof(float)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
     } else {
         glDisableVertexAttribArray(1);
     }
 
     // Color (Attrib 2)
     if (attribMask & (1u << 2)) {
+        glBindBuffer(GL_ARRAY_BUFFER, entry->vbo[2]);
         glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(6 * sizeof(float)));
+        glVertexAttribPointer(2, entry->color_size, entry->color_type, entry->color_type == GL_UNSIGNED_BYTE ? GL_TRUE : GL_FALSE, 0, 0);
     } else {
         glDisableVertexAttribArray(2);
     }
 
     // TexCoord (Attrib 3)
     if (attribMask & (1u << 3)) {
+        glBindBuffer(GL_ARRAY_BUFFER, entry->vbo[3]);
         glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, STRIDE, (const void*)(10 * sizeof(float)));
+        glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
     } else {
         glDisableVertexAttribArray(3);
     }
@@ -992,6 +953,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     GLint  colorSize = (attribMask & (1u<<2)) ? gColorArraySize : 0;
 
     // ── Draw-cache lookup ─────────────────────────────────────────────
+    BeginRenderSubphase(PROFILE_RENDER_SUB_GLES_CACHE);
     bool forceCacheMiss = ForceCacheMisses();
     gCacheLookupsThisFrame++;
     int cacheIdx = -1;
@@ -1010,6 +972,7 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
             colorType,
             colorSize);
     }
+    EndRenderSubphase(PROFILE_RENDER_SUB_GLES_CACHE);
 
     B2DrawCacheEntry *drawEntry = NULL;
 
@@ -1034,23 +997,48 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
             gCacheEvictionsThisFrame++;
 
         if (!e->vao) glGenVertexArrays(1, &e->vao);
-        if (!e->vbo) glGenBuffers(1, &e->vbo);
+        if (!e->vbo[0]) glGenBuffers(4, e->vbo);
         if (!e->ebo) glGenBuffers(1, &e->ebo);
 
-        int vbo_bytes = BuildInterleaveBuffer(nVerts, vertPtr, normPtr, colorPtr, colorType, colorSize, texcPtr, attribMask);
-
-        glBindBuffer(GL_ARRAY_BUFFER, e->vbo);
-        if (vbo_bytes > 0)
+        BeginRenderSubphase(PROFILE_RENDER_SUB_GLES_UPLOAD);
+        int vbo_bytes = 0;
+        if (vertPtr)
         {
-            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vbo_bytes, s_interleave_buf, GL_DYNAMIC_DRAW);
-            gBytesUploadedThisFrame += vbo_bytes;
-            gVerticesUploadedThisFrame += nVerts;
+            int bytes = nVerts * 3 * (int)sizeof(GLfloat);
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[0]);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)bytes, vertPtr, GL_STATIC_DRAW);
+            vbo_bytes += bytes;
         }
+        if (normPtr)
+        {
+            int bytes = nVerts * 3 * (int)sizeof(GLfloat);
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[1]);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)bytes, normPtr, GL_STATIC_DRAW);
+            vbo_bytes += bytes;
+        }
+        if (colorPtr)
+        {
+            int colorTypeSize = colorType == GL_UNSIGNED_BYTE ? (int)sizeof(GLubyte) : (int)sizeof(GLfloat);
+            int bytes = nVerts * colorSize * colorTypeSize;
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[2]);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)bytes, colorPtr, GL_STATIC_DRAW);
+            vbo_bytes += bytes;
+        }
+        if (texcPtr)
+        {
+            int bytes = nVerts * 2 * (int)sizeof(GLfloat);
+            glBindBuffer(GL_ARRAY_BUFFER, e->vbo[3]);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)bytes, texcPtr, GL_STATIC_DRAW);
+            vbo_bytes += bytes;
+        }
+        gBytesUploadedThisFrame += vbo_bytes;
+        gVerticesUploadedThisFrame += nVerts;
 
         size_t indexSize = (size_t)count * (type == GL_UNSIGNED_INT ? sizeof(GLuint) : sizeof(GLushort));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, e->ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)indexSize, indices, GL_STATIC_DRAW);
         gBytesUploadedThisFrame += (int)indexSize;
+        EndRenderSubphase(PROFILE_RENDER_SUB_GLES_UPLOAD);
 
         // Store cache entry
         e->vert_ptr    = vertPtr;
@@ -1073,9 +1061,13 @@ void GLES3_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* ind
     glBindVertexArray(drawEntry->vao);
     B2DrawCacheSetFallbackAttribs(attribMask);
 
+    BeginRenderSubphase(PROFILE_RENDER_SUB_GLES_UNIFORMS);
     UploadUniforms();
+    EndRenderSubphase(PROFILE_RENDER_SUB_GLES_UNIFORMS);
 
+    BeginRenderSubphase(PROFILE_RENDER_SUB_GLES_DRAW);
     glDrawElements(mode, count, type, 0);
+    EndRenderSubphase(PROFILE_RENDER_SUB_GLES_DRAW);
     gDrawCallsThisFrame++;
 
     // Reset the client active texture unit to 0 after every draw.

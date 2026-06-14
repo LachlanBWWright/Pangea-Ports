@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 
 /****************************/
@@ -22,6 +23,7 @@ static void CalcNewItemDeleteWindow(void);
 static int BuildTerrainSuperTile(int startCol, int startRow);
 static void ReleaseAllSuperTiles(void);
 static void DoSuperTileDeformation(SuperTileMemoryType *superTile);
+static Boolean SuperTileCanBeAffectedByDeformation(SuperTileMemoryType *superTile);
 static void UpdateTerrainDeformationFunctions(void);
 static void DrawTerrain(ObjNode *theNode);
 
@@ -924,9 +926,13 @@ static void DrawTerrain(ObjNode *theNode)
 {
 int				r,c;
 int				i,unique;
+int				numVisibleSuperTiles = 0;
+int				visibleSuperTiles[MAX_SUPERTILES];
+int				visibleSuperTileMaterials[MAX_SUPERTILES];
 Boolean			superTileVisible;
 
 	(void) theNode;
+	BeginRenderSection(PROFILE_RENDER_TERRAIN);
 
 				/**************/
 				/* DRAW STUFF */
@@ -981,37 +987,65 @@ Boolean			superTileVisible;
 
 					/* SEE IF IS CULLED & DO SUPERTILE DEFORMATION */
 
+				BeginRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_CULL);
 				superTileVisible = OGL_IsBBoxVisible(&gSuperTileMemoryList[i].bBox, nil);
+				EndRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_CULL);
 
 				if (superTileVisible || gCleanupDeformation)					// update deformation of this ST under these conditions
+				{
+					BeginRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_DEFORM);
 					DoSuperTileDeformation(&gSuperTileMemoryList[i]);
+					EndRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_DEFORM);
+				}
 
 				if (!superTileVisible)
 					continue;
 
 
 
-						/***********************************/
-						/* DRAW THE MESH IN THIS SUPERTILE */
-						/***********************************/
-
-					/* SUBMIT THE TEXTURE */
-
-				MO_DrawMaterial(gSuperTileTextureObjects[unique]);
-
-
-					/* SUBMIT THE GEOMETRY */
-
-				MO_DrawGeometry_VertexArray(gSuperTileMemoryList[i].meshData);
-				gNumSuperTilesDrawn++;
-
+				if (numVisibleSuperTiles < MAX_SUPERTILES)
+				{
+					visibleSuperTiles[numVisibleSuperTiles] = i;
+					visibleSuperTileMaterials[numVisibleSuperTiles] = unique;
+					numVisibleSuperTiles++;
+				}
 			}
+		}
+	}
+
+		/* Terrain is opaque, so batch visible supertiles by material to reduce state changes. */
+
+	for (unique = 0; unique < gNumUniqueSuperTiles; unique++)
+	{
+		Boolean materialWasSubmitted = false;
+
+		for (i = 0; i < numVisibleSuperTiles; i++)
+		{
+			int superTileNum;
+
+			if (visibleSuperTileMaterials[i] != unique)
+				continue;
+
+			if (!materialWasSubmitted)
+			{
+				BeginRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_MATERIAL);
+				MO_DrawMaterial(gSuperTileTextureObjects[unique]);
+				EndRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_MATERIAL);
+				materialWasSubmitted = true;
+			}
+
+			superTileNum = visibleSuperTiles[i];
+			BeginRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_DRAW);
+			MO_DrawGeometry_VertexArray(gSuperTileMemoryList[superTileNum].meshData);
+			EndRenderSubphase(PROFILE_RENDER_SUB_TERRAIN_DRAW);
+			gNumSuperTilesDrawn++;
 		}
 	}
 	gCleanupDeformation = false;							// reset this now
 
 
 	OGL_PopState();
+	EndRenderSection(PROFILE_RENDER_TERRAIN);
 
 
 		/*********************************************/
@@ -1079,6 +1113,9 @@ float	x,y,z, dist, decay, off, d2, originalY;
 float	oneOverWaveLength,r,rw,dampenRatio;
 
 	if ((gNumTerrainDeformations == 0) && (!gCleanupDeformation))
+		return;
+
+	if (!gCleanupDeformation && !SuperTileCanBeAffectedByDeformation(superTile))
 		return;
 
 	startRow = superTile->tileRow;													// get tile row/col of this supertile
@@ -1233,6 +1270,53 @@ float	oneOverWaveLength,r,rw,dampenRatio;
 	GLES3_InvalidateCachePtr(superTile->meshData->normals);
 #endif
 
+}
+
+
+/********************* CHECK SUPERTILE DEFORMATION RANGE *****************************/
+
+static Boolean SuperTileCanBeAffectedByDeformation(SuperTileMemoryType *superTile)
+{
+const float minX = superTile->bBox.min.x - (gTerrainPolygonSize * 2.0f);
+const float maxX = superTile->bBox.max.x + (gTerrainPolygonSize * 2.0f);
+const float minZ = superTile->bBox.min.z - (gTerrainPolygonSize * 2.0f);
+const float maxZ = superTile->bBox.max.z + (gTerrainPolygonSize * 2.0f);
+
+	for (int i = 0; i < MAX_DEFORMATIONS; i++)
+	{
+		if (!gDeformationList[i].isUsed)
+			continue;
+
+		if ((gDeformationList[i].type != DEFORMATION_TYPE_RADIALWAVE) &&
+			(gDeformationList[i].type != DEFORMATION_TYPE_DAMPEN))
+		{
+			return true;
+		}
+
+		float range = gDeformationList[i].radius + gDeformationList[i].radialWidth + gTerrainPolygonSize;
+		if (range < 0.0f)
+			range = 0.0f;
+
+		float dx = 0.0f;
+		float dz = 0.0f;
+		const float originX = gDeformationList[i].origin.x;
+		const float originZ = gDeformationList[i].origin.y;
+
+		if (originX < minX)
+			dx = minX - originX;
+		else if (originX > maxX)
+			dx = originX - maxX;
+
+		if (originZ < minZ)
+			dz = minZ - originZ;
+		else if (originZ > maxZ)
+			dz = originZ - maxZ;
+
+		if ((dx * dx) + (dz * dz) <= (range * range))
+			return true;
+	}
+
+	return false;
 }
 
 
@@ -1842,13 +1926,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
-
-
-
-
-
-
 
 
 

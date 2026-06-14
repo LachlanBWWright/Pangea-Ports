@@ -479,6 +479,7 @@ int	numChildren,i;
 				/* VERIFY OBJECT TYPE */
 
 	GAME_ASSERT(object->objectHeader.type == MO_TYPE_GROUP);
+	BeginRenderSubphase(PROFILE_RENDER_SUB_MO_GROUP);
 
 
 			/*************************************/
@@ -506,6 +507,7 @@ int	numChildren,i;
 			/******************************/
 
 	OGL_PopState();
+	EndRenderSubphase(PROFILE_RENDER_SUB_MO_GROUP);
 }
 
 
@@ -521,6 +523,7 @@ Boolean		needNormals;
 			/* SETUP VERTEX ARRAY */
 			/**********************/
 
+	BeginRenderSubphase(PROFILE_RENDER_SUB_MO_SETUP);
 	glEnableClientState(GL_VERTEX_ARRAY);				// enable vertex arrays
 	glVertexPointer(3, GL_FLOAT, 0, data->points);		// point to points array
 
@@ -569,6 +572,7 @@ Boolean		needNormals;
 	}
 
 	OGL_CheckError();
+	EndRenderSubphase(PROFILE_RENDER_SUB_MO_SETUP);
 
 
 
@@ -740,6 +744,7 @@ go_here:
 			// before we can determine if normals are actually needed
 			//
 
+	BeginRenderSubphase(PROFILE_RENDER_SUB_MO_SETUP);
 	if (data->normals == nil)							// see if we even have normals to pass
 		needNormals = false;
 	else
@@ -785,6 +790,7 @@ go_here:
 		glDisableClientState(GL_NORMAL_ARRAY);			// disable normal arrays
 
 	OGL_CheckError();
+	EndRenderSubphase(PROFILE_RENDER_SUB_MO_SETUP);
 
 
 			/***********/
@@ -795,7 +801,9 @@ go_here:
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	GLES3_SetVertexCount(data->numPoints);
 #endif
+	BeginRenderSubphase(PROFILE_RENDER_SUB_MO_SUBMIT);
 	glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
+	EndRenderSubphase(PROFILE_RENDER_SUB_MO_SUBMIT);
 	OGL_CheckError();
 //	glUnlockArraysEXT();
 
@@ -834,6 +842,8 @@ OGLColorRGBA		*diffuseColor,diffColor2;
 Boolean				textureHasAlpha = false;
 Boolean				alreadySet;
 uint32_t				matFlags;
+
+	BeginRenderSubphase(PROFILE_RENDER_SUB_MO_MATERIAL);
 
 			/* SEE IF THIS MATERIAL IS ALREADY SET AS CURRENT */
 
@@ -887,14 +897,38 @@ uint32_t				matFlags;
 				/* SET TEXTURE WRAPPING MODE */
 
 		if (matFlags & BG3D_MATERIALFLAG_CLAMP_U)
-		    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		{
+			if (!(matData->flags & BG3D_MATERIALFLAG_CLAMP_U_TRUE))
+			{
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				matData->flags |= BG3D_MATERIALFLAG_CLAMP_U_TRUE;
+			}
+		}
 		else
-		    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		{
+			if (matData->flags & BG3D_MATERIALFLAG_CLAMP_U_TRUE)
+			{
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+				matData->flags &= ~BG3D_MATERIALFLAG_CLAMP_U_TRUE;
+			}
+		}
 
 		if (matFlags & BG3D_MATERIALFLAG_CLAMP_V)
-		    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		{
+			if (!(matData->flags & BG3D_MATERIALFLAG_CLAMP_V_TRUE))
+			{
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				matData->flags |= BG3D_MATERIALFLAG_CLAMP_V_TRUE;
+			}
+		}
 		else
-		    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		{
+			if (matData->flags & BG3D_MATERIALFLAG_CLAMP_V_TRUE)
+			{
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+				matData->flags &= ~BG3D_MATERIALFLAG_CLAMP_V_TRUE;
+			}
+		}
 
 
 	}
@@ -952,6 +986,7 @@ uint32_t				matFlags;
 			/* SAVE THIS STUFF */
 
 	gMostRecentMaterial = matObj;
+	EndRenderSubphase(PROFILE_RENDER_SUB_MO_MATERIAL);
 }
 
 

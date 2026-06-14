@@ -487,6 +487,7 @@ long			type;
 float			cameraX, cameraZ;
 
 	(void) theNode;
+	BeginRenderSection(PROFILE_RENDER_FENCES);
 
 	GLboolean hadCullFace = 0 == (theNode->StatusBits & STATUS_BIT_DOUBLESIDED);
 	GLboolean hasCullFace = hadCullFace;
@@ -563,6 +564,7 @@ float			cameraX, cameraZ;
 			glDisable(GL_CULL_FACE);
 		}
 	}
+	EndRenderSection(PROFILE_RENDER_FENCES);
 }
 
 
@@ -1089,4 +1091,3 @@ Boolean			intersected;
 
 	return(false);
 }
-

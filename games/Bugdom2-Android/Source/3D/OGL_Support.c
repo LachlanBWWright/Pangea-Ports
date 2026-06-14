@@ -604,10 +604,12 @@ do_anaglyph:
 
 	if (gDebugMode > 0)
 	{
-		int		y = 100;
+		BeginSwapSubphase(PROFILE_SWAP_DEBUG_OVERLAY);
+
+		int		y = 185;
 		float	totalMs = 0.0f;
-		char	debugText[1024];
-		int		debugTextLen = 0;
+		char	debugLeft[1024];
+		char	debugRight[1024];
 
 		float inputMs = GetProfilePhaseMs(PROFILE_PHASE_INPUT);
 		float logicMs = GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC);
@@ -616,16 +618,17 @@ do_anaglyph:
 		float swapMs = GetProfilePhaseMs(PROFILE_PHASE_SWAP_BUFFERS);
 		totalMs = inputMs + logicMs + renderMs + uiMs + swapMs;
 
-		debugTextLen += SDL_snprintf(
-			debugText + debugTextLen,
-			sizeof(debugText) - debugTextLen,
+		SDL_snprintf(
+			debugLeft,
+			sizeof(debugLeft),
 			"fps %d total %.2f\n"
 			"ms i/l/r %.2f/%.2f/%.2f\n"
 			"ms ui/s %.2f/%.2f\n"
-			"tris/draws %d/%d\n"
-			"cache H/M/E %d/%d/%d\n"
-			"upload/immKB %d/%d\n"
-			"imm draws: %d\n",
+			"s dbg/p/y %.2f/%.2f/%.2f\n"
+			"rend c/sky/t/f %.2f/%.2f/%.2f/%.2f\n"
+			"rend sk/mo/sp %.2f/%.2f/%.2f\n"
+			"t c/d/m/dr %.2f/%.2f/%.2f/%.2f\n"
+			"mo g/m/s/sub %.2f/%.2f/%.2f/%.2f\n",
 			(int)(gFramesPerSecond+.5f),
 			totalMs,
 			inputMs,
@@ -633,47 +636,58 @@ do_anaglyph:
 			renderMs,
 			uiMs,
 			swapMs,
+			GetSwapSubphaseMs(PROFILE_SWAP_DEBUG_OVERLAY),
+			GetSwapSubphaseMs(PROFILE_SWAP_PRESENT),
+			GetSwapSubphaseMs(PROFILE_SWAP_YIELD),
+			GetRenderSectionMs(PROFILE_RENDER_CULL),
+			GetRenderSectionMs(PROFILE_RENDER_CYCLORAMA),
+			GetRenderSectionMs(PROFILE_RENDER_TERRAIN),
+			GetRenderSectionMs(PROFILE_RENDER_FENCES),
+			GetRenderSectionMs(PROFILE_RENDER_SKELETONS),
+			GetRenderSectionMs(PROFILE_RENDER_METAOBJECTS),
+			GetRenderSectionMs(PROFILE_RENDER_SPRITES),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_TERRAIN_CULL),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_TERRAIN_DEFORM),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_TERRAIN_MATERIAL),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_TERRAIN_DRAW),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_MO_GROUP),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_MO_MATERIAL),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_MO_SETUP),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_MO_SUBMIT));
+
+		SDL_snprintf(
+			debugRight,
+			sizeof(debugRight),
+			"tris/draws %d/%d\n"
+			"cache L/H/M/E/I %d/%d/%d/%d/%d\n"
+			"upload KB/vtx %d/%d\n"
+			"gl c/u/u/d %.2f/%.2f/%.2f/%.2f\n"
+			"imm KB/draws %d/%d\n"
+			"imm T/H/S %d/%d/%d\n"
+			"idx scans/K %d/%d",
 			gPolysThisFrame,
 			gDrawCallsLastFrame,
+			gCacheLookupsLastFrame,
 			gCacheHitsLastFrame,
 			gCacheMissesLastFrame,
 			gCacheEvictionsLastFrame,
+			gCacheInvalidationsLastFrame,
 			gBytesUploadedLastFrame / 1024,
+			gVerticesUploadedLastFrame,
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_GLES_CACHE),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_GLES_UPLOAD),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_GLES_UNIFORMS),
+			GetRenderSubphaseMs(PROFILE_RENDER_SUB_GLES_DRAW),
 			gImmediateBytesUploadedLastFrame / 1024,
-			gImmediateDrawsLastFrame);
-
-		debugTextLen += SDL_snprintf(
-			debugText + debugTextLen,
-			sizeof(debugText) - debugTextLen,
-			"imm T/H/S: %d/%d/%d",
+			gImmediateDrawsLastFrame,
 			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_TEXT],
 			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_INFOBAR],
-			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_SHADOW]);
-
-		debugTextLen += SDL_snprintf(
-			debugText + debugTextLen,
-			sizeof(debugText) - debugTextLen,
-			"\nimm sp/w/l: %d/%d/%d",
-			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_SPARKLE],
-			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_WATER],
-			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_LENS_FLARE]);
-
-		debugTextLen += SDL_snprintf(
-			debugText + debugTextLen,
-			sizeof(debugText) - debugTextLen,
-			"\nimm sh/ln/o: %d/%d/%d",
-			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_SHARDS],
-			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_LINES],
-			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_OTHER]);
-
-		SDL_snprintf(
-			debugText + debugTextLen,
-			sizeof(debugText) - debugTextLen,
-			"\nidx scans/K %d/%d",
+			gImmediateSourceDrawsLastFrame[PROFILE_IMMEDIATE_SHADOW],
 			gIndexScansLastFrame,
 			gIndicesScannedLastFrame / 1024);
 
-		OGL_DrawString(debugText, 20, y);
+		OGL_DrawString(debugLeft, 20, 60);
+		OGL_DrawString(debugRight, 330, 60);
 
 
 
@@ -759,6 +773,8 @@ do_anaglyph:
 		OGL_DrawString("ptrs:", 20,y);
 		OGL_DrawInt(gNumPointers, 100,y);
 		y += 15;
+
+		EndSwapSubphase(PROFILE_SWAP_DEBUG_OVERLAY);
 	}
 
 
@@ -770,10 +786,14 @@ do_anaglyph:
 
            /* SWAP THE BUFFS */
 
+	BeginSwapSubphase(PROFILE_SWAP_PRESENT);
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
+	EndSwapSubphase(PROFILE_SWAP_PRESENT);
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 #ifdef __EMSCRIPTEN__
+	BeginSwapSubphase(PROFILE_SWAP_YIELD);
 	emscripten_sleep(0);									// yield to browser event loop (ASYNCIFY)
+	EndSwapSubphase(PROFILE_SWAP_YIELD);
 #endif
 
 
@@ -1321,18 +1341,33 @@ uint32_t	a;
 
 void OGL_Texture_SetOpenGLTexture(GLuint textureName)
 {
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	if (OGL_CheckError())
-		DoFatalAlert("OGL_Texture_SetOpenGLTexture: glPixelStorei failed!");
+	static Boolean unpackAlignmentSet = false;
+	static GLuint currentTextureName = 0;
 
-	glBindTexture(GL_TEXTURE_2D, textureName);
-	if (OGL_CheckError())
-		DoFatalAlert("OGL_Texture_SetOpenGLTexture: glBindTexture failed!");
+	if (!unpackAlignmentSet)
+	{
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		if (OGL_CheckError())
+			DoFatalAlert("OGL_Texture_SetOpenGLTexture: glPixelStorei failed!");
+
+		unpackAlignmentSet = true;
+	}
+
+	if (currentTextureName != textureName)
+	{
+		glBindTexture(GL_TEXTURE_2D, textureName);
+		if (OGL_CheckError())
+			DoFatalAlert("OGL_Texture_SetOpenGLTexture: glBindTexture failed!");
+
+		currentTextureName = textureName;
+	}
 
 //	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);	// disable mipmaps & turn on filtering
 //	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+#ifndef __EMSCRIPTEN__
 	glGetError();	// clear any error from the above calls
+#endif
 
 	glEnable(GL_TEXTURE_2D);
 }

@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "profiling.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -420,7 +421,9 @@ float			cameraX, cameraZ;
 
 				/* FIRST DO OUR CULLING */
 
+	BeginRenderSection(PROFILE_RENDER_CULL);
 	CullTestAllObjects();
+	EndRenderSection(PROFILE_RENDER_CULL);
 
 	theNode = gFirstNodePtr;
 
@@ -432,7 +435,9 @@ float			cameraX, cameraZ;
 
 	gDepthWriteShouldBeOn = true;
 
+	BeginRenderSection(PROFILE_RENDER_CYCLORAMA);
 	DrawCyclorama();
+	EndRenderSection(PROFILE_RENDER_CYCLORAMA);
 
 	noLighting = false;
 	noZBuffer = false;
@@ -736,14 +741,18 @@ float			cameraX, cameraZ;
 		{
 
 			case	SKELETON_GENRE:
+					BeginRenderSection(PROFILE_RENDER_SKELETONS);
 					DrawSkeleton(theNode);
+					EndRenderSection(PROFILE_RENDER_SKELETONS);
 					break;
 
 			case	DISPLAY_GROUP_GENRE:
 			case	QUADMESH_GENRE:
 					if (theNode->BaseGroup)
 					{
+						BeginRenderSection(PROFILE_RENDER_METAOBJECTS);
 						MO_DrawObject(theNode->BaseGroup);
+						EndRenderSection(PROFILE_RENDER_METAOBJECTS);
 					}
 					break;
 
@@ -760,7 +769,9 @@ float			cameraX, cameraZ;
 						theNode->SpriteMO->objectData.scaleY = theNode->Scale.y;
 						theNode->SpriteMO->objectData.rot = theNode->Rot.y;
 
+						BeginRenderSection(PROFILE_RENDER_SPRITES);
 						MO_DrawObject(theNode->SpriteMO);
+						EndRenderSection(PROFILE_RENDER_SPRITES);
 						OGL_PopState();									// restore state
 					}
 					break;
@@ -771,7 +782,9 @@ float			cameraX, cameraZ;
 						OGL_PushState();	//--
 						SetInfobarSpriteState();	//--
 
+						BeginRenderSection(PROFILE_RENDER_METAOBJECTS);
 						MO_DrawObject(theNode->BaseGroup);
+						EndRenderSection(PROFILE_RENDER_METAOBJECTS);
 
 						if (gDebugMode >= 2)
 						{
