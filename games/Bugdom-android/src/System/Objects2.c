@@ -93,7 +93,9 @@ void CalcObjectBoxFromNode(ObjNode *theNode)
 {
 CollisionBoxType *boxPtr;
 
-	GAME_ASSERT_MESSAGE(theNode->CollisionBoxes, "CalcObjectBox on objnode with no CollisionBoxType");
+	if (!theNode->CollisionBoxes)
+		return;
+
 	GAME_ASSERT(theNode->NumCollisionBoxes == 1);  // Source port
 		
 	boxPtr = theNode->CollisionBoxes;					// get ptr to 1st box (presumed only box)

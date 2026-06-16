@@ -118,16 +118,57 @@ static duk_ret_t level_current(duk_context* ctx)
 
 static duk_ret_t spawn_native(duk_context* ctx)
 {
-	(void) ctx;
-	printf("[PangeaScript warning] pangea.spawn.native is not bound for this game yet\n");
-	return 0;
+	const char* id = duk_safe_to_string(ctx, 0);
+	PangeaScriptVector3 pos;
+	if (!read_vector3(ctx, 1, &pos))
+	{
+		duk_push_undefined(ctx);
+		return 1;
+	}
+
+	int subtype = -1;
+	int amount = -1;
+	if (duk_is_object(ctx, 2))
+	{
+		double val;
+		if (read_number_property(ctx, 2, "subtype", &val))
+			subtype = (int) val;
+		if (read_number_property(ctx, 2, "amount", &val))
+			amount = (int) val;
+	}
+
+	PangeaScriptObjectHandle outHandle = {0, 0};
+	PangeaScriptStatus status = PangeaScript_SpawnNative(id, pos.x, pos.y, pos.z, subtype, amount, &outHandle);
+	if (status == PANGEA_SCRIPT_OK && outHandle.id > 0)
+	{
+		push_object_handle(ctx, outHandle);
+		return 1;
+	}
+
+	duk_push_undefined(ctx);
+	return 1;
 }
 
 static duk_ret_t spawn_scripted(duk_context* ctx)
 {
-	(void) ctx;
-	printf("[PangeaScript warning] pangea.spawn.scripted is not bound for this game yet\n");
-	return 0;
+	const char* id = duk_safe_to_string(ctx, 0);
+	PangeaScriptVector3 pos;
+	if (!read_vector3(ctx, 1, &pos))
+	{
+		duk_push_undefined(ctx);
+		return 1;
+	}
+
+	PangeaScriptObjectHandle outHandle = {0, 0};
+	PangeaScriptStatus status = PangeaScript_RegisterScriptedObject(id, pos.x, pos.y, pos.z, &outHandle);
+	if (status == PANGEA_SCRIPT_OK && outHandle.id > 0)
+	{
+		push_object_handle(ctx, outHandle);
+		return 1;
+	}
+
+	duk_push_undefined(ctx);
+	return 1;
 }
 
 static duk_ret_t player_get(duk_context* ctx)
@@ -216,6 +257,22 @@ static void install_module_exports(duk_context* ctx)
 	duk_pop(ctx);
 }
 
+static duk_ret_t api_capabilities(duk_context* ctx)
+{
+	duk_push_object(ctx);
+	duk_push_boolean(ctx, 1);
+	duk_put_prop_string(ctx, -2, "objectPosition");
+	duk_push_boolean(ctx, 1);
+	duk_put_prop_string(ctx, -2, "objectMutation");
+	duk_push_boolean(ctx, 1);
+	duk_put_prop_string(ctx, -2, "spawnNative");
+	duk_push_boolean(ctx, 1);
+	duk_put_prop_string(ctx, -2, "spawnScripted");
+	duk_push_boolean(ctx, 1);
+	duk_put_prop_string(ctx, -2, "levelSettings");
+	return 1;
+}
+
 static void install_pangea_api(PangeaScriptBackend* backend)
 {
 	duk_context* ctx = backend->ctx;
@@ -225,6 +282,7 @@ static void install_pangea_api(PangeaScriptBackend* backend)
 	duk_push_object(ctx);
 	duk_push_int(ctx, 1);
 	duk_put_prop_string(ctx, -2, "version");
+	put_function(ctx, "capabilities", api_capabilities);
 	duk_put_prop_string(ctx, -2, "api");
 
 	duk_push_object(ctx);
@@ -235,10 +293,6 @@ static void install_pangea_api(PangeaScriptBackend* backend)
 	duk_put_prop_string(ctx, -2, "game");
 
 	duk_push_object(ctx);
-	put_function(ctx, "current", level_current);
-	duk_put_prop_string(ctx, -2, "level");
-
-	duk_push_object(ctx);
 	put_function(ctx, "info", log_info);
 	put_function(ctx, "warn", log_warn);
 	put_function(ctx, "error", log_error);
@@ -246,12 +300,7 @@ static void install_pangea_api(PangeaScriptBackend* backend)
 
 	duk_push_object(ctx);
 	put_function(ctx, "native", spawn_native);
-	put_function(ctx, "scripted", spawn_scripted);
 	duk_put_prop_string(ctx, -2, "spawn");
-
-	duk_push_object(ctx);
-	put_function(ctx, "get", player_get);
-	duk_put_prop_string(ctx, -2, "player");
 
 	duk_push_object(ctx);
 	put_function(ctx, "position", object_position);
@@ -267,6 +316,22 @@ static void install_pangea_api(PangeaScriptBackend* backend)
 	duk_dup(ctx, -2);
 	duk_put_global_string(ctx, "console");
 	duk_put_prop_string(ctx, -2, "console");
+
+	duk_push_object(ctx);
+
+	duk_push_object(ctx);
+	put_function(ctx, "current", level_current);
+	duk_put_prop_string(ctx, -2, "level");
+
+	duk_push_object(ctx);
+	put_function(ctx, "get", player_get);
+	duk_put_prop_string(ctx, -2, "player");
+
+	duk_push_object(ctx);
+	put_function(ctx, "scripted", spawn_scripted);
+	duk_put_prop_string(ctx, -2, "spawn");
+
+	duk_put_prop_string(ctx, -2, "experimental");
 
 	duk_put_global_string(ctx, "pangea");
 }

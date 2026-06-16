@@ -109,27 +109,46 @@ export interface ScriptedSpawnOptions {
   readonly radius?: number;
 }
 
+export interface PangeaCapabilities {
+  readonly objectPosition: boolean;
+  readonly objectMutation: boolean;
+  readonly spawnNative: boolean;
+  readonly spawnScripted: boolean;
+  readonly levelSettings: boolean;
+}
+
+export interface PangeaExperimentalApi {
+  readonly level?: {
+    current(): number;
+  };
+  readonly time?: {
+    delta(): number;
+  };
+  readonly player?: {
+    get(playerNum: number): ObjectHandle | undefined;
+  };
+  readonly spawn?: {
+    readonly scripted?: (
+      id: string,
+      position: Vector3,
+      options?: ScriptedSpawnOptions,
+    ) => ObjectHandle | undefined;
+  };
+}
+
 export interface PangeaApi {
   readonly api: {
     readonly version: 1;
+    capabilities(): PangeaCapabilities;
   };
   readonly game: {
     readonly id: GameId;
     readonly name: string;
   };
-  readonly level: {
-    current(): number;
-  };
-  readonly time: {
-    delta(): number;
-  };
   readonly log: {
     info(message: string): void;
     warn(message: string): void;
     error(message: string): void;
-  };
-  readonly player: {
-    get(playerNum: number): ObjectHandle | undefined;
   };
   readonly object: {
     position(handle: ObjectHandle): Vector3 | undefined;
@@ -143,12 +162,8 @@ export interface PangeaApi {
       position: Vector3,
       options?: NativeSpawnOptions,
     ): ObjectHandle | undefined;
-    scripted(
-      id: string,
-      position: Vector3,
-      options?: ScriptedSpawnOptions,
-    ): ObjectHandle | undefined;
   };
+  readonly experimental?: PangeaExperimentalApi;
 }
 
 export declare const pangea: PangeaApi;

@@ -70,11 +70,45 @@ static void write_tags_json(const char* const* tags, int tagCount, char* dest, i
 	dest[used] = '\0';
 }
 
+static void write_params_json(const unsigned char* params, int paramCount, char* dest, int capacity)
+{
+	int used = 0;
+	if (!dest || capacity <= 0)
+		return;
+
+	dest[used++] = '[';
+	for (int i = 0; i < paramCount && used < capacity - 2; i++)
+	{
+		int written = snprintf(dest + used, (size_t)(capacity - used), "%s%d", i == 0 ? "" : ",", params[i]);
+		if (written < 0)
+			break;
+		used += written;
+		if (used >= capacity)
+		{
+			used = capacity - 1;
+			break;
+		}
+	}
+
+	if (used < capacity - 1)
+		dest[used++] = ']';
+	dest[used] = '\0';
+}
+
 EM_JS(void, pangea_script_install_game_info_js, (const char* gameIdJson, const char* gameNameJson), {
 	const gameId = JSON.parse(UTF8ToString(gameIdJson));
 	const gameName = JSON.parse(UTF8ToString(gameNameJson));
 	globalThis.pangea = globalThis.pangea || {};
-	globalThis.pangea.api = { version: 1 };
+	globalThis.pangea.api = {
+		version: 1,
+		capabilities: () => ({
+			objectPosition: true,
+			objectMutation: true,
+			spawnNative: true,
+			spawnScripted: true,
+			levelSettings: true
+		})
+	};
 	globalThis.pangea.game = { id: gameId, name: gameName };
 	globalThis.pangea.log = globalThis.pangea.log || {
 		info: (message) => {
@@ -111,17 +145,102 @@ EM_JS(void, pangea_script_install_game_info_js, (const char* gameIdJson, const c
 			}
 		},
 	};
-	globalThis.pangea.level = globalThis.pangea.level || { current: () => null };
-	globalThis.pangea.spawn = globalThis.pangea.spawn || {
-		native: () => globalThis.pangea.log.warn("pangea.spawn.native is not bound for this game yet"),
-		scripted: () => globalThis.pangea.log.warn("pangea.spawn.scripted is not bound for this game yet"),
+	globalThis.pangea.spawn = {
+		native: (id, pos, options) => {
+			if (typeof id !== "string" || !pos || typeof pos.x !== "number" || typeof pos.y !== "number" || typeof pos.z !== "number") return undefined;
+			
+			let subtype = -1;
+			let amount = -1;
+			if (options && typeof options === "object") {
+				if (typeof options.subtype === "number") subtype = options.subtype;
+				if (typeof options.amount === "number") amount = options.amount;
+			}
+
+			const idLen = lengthBytesUTF8(id) + 1;
+			const idPtr = _malloc(idLen);
+			stringToUTF8(id, idPtr, idLen);
+			
+			const outHandleIdPtr = _malloc(4);
+			const outHandleGenPtr = _malloc(4);
+			
+			const status = _PangeaScript_SpawnNativeJS(idPtr, pos.x, pos.y, pos.z, subtype, amount, outHandleIdPtr, outHandleGenPtr);
+			_free(idPtr);
+			
+			if (status === 0) { // PANGEA_SCRIPT_OK
+				const handleId = HEAP32[outHandleIdPtr >> 2];
+				const handleGen = HEAP32[outHandleGenPtr >> 2];
+				_free(outHandleIdPtr);
+				_free(outHandleGenPtr);
+				if (handleId > 0) {
+					return { id: handleId, generation: handleGen };
+				}
+			} else {
+				_free(outHandleIdPtr);
+				_free(outHandleGenPtr);
+			}
+			return undefined;
+		}
 	};
-	globalThis.pangea.player = globalThis.pangea.player || { get: () => null };
-	globalThis.pangea.object = globalThis.pangea.object || {
-		position: () => null,
-		setPosition: () => false,
-		setVelocity: () => false,
-		delete: () => false,
+	globalThis.pangea.object = {
+		position: (handle) => {
+			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number") return undefined;
+			const outXPtr = _malloc(4);
+			const outYPtr = _malloc(4);
+			const outZPtr = _malloc(4);
+			const ok = _PangeaScript_GetObjectPositionJS(handle.id, handle.generation, outXPtr, outYPtr, outZPtr);
+			if (!ok) {
+				_free(outXPtr); _free(outYPtr); _free(outZPtr);
+				return undefined;
+			}
+			const x = HEAPF32[outXPtr >> 2];
+			const y = HEAPF32[outYPtr >> 2];
+			const z = HEAPF32[outZPtr >> 2];
+			_free(outXPtr); _free(outYPtr); _free(outZPtr);
+			return { x, y, z };
+		},
+		setPosition: (handle, pos) => {
+			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number") return false;
+			if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number" || typeof pos.z !== "number") return false;
+			return !!_PangeaScript_SetObjectPositionJS(handle.id, handle.generation, pos.x, pos.y, pos.z);
+		},
+		setVelocity: (handle, vel) => {
+			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number") return false;
+			if (!vel || typeof vel.x !== "number" || typeof vel.y !== "number" || typeof vel.z !== "number") return false;
+			return !!_PangeaScript_SetObjectVelocityJS(handle.id, handle.generation, vel.x, vel.y, vel.z);
+		},
+		delete: (handle) => {
+			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number") return false;
+			return !!_PangeaScript_DeleteObjectJS(handle.id, handle.generation);
+		}
+	};
+	globalThis.pangea.experimental = {
+		level: { current: () => null },
+		player: { get: () => null },
+		spawn: {
+			scripted: (id, pos) => {
+				if (typeof id !== "string" || !pos || typeof pos.x !== "number" || typeof pos.y !== "number" || typeof pos.z !== "number") return undefined;
+				const idLen = lengthBytesUTF8(id) + 1;
+				const idPtr = _malloc(idLen);
+				stringToUTF8(id, idPtr, idLen);
+				const outHandleIdPtr = _malloc(4);
+				const outHandleGenPtr = _malloc(4);
+				const status = _PangeaScript_RegisterScriptedObjectJS(idPtr, pos.x, pos.y, pos.z, outHandleIdPtr, outHandleGenPtr);
+				_free(idPtr);
+				if (status === 0) {
+					const handleId = HEAP32[outHandleIdPtr >> 2];
+					const handleGen = HEAP32[outHandleGenPtr >> 2];
+					_free(outHandleIdPtr);
+					_free(outHandleGenPtr);
+					if (handleId > 0) {
+						return { id: handleId, generation: handleGen };
+					}
+				} else {
+					_free(outHandleIdPtr);
+					_free(outHandleGenPtr);
+				}
+				return undefined;
+			}
+		}
 	};
 	globalThis.exports = {};
 	globalThis.module = { exports: globalThis.exports };
@@ -162,17 +281,31 @@ EM_JS(int, pangea_script_load_js, (const char* source), {
 	}
 });
 
-EM_JS(int, pangea_script_call_js, (const char* hookName, const char* contextJson, double* outX, double* outY, double* outZ, int* outHasOffset), {
+EM_JS(int, pangea_script_call_js, (const char* hookName, const char* contextJson, double* outX, double* outY, double* outZ, int* outHasOffset, int* outHandled, int* outMarkInUse), {
 	const name = UTF8ToString(hookName);
 	try {
 		if (outHasOffset) {
 			HEAP32[outHasOffset >> 2] = 0;
+		}
+		if (outHandled) {
+			HEAP32[outHandled >> 2] = 0;
+		}
+		if (outMarkInUse) {
+			HEAP32[outMarkInUse >> 2] = 0;
 		}
 		const hook = globalThis[name] || (globalThis.exports && globalThis.exports[name]);
 		if (typeof hook !== "function") {
 			return 0;
 		}
 		const result = hook(JSON.parse(UTF8ToString(contextJson)));
+		if (result && typeof result === "object") {
+			if (outHandled && "handled" in result) {
+				HEAP32[outHandled >> 2] = result.handled ? 1 : 0;
+			}
+			if (outMarkInUse && "markInUse" in result) {
+				HEAP32[outMarkInUse >> 2] = result.markInUse ? 1 : 0;
+			}
+		}
 		const positionOffset =
 			result && typeof result === "object" && result.positionOffset && typeof result.positionOffset === "object"
 				? result.positionOffset
@@ -239,7 +372,7 @@ PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backen
 	}
 
 	snprintf(contextJson, sizeof(contextJson), "{\"levelNum\":%d,\"levelName\":null}", context->levelNum);
-	if (pangea_script_call_js(hookName, contextJson, NULL, NULL, NULL, NULL) != 0)
+	if (pangea_script_call_js(hookName, contextJson, NULL, NULL, NULL, NULL, NULL, NULL) != 0)
 		return copy_js_error(error, errorCapacity);
 
 	return PANGEA_SCRIPT_OK;
@@ -259,7 +392,7 @@ PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backen
 		context->frameNum,
 		context->deltaSeconds,
 		context->levelTimeSeconds);
-	if (pangea_script_call_js("onFrame", contextJson, NULL, NULL, NULL, NULL) != 0)
+	if (pangea_script_call_js("onFrame", contextJson, NULL, NULL, NULL, NULL, NULL, NULL) != 0)
 		return copy_js_error(error, errorCapacity);
 
 	return PANGEA_SCRIPT_OK;
@@ -267,28 +400,94 @@ PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backen
 
 PangeaScriptStatus PangeaScriptBackend_CallTerrainItemHook(PangeaScriptBackend* backend, PangeaScriptTerrainItemContext* context, char* error, int errorCapacity)
 {
-	(void) backend;
-	(void) context;
-	(void) error;
-	(void) errorCapacity;
+	char paramsJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
+	char contextJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
+	int handled = 0;
+	int markInUse = 0;
+
+	if (!backend || !context)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	write_params_json(context->params, context->paramCount, paramsJson, (int)sizeof(paramsJson));
+	snprintf(
+		contextJson,
+		sizeof(contextJson),
+		"{\"levelNum\":%d,\"itemType\":%d,\"remappedItemType\":%d,\"playerNum\":%d,\"networked\":%s,\"position\":{\"x\":%.9g,\"y\":0,\"z\":%.9g},\"flags\":%u,\"params\":%s}",
+		context->levelNum,
+		context->itemType,
+		context->remappedItemType,
+		context->playerNum,
+		context->networked ? "true" : "false",
+		context->x,
+		context->z,
+		context->flags,
+		paramsJson);
+
+	if (pangea_script_call_js("onTerrainItem", contextJson, NULL, NULL, NULL, NULL, &handled, &markInUse) != 0)
+		return copy_js_error(error, errorCapacity);
+
+	context->handled = handled != 0;
+	context->markInUse = markInUse != 0;
 	return PANGEA_SCRIPT_OK;
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallSplineItemHook(PangeaScriptBackend* backend, PangeaScriptSplineItemContext* context, char* error, int errorCapacity)
 {
-	(void) backend;
-	(void) context;
-	(void) error;
-	(void) errorCapacity;
+	char paramsJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
+	char contextJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
+	int handled = 0;
+	int markInUse = 0;
+
+	if (!backend || !context)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	write_params_json(context->params, context->paramCount, paramsJson, (int)sizeof(paramsJson));
+	snprintf(
+		contextJson,
+		sizeof(contextJson),
+		"{\"levelNum\":%d,\"itemType\":%d,\"splineNum\":%d,\"placement\":%.9g,\"params\":%s}",
+		context->levelNum,
+		context->itemType,
+		context->splineNum,
+		context->placement,
+		paramsJson);
+
+	if (pangea_script_call_js("onSplineItem", contextJson, NULL, NULL, NULL, NULL, &handled, &markInUse) != 0)
+		return copy_js_error(error, errorCapacity);
+
+	context->handled = handled != 0;
+	context->markInUse = markInUse != 0;
 	return PANGEA_SCRIPT_OK;
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* backend, PangeaScriptMapItemContext* context, char* error, int errorCapacity)
 {
-	(void) backend;
-	(void) context;
-	(void) error;
-	(void) errorCapacity;
+	char paramsJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
+	char contextJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
+	int handled = 0;
+	int markInUse = 0;
+
+	if (!backend || !context)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	write_params_json(context->params, context->paramCount, paramsJson, (int)sizeof(paramsJson));
+	snprintf(
+		contextJson,
+		sizeof(contextJson),
+		"{\"levelNum\":%d,\"sceneNum\":%d,\"areaNum\":%d,\"itemType\":%d,\"position\":{\"x\":%.9g,\"y\":%.9g},\"params\":%s}",
+		context->levelNum,
+		context->sceneNum,
+		context->areaNum,
+		context->itemType,
+		context->x,
+		context->y,
+		paramsJson);
+
+	if (pangea_script_call_js("onMapItem", contextJson, NULL, NULL, NULL, NULL, &handled, &markInUse) != 0)
+		return copy_js_error(error, errorCapacity);
+
+	context->handled = handled != 0;
+	context->markInUse = markInUse != 0;
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -325,7 +524,7 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 		context->position.z,
 		tagsJson);
 
-	if (pangea_script_call_js("onObjectFrame", contextJson, &x, &y, &z, &hasOffset) != 0)
+	if (pangea_script_call_js("onObjectFrame", contextJson, &x, &y, &z, &hasOffset, NULL, NULL) != 0)
 		return copy_js_error(error, errorCapacity);
 
 	if (hasOffset)

@@ -2,6 +2,7 @@ option(PANGEA_SCRIPT_USE_DUKTAPE "Use Duktape for native script execution when a
 
 set(PANGEA_SCRIPT_SOURCES
 	pangea_script.c
+	pangea_script_config.c
 )
 
 if(EMSCRIPTEN)

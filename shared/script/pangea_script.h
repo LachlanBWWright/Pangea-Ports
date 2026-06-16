@@ -52,6 +52,7 @@ typedef struct PangeaScriptGameInfo
 {
 	const char* gameId;
 	const char* gameName;
+	PangeaScriptStatus (*spawnNative)(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle);
 } PangeaScriptGameInfo;
 
 typedef struct PangeaScriptLevelContext
@@ -200,6 +201,7 @@ PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle,
 
 void PangeaScript_ResetObjects(void);
 PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistration* registration, PangeaScriptObjectHandle* outHandle);
+PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle);
 bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition);
 bool PangeaScript_SetObjectPosition(PangeaScriptObjectHandle handle, const PangeaScriptVector3* position);
@@ -207,7 +209,7 @@ bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const Pange
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle);
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count);
-PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z);
+PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle);
 
 typedef enum PangeaScriptLogLevel
 {
@@ -221,8 +223,8 @@ typedef struct PangeaScriptStatusInfo
 	bool enabled;
 	bool configLoaded;
 	bool bundleLoaded;
-	char activeScriptPath[256];
-	char lastError[256];
+	char activeScriptPath[260];
+	char lastError[512];
 	int errorCount;
 	int budgetExceededCount;
 	int hooksCalledCount;

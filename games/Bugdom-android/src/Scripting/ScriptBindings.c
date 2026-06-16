@@ -6,6 +6,7 @@
 #include "structs.h"
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
+static void BugdomScript_UpdateObjectCollisionBox(ObjNode* obj);
 
 static PangeaScriptFrameContext gScriptFrameContext;
 static const char* const kBugdomPlayerTags[] = { "bugdom.player" };
@@ -176,7 +177,7 @@ void BugdomScript_ApplyObjectScripting(ObjNode* obj)
 	}
 
 	UpdateObjectTransforms(obj);
-	CalcObjectBoxFromNode(obj);
+	BugdomScript_UpdateObjectCollisionBox(obj);
 	obj->ScriptVisualOffset = (TQ3Vector3D){0};
 	if (!result.hasPositionOffset)
 		return;
@@ -233,6 +234,14 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 		runtimeUnavailableLogged = true;
 
 	SDL_Log("Bugdom scripting %s failed: %s", action, PangeaScript_GetLastError());
+}
+
+static void BugdomScript_UpdateObjectCollisionBox(ObjNode* obj)
+{
+	if (!obj || !obj->CollisionBoxes || obj->NumCollisionBoxes != 1)
+		return;
+
+	CalcObjectBoxFromNode(obj);
 }
 
 void BugdomScript_Init(void)

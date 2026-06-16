@@ -15,33 +15,7 @@
 #define PANGEA_SCRIPT_MAX_OBJECTS 2048
 #define PANGEA_SCRIPT_MAX_OBJECT_TAGS 8
 
-typedef enum LevelSettingType
-{
-	LEVEL_SETTING_FLOAT,
-	LEVEL_SETTING_INT,
-	LEVEL_SETTING_BOOL,
-	LEVEL_SETTING_STRING
-} LevelSettingType;
-
-typedef struct ItemRemap
-{
-	int levelNum;
-	int fromType;
-	int toType;
-} ItemRemap;
-
-typedef struct LevelSetting
-{
-	char key[64];
-	LevelSettingType type;
-	union
-	{
-		float floatValue;
-		int intValue;
-		bool boolValue;
-		char stringValue[256];
-	};
-} LevelSetting;
+#include "pangea_script_config.h"
 
 typedef struct RegisteredObject
 {
@@ -77,9 +51,49 @@ static int gHooksCalledCount;
 static int gConsecutiveHookFailures;
 static bool gScriptsDisabled;
 
+#define PANGEA_SCRIPT_MAX_SCRIPTED_OBJECTS 256
+
+typedef struct ScriptedObjectState
+{
+	PangeaScriptVector3 position;
+	char id[64];
+} ScriptedObjectState;
+
+static ScriptedObjectState gScriptedObjects[PANGEA_SCRIPT_MAX_SCRIPTED_OBJECTS];
+static int gScriptedObjectCount;
+
+static bool ScriptedGetPosition(void* nativeObject, PangeaScriptVector3* outPosition)
+{
+	ScriptedObjectState* state = (ScriptedObjectState*) nativeObject;
+	if (!state || !outPosition) return false;
+	*outPosition = state->position;
+	return true;
+}
+
+static bool ScriptedSetPosition(void* nativeObject, const PangeaScriptVector3* position)
+{
+	ScriptedObjectState* state = (ScriptedObjectState*) nativeObject;
+	if (!state || !position) return false;
+	state->position = *position;
+	return true;
+}
+
+static bool ScriptedDeleteObject(void* nativeObject)
+{
+	(void) nativeObject;
+	return true;
+}
+
+static const PangeaScriptObjectOps kScriptedOps = {
+	.getPosition = ScriptedGetPosition,
+	.setPosition = ScriptedSetPosition,
+	.deleteObject = ScriptedDeleteObject
+};
+
 static void reset_objects(void)
 {
 	memset(gRegisteredObjects, 0, sizeof(gRegisteredObjects));
+	gScriptedObjectCount = 0;
 }
 
 static void clear_level_settings(void)
@@ -90,55 +104,7 @@ static void clear_level_settings(void)
 	gLevelAssetDependencyCount = 0;
 }
 
-static bool is_integer_number(double value)
-{
-	int intValue = (int)value;
-	return (double)intValue == value;
-}
 
-static void add_level_float_setting(const char* key, float value)
-{
-	if (!key || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
-		return;
-
-	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
-	snprintf(setting->key, sizeof(setting->key), "%s", key);
-	setting->type = LEVEL_SETTING_FLOAT;
-	setting->floatValue = value;
-}
-
-static void add_level_int_setting(const char* key, int value)
-{
-	if (!key || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
-		return;
-
-	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
-	snprintf(setting->key, sizeof(setting->key), "%s", key);
-	setting->type = LEVEL_SETTING_INT;
-	setting->intValue = value;
-}
-
-static void add_level_bool_setting(const char* key, bool value)
-{
-	if (!key || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
-		return;
-
-	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
-	snprintf(setting->key, sizeof(setting->key), "%s", key);
-	setting->type = LEVEL_SETTING_BOOL;
-	setting->boolValue = value;
-}
-
-static void add_level_string_setting(const char* key, const char* value)
-{
-	if (!key || !value || gLevelSettingCount >= PANGEA_SCRIPT_MAX_LEVEL_SETTINGS)
-		return;
-
-	LevelSetting* setting = &gLevelSettings[gLevelSettingCount++];
-	snprintf(setting->key, sizeof(setting->key), "%s", key);
-	setting->type = LEVEL_SETTING_STRING;
-	snprintf(setting->stringValue, sizeof(setting->stringValue), "%s", value);
-}
 
 static const LevelSetting* find_level_setting(const char* key)
 {
@@ -154,15 +120,7 @@ static const LevelSetting* find_level_setting(const char* key)
 	return NULL;
 }
 
-static void add_level_asset_dependency(const char* kind, const char* id)
-{
-	if (!kind || !kind[0] || !id || !id[0] || gLevelAssetDependencyCount >= PANGEA_SCRIPT_MAX_ASSET_DEPENDENCIES)
-		return;
 
-	PangeaScriptAssetDependency* dependency = &gLevelAssetDependencies[gLevelAssetDependencyCount++];
-	snprintf(dependency->kind, sizeof(dependency->kind), "%s", kind);
-	snprintf(dependency->id, sizeof(dependency->id), "%s", id);
-}
 
 static void clear_registered_object(RegisteredObject* object)
 {
@@ -311,540 +269,7 @@ static char* read_text_file(const char* path, long* outSize)
 	return bytes;
 }
 
-typedef enum {
-	JSON_TOKEN_ERROR,
-	JSON_TOKEN_EOF,
-	JSON_TOKEN_LBRACE,
-	JSON_TOKEN_RBRACE,
-	JSON_TOKEN_LBRACKET,
-	JSON_TOKEN_RBRACKET,
-	JSON_TOKEN_COLON,
-	JSON_TOKEN_COMMA,
-	JSON_TOKEN_STRING,
-	JSON_TOKEN_NUMBER,
-	JSON_TOKEN_TRUE,
-	JSON_TOKEN_FALSE,
-	JSON_TOKEN_NULL
-} JsonTokenType;
-
-typedef struct {
-	const char* start;
-	const char* end;
-	JsonTokenType type;
-	union {
-		double number_value;
-		char string_value[512];
-	};
-} JsonToken;
-
-static const char* skip_whitespace(const char* cursor) {
-	while (*cursor && (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n')) {
-		cursor++;
-	}
-	return cursor;
-}
-
-static const char* next_token(const char* cursor, JsonToken* token) {
-	cursor = skip_whitespace(cursor);
-	if (!*cursor) {
-		token->type = JSON_TOKEN_EOF;
-		return cursor;
-	}
-
-	char c = *cursor;
-	token->start = cursor;
-	if (c == '{') { token->type = JSON_TOKEN_LBRACE; return cursor + 1; }
-	if (c == '}') { token->type = JSON_TOKEN_RBRACE; return cursor + 1; }
-	if (c == '[') { token->type = JSON_TOKEN_LBRACKET; return cursor + 1; }
-	if (c == ']') { token->type = JSON_TOKEN_RBRACKET; return cursor + 1; }
-	if (c == ':') { token->type = JSON_TOKEN_COLON; return cursor + 1; }
-	if (c == ',') { token->type = JSON_TOKEN_COMMA; return cursor + 1; }
-
-	if (c == '"') {
-		const char* end = strchr(cursor + 1, '"');
-		if (!end) {
-			token->type = JSON_TOKEN_ERROR;
-			return cursor;
-		}
-		size_t len = (size_t)(end - (cursor + 1));
-		if (len >= sizeof(token->string_value)) {
-			token->type = JSON_TOKEN_ERROR;
-			return cursor;
-		}
-		memcpy(token->string_value, cursor + 1, len);
-		token->string_value[len] = '\0';
-		token->type = JSON_TOKEN_STRING;
-		return end + 1;
-	}
-
-	if ((c >= '0' && c <= '9') || c == '-') {
-		char* end = NULL;
-		token->number_value = strtod(cursor, &end);
-		if (end == cursor) {
-			token->type = JSON_TOKEN_ERROR;
-			return cursor;
-		}
-		token->type = JSON_TOKEN_NUMBER;
-		return end;
-	}
-
-	if (strncmp(cursor, "true", 4) == 0) { token->type = JSON_TOKEN_TRUE; return cursor + 4; }
-	if (strncmp(cursor, "false", 5) == 0) { token->type = JSON_TOKEN_FALSE; return cursor + 5; }
-	if (strncmp(cursor, "null", 4) == 0) { token->type = JSON_TOKEN_NULL; return cursor + 4; }
-
-	token->type = JSON_TOKEN_ERROR;
-	return cursor;
-}
-
-static bool parse_levels_json(const char* json, int targetLevelNum, char* outScriptPath, size_t outScriptPathSize, PangeaScriptStatus* outStatus, char* outErrorMsg, size_t outErrorSize) {
-	const char* cursor = json;
-	JsonToken token;
-	cursor = next_token(cursor, &token);
-	if (token.type != JSON_TOKEN_LBRACE) {
-		*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-		snprintf(outErrorMsg, outErrorSize, "Config is not a JSON object");
-		return false;
-	}
-
-	int version = -1;
-	bool foundLevel = false;
-
-	while (true) {
-		cursor = next_token(cursor, &token);
-		if (token.type == JSON_TOKEN_RBRACE) {
-			break;
-		}
-		if (token.type != JSON_TOKEN_STRING) {
-			*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-			snprintf(outErrorMsg, outErrorSize, "Expected string key in object");
-			return false;
-		}
-		char key[256];
-		snprintf(key, sizeof(key), "%s", token.string_value);
-
-		cursor = next_token(cursor, &token);
-		if (token.type != JSON_TOKEN_COLON) {
-			*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-			snprintf(outErrorMsg, outErrorSize, "Expected colon after key");
-			return false;
-		}
-
-		if (strcmp(key, "version") == 0) {
-			cursor = next_token(cursor, &token);
-			if (token.type != JSON_TOKEN_NUMBER) {
-				*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-				snprintf(outErrorMsg, outErrorSize, "version must be a number");
-				return false;
-			}
-			version = (int)token.number_value;
-			if (version != 1) {
-				*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-				snprintf(outErrorMsg, outErrorSize, "Unknown schema version: %d", version);
-				return false;
-			}
-		} else if (strcmp(key, "levels") == 0) {
-			cursor = next_token(cursor, &token);
-			if (token.type != JSON_TOKEN_LBRACE) {
-				*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-				snprintf(outErrorMsg, outErrorSize, "levels must be an object");
-				return false;
-			}
-			// Parse levels object
-			while (true) {
-				cursor = next_token(cursor, &token);
-				if (token.type == JSON_TOKEN_RBRACE) {
-					break;
-				}
-				if (token.type != JSON_TOKEN_STRING) {
-					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-					snprintf(outErrorMsg, outErrorSize, "Expected string level key");
-					return false;
-				}
-				char levelKey[64];
-				snprintf(levelKey, sizeof(levelKey), "%s", token.string_value);
-				int levelKeyNum = atoi(levelKey);
-
-				cursor = next_token(cursor, &token);
-				if (token.type != JSON_TOKEN_COLON) {
-					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-					snprintf(outErrorMsg, outErrorSize, "Expected colon after level key");
-					return false;
-				}
-
-				cursor = next_token(cursor, &token);
-				if (token.type != JSON_TOKEN_LBRACE) {
-					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-					snprintf(outErrorMsg, outErrorSize, "level config must be an object");
-					return false;
-				}
-
-				bool isTargetLevel = (levelKeyNum == targetLevelNum || strcmp(levelKey, "current") == 0);
-				if (isTargetLevel) {
-					foundLevel = true;
-				}
-
-				// Parse individual level config
-				while (true) {
-					cursor = next_token(cursor, &token);
-					if (token.type == JSON_TOKEN_RBRACE) {
-						break;
-					}
-					if (token.type != JSON_TOKEN_STRING) {
-						*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-						snprintf(outErrorMsg, outErrorSize, "Expected string key in level config");
-						return false;
-					}
-					char subKey[256];
-					snprintf(subKey, sizeof(subKey), "%s", token.string_value);
-
-					cursor = next_token(cursor, &token);
-					if (token.type != JSON_TOKEN_COLON) {
-						*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-						snprintf(outErrorMsg, outErrorSize, "Expected colon in level config");
-						return false;
-					}
-
-					if (strcmp(subKey, "script") == 0) {
-						cursor = next_token(cursor, &token);
-						if (token.type != JSON_TOKEN_STRING) {
-							*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-							snprintf(outErrorMsg, outErrorSize, "script path must be a string");
-							return false;
-						}
-						if (isTargetLevel) {
-							snprintf(outScriptPath, outScriptPathSize, "%s", token.string_value);
-						}
-					} else if (strcmp(subKey, "itemOverrides") == 0) {
-						cursor = next_token(cursor, &token);
-						if (token.type != JSON_TOKEN_LBRACKET) {
-							*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-							snprintf(outErrorMsg, outErrorSize, "itemOverrides must be an array");
-							return false;
-						}
-						while (true) {
-							cursor = next_token(cursor, &token);
-							if (token.type == JSON_TOKEN_RBRACKET) {
-								break;
-							}
-							if (token.type != JSON_TOKEN_LBRACE) {
-								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-								snprintf(outErrorMsg, outErrorSize, "override item must be an object");
-								return false;
-							}
-							int fromType = -1;
-							int toType = -1;
-							while (true) {
-								cursor = next_token(cursor, &token);
-								if (token.type == JSON_TOKEN_RBRACE) {
-									break;
-								}
-								if (token.type != JSON_TOKEN_STRING) {
-									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-									snprintf(outErrorMsg, outErrorSize, "Expected string key in override item");
-									return false;
-								}
-								char overrideKey[64];
-								snprintf(overrideKey, sizeof(overrideKey), "%s", token.string_value);
-
-								cursor = next_token(cursor, &token);
-								if (token.type != JSON_TOKEN_COLON) {
-									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-									snprintf(outErrorMsg, outErrorSize, "Expected colon in override item");
-									return false;
-								}
-
-								cursor = next_token(cursor, &token);
-								if (token.type != JSON_TOKEN_NUMBER) {
-									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-									snprintf(outErrorMsg, outErrorSize, "override values must be numbers");
-									return false;
-								}
-								if (strcmp(overrideKey, "from") == 0) {
-									fromType = (int)token.number_value;
-								} else if (strcmp(overrideKey, "to") == 0) {
-									toType = (int)token.number_value;
-								}
-
-								cursor = next_token(cursor, &token);
-								if (token.type == JSON_TOKEN_COMMA) {
-									// continue parsing keys
-								} else if (token.type == JSON_TOKEN_RBRACE) {
-									break;
-								} else {
-									*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-									snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in override item");
-									return false;
-								}
-							}
-							if (isTargetLevel && fromType != -1 && toType != -1 && gItemRemapCount < PANGEA_SCRIPT_MAX_REMAPS) {
-								gItemRemaps[gItemRemapCount].levelNum = targetLevelNum;
-								gItemRemaps[gItemRemapCount].fromType = fromType;
-								gItemRemaps[gItemRemapCount].toType = toType;
-								gItemRemapCount++;
-							}
-							cursor = next_token(cursor, &token);
-							if (token.type == JSON_TOKEN_COMMA) {
-								// continue array
-							} else if (token.type == JSON_TOKEN_RBRACKET) {
-								break;
-							} else {
-								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-								snprintf(outErrorMsg, outErrorSize, "Expected comma or closing bracket in itemOverrides array");
-								return false;
-							}
-						}
-					} else if (strcmp(subKey, "levelSettings") == 0) {
-						cursor = next_token(cursor, &token);
-						if (token.type != JSON_TOKEN_LBRACE) {
-							*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-							snprintf(outErrorMsg, outErrorSize, "levelSettings must be an object");
-							return false;
-						}
-
-						while (true) {
-							cursor = next_token(cursor, &token);
-							if (token.type == JSON_TOKEN_RBRACE) {
-								break;
-							}
-							if (token.type != JSON_TOKEN_STRING) {
-								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-								snprintf(outErrorMsg, outErrorSize, "Expected string key in levelSettings");
-								return false;
-							}
-
-							char settingKey[64];
-							snprintf(settingKey, sizeof(settingKey), "%s", token.string_value);
-
-							cursor = next_token(cursor, &token);
-							if (token.type != JSON_TOKEN_COLON) {
-								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-								snprintf(outErrorMsg, outErrorSize, "Expected colon in levelSettings");
-								return false;
-							}
-
-							cursor = next_token(cursor, &token);
-							if (isTargetLevel && token.type == JSON_TOKEN_NUMBER) {
-								if (is_integer_number(token.number_value))
-									add_level_int_setting(settingKey, (int)token.number_value);
-								else
-									add_level_float_setting(settingKey, (float)token.number_value);
-							} else if (isTargetLevel && token.type == JSON_TOKEN_TRUE) {
-								add_level_bool_setting(settingKey, true);
-							} else if (isTargetLevel && token.type == JSON_TOKEN_FALSE) {
-								add_level_bool_setting(settingKey, false);
-							} else if (isTargetLevel && token.type == JSON_TOKEN_STRING) {
-								add_level_string_setting(settingKey, token.string_value);
-							} else if (token.type == JSON_TOKEN_LBRACE) {
-								int braceCount = 1;
-								int bracketCount = 0;
-								while (braceCount > 0 || bracketCount > 0) {
-									cursor = next_token(cursor, &token);
-									if (token.type == JSON_TOKEN_ERROR || token.type == JSON_TOKEN_EOF) {
-										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-										snprintf(outErrorMsg, outErrorSize, "Invalid nested levelSettings value");
-										return false;
-									}
-									if (token.type == JSON_TOKEN_LBRACE) braceCount++;
-									else if (token.type == JSON_TOKEN_RBRACE) braceCount--;
-									else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
-									else if (token.type == JSON_TOKEN_RBRACKET) bracketCount--;
-								}
-							} else if (token.type == JSON_TOKEN_LBRACKET && strcmp(settingKey, "assetDependencies") == 0) {
-								while (true) {
-									cursor = next_token(cursor, &token);
-									if (token.type == JSON_TOKEN_RBRACKET) {
-										break;
-									}
-									if (token.type != JSON_TOKEN_LBRACE) {
-										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-										snprintf(outErrorMsg, outErrorSize, "assetDependencies entries must be objects");
-										return false;
-									}
-
-									char dependencyKind[32];
-									char dependencyId[96];
-									dependencyKind[0] = '\0';
-									dependencyId[0] = '\0';
-									while (true) {
-										cursor = next_token(cursor, &token);
-										if (token.type == JSON_TOKEN_RBRACE) {
-											break;
-										}
-										if (token.type != JSON_TOKEN_STRING) {
-											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-											snprintf(outErrorMsg, outErrorSize, "Expected string key in asset dependency");
-											return false;
-										}
-
-										char dependencyKey[32];
-										snprintf(dependencyKey, sizeof(dependencyKey), "%s", token.string_value);
-
-										cursor = next_token(cursor, &token);
-										if (token.type != JSON_TOKEN_COLON) {
-											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-											snprintf(outErrorMsg, outErrorSize, "Expected colon in asset dependency");
-											return false;
-										}
-
-										cursor = next_token(cursor, &token);
-										if (token.type != JSON_TOKEN_STRING) {
-											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-											snprintf(outErrorMsg, outErrorSize, "asset dependency values must be strings");
-											return false;
-										}
-										if (strcmp(dependencyKey, "kind") == 0) {
-											snprintf(dependencyKind, sizeof(dependencyKind), "%s", token.string_value);
-										} else if (strcmp(dependencyKey, "id") == 0) {
-											snprintf(dependencyId, sizeof(dependencyId), "%s", token.string_value);
-										}
-
-										cursor = next_token(cursor, &token);
-										if (token.type == JSON_TOKEN_COMMA) {
-											// continue dependency fields
-										} else if (token.type == JSON_TOKEN_RBRACE) {
-											break;
-										} else {
-											*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-											snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in asset dependency");
-											return false;
-										}
-									}
-									if (isTargetLevel)
-										add_level_asset_dependency(dependencyKind, dependencyId);
-
-									cursor = next_token(cursor, &token);
-									if (token.type == JSON_TOKEN_COMMA) {
-										// continue dependencies
-									} else if (token.type == JSON_TOKEN_RBRACKET) {
-										break;
-									} else {
-										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-										snprintf(outErrorMsg, outErrorSize, "Expected comma or closing bracket in assetDependencies");
-										return false;
-									}
-								}
-							} else if (token.type == JSON_TOKEN_LBRACKET) {
-								int braceCount = 0;
-								int bracketCount = 1;
-								while (braceCount > 0 || bracketCount > 0) {
-									cursor = next_token(cursor, &token);
-									if (token.type == JSON_TOKEN_ERROR || token.type == JSON_TOKEN_EOF) {
-										*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-										snprintf(outErrorMsg, outErrorSize, "Invalid nested levelSettings value");
-										return false;
-									}
-									if (token.type == JSON_TOKEN_LBRACE) braceCount++;
-									else if (token.type == JSON_TOKEN_RBRACE) braceCount--;
-									else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
-									else if (token.type == JSON_TOKEN_RBRACKET) bracketCount--;
-								}
-							} else if (token.type == JSON_TOKEN_ERROR || token.type == JSON_TOKEN_EOF) {
-								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-								snprintf(outErrorMsg, outErrorSize, "Invalid levelSettings value");
-								return false;
-							}
-
-							cursor = next_token(cursor, &token);
-							if (token.type == JSON_TOKEN_COMMA) {
-								// continue settings
-							} else if (token.type == JSON_TOKEN_RBRACE) {
-								break;
-							} else {
-								*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-								snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in levelSettings");
-								return false;
-							}
-						}
-					} else {
-						// Skip unknown field value
-						int braceCount = 0;
-						int bracketCount = 0;
-						while (true) {
-							cursor = next_token(cursor, &token);
-							if (token.type == JSON_TOKEN_LBRACE) braceCount++;
-							else if (token.type == JSON_TOKEN_RBRACE) {
-								if (braceCount == 0) {
-									break;
-								}
-								braceCount--;
-							}
-							else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
-							else if (token.type == JSON_TOKEN_RBRACKET) {
-								bracketCount--;
-							}
-							if (braceCount == 0 && bracketCount == 0 && (token.type == JSON_TOKEN_COMMA || token.type == JSON_TOKEN_RBRACE)) {
-								break;
-							}
-						}
-						if (token.type == JSON_TOKEN_RBRACE) {
-							break;
-						}
-						continue;
-					}
-
-					cursor = next_token(cursor, &token);
-					if (token.type == JSON_TOKEN_COMMA) {
-						// continue level config fields
-					} else if (token.type == JSON_TOKEN_RBRACE) {
-						break;
-					} else {
-						*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-						snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in level config");
-						return false;
-					}
-				}
-
-				cursor = next_token(cursor, &token);
-				if (token.type == JSON_TOKEN_COMMA) {
-					// continue parsing levels
-				} else if (token.type == JSON_TOKEN_RBRACE) {
-					break;
-				} else {
-					*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-					snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in levels object");
-					return false;
-				}
-			}
-		} else {
-			// Skip unknown property value
-			int braceCount = 0;
-			int bracketCount = 0;
-			while (true) {
-				cursor = next_token(cursor, &token);
-				if (token.type == JSON_TOKEN_LBRACE) braceCount++;
-				else if (token.type == JSON_TOKEN_RBRACE) braceCount--;
-				else if (token.type == JSON_TOKEN_LBRACKET) bracketCount++;
-				else if (token.type == JSON_TOKEN_RBRACKET) bracketCount--;
-				if (braceCount <= 0 && bracketCount <= 0 && (token.type == JSON_TOKEN_COMMA || token.type == JSON_TOKEN_RBRACE)) {
-					break;
-				}
-			}
-			if (token.type == JSON_TOKEN_RBRACE) {
-				break;
-			}
-			continue;
-		}
-
-		cursor = next_token(cursor, &token);
-		if (token.type == JSON_TOKEN_COMMA) {
-			// continue object properties
-		} else if (token.type == JSON_TOKEN_RBRACE) {
-			break;
-		} else {
-			*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-			snprintf(outErrorMsg, outErrorSize, "Expected comma or closing brace in config object");
-			return false;
-		}
-	}
-
-	if (version == -1) {
-		*outStatus = PANGEA_SCRIPT_CONFIG_ERROR;
-		snprintf(outErrorMsg, outErrorSize, "Missing required field: version");
-		return false;
-	}
-
-	return foundLevel;
-}
+// Custom JSON parser functions removed. Config parsing is handled in pangea_script_config.c.
 
 PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 {
@@ -1010,19 +435,41 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
 
-	char scriptPath[PANGEA_SCRIPT_PATH_CAPACITY];
-	scriptPath[0] = '\0';
-	PangeaScriptStatus parseStatus = PANGEA_SCRIPT_OK;
-	char errorMsg[256];
+	PangeaConfig parsedConfig;
+	char errorMsg[512];
 	errorMsg[0] = '\0';
 
-	bool found = parse_levels_json(config, levelNum, scriptPath, sizeof(scriptPath), &parseStatus, errorMsg, sizeof(errorMsg));
+	PangeaScriptStatus parseStatus = PangeaScript_ParseConfig(config, levelNum, &parsedConfig, errorMsg, sizeof(errorMsg));
 	if (parseStatus != PANGEA_SCRIPT_OK)
 	{
 		free(config);
 		clear_level_settings();
 		set_error(parseStatus, errorMsg);
 		return parseStatus;
+	}
+
+	bool found = parsedConfig.level.hasConfig;
+	const char* scriptPath = parsedConfig.level.scriptPath;
+
+	if (found)
+	{
+		gItemRemapCount = parsedConfig.level.itemRemapCount;
+		for (int i = 0; i < gItemRemapCount; i++)
+		{
+			gItemRemaps[i] = parsedConfig.level.itemRemaps[i];
+		}
+
+		gLevelSettingCount = parsedConfig.level.levelSettingCount;
+		for (int i = 0; i < gLevelSettingCount; i++)
+		{
+			gLevelSettings[i] = parsedConfig.level.levelSettings[i];
+		}
+
+		gLevelAssetDependencyCount = parsedConfig.level.assetDependencyCount;
+		for (int i = 0; i < gLevelAssetDependencyCount; i++)
+		{
+			gLevelAssetDependencies[i] = parsedConfig.level.assetDependencies[i];
+		}
 	}
 
 	if (found && scriptPath[0])
@@ -1353,6 +800,28 @@ PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistrat
 	return PANGEA_SCRIPT_OK;
 }
 
+PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle)
+{
+	if (gScriptedObjectCount >= PANGEA_SCRIPT_MAX_SCRIPTED_OBJECTS)
+		return PANGEA_SCRIPT_BUDGET_EXCEEDED;
+
+	ScriptedObjectState* state = &gScriptedObjects[gScriptedObjectCount++];
+	state->position.x = x;
+	state->position.y = y;
+	state->position.z = z;
+	snprintf(state->id, sizeof(state->id), "%s", id ? id : "");
+
+	PangeaScriptObjectRegistration reg = {
+		.nativeObject = state,
+		.ops = &kScriptedOps,
+		.tags = NULL,
+		.tagCount = 0,
+		.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL
+	};
+
+	return PangeaScript_RegisterObject(&reg, outHandle);
+}
+
 bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle)
 {
 	RegisteredObject* object = resolve_object(handle);
@@ -1435,13 +904,15 @@ PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem
 	return PANGEA_SCRIPT_OK;
 }
 
-PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z)
+PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle)
 {
-	(void) x;
-	(void) y;
-	(void) z;
 	if (!id || !id[0])
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	if (gGameInfo.spawnNative)
+	{
+		return gGameInfo.spawnNative(id, x, y, z, subtype, amount, outHandle);
+	}
 
 	for (int i = 0; i < gNativeItemCount; i++)
 	{
@@ -1543,6 +1014,70 @@ bool PangeaScript_GetStatusScriptsDisabled(void) { return gScriptsDisabled; }
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_GetObjectPositionJS(int id, uint32_t generation, float* outX, float* outY, float* outZ)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	PangeaScriptVector3 pos;
+	if (PangeaScript_GetObjectPosition(handle, &pos))
+	{
+		*outX = pos.x;
+		*outY = pos.y;
+		*outZ = pos.z;
+		return true;
+	}
+	return false;
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_SetObjectPositionJS(int id, uint32_t generation, float x, float y, float z)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	PangeaScriptVector3 pos = { x, y, z };
+	return PangeaScript_SetObjectPosition(handle, &pos);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_SetObjectVelocityJS(int id, uint32_t generation, float x, float y, float z)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	PangeaScriptVector3 vel = { x, y, z };
+	return PangeaScript_SetObjectVelocity(handle, &vel);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_DeleteObjectJS(int id, uint32_t generation)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	return PangeaScript_DeleteObject(handle);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int PangeaScript_SpawnNativeJS(const char* id, float x, float y, float z, int subtype, int amount, int* outId, uint32_t* outGen)
+{
+	PangeaScriptObjectHandle handle = {0, 0};
+	PangeaScriptStatus status = PangeaScript_SpawnNative(id, x, y, z, subtype, amount, &handle);
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		*outId = handle.id;
+		*outGen = handle.generation;
+	}
+	return (int) status;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int PangeaScript_RegisterScriptedObjectJS(const char* id, float x, float y, float z, int* outId, uint32_t* outGen)
+{
+	PangeaScriptObjectHandle handle = {0, 0};
+	PangeaScriptStatus status = PangeaScript_RegisterScriptedObject(id, x, y, z, &handle);
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		*outId = handle.id;
+		*outGen = handle.generation;
+	}
+	return (int) status;
+}
+
+EMSCRIPTEN_KEEPALIVE
 void* gPangeaScriptPreserveStatus[] = {
 	(void*)PangeaScript_GetStatusEnabled,
 	(void*)PangeaScript_GetStatusConfigLoaded,
@@ -1553,6 +1088,12 @@ void* gPangeaScriptPreserveStatus[] = {
 	(void*)PangeaScript_GetStatusBudgetExceededCount,
 	(void*)PangeaScript_GetStatusHooksCalledCount,
 	(void*)PangeaScript_GetStatusScriptsDisabled,
-	(void*)PangeaScript_LogJS
+	(void*)PangeaScript_LogJS,
+	(void*)PangeaScript_GetObjectPositionJS,
+	(void*)PangeaScript_SetObjectPositionJS,
+	(void*)PangeaScript_SetObjectVelocityJS,
+	(void*)PangeaScript_DeleteObjectJS,
+	(void*)PangeaScript_SpawnNativeJS,
+	(void*)PangeaScript_RegisterScriptedObjectJS
 };
 #endif

@@ -309,12 +309,76 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 	SDL_Log("Bugdom2 scripting %s failed: %s", action, PangeaScript_GetLastError());
 }
 
+static PangeaScriptStatus Bugdom2Script_SpawnNativeCallback(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle)
+{
+	(void) amount;
+	if (strcmp(id, "bugdom2.dcell") == 0)
+	{
+		if (gBG3DContainerList[MODEL_GROUP_LEVELSPECIFIC] == nil)
+		{
+			return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+		}
+
+		ObjNode* newObj;
+		gNewObjectDefinition.genre = 0;
+		gNewObjectDefinition.group = MODEL_GROUP_LEVELSPECIFIC;
+		gNewObjectDefinition.type = PLAYROOM_ObjType_DCell;
+		gNewObjectDefinition.scale = 1.0;
+		gNewObjectDefinition.coord.x = x;
+		gNewObjectDefinition.coord.z = z;
+		gNewObjectDefinition.coord.y = y;
+		gNewObjectDefinition.flags = gAutoFadeStatusBits;
+		gNewObjectDefinition.slot = 358;
+		gNewObjectDefinition.moveCall = MoveStaticObject;
+		gNewObjectDefinition.rot = RandomFloat() * PI2;
+		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		if (!newObj)
+			return PANGEA_SCRIPT_RUNTIME_ERROR;
+
+		newObj->TerrainItemPtr = NULL;
+		newObj->CType = CTYPE_MISC | CTYPE_BLOCKCAMERA | CTYPE_BLOCKSHADOW;
+		newObj->CBits = CBITS_ALLSOLID;
+		CreateCollisionBoxFromBoundingBox(newObj, 1, 1);
+
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.dcell", "pickup");
+
+		if (outHandle)
+		{
+			outHandle->id = newObj->ScriptObjectID;
+			outHandle->generation = (uint32_t) newObj->ScriptObjectGeneration;
+		}
+		return PANGEA_SCRIPT_OK;
+	}
+
+	if (strcmp(id, "bugdom2.powerup") == 0)
+	{
+		int powKind = subtype >= 0 ? subtype : 0;
+		OGLPoint3D where = { x, y, z };
+		ObjNode* pow = MakePOW(powKind, &where);
+		if (!pow)
+			return PANGEA_SCRIPT_RUNTIME_ERROR;
+
+		pow->TerrainItemPtr = NULL;
+		Bugdom2Script_RegisterObject(pow, "bugdom2.powerup", "powerup");
+
+		if (outHandle)
+		{
+			outHandle->id = pow->ScriptObjectID;
+			outHandle->generation = (uint32_t) pow->ScriptObjectGeneration;
+		}
+		return PANGEA_SCRIPT_OK;
+	}
+
+	return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+}
+
 void Bugdom2Script_Init(void)
 {
 	const PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "Bugdom2-Android",
 		.gameName = "Bugdom 2",
+		.spawnNative = Bugdom2Script_SpawnNativeCallback,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
