@@ -18,9 +18,10 @@ void PangeaScriptBackend_Destroy(PangeaScriptBackend* backend)
 	(void) backend;
 }
 
-PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* source, char* error, int errorCapacity)
+PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* scriptPath, const char* source, char* error, int errorCapacity)
 {
 	(void) backend;
+	(void) scriptPath;
 	(void) source;
 	if (error && errorCapacity > 0)
 		error[0] = '\0';

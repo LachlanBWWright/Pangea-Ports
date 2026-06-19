@@ -109,10 +109,10 @@ Profiling and cache-parity scenarios are documented in
 Set `PANGEA_FORCE_CACHE_MISS=1` in the game runtime environment to compare cached
 rendering against the streaming miss path.
 
-TypeScript-authored game scripting is documented in
-[`docs/typescript-scripting.md`](./docs/typescript-scripting.md). The first
-adapter is Bugdom 2 behind `PANGEA_ENABLE_SCRIPTING=ON`; the default build keeps
-scripting disabled.
+Lua game scripting is documented in
+[`docs/lua-scripting.md`](./docs/lua-scripting.md). All eight games share the
+same optional `PangeaScript` host behind `PANGEA_ENABLE_SCRIPTING=ON`; the
+default build keeps scripting disabled.
 
 ## GitHub Pages layout
 

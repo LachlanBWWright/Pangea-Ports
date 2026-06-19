@@ -209,7 +209,7 @@ static void set_backend_error(PangeaScriptStatus status, const char* message)
 	if (message && message[0])
 		set_error(status, message);
 	else if (status == PANGEA_SCRIPT_RUNTIME_ERROR)
-		set_error(status, "JavaScript engine is not linked; script execution is unavailable");
+		set_error(status, "Lua runtime is not linked; script execution is unavailable");
 	else
 		set_error(status, "Script execution failed");
 }
@@ -358,7 +358,7 @@ PangeaScriptStatus PangeaScript_Reload(void)
 		return PANGEA_SCRIPT_NOT_ENABLED;
 	}
 
-	const char* scriptPath = gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js";
+	const char* scriptPath = gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.lua";
 	long scriptSize = 0;
 	char* script = read_text_file(scriptPath, &scriptSize);
 	if (!script)
@@ -380,7 +380,7 @@ PangeaScriptStatus PangeaScript_Reload(void)
 	{
 		char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
 		backendError[0] = '\0';
-		PangeaScriptStatus status = PangeaScriptBackend_Load(gBackend, script, backendError, (int)sizeof(backendError));
+		PangeaScriptStatus status = PangeaScriptBackend_Load(gBackend, scriptPath, script, backendError, (int)sizeof(backendError));
 		free(script);
 		if (status != PANGEA_SCRIPT_OK)
 		{
@@ -394,7 +394,7 @@ PangeaScriptStatus PangeaScript_Reload(void)
 	}
 
 	free(script);
-	set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "JavaScript engine is not linked; script execution is unavailable");
+	set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Lua runtime is not linked; script execution is unavailable");
 	return PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
@@ -944,11 +944,6 @@ void PangeaScript_Log(PangeaScriptLogLevel level, const char* source, const char
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
-EMSCRIPTEN_KEEPALIVE
-void PangeaScript_LogJS(int level, const char* message)
-{
-	PangeaScript_Log((PangeaScriptLogLevel)level, "JS", message);
-}
 #endif
 
 void PangeaScript_GetStatusInfo(PangeaScriptStatusInfo* outInfo)
@@ -959,7 +954,7 @@ void PangeaScript_GetStatusInfo(PangeaScriptStatusInfo* outInfo)
 	outInfo->enabled = gInitialized;
 	outInfo->configLoaded = gConfigPath[0] != '\0';
 	outInfo->bundleLoaded = gScriptLoaded;
-	snprintf(outInfo->activeScriptPath, sizeof(outInfo->activeScriptPath), "%s", gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js");
+	snprintf(outInfo->activeScriptPath, sizeof(outInfo->activeScriptPath), "%s", gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.lua");
 	snprintf(outInfo->lastError, sizeof(outInfo->lastError), "%s", gLastError);
 	outInfo->errorCount = gErrorCount;
 	outInfo->budgetExceededCount = gBudgetExceededCount;
@@ -985,7 +980,7 @@ bool PangeaScript_GetStatusBundleLoaded(void) { return gScriptLoaded; }
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
-const char* PangeaScript_GetStatusActiveScriptPath(void) { return gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js"; }
+const char* PangeaScript_GetStatusActiveScriptPath(void) { return gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.lua"; }
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
@@ -1011,89 +1006,3 @@ int PangeaScript_GetStatusHooksCalledCount(void) { return gHooksCalledCount; }
 EMSCRIPTEN_KEEPALIVE
 #endif
 bool PangeaScript_GetStatusScriptsDisabled(void) { return gScriptsDisabled; }
-
-#ifdef __EMSCRIPTEN__
-EMSCRIPTEN_KEEPALIVE
-bool PangeaScript_GetObjectPositionJS(int id, uint32_t generation, float* outX, float* outY, float* outZ)
-{
-	PangeaScriptObjectHandle handle = { id, generation };
-	PangeaScriptVector3 pos;
-	if (PangeaScript_GetObjectPosition(handle, &pos))
-	{
-		*outX = pos.x;
-		*outY = pos.y;
-		*outZ = pos.z;
-		return true;
-	}
-	return false;
-}
-
-EMSCRIPTEN_KEEPALIVE
-bool PangeaScript_SetObjectPositionJS(int id, uint32_t generation, float x, float y, float z)
-{
-	PangeaScriptObjectHandle handle = { id, generation };
-	PangeaScriptVector3 pos = { x, y, z };
-	return PangeaScript_SetObjectPosition(handle, &pos);
-}
-
-EMSCRIPTEN_KEEPALIVE
-bool PangeaScript_SetObjectVelocityJS(int id, uint32_t generation, float x, float y, float z)
-{
-	PangeaScriptObjectHandle handle = { id, generation };
-	PangeaScriptVector3 vel = { x, y, z };
-	return PangeaScript_SetObjectVelocity(handle, &vel);
-}
-
-EMSCRIPTEN_KEEPALIVE
-bool PangeaScript_DeleteObjectJS(int id, uint32_t generation)
-{
-	PangeaScriptObjectHandle handle = { id, generation };
-	return PangeaScript_DeleteObject(handle);
-}
-
-EMSCRIPTEN_KEEPALIVE
-int PangeaScript_SpawnNativeJS(const char* id, float x, float y, float z, int subtype, int amount, int* outId, uint32_t* outGen)
-{
-	PangeaScriptObjectHandle handle = {0, 0};
-	PangeaScriptStatus status = PangeaScript_SpawnNative(id, x, y, z, subtype, amount, &handle);
-	if (status == PANGEA_SCRIPT_OK)
-	{
-		*outId = handle.id;
-		*outGen = handle.generation;
-	}
-	return (int) status;
-}
-
-EMSCRIPTEN_KEEPALIVE
-int PangeaScript_RegisterScriptedObjectJS(const char* id, float x, float y, float z, int* outId, uint32_t* outGen)
-{
-	PangeaScriptObjectHandle handle = {0, 0};
-	PangeaScriptStatus status = PangeaScript_RegisterScriptedObject(id, x, y, z, &handle);
-	if (status == PANGEA_SCRIPT_OK)
-	{
-		*outId = handle.id;
-		*outGen = handle.generation;
-	}
-	return (int) status;
-}
-
-EMSCRIPTEN_KEEPALIVE
-void* gPangeaScriptPreserveStatus[] = {
-	(void*)PangeaScript_GetStatusEnabled,
-	(void*)PangeaScript_GetStatusConfigLoaded,
-	(void*)PangeaScript_GetStatusBundleLoaded,
-	(void*)PangeaScript_GetStatusActiveScriptPath,
-	(void*)PangeaScript_GetStatusLastError,
-	(void*)PangeaScript_GetStatusErrorCount,
-	(void*)PangeaScript_GetStatusBudgetExceededCount,
-	(void*)PangeaScript_GetStatusHooksCalledCount,
-	(void*)PangeaScript_GetStatusScriptsDisabled,
-	(void*)PangeaScript_LogJS,
-	(void*)PangeaScript_GetObjectPositionJS,
-	(void*)PangeaScript_SetObjectPositionJS,
-	(void*)PangeaScript_SetObjectVelocityJS,
-	(void*)PangeaScript_DeleteObjectJS,
-	(void*)PangeaScript_SpawnNativeJS,
-	(void*)PangeaScript_RegisterScriptedObjectJS
-};
-#endif

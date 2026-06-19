@@ -21,7 +21,7 @@ project(${GAME_TARGET}
 
 option(BUILD_SDL_FROM_SOURCE "Build SDL from source" OFF)
 option(SDL_STATIC "Static link SDL" OFF)
-option(PANGEA_ENABLE_SCRIPTING "Enable TypeScript-authored scripting support" OFF)
+option(PANGEA_ENABLE_SCRIPTING "Enable Lua scripting support" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 

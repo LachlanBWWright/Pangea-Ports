@@ -26,9 +26,10 @@ void PangeaScriptBackend_Destroy(PangeaScriptBackend* backend)
 	(void) backend;
 }
 
-PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* source, char* error, int errorCapacity)
+PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* scriptPath, const char* source, char* error, int errorCapacity)
 {
 	(void) backend;
+	(void) scriptPath;
 	(void) source;
 	(void) error;
 	(void) errorCapacity;
@@ -145,7 +146,7 @@ void test_capability_gates(void)
 {
 	printf("Testing object capability level gates...\n");
 
-	PangeaScriptGameInfo gameInfo = { "TestGame", "Test Game" };
+	PangeaScriptGameInfo gameInfo = { .gameId = "TestGame", .gameName = "Test Game" };
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	assert(status == PANGEA_SCRIPT_OK);
 
@@ -231,7 +232,7 @@ void test_config_parsing_and_sandbox(void)
 {
 	printf("Testing config parsing and path traversal protections...\n");
 
-	PangeaScriptGameInfo gameInfo = { "TestGame", "Test Game" };
+	PangeaScriptGameInfo gameInfo = { .gameId = "TestGame", .gameName = "Test Game" };
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	assert(status == PANGEA_SCRIPT_OK);
 
@@ -240,8 +241,8 @@ void test_config_parsing_and_sandbox(void)
 	system("mkdir -p Data/Scripts/dist");
 
 	// Write dummy script files
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
-	write_temp_file("Data/Scripts/dist/level1.js", "console.log('level1');");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
+	write_temp_file("Data/Scripts/dist/level1.lua", "return {}");
 
 	// 1. Valid config
 	const char* valid_config = 
@@ -249,7 +250,7 @@ void test_config_parsing_and_sandbox(void)
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/level1.js\"\n"
+		"      \"script\": \"Data/Scripts/dist/level1.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -265,7 +266,7 @@ void test_config_parsing_and_sandbox(void)
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/../../evil.js\"\n"
+		"      \"script\": \"Data/Scripts/dist/../../evil.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -280,7 +281,7 @@ void test_config_parsing_and_sandbox(void)
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/evil.js\"\n"
+		"      \"script\": \"Data/evil.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -294,7 +295,7 @@ void test_config_parsing_and_sandbox(void)
 		"{\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/level1.js\"\n"
+		"      \"script\": \"Data/Scripts/dist/level1.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -314,20 +315,20 @@ void test_level_settings_accessors(void)
 {
 	printf("Testing level settings accessors...\n");
 
-	PangeaScriptGameInfo gameInfo = { "TestGame", "Test Game" };
+	PangeaScriptGameInfo gameInfo = { .gameId = "TestGame", .gameName = "Test Game" };
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	assert(status == PANGEA_SCRIPT_OK);
 
 	system("mkdir -p Data/Scripts/config");
 	system("mkdir -p Data/Scripts/dist");
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
 
 	const char* valid_config =
 		"{\n"
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/main.js\",\n"
+		"      \"script\": \"Data/Scripts/dist/main.lua\",\n"
 		"      \"levelSettings\": {\n"
 		"        \"gravity\": 3900,\n"
 		"        \"debugSplineFlatY\": 500.5,\n"
@@ -414,7 +415,7 @@ void test_consecutive_failures(void)
 {
 	printf("Testing host shutdown on consecutive hook failures...\n");
 
-	PangeaScriptGameInfo gameInfo = { "TestGame", "Test Game" };
+	PangeaScriptGameInfo gameInfo = { .gameId = "TestGame", .gameName = "Test Game" };
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	assert(status == PANGEA_SCRIPT_OK);
 
@@ -423,8 +424,8 @@ void test_consecutive_failures(void)
 	g_mock_load_status = PANGEA_SCRIPT_OK;
 	// Create a dummy startup script path and simulate successful load
 	system("mkdir -p Data/Scripts/dist");
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
-	status = PangeaScript_SetStartupScript("Data/Scripts/dist/main.js");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
+	status = PangeaScript_SetStartupScript("Data/Scripts/dist/main.lua");
 	assert(status == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_HasRunnableModule());
 

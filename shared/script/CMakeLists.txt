@@ -1,24 +1,37 @@
-option(PANGEA_SCRIPT_USE_DUKTAPE "Use Duktape for native script execution when available" ON)
+set(PANGEA_LUA_VERSION "5.4.7")
 
 set(PANGEA_SCRIPT_SOURCES
 	pangea_script.c
 	pangea_script_config.c
+	pangea_script_backend_lua.c
+	third_party/lua/src/lapi.c
+	third_party/lua/src/lauxlib.c
+	third_party/lua/src/lbaselib.c
+	third_party/lua/src/lcode.c
+	third_party/lua/src/lcorolib.c
+	third_party/lua/src/lctype.c
+	third_party/lua/src/ldebug.c
+	third_party/lua/src/ldo.c
+	third_party/lua/src/ldump.c
+	third_party/lua/src/lfunc.c
+	third_party/lua/src/lgc.c
+	third_party/lua/src/llex.c
+	third_party/lua/src/lmem.c
+	third_party/lua/src/lobject.c
+	third_party/lua/src/lopcodes.c
+	third_party/lua/src/lparser.c
+	third_party/lua/src/lstate.c
+	third_party/lua/src/lstring.c
+	third_party/lua/src/ltable.c
+	third_party/lua/src/ltablib.c
+	third_party/lua/src/ltm.c
+	third_party/lua/src/lundump.c
+	third_party/lua/src/lutf8lib.c
+	third_party/lua/src/lvm.c
+	third_party/lua/src/lzio.c
+	third_party/lua/src/lmathlib.c
+	third_party/lua/src/lstrlib.c
 )
-
-if(EMSCRIPTEN)
-	list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_emscripten.c)
-elseif(PANGEA_SCRIPT_USE_DUKTAPE AND NOT ANDROID)
-	find_library(PANGEA_SCRIPT_DUKTAPE_LIBRARY NAMES duktape libduktape.so.207)
-	find_path(PANGEA_SCRIPT_DUKTAPE_INCLUDE_DIR NAMES duktape.h)
-endif()
-
-if(NOT EMSCRIPTEN)
-	if(PANGEA_SCRIPT_DUKTAPE_LIBRARY AND PANGEA_SCRIPT_DUKTAPE_INCLUDE_DIR)
-		list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_duktape.c)
-	else()
-		list(APPEND PANGEA_SCRIPT_SOURCES pangea_script_backend_none.c)
-	endif()
-endif()
 
 add_library(PangeaScript STATIC ${PANGEA_SCRIPT_SOURCES})
 
@@ -26,10 +39,13 @@ target_include_directories(PangeaScript PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_compile_features(PangeaScript PUBLIC c_std_17)
+target_include_directories(PangeaScript PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/lua/src
+)
 
-if(PANGEA_SCRIPT_DUKTAPE_LIBRARY AND PANGEA_SCRIPT_DUKTAPE_INCLUDE_DIR)
-	target_include_directories(PangeaScript PRIVATE ${PANGEA_SCRIPT_DUKTAPE_INCLUDE_DIR})
-	target_link_libraries(PangeaScript PUBLIC ${PANGEA_SCRIPT_DUKTAPE_LIBRARY})
-	target_compile_definitions(PangeaScript PRIVATE PANGEA_SCRIPT_USE_DUKTAPE=1)
+target_compile_features(PangeaScript PUBLIC c_std_17)
+target_compile_definitions(PangeaScript PRIVATE LUA_USE_C89=1 PANGEA_SCRIPT_LUA_VERSION="${PANGEA_LUA_VERSION}")
+
+if(NOT WIN32)
+	target_link_libraries(PangeaScript PUBLIC m)
 endif()

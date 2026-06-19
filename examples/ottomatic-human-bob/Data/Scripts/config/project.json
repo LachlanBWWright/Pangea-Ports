@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "game": "Otto Matic",
-  "runtime": "duktape",
+  "language": "lua",
+  "runtime": "lua-5.4",
   "configRoot": "Data/Scripts/config",
   "sourceRoot": "Data/Scripts/src",
   "distRoot": "Data/Scripts/dist",

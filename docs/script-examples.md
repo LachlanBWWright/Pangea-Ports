@@ -1,30 +1,39 @@
 # Script Examples
 
+Converted Lua examples live under `shared/script/examples/`.
+
 ## Bugdom 2 Level Log
 
-```ts
-import { pangea } from "@pangea-ports/script-types";
-import type { Bugdom2LevelContext } from "@pangea-ports/script-types/games/bugdom2";
+```lua
+local pangea = require("pangea")
+local module = {}
 
-export function onLevelLoad(ctx: Bugdom2LevelContext): void {
-  pangea.log.info(`Loaded level ${ctx.levelNum}`);
-}
+function module.onLevelLoad(ctx)
+    pangea.log.info("Loaded level " .. ctx.levelNum)
+end
+
+return module
 ```
 
 ## Bugdom 2 Terrain Item
 
-```ts
-import { defineTerrainItem, pangea } from "@pangea-ports/script-types";
+```lua
+local pangea = require("pangea")
+local module = {}
 
-export const bouncingHealth = defineTerrainItem({
-  id: "custom.bouncingHealth",
-  nativeType: 240,
-  onSpawn(item) {
-    const handle = pangea.spawn.scripted("custom.bouncingPickup", item.position, {
-      amount: item.params[0] + 10,
-    });
+function module.onTerrainItem(item)
+    local handle = pangea.spawn.scripted("custom.bouncingPickup", {
+        x = item.x,
+        y = 0,
+        z = item.z,
+    })
 
-    return handle ? { handled: true, markInUse: true } : { handled: false };
-  },
-});
+    if handle then
+        return { handled = true, markInUse = true }
+    end
+
+    return { handled = false }
+end
+
+return module
 ```
