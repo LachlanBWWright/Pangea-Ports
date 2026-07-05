@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -430,6 +433,11 @@ void PingShield(float damage)
 	PlayEffect(EFFECT_SHIELDHIT);
 	gPlayerInfo.shieldAlpha = .8f;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (BillyScript_OnPlayerDamage(NULL, &damage, "billy.shieldDamage", 1))
+		return;
+#endif
+
 			/* LOSE SHIELD POWER */
 			
 	gPlayerInfo.shieldPower -= damage * 2.0f;
@@ -437,7 +445,6 @@ void PingShield(float damage)
 		gPlayerInfo.shieldPower = 0.0f;
 
 }
-
 
 
 

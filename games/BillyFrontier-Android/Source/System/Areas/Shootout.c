@@ -1000,6 +1000,7 @@ static void MovePlayer_Shootout_Battle(ObjNode *player)
 void ShootoutPlayerHitByBulletCallback(ObjNode *bullet, ObjNode *player, const OGLPoint3D *impactPt)
 {
 OGLVector3D	splatVec;
+float damage = bullet->Damage;
 
 	
 
@@ -1030,7 +1031,12 @@ OGLVector3D	splatVec;
 
 	if (player->Health > 0.0f)									// if not already dead
 	{
-		player->Health -= bullet->Damage;		
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (BillyScript_OnPlayerDamage(bullet, &damage, "billy.shootoutBullet", 2))
+			return;
+#endif
+		if (damage > 0.0f)
+			player->Health -= damage;
 	}
 
 				/*****************************/
@@ -1145,5 +1151,4 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
 

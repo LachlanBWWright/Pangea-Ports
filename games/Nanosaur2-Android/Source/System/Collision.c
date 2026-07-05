@@ -11,12 +11,18 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+static const char* GetTriggerScriptId(const ObjNode* triggerObj);
+#endif
 
 
 /****************************/
@@ -36,6 +42,55 @@ short			gNumCollisions = 0;
 Byte			gTotalSides;
 Boolean			gSolidTriggerKeepDelta;
 Byte			gTriggerSides;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+static const char* GetTriggerScriptId(const ObjNode* triggerObj)
+{
+	if (!triggerObj)
+		return "nanosaur2.trigger";
+
+	switch (triggerObj->Kind)
+	{
+		case NANOSAUR2_SCRIPT_TRIGGER_WEAPON_POW:
+			return "nanosaur2.weaponPow";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_HEALTH_POW:
+			return "nanosaur2.healthPow";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_FUEL_POW:
+			return "nanosaur2.fuelPow";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_SHIELD_POW:
+			return "nanosaur2.shieldPow";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_FREE_LIFE_POW:
+			return "nanosaur2.freeLifePow";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_EGG:
+			return "nanosaur2.egg";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_MINE:
+			return "nanosaur2.mine";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_ELECTRODE:
+			return "nanosaur2.electrode";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_DOOR_KEY:
+			return "nanosaur2.forestDoorKey";
+
+		case NANOSAUR2_SCRIPT_TRIGGER_SMACKABLE:
+			return "nanosaur2.smackable";
+
+		default:
+			break;
+	}
+
+	if (triggerObj->CType & CTYPE_POWERUP)
+		return "nanosaur2.powerup";
+
+	return "nanosaur2.trigger";
+}
+#endif
 
 
 /******************* COLLISION DETECT *********************/
@@ -380,6 +435,20 @@ again:
 			if (targetCType == INVALID_NODE_FLAG)
 				continue;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (Nanosaur2Script_OnObjectCollision(theNode, targetObj, "object.contact", (int) targetCType, gCollisionList[i].sides))
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			if (targetObj->CType == INVALID_NODE_FLAG)
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			targetCType = targetObj->CType;
+#endif
+
 						/* HANDLE TRIGGERS */
 
 			if (((targetCType & CTYPE_TRIGGER) && (cType & CTYPE_TRIGGER)) ||	// target must be trigger and we must have been looking for them as well
@@ -390,6 +459,15 @@ again:
 	  			if (targetObj->TriggerCallback != nil)							// make sure there's a callback installed
 	  			{
 	  				gTriggerSides = gCollisionList[i].sides;					// set this global in case the trigger handler needs it (rather than passing it to the trigger func)
+#ifdef PANGEA_ENABLE_SCRIPTING
+					Boolean isSolid = true;
+					if (Nanosaur2Script_OnTriggerEnter(targetObj, theNode, GetTriggerScriptId(targetObj), targetObj->Type, gCollisionList[i].sides, &isSolid))
+					{
+						if (!isSolid)
+							gCollisionList[i].sides = 0;
+					}
+					else
+#endif
  					if (!targetObj->TriggerCallback(targetObj,theNode))			// returns false if handle as non-solid trigger
 						gCollisionList[i].sides = 0;
 
@@ -1574,10 +1652,6 @@ uint32_t		inCType = *cTypes;							// get the input CType mask
 
 	return(hit);
 }
-
-
-
-
 
 
 

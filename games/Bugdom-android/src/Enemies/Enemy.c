@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -171,7 +175,12 @@ float	realSpeed;
 					
 			if (ctype & CTYPE_HURTENEMY)
 			{
-				if (EnemyGotHurt(theEnemy,hitObj->Damage))		// handle hit (returns true if was deleted)
+				float damage = hitObj->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (BugdomScript_OnWeaponHit(hitObj, theEnemy, "bugdom.weaponHit", hitObj->Type, &damage))
+					return(theEnemy->CType == INVALID_NODE_FLAG);
+#endif
+				if (EnemyGotHurt(theEnemy,damage))		// handle hit (returns true if was deleted)
 					return(true);
 			}
 
@@ -188,7 +197,12 @@ float	realSpeed;
 
 	if (ParticleHitObject(theEnemy, PARTICLE_FLAGS_HURTENEMY))
 	{
-		if (EnemyGotHurt(theEnemy,.3))						// handle hit (returns true if was deleted)
+		float damage = .3f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (BugdomScript_OnWeaponHit(nil, theEnemy, "bugdom.particleHit", PARTICLE_FLAGS_HURTENEMY, &damage))
+			return(theEnemy->CType == INVALID_NODE_FLAG);
+#endif
+		if (EnemyGotHurt(theEnemy,damage))						// handle hit (returns true if was deleted)
 			return(true);
 	}
 			
@@ -226,6 +240,10 @@ Boolean EnemyGotHurt(ObjNode *theEnemy, float damage)
 {
 Boolean	wasDeleted;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (BugdomScript_OnObjectDamage(nil, theEnemy, "bugdom.enemyDamage", theEnemy->Kind, &damage))
+		return theEnemy->CType == INVALID_NODE_FLAG;
+#endif
 
 			/* LOSE HEALTH */
 			
@@ -379,8 +397,6 @@ Boolean DetachEnemyFromSpline(ObjNode *theNode, void (*moveCall)(ObjNode*))
 
 	return(true);
 }
-
-
 
 
 

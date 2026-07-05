@@ -25,5 +25,11 @@ void MikeScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void MikeScript_RunObjectFrame(ObjNode* obj);
 int MikeScript_RemapMapItemType(int sceneNum, int areaNum, int itemType);
 Boolean MikeScript_OnMapItem(ObjectEntryType* itemPtr, int sceneNum, int areaNum, int itemType);
+Boolean MikeScript_OnTriggerEnter(ObjNode* triggerObj, ObjNode* otherObj, const char* triggerId, int triggerType, unsigned int sideBits, Boolean* outSolid);
+Boolean MikeScript_OnObjectCollision(ObjNode* selfObj, ObjNode* otherObj, const char* collisionId, int collisionType, unsigned int sideBits);
+Boolean MikeScript_OnPickupCollected(ObjNode* pickupObj, ObjNode* playerObj, const char* pickupId, int pickupType, int amount);
+Boolean MikeScript_OnWeaponHit(ObjNode* weaponObj, ObjNode* targetObj, const char* weaponId, int weaponType, float* ioDamage);
+Boolean MikeScript_OnObjectDamage(ObjNode* sourceObj, ObjNode* targetObj, const char* damageId, int damageType, float* ioDamage);
+Boolean MikeScript_OnPlayerDamage(float* ioDamage, const char* damageId, int damageType);
 
 #endif

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -123,6 +127,10 @@ ObjNode	*newObj;
 		SetObjectCollisionBounds(newObj,500,0,-60,60,60,-60);
 
 		newObj->SpecialF[0] = 0;						// ring emitter timer
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_RegisterObject(newObj, "nanosaur.timePortal", "trigger");
+#endif
 	}
 
 	return(newObj);									// item was added
@@ -363,7 +371,6 @@ short	close = -1;
 
 	return(close);
 }
-
 
 
 

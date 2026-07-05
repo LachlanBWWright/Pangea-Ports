@@ -101,6 +101,10 @@ short		i;
 
 		InitYOffset(newObj, -15);
 		newObj->DZ = -0xA0000L+(MyRandomShort()<<2);					// start bouncing up
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_RegisterObject(newObj, "mightymike.coin", "pickup");
+#endif
 	}
 }
 
@@ -572,6 +576,10 @@ ObjNode		*newObj;
 	else
 		newObj->Special1 = 0xf0000L;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.miscPow", "pickup");
+#endif
+
 	return(true);									// was added
 }
 
@@ -850,6 +858,9 @@ ObjNode		*newObj;
 	newObj->RightOff = 20;
 	CalcObjectBox2(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.shipPow", "pickup");
+#endif
+
 	return(true);									// was added
 }
-

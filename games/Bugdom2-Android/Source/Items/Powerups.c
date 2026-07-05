@@ -24,6 +24,7 @@ static void MoveButterfly(ObjNode *body);
 static Boolean DoTrig_Butterfly(ObjNode *trigger, ObjNode *who, Byte sideBits);
 static void MovePowerupVanish(ObjNode *pow);
 static void MoveCheckpoint(ObjNode *theNode);
+static Boolean TryScriptConsumePowerup(ObjNode* pow, ObjNode* player);
 
 
 
@@ -429,84 +430,98 @@ Boolean DoTrig_Powerup(ObjNode *pow, ObjNode *who, Byte sideBits)
 	(void) who;
 	(void) sideBits;
 
-	switch(pow->POWKind)
+	if (!TryScriptConsumePowerup(pow, who))
 	{
-				/* GET HEALTH */
+		switch(pow->POWKind)
+		{
+					/* GET HEALTH */
 
-		case	POW_KIND_HEALTH:
-				gPlayerInfo.health += .15f;
-				if (gPlayerInfo.health > 1.0f)
-					gPlayerInfo.health = 1.0f;
-				break;
-
-
-			/* GET FLIGHT FRUIT */
-
-		case	POW_KIND_FLIGHT:
-				gPlayerInfo.glidePower += .2f;
-				if (gPlayerInfo.glidePower > 1.0f)
-					gPlayerInfo.glidePower = 1.0f;
-				break;
+			case	POW_KIND_HEALTH:
+					gPlayerInfo.health += .15f;
+					if (gPlayerInfo.health > 1.0f)
+						gPlayerInfo.health = 1.0f;
+					break;
 
 
-				/* GET MAP */
+				/* GET FLIGHT FRUIT */
 
-		case	POW_KIND_MAP:
-				gPlayerInfo.hasMap = true;
-				break;
-
-
-				/* FREE LIFE */
-
-		case	POW_KIND_FREELIFE:
-				gPlayerInfo.lives++;
-				break;
+			case	POW_KIND_FLIGHT:
+					gPlayerInfo.glidePower += .2f;
+					if (gPlayerInfo.glidePower > 1.0f)
+						gPlayerInfo.glidePower = 1.0f;
+					break;
 
 
-				/* GET RAM GRAIN */
+					/* GET MAP */
 
-		case	POW_KIND_RAMGRAIN:
-				SetPlayerRammingAnim(who);
-				break;
-
-
-				/* GET KEY */
-
-		case	POW_KIND_REDKEY:
-		case	POW_KIND_GREENKEY:
-		case	POW_KIND_BLUEKEY:
-				gPlayerInfo.hasKey[pow->POWKind - POW_KIND_REDKEY] = true;
-
-				if (pow->POWKind == POW_KIND_GREENKEY)					// on park level make the snail shut up if we already got the green key
-					gIgnoreBottleKeySnail = true;
-				break;
+			case	POW_KIND_MAP:
+					gPlayerInfo.hasMap = true;
+					break;
 
 
+					/* FREE LIFE */
 
-				/* CLOVER */
-
-		case	POW_KIND_GREENCLOVER:
-				gPlayerInfo.numGreenClovers++;
-				break;
-		case	POW_KIND_BLUECLOVER:
-				gPlayerInfo.numBlueClovers++;
-				break;
-		case	POW_KIND_GOLDCLOVER:
-				gPlayerInfo.numGoldClovers++;
-				break;
+			case	POW_KIND_FREELIFE:
+					gPlayerInfo.lives++;
+					break;
 
 
-				/* SHIELD */
+					/* GET RAM GRAIN */
 
-		case	POW_KIND_SHIELD:
-				gPlayerInfo.shieldTimer = 15.0f;
-				break;
+			case	POW_KIND_RAMGRAIN:
+					SetPlayerRammingAnim(who);
+					break;
 
+
+					/* GET KEY */
+
+			case	POW_KIND_REDKEY:
+			case	POW_KIND_GREENKEY:
+			case	POW_KIND_BLUEKEY:
+					gPlayerInfo.hasKey[pow->POWKind - POW_KIND_REDKEY] = true;
+
+					if (pow->POWKind == POW_KIND_GREENKEY)					// on park level make the snail shut up if we already got the green key
+						gIgnoreBottleKeySnail = true;
+					break;
+
+
+
+					/* CLOVER */
+
+			case	POW_KIND_GREENCLOVER:
+					gPlayerInfo.numGreenClovers++;
+					break;
+			case	POW_KIND_BLUECLOVER:
+					gPlayerInfo.numBlueClovers++;
+					break;
+			case	POW_KIND_GOLDCLOVER:
+					gPlayerInfo.numGoldClovers++;
+					break;
+
+
+					/* SHIELD */
+
+			case	POW_KIND_SHIELD:
+					gPlayerInfo.shieldTimer = 15.0f;
+					break;
+
+		}
 	}
 
 
 	StartPowerupVanish(pow);
 	return(true);
+}
+
+static Boolean TryScriptConsumePowerup(ObjNode* pow, ObjNode* player)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	return Bugdom2Script_OnPickupCollected(pow, player ? player : gPlayerInfo.objNode, "bugdom2.powerup", pow->POWKind, 1);
+#else
+	(void) pow;
+	(void) player;
+	return false;
+#endif
 }
 
 
@@ -689,7 +704,6 @@ float	y;
 
 	UpdateObject(theNode);
 }
-
 
 
 

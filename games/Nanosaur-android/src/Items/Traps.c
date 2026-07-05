@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -75,6 +79,9 @@ float	scale;
 	newObj->CType = CTYPE_MISC|CTYPE_BLOCKSHADOW;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,30.0f*scale,-30.0f*scale,-30.0f*scale,30.0f*scale,30.0f*scale,-30.0f*scale);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.rollingBoulder", "hazard");
+#endif
 	return(true);								// item was added
 }
 
@@ -251,6 +258,9 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_MISC;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,20,0,-20,20,20,-20);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.sporePod", "hazard");
+#endif
 	return(true);								// item was added
 }
 
@@ -333,6 +343,10 @@ short	i;
 			newObj->CBits = CBITS_TOUCHABLE;
 			SetObjectCollisionBounds(newObj,10,-10,-10,10,10,-10);			
 			newObj->Damage = .05f;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			NanosaurScript_RegisterObject(newObj, "nanosaur.spore", "projectile");
+#endif
 		}
 	}
 }
@@ -393,7 +407,6 @@ ObjNode	*puff;
 		UpdateObject(theNode);
 	}
 }
-
 
 
 

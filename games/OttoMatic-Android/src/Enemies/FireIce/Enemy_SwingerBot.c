@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -648,7 +652,12 @@ static Boolean SwingerBotHitByWeapon(ObjNode *weapon, ObjNode *enemy, OGLPoint3D
 
 			/* HURT IT */
 
-	HurtSwingerBot(enemy, weapon->Damage);
+	float damage = weapon->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(weapon, enemy, "ottomatic.weaponHit", weapon->Type, &damage))
+		return(true);
+#endif
+	HurtSwingerBot(enemy, damage);
 
 
 			/* GIVE MOMENTUM */
@@ -940,4 +949,3 @@ int				i;
 	}
 
 }
-

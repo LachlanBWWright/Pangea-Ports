@@ -3257,6 +3257,8 @@ void BlastCars(short whoThrew, float x, float y, float z, float radius)
 short	i;
 float	d,x2,y2,z2,dx,dy,dz,d2;
 ObjNode	*obj;
+ObjNode	*sourceObj;
+OGLPoint3D blastPosition = { x, y, z };
 
 			/* CHECK EACH CAR */
 
@@ -3273,13 +3275,18 @@ ObjNode	*obj;
 			d2 = radius - d;												// determine blast force
 
 			obj = gPlayerInfo[i].objNode;								// get the car object
+			sourceObj = (whoThrew >= 0 && whoThrew < gNumTotalPlayers) ? gPlayerInfo[whoThrew].objNode : nil;
 
 
 				/* CAUSE HEALTH DAMAGE */
 
 			if (gGameMode == GAME_MODE_SURVIVAL)
 			{
-				PlayerLoseHealth(i, d2 / BLAST_DAMAGE);
+				float damage = d2 / BLAST_DAMAGE;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!CroMagScript_OnWeaponHit(sourceObj, obj, "cromag.blast", whoThrew, i, &blastPosition, &damage))
+#endif
+					PlayerLoseHealth(i, damage);
 			}
 
 				/* CAUSE DROP TORCH */
@@ -3657,7 +3664,6 @@ new_group:
 
 
 }
-
 
 
 

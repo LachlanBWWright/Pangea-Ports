@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -135,6 +139,9 @@ float	y;
 	if (gLavaSoundChannel == -1)
 		gLavaSoundChannel = PlayEffect_Parms(EFFECT_BUBBLES,1,kMiddleC);
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.lavaPatch", "hazard");
+#endif
 	
 	return(true);													// item was added
 }
@@ -222,6 +229,10 @@ float	d;
 					newObj->Damage = .08;
 					
 					newObj->FireballPuffTimer = 0;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+					NanosaurScript_RegisterObject(newObj, "nanosaur.fireball", "projectile");
+#endif
 				}
 			}		
 		}		
@@ -341,6 +352,10 @@ float	y;
 	newObj->UndulationIndex = 1;
 
 	gNumWaterPatches++;												// keep count of these
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.waterPatch", "environment");
+#endif
 		
 	return(true);													// item was added
 }
@@ -442,6 +457,9 @@ static const float scales[] =
 									-30,30,30,-30);
 
 	UpdateObjectTransforms(newObj);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.tree", "obstacle");
+#endif
 	return(true);									// item was added
 }
 
@@ -499,6 +517,10 @@ float	scale;
 	
 	SetObjectCollisionBounds(newObj,newObj->Radius,0,-100,100,100,-100);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.mushroom", "obstacle");
+#endif
+
 	return(true);									// item was added
 }
 
@@ -539,6 +561,9 @@ float	scale;
 	
 	CreateCollisionTrianglesForObject(newObj);		// build triangle list
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.boulder", "obstacle");
+#endif
 
 	return(true);									// item was added
 }
@@ -592,6 +617,10 @@ TQ3BoundingBox *bbox;
 	{
 		MakeTriceratops(newObj, x, z);
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.bush", "obstacle");
+#endif
 			
 	
 	return(true);									// item was added
@@ -662,6 +691,10 @@ ObjNode	*newObj;
 	if (gSteamSoundChannel == -1)
 		gSteamSoundChannel = PlayEffect_Parms(EFFECT_STEAM,1,kMiddleC);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.gasVent", "pickup");
+#endif
+
 	return(true);									// item was added
 }
 
@@ -729,6 +762,5 @@ float	d;
 		gMinSteamDist = d;
 
 }
-
 
 

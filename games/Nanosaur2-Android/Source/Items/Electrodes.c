@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -128,6 +132,9 @@ ObjNode	*pole, *topbot, *middle;
 	CreateCollisionBoxFromBoundingBox(pole, 1, 1);
 
 	pole->TriggerCallback = DoTrig_Electrode;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	pole->Kind = NANOSAUR2_SCRIPT_TRIGGER_ELECTRODE;
+#endif
 	pole->HitByWeaponHandler = ElectrodeHitByWeaponCallback;
 
 	pole->Timer = RandomFloat() * 1.0f;
@@ -152,6 +159,9 @@ ObjNode	*pole, *topbot, *middle;
 
 	topbot->CType 				= CTYPE_SOLIDTOENEMY | CTYPE_WEAPONTEST | CTYPE_PLAYERTEST;
 	topbot->TriggerCallback 	= DoTrig_Electrode;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	topbot->Kind 				= NANOSAUR2_SCRIPT_TRIGGER_ELECTRODE;
+#endif
 	topbot->HitByWeaponHandler 	= ElectrodeHitByWeaponCallback;
 
 	pole->ChainNode = topbot;
@@ -168,12 +178,20 @@ ObjNode	*pole, *topbot, *middle;
 
 	middle->CType 				= CTYPE_SOLIDTOENEMY | CTYPE_WEAPONTEST | CTYPE_PLAYERTEST;
 	middle->TriggerCallback 	= DoTrig_Electrode;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	middle->Kind 				= NANOSAUR2_SCRIPT_TRIGGER_ELECTRODE;
+#endif
 	middle->HitByWeaponHandler 	= ElectrodeHitByWeaponCallback;
 
 
 	topbot->ChainNode = middle;
 	middle->ChainHead = topbot;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(pole, "nanosaur2.electrodePole", "hazard");
+	Nanosaur2Script_RegisterObject(topbot, "nanosaur2.electrodeTopBottom", "hazard");
+	Nanosaur2Script_RegisterObject(middle, "nanosaur2.electrodeMiddle", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -801,9 +819,6 @@ static void FreeZap(short zapNum)
 
 	gZaps[zapNum].isUsed = false;
 }
-
-
-
 
 
 

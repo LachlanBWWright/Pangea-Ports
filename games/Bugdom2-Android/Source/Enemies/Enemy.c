@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -250,8 +254,17 @@ int		i;
 		if (ctype & CTYPE_HURTENEMY)
 		{
 			if (theEnemy->HurtCallback != nil)							// if has a hurt callback
-				if (theEnemy->HurtCallback(theEnemy, hitObj->Damage))	// handle hit (returns true if was deleted)
+			{
+				float damage = hitObj->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (Bugdom2Script_OnWeaponHit(hitObj, theEnemy, "bugdom2.weaponHit", hitObj->Type, &damage))
+					return(theEnemy->CType == INVALID_NODE_FLAG);
+				if (Bugdom2Script_OnObjectDamage(hitObj, theEnemy, "bugdom2.enemyDamage", theEnemy->Type, &damage))
+					return(theEnemy->CType == INVALID_NODE_FLAG);
+#endif
+				if (theEnemy->HurtCallback(theEnemy, damage))	// handle hit (returns true if was deleted)
 					return(true);
+			}
 		}
 
 			/* TOUCHED PLAYER */
@@ -271,8 +284,14 @@ int		i;
 	{
 		if (ParticleHitObject(theEnemy, PARTICLE_FLAGS_HURTENEMY))
 		{
-
-			if (theEnemy->HurtCallback(theEnemy, .3))			// handle hit (returns true if was deleted)
+			float damage = .3;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (Bugdom2Script_OnWeaponHit(nil, theEnemy, "bugdom2.particleHit", PARTICLE_FLAGS_HURTENEMY, &damage))
+				return(theEnemy->CType == INVALID_NODE_FLAG);
+			if (Bugdom2Script_OnObjectDamage(nil, theEnemy, "bugdom2.enemyDamage", theEnemy->Type, &damage))
+				return(theEnemy->CType == INVALID_NODE_FLAG);
+#endif
+			if (theEnemy->HurtCallback(theEnemy, damage))			// handle hit (returns true if was deleted)
 				return(true);
 		}
 	}
@@ -354,10 +373,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(chunk);
 }
-
-
-
-
 
 
 

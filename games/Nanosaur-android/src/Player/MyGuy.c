@@ -1014,8 +1014,12 @@ void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean o
 	else
 	if (theNode->InvincibleTimer < INVINCIBILITY_DURATION_SHORT)
 		theNode->InvincibleTimer = INVINCIBILITY_DURATION_SHORT;	// make me invincible for a shorter while
-	
-	
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (NanosaurScript_OnPlayerDamage(theNode, &damage))
+		return;
+#endif
+
 	gMyHealth -= damage;										// take damage
 	gInfobarUpdateBits |= UPDATE_HEALTH;						// tell system to update this at end of frame
 	if (gMyHealth <= 0)											// see if was killed
@@ -1099,7 +1103,6 @@ float	fps = gFramesPerSecondFrac;
 	
 	UpdateObjectTransforms(theNode);
 }
-
 
 
 

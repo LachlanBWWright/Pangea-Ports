@@ -12,6 +12,9 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -78,6 +81,9 @@ Boolean AddBirchTree(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->HitByWeaponHandler = TreeHitByWeaponCallback;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.birch", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -119,6 +125,9 @@ Boolean AddPineTree(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->HitByWeaponHandler = TreeHitByWeaponCallback;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.pine", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -156,6 +165,9 @@ Boolean AddFallenTree(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->TriggerCallback = DoTrig_Tree;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.fallen", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -193,6 +205,9 @@ ObjNode	*newObj;
 
 	newObj->TriggerCallback = DoTrig_Tree;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.stump", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -277,6 +292,9 @@ Boolean AddSmallTree(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->TriggerCallback = DoTrig_SmallTree;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.small", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -580,6 +598,10 @@ float	rot = (float)itemPtr->parm[1] * (PI2/8.0);
 
 	trunk->ChainNode = leaves;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(trunk, "nanosaur2.tree.bentPineTrunk", "obstacle");
+	Nanosaur2Script_RegisterObject(leaves, "nanosaur2.tree.bentPineLeaves", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -649,6 +671,10 @@ long	rot = itemPtr->parm[1];
 
 	newObj->ChainNode = canopy;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.desert", "obstacle");
+	Nanosaur2Script_RegisterObject(canopy, "nanosaur2.tree.desertCanopy", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -712,6 +738,10 @@ long	rot = itemPtr->parm[1];
 
 	newObj->ChainNode = canopy;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.palm", "obstacle");
+	Nanosaur2Script_RegisterObject(canopy, "nanosaur2.tree.palmCanopy", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -751,6 +781,10 @@ short	type = itemPtr->parm[0];
 
 	newObj->TriggerCallback = DoTrig_Tree;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.burntDesert", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -789,6 +823,10 @@ short	type = itemPtr->parm[0];
 
 	CreateCollisionBoxFromBoundingBox(newObj, .1, .7);								// tree trunk collision box
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.hydra", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -826,6 +864,10 @@ short	type = itemPtr->parm[0];
 	newObj->TriggerCallback = DoTrig_FallenSwampTree;
 
 	CreateCollisionBoxFromBoundingBox(newObj, .25, .9);								// tree trunk collision box
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.odd", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -868,6 +910,10 @@ ObjNode	*trunk;
 	CreateCollisionBoxFromBoundingBox_Rotated(trunk, 1, 1);
 
 	trunk->TriggerCallback = DoTrig_FallenSwampTree;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(trunk, "nanosaur2.tree.swampFallen", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -932,7 +978,9 @@ Boolean AddSwampStump(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->TriggerCallback = DoTrig_Tree;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.tree.swampStump", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
-

@@ -22,7 +22,14 @@ void OttoScript_RunHumanObjectFrame(ObjNode* human, Boolean usesGlobals);
 void OttoScript_ApplyHumanVisualOffset(ObjNode* human);
 
 void OttoScript_RegisterObjectNode(ObjNode* theNode, PangeaScriptCapabilityLevel capabilityLevel, const char* const* tags, int tagCount);
+void OttoScript_RegisterTaggedObjectNode(ObjNode* theNode, const char* nativeId, const char* category);
 void OttoScript_UnregisterObjectNode(ObjNode* theNode);
+Boolean OttoScript_OnTriggerEnter(ObjNode* triggerObj, ObjNode* otherObj, const char* triggerId, int triggerType, unsigned int sideBits, Boolean* outSolid);
+Boolean OttoScript_OnObjectCollision(ObjNode* selfObj, ObjNode* otherObj, const char* collisionId, int collisionType, unsigned int sideBits);
+Boolean OttoScript_OnPickupCollected(ObjNode* pickupObj, ObjNode* playerObj, const char* pickupId, int pickupType, int amount);
+Boolean OttoScript_OnWeaponHit(ObjNode* weaponObj, ObjNode* targetObj, const char* weaponId, int weaponType, float* ioDamage);
+Boolean OttoScript_OnObjectDamage(ObjNode* sourceObj, ObjNode* targetObj, const char* damageId, int damageType, float* ioDamage);
+Boolean OttoScript_OnPlayerDamage(float* ioDamage, Byte deathType, ObjNode* sourceObj);
 void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals);
 void OttoScript_ApplyObjectVisualOffset(ObjNode* theNode);
 

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -1818,6 +1822,10 @@ ObjNode						*newObj;
 
 	newObj->MineArmingTimer = 1.0;							// arming timer
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.landMine", "hazard");
+#endif
+
 	PlayEffect_Parms3D(EFFECT_MINE, &newObj->Coord, NORMAL_CHANNEL_RATE, 2);
 
 }
@@ -1883,7 +1891,6 @@ Boolean DoTrig_LandMine(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	return(false);
 }
-
 
 
 

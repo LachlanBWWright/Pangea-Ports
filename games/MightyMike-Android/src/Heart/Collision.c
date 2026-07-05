@@ -15,6 +15,10 @@
 #include "collision.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -438,32 +442,49 @@ short			originalX,originalY,offset;
 		else
 		if (gCollisionList[i].type == COLLISION_TYPE_OBJ)
 		{
+			ObjNode* targetObj = gCollisionList[i].objectPtr;
+
+			if (targetObj->CType == INVALID_NODE_FLAG)
+				continue;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (MikeScript_OnObjectCollision(gThisNodePtr, targetObj, "object.contact", (int) targetObj->CType, gCollisionList[i].sides))
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			if (targetObj->CType == INVALID_NODE_FLAG)
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+#endif
 					/****************************/
 					/* HANDLE OBJECT COLLISIONS */
 					/****************************/
 
 			if (gCollisionList[i].sides & SIDE_BITS_TOP)	// SEE IF HIT TOP
 			{
-				offset = (gCollisionList[i].objectPtr->BottomSide-gTopSide)+1;	// see how far over it went
+				offset = (targetObj->BottomSide-gTopSide)+1;	// see how far over it went
 				gY.Int = originalY+offset;					// adjust y coord
 			}
 			else
 			if (gCollisionList[i].sides & SIDE_BITS_BOTTOM)	// SEE IF HIT BOTTOM
 			{
-				offset = (gBottomSide-gCollisionList[i].objectPtr->TopSide)+1;	// see how far over it went
+				offset = (gBottomSide-targetObj->TopSide)+1;	// see how far over it went
 				gY.Int = originalY-offset;					// adjust y coord
 			}
 
 
 			if (gCollisionList[i].sides & SIDE_BITS_LEFT)	// SEE IF HIT LEFT
 			{
-				offset = (gCollisionList[i].objectPtr->RightSide-gLeftSide)+1;	// see how far over it went
+				offset = (targetObj->RightSide-gLeftSide)+1;	// see how far over it went
 				gX.Int = originalX+offset;					// adjust x coord
 			}
 			else
 			if (gCollisionList[i].sides & SIDE_BITS_RIGHT)	// SEE IF HIT RIGHT
 			{
-				offset = (gRightSide-gCollisionList[i].objectPtr->LeftSide)+1;	// see how far over it went
+				offset = (gRightSide-targetObj->LeftSide)+1;	// see how far over it went
 				gX.Int = originalX-offset;					// adjust x coord
 			}
 		}
@@ -588,4 +609,3 @@ next:
 	}
 	return (gNumCollisions>0);
 }
-

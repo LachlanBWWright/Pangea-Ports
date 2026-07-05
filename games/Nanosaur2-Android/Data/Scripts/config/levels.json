@@ -1,4 +1,10 @@
 {
   "version": 1,
-  "levels": []
+  "levels": {
+    "0": {
+      "script": "Data/Scripts/dist/main.lua",
+      "extraNativeItems": [],
+      "itemOverrides": []
+    }
+  }
 }

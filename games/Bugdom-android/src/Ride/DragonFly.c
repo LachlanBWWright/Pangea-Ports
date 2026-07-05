@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /*******************/
 /*   PROTOTYPES    */
@@ -117,6 +121,10 @@ TQ3Point3D	where;
 				/* MAKE SHADOW */
 				
 	AttachShadowToObject(newObj, 8, 15, false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.dragonFly", "ride");
+#endif
 
 	return(true);							// item was added
 }
@@ -638,7 +646,6 @@ TQ3Vector3D		delta;
 
 	DeleteObject(theNode);
 }
-
 
 
 

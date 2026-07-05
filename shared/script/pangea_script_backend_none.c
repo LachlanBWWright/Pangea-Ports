@@ -37,9 +37,29 @@ PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backen
 	return PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
+PangeaScriptStatus PangeaScriptBackend_CallNamedLevelHook(PangeaScriptBackend* backend, const char* hookName, const PangeaScriptLevelContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) hookName;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
 PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backend, const PangeaScriptFrameContext* context, char* error, int errorCapacity)
 {
 	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallNamedFrameHook(PangeaScriptBackend* backend, const char* hookName, const PangeaScriptFrameContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) hookName;
 	(void) context;
 	if (error && errorCapacity > 0)
 		error[0] = '\0';
@@ -65,6 +85,69 @@ PangeaScriptStatus PangeaScriptBackend_CallSplineItemHook(PangeaScriptBackend* b
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* backend, PangeaScriptMapItemContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallPickupCollectedHook(PangeaScriptBackend* backend, PangeaScriptPickupContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallWeaponHitHook(PangeaScriptBackend* backend, PangeaScriptWeaponHitContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallTriggerEnterHook(PangeaScriptBackend* backend, PangeaScriptTriggerContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallObjectCollisionHook(PangeaScriptBackend* backend, PangeaScriptObjectCollisionContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallPlayerDamageHook(PangeaScriptBackend* backend, PangeaScriptPlayerDamageContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallObjectDamageHook(PangeaScriptBackend* backend, PangeaScriptObjectDamageContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	if (error && errorCapacity > 0)
+		error[0] = '\0';
+	return PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallObjectDeleteHook(PangeaScriptBackend* backend, const PangeaScriptObjectDeleteContext* context, char* error, int errorCapacity)
 {
 	(void) backend;
 	(void) context;

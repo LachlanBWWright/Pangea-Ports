@@ -28,5 +28,11 @@ void Bugdom2Script_UnregisterObject(ObjNode* obj);
 void Bugdom2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void Bugdom2Script_ApplyObjectScripting(ObjNode* obj);
 void Bugdom2Script_RunObjectFrame(ObjNode* obj);
+Boolean Bugdom2Script_OnTriggerEnter(ObjNode* triggerObj, ObjNode* otherObj, const char* triggerId, int triggerType, unsigned int sideBits, Boolean* outSolid);
+Boolean Bugdom2Script_OnObjectCollision(ObjNode* selfObj, ObjNode* otherObj, const char* collisionId, int collisionType, unsigned int sideBits);
+Boolean Bugdom2Script_OnPickupCollected(ObjNode* pickupObj, ObjNode* playerObj, const char* pickupId, int pickupType, int amount);
+Boolean Bugdom2Script_OnWeaponHit(ObjNode* weaponObj, ObjNode* targetObj, const char* weaponId, int weaponType, float* ioDamage);
+Boolean Bugdom2Script_OnObjectDamage(ObjNode* sourceObj, ObjNode* targetObj, const char* damageId, int damageType, float* ioDamage);
+Boolean Bugdom2Script_OnPlayerDamage(float* ioDamage, Byte deathType, ObjNode* sourceObj);
 
 #endif

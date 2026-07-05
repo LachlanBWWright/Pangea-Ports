@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -163,12 +167,21 @@ long	h = itemPtr->parm[0];
 	CreateCollisionBoxFromBoundingBox(mine, .5, .9);
 
 	mine->TriggerCallback = DoTrig_AirMine;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	mine->Kind = NANOSAUR2_SCRIPT_TRIGGER_MINE;
+#endif
 	mine->HitByWeaponHandler = AirMineHitByWeaponCallback;
 
 
 
 	chain->ChainNode = mine;
 	mine->ChainHead = chain;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(base, "nanosaur2.airMineBase", "hazard");
+	Nanosaur2Script_RegisterObject(chain, "nanosaur2.airMineChain", "hazard");
+	Nanosaur2Script_RegisterObject(mine, "nanosaur2.airMine", "hazard");
+#endif
 
 
 
@@ -604,9 +617,6 @@ short	i;
 
 
 }
-
-
-
 
 
 

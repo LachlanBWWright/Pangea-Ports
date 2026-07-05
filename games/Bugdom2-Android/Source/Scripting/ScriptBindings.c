@@ -6,7 +6,6 @@
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
 static PangeaScriptFrameContext gScriptFrameContext;
-static const char* const kBugdom2PlayerTags[] = { "bugdom2.player" };
 
 static bool Bugdom2Script_GetObjectPosition(void* nativeObject, PangeaScriptVector3* outPosition)
 {
@@ -55,13 +54,268 @@ static bool Bugdom2Script_DeleteObject(void* nativeObject)
 	return true;
 }
 
+static bool Bugdom2Script_GetObjectInfo(void* nativeObject, PangeaScriptObjectInfo* outInfo)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outInfo || obj->CType == INVALID_NODE_FLAG)
+		return false;
+
+	*outInfo = (PangeaScriptObjectInfo)
+	{
+		.type = obj->Type,
+		.kind = obj->Kind,
+		.mode = obj->Mode,
+		.statusBits = obj->StatusBits,
+		.cType = obj->CType,
+		.cBits = obj->CBits,
+		.health = obj->Health,
+		.damage = obj->Damage,
+		.velocity = { obj->Delta.x, obj->Delta.y, obj->Delta.z },
+		.validMask = PANGEA_SCRIPT_OBJECT_INFO_TYPE
+			| PANGEA_SCRIPT_OBJECT_INFO_KIND
+			| PANGEA_SCRIPT_OBJECT_INFO_MODE
+			| PANGEA_SCRIPT_OBJECT_INFO_FLAGS
+			| PANGEA_SCRIPT_OBJECT_INFO_COLLISION
+			| PANGEA_SCRIPT_OBJECT_INFO_HEALTH
+			| PANGEA_SCRIPT_OBJECT_INFO_DAMAGE
+			| PANGEA_SCRIPT_OBJECT_INFO_VELOCITY,
+	};
+	return true;
+}
+
+static bool Bugdom2Script_SetObjectInfo(void* nativeObject, const PangeaScriptObjectInfo* info)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !info || obj->CType == INVALID_NODE_FLAG)
+		return false;
+
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_TYPE)
+		obj->Type = info->type;
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_KIND)
+		obj->Kind = info->kind;
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_MODE)
+		obj->Mode = info->mode;
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_FLAGS)
+		obj->StatusBits = info->statusBits;
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_COLLISION)
+	{
+		obj->CType = info->cType;
+		obj->CBits = info->cBits;
+	}
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_HEALTH)
+		obj->Health = info->health;
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_DAMAGE)
+		obj->Damage = info->damage;
+	if (info->validMask & PANGEA_SCRIPT_OBJECT_INFO_VELOCITY)
+	{
+		obj->Delta.x = info->velocity.x;
+		obj->Delta.y = info->velocity.y;
+		obj->Delta.z = info->velocity.z;
+	}
+
+	return true;
+}
+
+static bool Bugdom2Script_GetObjectBounds(void* nativeObject, PangeaScriptObjectBounds* outBounds)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outBounds || obj->CType == INVALID_NODE_FLAG)
+		return false;
+
+	*outBounds = (PangeaScriptObjectBounds)
+	{
+		.left = obj->LeftOff,
+		.right = obj->RightOff,
+		.front = obj->FrontOff,
+		.back = obj->BackOff,
+		.top = obj->TopOff,
+		.bottom = obj->BottomOff,
+	};
+	return true;
+}
+
+static bool Bugdom2Script_SetObjectBounds(void* nativeObject, const PangeaScriptObjectBounds* bounds)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !bounds || obj->CType == INVALID_NODE_FLAG)
+		return false;
+
+	obj->LeftOff = bounds->left;
+	obj->RightOff = bounds->right;
+	obj->FrontOff = bounds->front;
+	obj->BackOff = bounds->back;
+	obj->TopOff = bounds->top;
+	obj->BottomOff = bounds->bottom;
+	CalcObjectBoxFromNode(obj);
+	return true;
+}
+
+static bool Bugdom2Script_GetObjectParams(void* nativeObject, PangeaScriptObjectParams* outParams)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outParams || obj->CType == INVALID_NODE_FLAG)
+		return false;
+
+	*outParams = (PangeaScriptObjectParams){0};
+	const Byte* params = NULL;
+	if (obj->TerrainItemPtr)
+		params = obj->TerrainItemPtr->parm;
+	else if (obj->SplineItemPtr)
+		params = obj->SplineItemPtr->parm;
+
+	if (!params)
+		return true;
+
+	outParams->count = 4;
+	for (int i = 0; i < outParams->count; i++)
+		outParams->values[i] = params[i];
+	return true;
+}
+
+static bool Bugdom2Script_SetObjectParams(void* nativeObject, const PangeaScriptObjectParams* params)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !params || obj->CType == INVALID_NODE_FLAG || params->count < 0 || params->count > 4)
+		return false;
+
+	Byte* itemParams = NULL;
+	if (obj->TerrainItemPtr)
+		itemParams = obj->TerrainItemPtr->parm;
+	else if (obj->SplineItemPtr)
+		itemParams = obj->SplineItemPtr->parm;
+
+	if (!itemParams)
+		return false;
+
+	for (int i = 0; i < params->count; i++)
+		itemParams[i] = (Byte) params->values[i];
+	return true;
+}
+
 static const PangeaScriptObjectOps kBugdom2PlayerObjectOps =
 {
 	.getPosition = Bugdom2Script_GetObjectPosition,
 	.setPosition = Bugdom2Script_SetObjectPosition,
 	.setVelocity = Bugdom2Script_SetObjectVelocity,
 	.deleteObject = Bugdom2Script_DeleteObject,
+	.getInfo = Bugdom2Script_GetObjectInfo,
+	.setInfo = Bugdom2Script_SetObjectInfo,
+	.getBounds = Bugdom2Script_GetObjectBounds,
+	.setBounds = Bugdom2Script_SetObjectBounds,
+	.getParams = Bugdom2Script_GetObjectParams,
+	.setParams = Bugdom2Script_SetObjectParams,
 };
+
+static int Bugdom2Script_GetKeyMapMask(void)
+{
+	int mask = 0;
+
+	for (int i = 0; i < NUM_KEY_TYPES; i++)
+	{
+		if (gPlayerInfo.hasKey[i])
+			mask |= 1 << i;
+	}
+
+	if (gPlayerInfo.hasMap)
+		mask |= 1 << NUM_KEY_TYPES;
+
+	return mask;
+}
+
+static void Bugdom2Script_SetKeyMapMask(int mask)
+{
+	for (int i = 0; i < NUM_KEY_TYPES; i++)
+		gPlayerInfo.hasKey[i] = (mask & (1 << i)) != 0;
+
+	gPlayerInfo.hasMap = (mask & (1 << NUM_KEY_TYPES)) != 0;
+}
+
+static short Bugdom2Script_ClampShortCounter(int value)
+{
+	if (value < 0)
+		return 0;
+	if (value > 32767)
+		return 32767;
+	return (short) value;
+}
+
+static Byte Bugdom2Script_ClampByteCounter(int value)
+{
+	if (value < 0)
+		return 0;
+	if (value > 255)
+		return 255;
+	return (Byte) value;
+}
+
+static float Bugdom2Script_ClampUnit(float value)
+{
+	if (value < 0.0f)
+		return 0.0f;
+	if (value > 1.0f)
+		return 1.0f;
+	return value;
+}
+
+static bool Bugdom2Script_GetPlayerInfo(int playerNum, PangeaScriptPlayerInfo* outInfo)
+{
+	if (playerNum != 0 || !outInfo)
+		return false;
+
+	*outInfo = (PangeaScriptPlayerInfo)
+	{
+		.playerNum = playerNum,
+		.score = (int) gScore,
+		.health = gPlayerInfo.health,
+		.lives = gPlayerInfo.lives,
+		.fuel = gPlayerInfo.glidePower,
+		.shield = gPlayerInfo.shieldTimer,
+		.currency = Bugdom2Script_GetKeyMapMask(),
+		.boostTimer = gPlayerInfo.rammingTimer,
+		.collectibleA = gPlayerInfo.numGreenClovers,
+		.collectibleB = gPlayerInfo.numBlueClovers,
+		.collectibleC = gPlayerInfo.numGoldClovers,
+		.validMask = PANGEA_SCRIPT_PLAYER_INFO_SCORE
+			| PANGEA_SCRIPT_PLAYER_INFO_HEALTH
+			| PANGEA_SCRIPT_PLAYER_INFO_LIVES
+			| PANGEA_SCRIPT_PLAYER_INFO_FUEL
+			| PANGEA_SCRIPT_PLAYER_INFO_SHIELD
+			| PANGEA_SCRIPT_PLAYER_INFO_CURRENCY
+			| PANGEA_SCRIPT_PLAYER_INFO_BOOST_TIMER
+			| PANGEA_SCRIPT_PLAYER_INFO_COLLECTIBLE_A
+			| PANGEA_SCRIPT_PLAYER_INFO_COLLECTIBLE_B
+			| PANGEA_SCRIPT_PLAYER_INFO_COLLECTIBLE_C,
+	};
+	return true;
+}
+
+static bool Bugdom2Script_SetPlayerInfo(int playerNum, const PangeaScriptPlayerInfo* info)
+{
+	if (playerNum != 0 || !info)
+		return false;
+
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_SCORE)
+		gScore = info->score < 0 ? 0 : (uint32_t) info->score;
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_HEALTH)
+		gPlayerInfo.health = info->health;
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_LIVES)
+		gPlayerInfo.lives = Bugdom2Script_ClampByteCounter(info->lives);
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_FUEL)
+		gPlayerInfo.glidePower = Bugdom2Script_ClampUnit(info->fuel);
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_SHIELD)
+		gPlayerInfo.shieldTimer = info->shield < 0.0f ? 0.0f : info->shield;
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_CURRENCY)
+		Bugdom2Script_SetKeyMapMask(info->currency);
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_BOOST_TIMER)
+		gPlayerInfo.rammingTimer = info->boostTimer < 0.0f ? 0.0f : info->boostTimer;
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_COLLECTIBLE_A)
+		gPlayerInfo.numGreenClovers = Bugdom2Script_ClampShortCounter(info->collectibleA);
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_COLLECTIBLE_B)
+		gPlayerInfo.numBlueClovers = Bugdom2Script_ClampShortCounter(info->collectibleB);
+	if (info->validMask & PANGEA_SCRIPT_PLAYER_INFO_COLLECTIBLE_C)
+		gPlayerInfo.numGoldClovers = Bugdom2Script_ClampShortCounter(info->collectibleC);
+	return true;
+}
 
 void Bugdom2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 {
@@ -241,6 +495,12 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "pickup",
 		.dependencySummary = "level-specific glider part models and terrain/collision systems",
 	},
+	{
+		.id = "bugdom2.trigger",
+		.nativeType = 0,
+		.category = "trigger",
+		.dependencySummary = "collision callback dispatch, player state, and object manager",
+	},
 };
 
 typedef struct Bugdom2NamedAsset
@@ -307,6 +567,65 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 		runtimeUnavailableLogged = true;
 
 	SDL_Log("Bugdom2 scripting %s failed: %s", action, PangeaScript_GetLastError());
+}
+
+static bool Bugdom2Script_PlaySound(const PangeaScriptSoundRequest* request)
+{
+	if (!request)
+		return false;
+
+	if (request->hasPosition)
+	{
+		OGLPoint3D where = { request->position.x, request->position.y, request->position.z };
+		PlayEffect3D(request->soundId, &where);
+		return true;
+	}
+
+	PlayEffect(request->soundId);
+	return true;
+}
+
+static bool Bugdom2Script_SpawnEffect(const PangeaScriptEffectRequest* request)
+{
+	if (!request || !request->hasPosition)
+		return false;
+
+	OGLPoint3D position = { request->position.x, request->position.y, request->position.z };
+	float scale = request->hasScale ? request->scale : 1.0f;
+
+	switch (request->effectId)
+	{
+		case 0:
+			MakeSparkExplosion(position.x, position.y, position.z, 300.0f, scale, PARTICLE_SObjType_WhiteSpark4, 100, 1.0f);
+			return true;
+
+		case 1:
+			MakeSparkExplosion(position.x, position.y, position.z, 300.0f, scale, PARTICLE_SObjType_BlueSpark, 100, 1.0f);
+			return true;
+
+		case 2:
+			MakeSparkExplosion(position.x, position.y, position.z, 300.0f, scale, PARTICLE_SObjType_YellowGlint, 100, 1.0f);
+			return true;
+
+		case 3:
+			MakeSplash(position.x, position.y, position.z, scale);
+			return true;
+
+		case 4:
+			MakeFireExplosion(&position);
+			return true;
+
+		case 5:
+			MakePuff(&position, 14.0f * scale, PARTICLE_SObjType_BlackSmoke, GL_SRC_ALPHA, GL_ONE, 0.5f);
+			return true;
+
+		case 6:
+			MakeConfettiExplosion(position.x, position.y, position.z, 300.0f, scale, PARTICLE_SObjType_WhiteSpark4, 100);
+			return true;
+
+		default:
+			return false;
+	}
 }
 
 static PangeaScriptStatus Bugdom2Script_SpawnNativeCallback(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle)
@@ -379,6 +698,10 @@ void Bugdom2Script_Init(void)
 		.gameId = "Bugdom2-Android",
 		.gameName = "Bugdom 2",
 		.spawnNative = Bugdom2Script_SpawnNativeCallback,
+		.getPlayerInfo = Bugdom2Script_GetPlayerInfo,
+		.setPlayerInfo = Bugdom2Script_SetPlayerInfo,
+		.playSound = Bugdom2Script_PlaySound,
+		.spawnEffect = Bugdom2Script_SpawnEffect,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -549,6 +872,424 @@ Boolean Bugdom2Script_OnSplineItem(SplineItemType* itemPtr, int levelNum, int sp
 	PangeaScriptStatus status = PangeaScript_CallSplineItemHook(&context);
 	LogScriptStatus("onSplineItem", status);
 	return context.handled && context.markInUse;
+}
+
+static void Bugdom2Script_DisableTriggerObject(ObjNode* obj)
+{
+	if (!obj || obj->CType == INVALID_NODE_FLAG)
+		return;
+
+	Bugdom2Script_UnregisterObject(obj);
+	obj->CType = 0;
+	obj->CBits = 0;
+	obj->StatusBits |= STATUS_BIT_HIDDEN;
+	if (obj->ShadowNode)
+		obj->ShadowNode->StatusBits |= STATUS_BIT_HIDDEN;
+}
+
+static void Bugdom2Script_ApplyHealthDelta(float healthDelta)
+{
+	if (healthDelta > 0.0f)
+	{
+		gPlayerInfo.health += healthDelta;
+		if (gPlayerInfo.health > 1.0f)
+			gPlayerInfo.health = 1.0f;
+		return;
+	}
+
+	if (healthDelta < 0.0f)
+	{
+		PlayerLoseHealth(-healthDelta, PLAYER_DEATH_TYPE_EXPLODE);
+	}
+}
+
+Boolean Bugdom2Script_OnTriggerEnter(ObjNode* triggerObj, ObjNode* otherObj, const char* triggerId, int triggerType, unsigned int sideBits, Boolean* outSolid)
+{
+	PangeaScriptTriggerContext context;
+	PangeaScriptStatus status;
+	PangeaScriptVector3 position = {0};
+
+	if (!triggerObj || triggerObj->CType == INVALID_NODE_FLAG)
+		return false;
+
+	if (triggerObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(triggerObj, triggerId, "trigger");
+
+	if (otherObj && otherObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(otherObj, "bugdom2.player", "player");
+
+	(void) Bugdom2Script_GetObjectPosition(triggerObj, &position);
+	context = (PangeaScriptTriggerContext)
+	{
+		.levelNum = gLevelNum,
+		.playerNum = 0,
+		.triggerId = triggerId,
+		.triggerType = triggerType,
+		.self = {
+			.id = triggerObj->ScriptObjectID,
+			.generation = (uint32_t) triggerObj->ScriptObjectGeneration,
+		},
+		.other = {
+			.id = otherObj ? otherObj->ScriptObjectID : 0,
+			.generation = otherObj ? (uint32_t) otherObj->ScriptObjectGeneration : 0,
+		},
+		.position = position,
+		.sideBits = sideBits,
+		.otherType = otherObj ? otherObj->Type : 0,
+		.otherFlags = otherObj ? otherObj->CType : 0,
+		.solid = true,
+	};
+
+	status = PangeaScript_CallTriggerEnterHook(&context);
+	LogScriptStatus("onTriggerEnter", status);
+	if (status != PANGEA_SCRIPT_OK || !context.handled)
+		return false;
+
+	if (context.scoreDelta != 0)
+		gScore += context.scoreDelta;
+
+	if (context.damagePlayer > 0.0f)
+		PlayerLoseHealth(context.damagePlayer, PLAYER_DEATH_TYPE_EXPLODE);
+
+	if (context.healthDelta != 0.0f)
+		Bugdom2Script_ApplyHealthDelta(context.healthDelta);
+
+	if (context.deleteOther && otherObj && otherObj != gPlayerInfo.objNode)
+	{
+		Bugdom2Script_UnregisterObject(otherObj);
+		DeleteObject(otherObj);
+	}
+
+	if (context.deleteSelf)
+		Bugdom2Script_DisableTriggerObject(triggerObj);
+
+	if (outSolid)
+		*outSolid = context.solid;
+	return true;
+}
+
+Boolean Bugdom2Script_OnObjectCollision(ObjNode* selfObj, ObjNode* otherObj, const char* collisionId, int collisionType, unsigned int sideBits)
+{
+	PangeaScriptObjectCollisionContext context;
+	PangeaScriptStatus status;
+	PangeaScriptVector3 position = {0};
+
+	if (!selfObj || !otherObj || selfObj->CType == INVALID_NODE_FLAG || otherObj->CType == INVALID_NODE_FLAG)
+		return false;
+
+	if (!PangeaScript_HasRunnableModule())
+		return false;
+
+	if (selfObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(selfObj, selfObj == gPlayerInfo.objNode ? "bugdom2.player" : "bugdom2.object", selfObj == gPlayerInfo.objNode ? "player" : "object");
+	if (otherObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(otherObj, "bugdom2.object", "object");
+
+	(void) Bugdom2Script_GetObjectPosition(otherObj, &position);
+	context = (PangeaScriptObjectCollisionContext)
+	{
+		.levelNum = gLevelNum,
+		.playerNum = selfObj == gPlayerInfo.objNode ? 0 : -1,
+		.collisionId = collisionId ? collisionId : "object.contact",
+		.collisionType = collisionType,
+		.self = {
+			.id = selfObj->ScriptObjectID,
+			.generation = (uint32_t) selfObj->ScriptObjectGeneration,
+		},
+		.other = {
+			.id = otherObj->ScriptObjectID,
+			.generation = (uint32_t) otherObj->ScriptObjectGeneration,
+		},
+		.position = position,
+		.sideBits = sideBits,
+		.selfType = selfObj->Type,
+		.selfFlags = selfObj->CType,
+		.otherType = otherObj->Type,
+		.otherFlags = otherObj->CType,
+		.damage = otherObj->Damage,
+	};
+
+	status = PangeaScript_CallObjectCollisionHook(&context);
+	LogScriptStatus("onObjectCollision", status);
+	if (status != PANGEA_SCRIPT_OK || !context.handled)
+		return false;
+
+	if (context.scoreDelta != 0)
+		gScore += context.scoreDelta;
+
+	if (context.applyDamage && context.damage != 0.0f)
+	{
+		if (selfObj == gPlayerInfo.objNode)
+			PlayerLoseHealth(context.damage, PLAYER_DEATH_TYPE_EXPLODE);
+		else
+			selfObj->Health -= context.damage;
+	}
+
+	if (context.healthDelta != 0.0f && selfObj == gPlayerInfo.objNode)
+		Bugdom2Script_ApplyHealthDelta(context.healthDelta);
+
+	if (context.deleteOther && otherObj != gPlayerInfo.objNode && otherObj->CType != INVALID_NODE_FLAG)
+	{
+		Bugdom2Script_UnregisterObject(otherObj);
+		DeleteObject(otherObj);
+	}
+
+	if (context.deleteSelf && selfObj != gPlayerInfo.objNode && selfObj->CType != INVALID_NODE_FLAG)
+	{
+		Bugdom2Script_UnregisterObject(selfObj);
+		DeleteObject(selfObj);
+	}
+
+	return context.suppressNative;
+}
+
+Boolean Bugdom2Script_OnPickupCollected(ObjNode* pickupObj, ObjNode* playerObj, const char* pickupId, int pickupType, int amount)
+{
+	PangeaScriptPickupContext context;
+	PangeaScriptVector3 position = {0};
+	PangeaScriptStatus status;
+
+	if (!pickupObj || pickupObj->CType == INVALID_NODE_FLAG || !PangeaScript_HasRunnableModule())
+		return false;
+
+	if (pickupObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(pickupObj, pickupId, "pickup");
+
+	if (playerObj && playerObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(playerObj, "bugdom2.player", "player");
+
+	(void) Bugdom2Script_GetObjectPosition(pickupObj, &position);
+	context = (PangeaScriptPickupContext)
+	{
+		.levelNum = gLevelNum,
+		.playerNum = 0,
+		.pickupId = pickupId,
+		.pickupType = pickupType,
+		.amount = amount,
+		.pickup = {
+			.id = pickupObj->ScriptObjectID,
+			.generation = (uint32_t) pickupObj->ScriptObjectGeneration,
+		},
+		.player = {
+			.id = playerObj ? playerObj->ScriptObjectID : 0,
+			.generation = playerObj ? (uint32_t) playerObj->ScriptObjectGeneration : 0,
+		},
+		.position = position,
+		.handled = false,
+		.consumePickup = false,
+		.scoreDelta = 0,
+		.healthDelta = 0.0f,
+	};
+
+	status = PangeaScript_CallPickupCollectedHook(&context);
+	LogScriptStatus("onPickupCollected", status);
+	if (status != PANGEA_SCRIPT_OK || !context.handled)
+		return false;
+
+	if (context.scoreDelta != 0)
+		gScore += context.scoreDelta;
+
+	if (context.healthDelta != 0.0f)
+		Bugdom2Script_ApplyHealthDelta(context.healthDelta);
+
+	return context.consumePickup;
+}
+
+Boolean Bugdom2Script_OnWeaponHit(ObjNode* weaponObj, ObjNode* targetObj, const char* weaponId, int weaponType, float* ioDamage)
+{
+	PangeaScriptWeaponHitContext context;
+	PangeaScriptVector3 position = {0};
+	PangeaScriptStatus status;
+
+	if (!targetObj || !ioDamage || targetObj->CType == INVALID_NODE_FLAG || !PangeaScript_HasRunnableModule())
+		return false;
+
+	if (weaponObj && weaponObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(weaponObj, weaponId, "weapon");
+
+	if (targetObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(targetObj, "bugdom2.enemy", "enemy");
+
+	(void) Bugdom2Script_GetObjectPosition(targetObj, &position);
+	context = (PangeaScriptWeaponHitContext)
+	{
+		.levelNum = gLevelNum,
+		.playerNum = 0,
+		.weaponId = weaponId,
+		.weaponType = weaponType,
+		.damage = *ioDamage,
+		.weapon = {
+			.id = weaponObj ? weaponObj->ScriptObjectID : 0,
+			.generation = weaponObj ? (uint32_t) weaponObj->ScriptObjectGeneration : 0,
+		},
+		.target = {
+			.id = targetObj->ScriptObjectID,
+			.generation = (uint32_t) targetObj->ScriptObjectGeneration,
+		},
+		.position = position,
+		.targetType = targetObj->Type,
+		.targetFlags = targetObj->CType,
+		.handled = false,
+		.applyDamage = false,
+		.destroyTarget = false,
+		.scoreDelta = 0,
+	};
+
+	status = PangeaScript_CallWeaponHitHook(&context);
+	LogScriptStatus("onWeaponHit", status);
+	if (status != PANGEA_SCRIPT_OK || !context.handled)
+		return false;
+
+	if (context.scoreDelta != 0)
+		gScore += context.scoreDelta;
+
+	if (context.destroyTarget && targetObj->CType != INVALID_NODE_FLAG)
+	{
+		Bugdom2Script_UnregisterObject(targetObj);
+		DeleteObject(targetObj);
+		return true;
+	}
+
+	if (context.applyDamage)
+	{
+		if (context.damage < 0.0f)
+			context.damage = 0.0f;
+
+		*ioDamage = context.damage;
+		return false;
+	}
+
+	return true;
+}
+
+Boolean Bugdom2Script_OnObjectDamage(ObjNode* sourceObj, ObjNode* targetObj, const char* damageId, int damageType, float* ioDamage)
+{
+	PangeaScriptObjectDamageContext context;
+	PangeaScriptVector3 position = {0};
+	PangeaScriptStatus status;
+
+	if (!targetObj || !ioDamage || targetObj->CType == INVALID_NODE_FLAG || !PangeaScript_HasRunnableModule())
+		return false;
+
+	if (sourceObj && sourceObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(sourceObj, damageId ? damageId : "bugdom2.objectDamage", "damageSource");
+
+	if (targetObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(targetObj, "bugdom2.damageTarget", "damageTarget");
+
+	(void) Bugdom2Script_GetObjectPosition(targetObj, &position);
+	context = (PangeaScriptObjectDamageContext)
+	{
+		.levelNum = gLevelNum,
+		.playerNum = 0,
+		.damageId = damageId ? damageId : "bugdom2.objectDamage",
+		.damageType = damageType,
+		.damage = *ioDamage,
+		.source = {
+			.id = sourceObj ? sourceObj->ScriptObjectID : 0,
+			.generation = sourceObj ? (uint32_t) sourceObj->ScriptObjectGeneration : 0,
+		},
+		.target = {
+			.id = targetObj->ScriptObjectID,
+			.generation = (uint32_t) targetObj->ScriptObjectGeneration,
+		},
+		.position = position,
+		.targetType = targetObj->Type,
+		.targetFlags = targetObj->CType,
+		.handled = false,
+		.applyDamage = false,
+		.destroyTarget = false,
+		.scoreDelta = 0,
+	};
+
+	status = PangeaScript_CallObjectDamageHook(&context);
+	LogScriptStatus("onObjectDamage", status);
+	if (status != PANGEA_SCRIPT_OK || !context.handled)
+		return false;
+
+	if (context.scoreDelta != 0)
+		gScore += context.scoreDelta;
+
+	if (context.destroyTarget && targetObj->CType != INVALID_NODE_FLAG)
+	{
+		Bugdom2Script_UnregisterObject(targetObj);
+		DeleteObject(targetObj);
+		return true;
+	}
+
+	if (context.applyDamage)
+	{
+		if (context.damage < 0.0f)
+			context.damage = 0.0f;
+
+		*ioDamage = context.damage;
+		return false;
+	}
+
+	return true;
+}
+
+Boolean Bugdom2Script_OnPlayerDamage(float* ioDamage, Byte deathType, ObjNode* sourceObj)
+{
+	ObjNode* playerObj = gPlayerInfo.objNode;
+	PangeaScriptObjectHandle sourceHandle = {0};
+	PangeaScriptObjectHandle playerHandle = {0};
+	PangeaScriptPlayerDamageContext context;
+	PangeaScriptStatus status;
+
+	if (!ioDamage || !PangeaScript_HasRunnableModule())
+		return false;
+
+	if (playerObj && playerObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterPlayerObject(playerObj);
+	if (sourceObj && sourceObj->ScriptObjectID == 0)
+		Bugdom2Script_RegisterObject(sourceObj, "bugdom2.damageSource", "damage");
+
+	if (sourceObj && sourceObj->ScriptObjectID > 0)
+	{
+		sourceHandle.id = sourceObj->ScriptObjectID;
+		sourceHandle.generation = (uint32_t) sourceObj->ScriptObjectGeneration;
+	}
+	if (playerObj && playerObj->ScriptObjectID > 0)
+	{
+		playerHandle.id = playerObj->ScriptObjectID;
+		playerHandle.generation = (uint32_t) playerObj->ScriptObjectGeneration;
+	}
+
+	context = (PangeaScriptPlayerDamageContext)
+	{
+		.levelNum = gLevelNum,
+		.playerNum = 0,
+		.damageId = "bugdom2.playerDamage",
+		.damageType = deathType,
+		.damage = *ioDamage,
+		.source = sourceHandle,
+		.player = playerHandle,
+		.position = playerObj ? (PangeaScriptVector3){ playerObj->Coord.x, playerObj->Coord.y, playerObj->Coord.z } : (PangeaScriptVector3){0},
+		.handled = false,
+		.applyDamage = true,
+		.healthDelta = 0.0f,
+		.scoreDelta = 0,
+	};
+
+	status = PangeaScript_CallPlayerDamageHook(&context);
+	LogScriptStatus("onPlayerDamage", status);
+	if (status != PANGEA_SCRIPT_OK)
+		return false;
+
+	if (context.scoreDelta != 0)
+		gScore += context.scoreDelta;
+
+	if (context.healthDelta > 0.0f)
+		Bugdom2Script_ApplyHealthDelta(context.healthDelta);
+	else if (context.healthDelta < 0.0f)
+		context.damage += -context.healthDelta;
+
+	if (context.damage < 0.0f)
+		context.damage = 0.0f;
+	*ioDamage = context.damage;
+
+	return context.handled && !context.applyDamage;
 }
 
 #endif

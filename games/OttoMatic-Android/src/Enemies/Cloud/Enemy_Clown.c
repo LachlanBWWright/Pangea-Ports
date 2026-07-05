@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -540,7 +544,12 @@ static Boolean ClownHitByWeapon(ObjNode *weapon, ObjNode *enemy, OGLPoint3D *wea
 
 			/* HURT IT */
 
-	HurtClown(enemy, weapon->Damage);
+	float damage = weapon->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(weapon, enemy, "ottomatic.weaponHit", weapon->Type, &damage))
+		return(true);
+#endif
+	HurtClown(enemy, damage);
 
 
 			/* GIVE MOMENTUM */
@@ -954,7 +963,6 @@ static Boolean BubbleHitByDart(ObjNode *weapon, ObjNode *bubble, OGLPoint3D *wea
 
 	return(true);			// stop weapon
 }
-
 
 
 

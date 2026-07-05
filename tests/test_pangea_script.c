@@ -45,9 +45,29 @@ PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backen
 	return g_mock_hook_status;
 }
 
+PangeaScriptStatus PangeaScriptBackend_CallNamedLevelHook(PangeaScriptBackend* backend, const char* hookName, const PangeaScriptLevelContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) hookName;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
 PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backend, const PangeaScriptFrameContext* context, char* error, int errorCapacity)
 {
 	(void) backend;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallNamedFrameHook(PangeaScriptBackend* backend, const char* hookName, const PangeaScriptFrameContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) hookName;
 	(void) context;
 	(void) error;
 	(void) errorCapacity;
@@ -73,6 +93,60 @@ PangeaScriptStatus PangeaScriptBackend_CallSplineItemHook(PangeaScriptBackend* b
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* backend, PangeaScriptMapItemContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallPickupCollectedHook(PangeaScriptBackend* backend, PangeaScriptPickupContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallWeaponHitHook(PangeaScriptBackend* backend, PangeaScriptWeaponHitContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallTriggerEnterHook(PangeaScriptBackend* backend, PangeaScriptTriggerContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallObjectCollisionHook(PangeaScriptBackend* backend, PangeaScriptObjectCollisionContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallPlayerDamageHook(PangeaScriptBackend* backend, PangeaScriptPlayerDamageContext* context, char* error, int errorCapacity)
+{
+	(void) backend;
+	(void) context;
+	(void) error;
+	(void) errorCapacity;
+	return g_mock_hook_status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallObjectDeleteHook(PangeaScriptBackend* backend, const PangeaScriptObjectDeleteContext* context, char* error, int errorCapacity)
 {
 	(void) backend;
 	(void) context;
@@ -184,6 +258,7 @@ void test_capability_gates(void)
 
 	assert(PangeaScript_GetObjectPosition(handle, &pos));
 	assert(pos.x == 1.0f && pos.y == 2.0f && pos.z == 3.0f);
+	assert(!PangeaScript_AddObjectTag(handle, "read-only-script-tag"));
 	assert(!PangeaScript_SetObjectPosition(handle, &pos));
 	assert(!PangeaScript_SetObjectVelocity(handle, &pos));
 	assert(!PangeaScript_DeleteObject(handle));
@@ -207,21 +282,33 @@ void test_capability_gates(void)
 	assert(!PangeaScript_DeleteObject(handle));
 
 	// 4. FULL capability level (everything allowed)
+	static const char* nativeTags[] = { "native", "item" };
 	PangeaScriptObjectRegistration regFull = {
 		.nativeObject = &dummy,
 		.ops = &kDummyOps,
-		.tags = NULL,
-		.tagCount = 0,
+		.tags = nativeTags,
+		.tagCount = 2,
 		.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL
 	};
 	status = PangeaScript_RegisterObject(&regFull, &handle);
 	assert(status == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_GetObjectTagCount(handle) == 2);
+	assert(PangeaScript_ObjectHasTag(handle, "native"));
+	assert(PangeaScript_AddObjectTag(handle, "scripted-item"));
+	assert(PangeaScript_AddObjectTag(handle, "scripted-item"));
+	assert(PangeaScript_GetObjectTagCount(handle) == 3);
+	assert(PangeaScript_ObjectHasTag(handle, "scripted-item"));
+	assert(PangeaScript_RemoveObjectTag(handle, "scripted-item"));
+	assert(!PangeaScript_ObjectHasTag(handle, "scripted-item"));
+	assert(PangeaScript_GetObjectTagCount(handle) == 2);
+	assert(!PangeaScript_RemoveObjectTag(handle, "native"));
 
 	PangeaScriptVector3 vel = { 5.0f, 5.0f, 5.0f };
 	assert(PangeaScript_SetObjectVelocity(handle, &vel));
 	assert(dummy.velocity.x == 5.0f && dummy.velocity.y == 5.0f && dummy.velocity.z == 5.0f);
 	assert(PangeaScript_DeleteObject(handle));
 	assert(dummy.deleted);
+	assert(!PangeaScript_ObjectExists(handle));
 
 	PangeaScript_Shutdown();
 	printf("Capability gates tests passed!\n");
@@ -240,8 +327,8 @@ void test_config_parsing_and_sandbox(void)
 	system("mkdir -p Data/Scripts/dist");
 
 	// Write dummy script files
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
-	write_temp_file("Data/Scripts/dist/level1.js", "console.log('level1');");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
+	write_temp_file("Data/Scripts/dist/level1.lua", "return {}");
 
 	// 1. Valid config
 	const char* valid_config = 
@@ -249,7 +336,7 @@ void test_config_parsing_and_sandbox(void)
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/level1.js\"\n"
+			"      \"script\": \"Data/Scripts/dist/level1.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -265,7 +352,7 @@ void test_config_parsing_and_sandbox(void)
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/../../evil.js\"\n"
+			"      \"script\": \"Data/Scripts/dist/../../evil.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -280,7 +367,7 @@ void test_config_parsing_and_sandbox(void)
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/evil.js\"\n"
+			"      \"script\": \"Data/evil.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -294,7 +381,7 @@ void test_config_parsing_and_sandbox(void)
 		"{\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/level1.js\"\n"
+			"      \"script\": \"Data/Scripts/dist/level1.lua\"\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -320,14 +407,14 @@ void test_level_settings_accessors(void)
 
 	system("mkdir -p Data/Scripts/config");
 	system("mkdir -p Data/Scripts/dist");
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
 
 	const char* valid_config =
 		"{\n"
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/main.js\",\n"
+			"      \"script\": \"Data/Scripts/dist/main.lua\",\n"
 		"      \"levelSettings\": {\n"
 		"        \"gravity\": 3900,\n"
 		"        \"debugSplineFlatY\": 500.5,\n"
@@ -423,8 +510,8 @@ void test_consecutive_failures(void)
 	g_mock_load_status = PANGEA_SCRIPT_OK;
 	// Create a dummy startup script path and simulate successful load
 	system("mkdir -p Data/Scripts/dist");
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
-	status = PangeaScript_SetStartupScript("Data/Scripts/dist/main.js");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
+	status = PangeaScript_SetStartupScript("Data/Scripts/dist/main.lua");
 	assert(status == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_HasRunnableModule());
 

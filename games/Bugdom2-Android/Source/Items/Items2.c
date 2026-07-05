@@ -84,6 +84,10 @@ ObjNode	*newObj;
 	newObj->Rot.z = (float)(MyRandomLong() & 0x3) * PI/2;
 	UpdateObjectTransforms(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.letterBlock", "platform");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -902,6 +906,10 @@ int		isOpen = itemPtr->flags & ITEM_FLAGS_USER1;
 
 	door->TriggerCallback = DoTrig_SiliconDoor;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(door, "bugdom2.siliconDoor", "trigger");
+#endif
+
 	return(true);
 }
 
@@ -1330,5 +1338,4 @@ ObjNode	*newObj;
 
 	return(true);
 }
-
 

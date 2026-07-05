@@ -11,6 +11,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -299,6 +302,11 @@ Boolean	killed = false;
 
 	if (gPlayerInfo.health < 0.0f)				// see if already dead
 		return(true);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnPlayerDamage(&damage, deathType, nil))
+		return false;
+#endif
 
 	gPlayerInfo.health -= damage;
 
@@ -1732,4 +1740,3 @@ float	y;
 	}
 
 }
-

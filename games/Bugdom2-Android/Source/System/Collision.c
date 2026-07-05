@@ -10,6 +10,9 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -40,6 +43,255 @@ CollisionRec	gCollisionList[MAX_COLLISIONS];
 int				gNumCollisions = 0;
 Byte			gTotalSides;
 Boolean			gSolidTriggerKeepDelta;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+static const char* GetPowerupTriggerScriptId(int powKind)
+{
+	switch (powKind)
+	{
+		case POW_KIND_HEALTH:
+			return "bugdom2.powerup.health";
+		case POW_KIND_FLIGHT:
+			return "bugdom2.powerup.flight";
+		case POW_KIND_MAP:
+			return "bugdom2.powerup.map";
+		case POW_KIND_FREELIFE:
+			return "bugdom2.powerup.freeLife";
+		case POW_KIND_RAMGRAIN:
+			return "bugdom2.powerup.ramGrain";
+		case POW_KIND_BUDDYBUG:
+			return "bugdom2.powerup.buddyBug";
+		case POW_KIND_REDKEY:
+			return "bugdom2.powerup.redKey";
+		case POW_KIND_GREENKEY:
+			return "bugdom2.powerup.greenKey";
+		case POW_KIND_BLUEKEY:
+			return "bugdom2.powerup.blueKey";
+		case POW_KIND_GREENCLOVER:
+			return "bugdom2.powerup.greenClover";
+		case POW_KIND_BLUECLOVER:
+			return "bugdom2.powerup.blueClover";
+		case POW_KIND_GOLDCLOVER:
+			return "bugdom2.powerup.goldClover";
+		case POW_KIND_SHIELD:
+			return "bugdom2.powerup.shield";
+		default:
+			return "bugdom2.powerup";
+	}
+}
+
+static const char* GetPickupTriggerScriptId(int pickupKind)
+{
+	switch (pickupKind)
+	{
+		case PICKUP_KIND_SNAILSHELL:
+			return "bugdom2.pickup.snailShell";
+		case PICKUP_KIND_ACORN:
+			return "bugdom2.pickup.acorn";
+		case PICKUP_KIND_SCARECROWHEAD:
+			return "bugdom2.pickup.scarecrowHead";
+		case PICKUP_KIND_BOWLINGMARBLE:
+			return "bugdom2.pickup.bowlingMarble";
+		case PICKUP_KIND_SQUISHBERRY:
+			return "bugdom2.pickup.squishBerry";
+		case PICKUP_KIND_POW:
+			return "bugdom2.powerup";
+		case PICKUP_KIND_PUZZLEPIECE:
+			return "bugdom2.pickup.puzzlePiece";
+		case PICKUP_KIND_MOTHBALL:
+			return "bugdom2.pickup.mothBall";
+		case PICKUP_KIND_CHIP1:
+			return "bugdom2.pickup.chip1";
+		case PICKUP_KIND_CHIP2:
+			return "bugdom2.pickup.chip2";
+		case PICKUP_KIND_BATTERY:
+			return "bugdom2.pickup.battery";
+		case PICKUP_KIND_FOOD:
+			return "bugdom2.pickup.food";
+		case PICKUP_KIND_KINDLING:
+			return "bugdom2.pickup.kindling";
+		case PICKUP_KIND_CANTAB:
+			return "bugdom2.pickup.canTab";
+		case PICKUP_KIND_WHEEL:
+			return "bugdom2.pickup.wheel";
+		case PICKUP_KIND_PROPELLER:
+			return "bugdom2.pickup.propeller";
+		default:
+			return "bugdom2.pickup";
+	}
+}
+
+static const char* GetSkeletonTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (triggerObj->Type)
+	{
+		case SKELETON_TYPE_SNAIL:
+			return "bugdom2.snail";
+		case SKELETON_TYPE_CHIPMUNK:
+			return "bugdom2.chipmunk";
+		case SKELETON_TYPE_MOUSETRAP:
+			return "bugdom2.trap.mouseTrap";
+		case SKELETON_TYPE_COMPUTERBUG:
+			return "bugdom2.enemy.computerBug";
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetGardenTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (triggerObj->Type)
+	{
+		case GARDEN_ObjType_RedDoor:
+			return "bugdom2.door.red";
+		case GARDEN_ObjType_GreenDoor:
+			return "bugdom2.door.green";
+		case GARDEN_ObjType_BlueDoor:
+			return "bugdom2.door.blue";
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetSidewalkTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (triggerObj->Type)
+	{
+		case SIDEWALK_ObjType_RedDoor:
+			return "bugdom2.door.red";
+		case SIDEWALK_ObjType_GreenDoor:
+			return "bugdom2.door.green";
+		case SIDEWALK_ObjType_BlueDoor:
+			return "bugdom2.door.blue";
+		case SIDEWALK_ObjType_RideBall:
+			return "bugdom2.rideBall";
+		case SIDEWALK_ObjType_PoolLeaf1:
+		case SIDEWALK_ObjType_PoolLeaf2:
+		case SIDEWALK_ObjType_PoolLeaf3:
+		case SIDEWALK_ObjType_PoolLeaf4:
+			return "bugdom2.poolLeaf";
+		case SIDEWALK_ObjType_DogHouse:
+			return "bugdom2.dogHouse";
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetPlayroomTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (triggerObj->Type)
+	{
+		case PLAYROOM_ObjType_LetterBlock1:
+		case PLAYROOM_ObjType_LetterBlock2:
+		case PLAYROOM_ObjType_LetterBlock3:
+			return "bugdom2.letterBlock";
+		case PLAYROOM_ObjType_SlotCarRed:
+		case PLAYROOM_ObjType_SlotCarYellow:
+			return "bugdom2.slotCar";
+		case PLAYROOM_ObjType_RedDoor:
+			return "bugdom2.door.red";
+		case PLAYROOM_ObjType_GreenDoor:
+			return "bugdom2.door.green";
+		case PLAYROOM_ObjType_BlueDoor:
+			return "bugdom2.door.blue";
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetClosetTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (triggerObj->Type)
+	{
+		case CLOSET_ObjType_TrampolineWebDown:
+		case CLOSET_ObjType_TrampolineWebUp:
+			return "bugdom2.trap.trampoline";
+		case CLOSET_ObjType_DiaryDoor:
+			return "bugdom2.door.diary";
+		case CLOSET_ObjType_Virus:
+			return "bugdom2.enemy.virus";
+		case CLOSET_ObjType_SiliconDoor:
+			return "bugdom2.siliconDoor";
+		case CLOSET_ObjType_Hanger:
+			return "bugdom2.hanger";
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetGarbageTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (triggerObj->Type)
+	{
+		case GARBAGE_ObjType_RedDoor:
+			return "bugdom2.door.red";
+		case GARBAGE_ObjType_GreenDoor:
+			return "bugdom2.door.green";
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetParkTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (triggerObj->Type)
+	{
+		case PARK_ObjType_Lure:
+			return "bugdom2.fishingLure";
+		case PARK_ObjType_PicnicBasket:
+			return "bugdom2.picnicBasket";
+		case PARK_ObjType_RedDoor:
+			return "bugdom2.door.red";
+		case PARK_ObjType_GreenDoor:
+			return "bugdom2.door.green";
+		case PARK_ObjType_BlueDoor:
+			return "bugdom2.door.blue";
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetLevelSpecificTriggerScriptId(const ObjNode* triggerObj)
+{
+	switch (gLevelNum)
+	{
+		case LEVEL_NUM_GNOMEGARDEN:
+			return GetGardenTriggerScriptId(triggerObj);
+		case LEVEL_NUM_SIDEWALK:
+			return GetSidewalkTriggerScriptId(triggerObj);
+		case LEVEL_NUM_PLAYROOM:
+			return GetPlayroomTriggerScriptId(triggerObj);
+		case LEVEL_NUM_CLOSET:
+			return GetClosetTriggerScriptId(triggerObj);
+		case LEVEL_NUM_GARBAGE:
+			return GetGarbageTriggerScriptId(triggerObj);
+		case LEVEL_NUM_PARK:
+			return GetParkTriggerScriptId(triggerObj);
+		default:
+			return "bugdom2.trigger";
+	}
+}
+
+static const char* GetTriggerScriptId(const ObjNode* triggerObj)
+{
+	if (triggerObj == nil)
+		return "bugdom2.trigger";
+
+	if (triggerObj->Kind == PICKUP_KIND_POW)
+		return GetPowerupTriggerScriptId(triggerObj->Special[0]);
+
+	if (triggerObj->Group == MODEL_GROUP_SKELETONBASE)
+		return GetSkeletonTriggerScriptId(triggerObj);
+
+	if (triggerObj->Group == MODEL_GROUP_LEVELSPECIFIC)
+		return GetLevelSpecificTriggerScriptId(triggerObj);
+
+	if (triggerObj->Kind >= PICKUP_KIND_SNAILSHELL && triggerObj->Kind <= PICKUP_KIND_PROPELLER)
+		return GetPickupTriggerScriptId(triggerObj->Kind);
+
+	return "bugdom2.trigger";
+}
+#endif
 
 /******************* COLLISION DETECT *********************/
 //
@@ -382,6 +634,20 @@ again:
 			if (targetCType == INVALID_NODE_FLAG)
 				continue;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (Bugdom2Script_OnObjectCollision(theNode, targetObj, "object.contact", (int) targetCType, gCollisionList[i].sides))
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			if (targetObj->CType == INVALID_NODE_FLAG)
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			targetCType = targetObj->CType;
+#endif
+
 						/* HANDLE TRIGGERS */
 
 			if (((targetCType & CTYPE_TRIGGER) && (cType & CTYPE_TRIGGER)) ||	// target must be trigger and we must have been looking for them as well
@@ -391,6 +657,15 @@ again:
 
 	  			if (targetObj->TriggerCallback != nil)							// make sure there's a callback installed
 	  			{
+					Boolean isSolid = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+					if (Bugdom2Script_OnTriggerEnter(targetObj, theNode, GetTriggerScriptId(targetObj), targetObj->Kind, gCollisionList[i].sides, &isSolid))
+					{
+	 					if (!isSolid)
+							gCollisionList[i].sides = 0;
+					}
+					else
+#endif
  					if (!targetObj->TriggerCallback(targetObj,theNode,gCollisionList[i].sides))	// returns false if handle as non-solid trigger
 						gCollisionList[i].sides = 0;
 
@@ -1665,9 +1940,6 @@ next:
 
 	return(nil);
 }
-
-
-
 
 
 

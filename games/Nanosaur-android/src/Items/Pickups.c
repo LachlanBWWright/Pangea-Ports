@@ -125,6 +125,10 @@ short	species;
 			/* EGG HAS BEEN RECOVERED */
 
 		whoHasMe = (ObjNode *)theNode->WhoHasPickUp;			// who has this?
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (NanosaurScript_OnPickupCollected(theNode, whoHasMe, "nanosaur.egg", theNode->Kind, 1))
+			return;
+#endif
 		DropItem(whoHasMe);							// if I'm carrying it, get rid of it
 		species = theNode->Kind;					// get species type
 		gRecoveredEggs[species]++;					// inc counter
@@ -483,7 +487,6 @@ int	i;
 
 	SeeIfAllEggSpeciesRecovered();
 }
-
 
 
 

@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -252,8 +256,15 @@ uint32_t	wasInWater;
 
 			if (ctype & CTYPE_HURTENEMY)
 			{
+				float damage = hitObj->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (Nanosaur2Script_OnWeaponHit(hitObj, theEnemy, "nanosaur2.weaponHit", hitObj->Type, &damage))
+					return(theEnemy->CType == INVALID_NODE_FLAG);
+				if (Nanosaur2Script_OnObjectDamage(hitObj, theEnemy, "nanosaur2.enemyDamage", theEnemy->Kind, &damage))
+					return(theEnemy->CType == INVALID_NODE_FLAG);
+#endif
 				if (theEnemy->HurtCallback != nil)							// if has a hurt callback
-					if (theEnemy->HurtCallback(theEnemy, hitObj->Damage))	// handle hit (returns true if was deleted)
+					if (theEnemy->HurtCallback(theEnemy, damage))	// handle hit (returns true if was deleted)
 						return(true);
 			}
 
@@ -417,8 +428,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(chunk);
 }
-
-
 
 
 

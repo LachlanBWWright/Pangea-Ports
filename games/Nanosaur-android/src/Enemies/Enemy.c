@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -147,6 +151,10 @@ Boolean EnemyGotHurt(ObjNode *theEnemy, ObjNode *theHurter, float damage)
 {
 	(void) theHurter;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (NanosaurScript_OnObjectDamage(theHurter, theEnemy, "nanosaur.enemyDamage", theEnemy->Kind, &damage))
+		return theEnemy->CType == INVALID_NODE_FLAG;
+#endif
 
 			/* LOSE HEALTH */
 			
@@ -287,7 +295,6 @@ float	y;
 	theNode->StatusBits &= ~STATUS_BIT_ONGROUND;
 	return(false);
 }
-
 
 
 

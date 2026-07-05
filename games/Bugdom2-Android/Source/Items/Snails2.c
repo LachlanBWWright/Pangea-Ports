@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -302,6 +306,11 @@ float			x,z,splineIndex,x2,z2,y;
 		CreateCollisionBoxFromBoundingBox(trig,1.3,1.5);
 		trig->TriggerCallback = DoTrig_Hanger;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.hanger", "splineItem");
+		Bugdom2Script_RegisterObject(trig, "bugdom2.hangerTrigger", "trigger");
+#endif
+
 		newObj->ChainNode = trig;
 		trig->ChainHead = newObj;
 
@@ -404,6 +413,10 @@ ObjNode	*newObj;
 	newObj->CType 		= CTYPE_TRIGGER | CTYPE_BLOCKSHADOW | CTYPE_MPLATFORM;
 	newObj->CBits		= CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj, 40,-40,-40,40,40,-40);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.fishingLure", "platform");
+#endif
 
 	return(true);
 }
@@ -529,6 +542,10 @@ ObjNode	*newObj;
 	newObj->CBits		= CBITS_ALLSOLID;
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj,1,.61);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.picnicBasket", "trigger");
+#endif
+
 	return(true);
 }
 
@@ -565,7 +582,6 @@ static Boolean DoTrig_PicnicBasket(ObjNode *basket, ObjNode *who, Byte sideBits)
 
 	return(true);
 }
-
 
 
 

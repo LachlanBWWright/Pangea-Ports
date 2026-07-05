@@ -1,7 +1,26 @@
 import type { AreaContext } from "./common";
-import type { FrameContext, ItemSpawnResult, SplineItemContext, TerrainItemContext } from "../pangea";
+import type {
+  FrameContext,
+  ItemSpawnResult,
+  ObjectDamageContext,
+  ObjectDamageResult,
+  PickupContext,
+  PickupResult,
+  SplineItemContext,
+  TerrainItemContext,
+  TriggerContext,
+  TriggerResult,
+  WeaponHitContext,
+  WeaponHitResult,
+} from "../pangea";
 
 export type BillyAreaMode = "duel" | "shootout" | "stampede" | "targetPractice";
+export type BillyTriggerId =
+  | "billy.trigger"
+  | "billy.peso"
+  | "billy.freeLifePow"
+  | "billy.boost"
+  | "billy.explosiveItem";
 
 export interface BillyAreaContext extends AreaContext {
   readonly gameId: "BillyFrontier-Android";
@@ -23,6 +42,11 @@ export interface BillySplineItemContext extends SplineItemContext {
   readonly mode: BillyAreaMode;
 }
 
+export interface BillyTriggerContext extends TriggerContext {
+  readonly gameId: "BillyFrontier-Android";
+  readonly triggerId?: BillyTriggerId;
+}
+
 export type BillyFrontierLifecycleModule = Partial<{
   onAreaLoad(ctx: BillyAreaContext): void;
   onDuelStart(ctx: BillyAreaContext): void;
@@ -33,5 +57,8 @@ export type BillyFrontierLifecycleModule = Partial<{
   onAreaComplete(ctx: BillyAreaContext): void;
   onTerrainItem(ctx: BillyTerrainItemContext): ItemSpawnResult | void;
   onSplineItem(ctx: BillySplineItemContext): ItemSpawnResult | void;
+  onPickupCollected(ctx: PickupContext): PickupResult | void;
+  onWeaponHit(ctx: WeaponHitContext): WeaponHitResult | void;
+  onObjectDamage(ctx: ObjectDamageContext): ObjectDamageResult | void;
+  onTriggerEnter(ctx: BillyTriggerContext): TriggerResult | void;
 }>;
-

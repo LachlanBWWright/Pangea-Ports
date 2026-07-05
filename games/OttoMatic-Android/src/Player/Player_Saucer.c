@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -1005,7 +1009,11 @@ float	dist;
 		{
 			if (theNode->HurtCallback)						// if has custom callback, then call it
 			{
-				theNode->HurtCallback(theNode,0);
+				float damage = 0.0f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!OttoScript_OnObjectDamage(gPlayerInfo.objNode, theNode, "ottomatic.saucerDestructoBeam", theNode->Kind, &damage))
+#endif
+					theNode->HurtCallback(theNode, damage);
 			}
 			else											// otherwise, do default kaboom
 			{
@@ -1050,8 +1058,6 @@ static const OGLColorRGBA white = {1,1,1,1};
 
 	return(d);													// return dist
 }
-
-
 
 
 

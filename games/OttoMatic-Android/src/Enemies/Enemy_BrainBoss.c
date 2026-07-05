@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -877,7 +881,12 @@ static Boolean BrainBossHitByWeapon(ObjNode *weapon, ObjNode *enemy, OGLPoint3D 
 {
 #pragma unused (weaponCoord, weaponDelta)
 
-	HurtBrainBoss(enemy, weapon->Damage);
+	float damage = weapon->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(weapon, enemy, "ottomatic.weaponHit", weapon->Type, &damage))
+		return(true);
+#endif
+	HurtBrainBoss(enemy, damage);
 
 	switch(enemy->Mode)
 	{
@@ -1199,6 +1208,10 @@ float	damage;
 		damage = weapon->Damage;
 		if (damage <= 0.0f)
 			damage = 1.0f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (OttoScript_OnWeaponHit(weapon, portal, "ottomatic.portalHit", weapon->Type, &damage))
+			return(true);
+#endif
 	}
 	else				// supernova probably
 		damage = 1.0f;
@@ -1219,7 +1232,6 @@ float	damage;
 
 	return(true);			// stop weapon
 }
-
 
 
 

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -623,7 +627,12 @@ static Boolean IceCubeHitByStunPulse(ObjNode *weapon, ObjNode *enemy, OGLPoint3D
 
 			/* HURT IT */
 
-	HurtIceCube(enemy, weapon->Damage * .25f);
+	float damage = weapon->Damage * .25f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(weapon, enemy, "ottomatic.weaponHit", weapon->Type, &damage))
+		return(true);
+#endif
+	HurtIceCube(enemy, damage);
 
 
 			/* GIVE MOMENTUM */
@@ -724,7 +733,12 @@ float	r;
 
 			/* HURT IT */
 
-	HurtIceCube(enemy, fist->Damage);
+	float damage = fist->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(fist, enemy, "ottomatic.punchHit", fist->Type, &damage))
+		return(true);
+#endif
+	HurtIceCube(enemy, damage);
 
 
 			/* GIVE MOMENTUM */
@@ -1044,7 +1058,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

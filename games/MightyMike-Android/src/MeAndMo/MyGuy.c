@@ -26,6 +26,10 @@
 #include "io.h"
 #include "collision.h"
 #include "input.h"
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include "externs.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
@@ -35,6 +39,8 @@
 /****************************/
 /*    CONSTANTS             */
 /****************************/
+
+static Boolean TryScriptConsumePickup(ObjNode* pickup, const char* pickupId, int pickupType, int amount);
 
 #define	BLINKIE_DURATION	(GAME_FPS*2-1)			// amount of time to blink after I've been hit
 
@@ -825,6 +831,23 @@ short		maxYOffset,maxXOffset;
 		else
 		if (gCollisionList[i].type == COLLISION_TYPE_OBJ)
 		{
+			ObjNode* targetObj = gCollisionList[i].objectPtr;
+
+			if (targetObj->CType == INVALID_NODE_FLAG)
+				continue;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (MikeScript_OnObjectCollision(gMyNodePtr, targetObj, "player.contact", (int) targetObj->CType, gCollisionList[i].sides))
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			if (targetObj->CType == INVALID_NODE_FLAG || gMyNodePtr->CType == INVALID_NODE_FLAG)
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+#endif
 					/****************************/
 					/* HANDLE OBJECT COLLISIONS */
 					/****************************/
@@ -832,9 +855,9 @@ short		maxYOffset,maxXOffset;
 
 							/* SEE IF HIT TRIGGER */
 
-			if (gCollisionList[i].objectPtr->CType & CTYPE_TRIGGER)
+			if (targetObj->CType & CTYPE_TRIGGER)
 			{
-				if (!HandleTrigger(gCollisionList[i].objectPtr,gCollisionList[i].sides))	// if returns false, then ignore solids
+				if (!HandleTrigger(targetObj,gCollisionList[i].sides))	// if returns false, then ignore solids
 					goto ignore_solid;
 			}
 
@@ -843,7 +866,7 @@ short		maxYOffset,maxXOffset;
 
 			if (gCollisionList[i].sides & SIDE_BITS_TOP)	// SEE IF HIT TOP
 			{
-				offset = (gCollisionList[i].objectPtr->BottomSide-gTopSide)+1;	// see how far over it went
+				offset = (targetObj->BottomSide-gTopSide)+1;	// see how far over it went
 				if (offset > maxYOffset)					// see if worst one
 					gY.Int = originalY+offset;				// adjust y coord
 				maxYOffset = offset;
@@ -852,7 +875,7 @@ short		maxYOffset,maxXOffset;
 			else
 			if (gCollisionList[i].sides & SIDE_BITS_BOTTOM)	// SEE IF HIT BOTTOM
 			{
-				offset = (gBottomSide-gCollisionList[i].objectPtr->TopSide)+1;	// see how far over it went
+				offset = (gBottomSide-targetObj->TopSide)+1;	// see how far over it went
 				if (offset > maxYOffset)					// see if worst one
 					gY.Int = originalY-offset;				// adjust y coord
 				maxYOffset = offset;
@@ -862,7 +885,7 @@ short		maxYOffset,maxXOffset;
 
 			if (gCollisionList[i].sides & SIDE_BITS_LEFT)	// SEE IF HIT LEFT
 			{
-				offset = (gCollisionList[i].objectPtr->RightSide-gLeftSide)+1;	// see how far over it went
+				offset = (targetObj->RightSide-gLeftSide)+1;	// see how far over it went
 				if (offset > maxXOffset)					// see if worst one
 					gX.Int = originalX+offset;				// adjust x coord
 				maxXOffset = offset;
@@ -871,7 +894,7 @@ short		maxYOffset,maxXOffset;
 			else
 			if (gCollisionList[i].sides & SIDE_BITS_RIGHT)	// SEE IF HIT RIGHT
 			{
-				offset = (gRightSide-gCollisionList[i].objectPtr->LeftSide)+1;	// see how far over it went
+				offset = (gRightSide-targetObj->LeftSide)+1;	// see how far over it went
 				if (offset > maxXOffset)					// see if worst one
 					gX.Int = originalX-offset;				// adjust x coord
 				maxXOffset = offset;
@@ -881,16 +904,16 @@ ignore_solid:
 
 							/* SEE IF HIT BONUS OBJECT */
 
-			if (gCollisionList[i].objectPtr->CType & CTYPE_BONUS)
-				MeHitBonusObject(gCollisionList[i].objectPtr);
+			if (targetObj->CType & CTYPE_BONUS)
+				MeHitBonusObject(targetObj);
 
 							/* SEE IF HIT ENEMY OBJECT */
 			else
-			if (gCollisionList[i].objectPtr->CType & (CTYPE_ENEMYA|CTYPE_ENEMYB|CTYPE_ENEMYC))
+			if (targetObj->CType & (CTYPE_ENEMYA|CTYPE_ENEMYB|CTYPE_ENEMYC))
 			{
 				if ((gMyBlinkieTimer+gShieldTimer) <= 0)		// check if I'm in blinkie invincible mode
 				{												// 	or shield mode
-					MeHitEnemyObject(gCollisionList[i].objectPtr);
+					MeHitEnemyObject(targetObj);
 					hurtFlag = true;
 				}
 			}
@@ -1206,7 +1229,8 @@ void MeHitBonusObject(ObjNode *targetNode)
 
 	if (targetNode->CType & CTYPE_WEAPONPOW)
 	{
-		GetAWeapon(targetNode->Kind);						// get the weapon
+		if (!TryScriptConsumePickup(targetNode, "mightymike.weaponPow", targetNode->Kind, 1))
+			GetAWeapon(targetNode->Kind);						// get the weapon
 		targetNode->ItemIndex = nil;						// wont be comin back
 		DeleteObject(targetNode);
 		return;
@@ -1216,7 +1240,8 @@ void MeHitBonusObject(ObjNode *targetNode)
 	else
 	if (targetNode->CType & CTYPE_MISCPOW)
 	{
-		GetMiscPOW(targetNode->Kind);						// get the POW
+		if (!TryScriptConsumePickup(targetNode, "mightymike.miscPow", targetNode->Kind, 1))
+			GetMiscPOW(targetNode->Kind);						// get the POW
 		targetNode->ItemIndex = nil;						// wont be comin back
 		DeleteObject(targetNode);
 		return;
@@ -1227,6 +1252,12 @@ void MeHitBonusObject(ObjNode *targetNode)
 	else
 	if (targetNode->CType & CTYPE_HEALTH)
 	{
+		if (TryScriptConsumePickup(targetNode, "mightymike.healthPow", targetNode->Kind, 1))
+		{
+			targetNode->ItemIndex = nil;
+			DeleteObject(targetNode);
+		}
+		else
 		if (gMyHealth < gMyMaxHealth)						// only get health if need it!
 		{
 			MakeMikeMessage(MESSAGE_NUM_FOOD);				// put message
@@ -1242,7 +1273,8 @@ void MeHitBonusObject(ObjNode *targetNode)
 	else
 	if ((targetNode->Type == ObjType_Coin) && (targetNode->SpriteGroupNum == GroupNum_Coin))
 	{
-		GetCoins(1);
+		if (!TryScriptConsumePickup(targetNode, "mightymike.coin", ObjType_Coin, 1))
+			GetCoins(1);
 		DeleteObject(targetNode);
 		PlaySound(SOUND_COINS);
 	}
@@ -1251,6 +1283,7 @@ void MeHitBonusObject(ObjNode *targetNode)
 	else
 	if ((targetNode->Type == ObjType_Bunny) && (targetNode->SpriteGroupNum == GroupNum_Bunny))
 	{
+		(void) TryScriptConsumePickup(targetNode, "mightymike.bunny", ObjType_Bunny, 1);
 		DeleteBunny(targetNode);
 		PlaySound(SOUND_SQUEEK);
 		DecBunnyCount();
@@ -1261,7 +1294,8 @@ void MeHitBonusObject(ObjNode *targetNode)
 	else
 	if (targetNode->CType & CTYPE_KEY)
 	{
-		gMyKeys[targetNode->SubType] = true;			// get the key
+		if (!TryScriptConsumePickup(targetNode, "mightymike.key", targetNode->SubType, 1))
+			gMyKeys[targetNode->SubType] = true;			// get the key
 
 		targetNode->ItemIndex = nil;				// wont be comin back
 		DeleteObject(targetNode);
@@ -1276,6 +1310,19 @@ void MeHitBonusObject(ObjNode *targetNode)
 	{
 		TurnMeIntoShip(targetNode);
 	}
+}
+
+static Boolean TryScriptConsumePickup(ObjNode* pickup, const char* pickupId, int pickupType, int amount)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	return MikeScript_OnPickupCollected(pickup, gMyNodePtr, pickupId, pickupType, amount);
+#else
+	(void) pickup;
+	(void) pickupId;
+	(void) pickupType;
+	(void) amount;
+	return false;
+#endif
 }
 
 
@@ -1339,12 +1386,21 @@ Boolean	delFlag;
 
 void IGotHurt(void)
 {
+	float damage = 1.0f;
+
 	if ((gMyBlinkieTimer+gShieldTimer) > 0)						// check if I'm in blinkie invincible mode
 		return;													// 	or shield mode
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (MikeScript_OnPlayerDamage(&damage, "mightymike.playerDamage", 0))
+		return;
+	if (damage <= 0.0f)
+		return;
+#endif
+
 			/* DECREASE SHIELD LIFE */
 
-	gMyHealth--;											// lose health
+	gMyHealth -= (short) (damage + 0.999f);					// lose health
 
 	DisposeFrog();											// undo frog if needed
 	DisposeSpaceShip();										// undo spaceship if needed
@@ -1570,8 +1626,4 @@ void MoveMyFlame(void)
 	gThisNodePtr->Z = gMyNodePtr->Z-1;
 	gThisNodePtr->YOffset = gMyNodePtr->YOffset;
 }
-
-
-
-
 

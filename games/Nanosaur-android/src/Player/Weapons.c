@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "../Scripting/ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -254,6 +258,10 @@ ObjNode	*hitObj;
 				
 			if (hitObj->CType & CTYPE_ENEMY)
 			{
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (NanosaurScript_OnWeaponHit(theBullet, hitObj, "nanosaur.weapon", theBullet->Kind, theBullet->Damage))
+					break;
+#endif
 				EnemyGotHurt(hitObj, theBullet, theBullet->Damage);		// hurt the enemy
 			}
 			
@@ -262,6 +270,10 @@ ObjNode	*hitObj;
 			else
 			if (hitObj->CType & CTYPE_CRYSTAL)
 			{
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (NanosaurScript_OnWeaponHit(theBullet, hitObj, "nanosaur.weapon", theBullet->Kind, theBullet->Damage))
+					break;
+#endif
 				ExplodeCrystal(hitObj);
 			}
 			break;

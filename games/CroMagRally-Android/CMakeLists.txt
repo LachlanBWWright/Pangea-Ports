@@ -13,7 +13,9 @@ set(CMAKE_CXX_STANDARD		20)
 set(CMAKE_C_STANDARD		17)
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment version")  # Sync with LSMinimumSystemVersion in SDL3.framework's Info.plist
-set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Target macOS architectures")
+if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
+	set(CMAKE_OSX_ARCHITECTURES "${CMAKE_HOST_SYSTEM_PROCESSOR}" CACHE STRING "Target macOS architectures")
+endif()
 
 project(${GAME_TARGET}
 	VERSION ${GAME_VERSION}
@@ -21,7 +23,7 @@ project(${GAME_TARGET}
 
 option(BUILD_SDL_FROM_SOURCE "Build SDL from source" OFF)
 option(SDL_STATIC "Static link SDL" OFF)
-option(PANGEA_ENABLE_SCRIPTING "Enable TypeScript-authored scripting support" OFF)
+option(PANGEA_ENABLE_SCRIPTING "Enable Lua scripting support" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 

@@ -22,6 +22,9 @@
 #include "sound2.h"
 #include "bonus.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -57,6 +60,48 @@ static	Boolean	(*gTriggerTable[])(void) = {
 					};
 
 
+static const char* GetTriggerScriptId(ObjNode* triggerNode)
+{
+	if (!triggerNode)
+		return "mightymike.trigger";
+
+	switch (triggerNode->TriggerType)
+	{
+		case TRIGTYPE_TELEPORT:
+			return "mightymike.teleport";
+
+		case TRIGTYPE_DOOR:
+			return "mightymike.door";
+
+		case TRIGTYPE_FAIRYDOOR:
+			return "mightymike.fairyDoor";
+
+		case TRIGTYPE_BARGAINDOOR:
+			return "mightymike.bargainDoor";
+
+		default:
+			return "mightymike.trigger";
+	}
+}
+
+static Boolean CallTriggerHandler(ObjNode* triggerNode, Byte side)
+{
+	if (!triggerNode)
+		return true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Boolean solid = true;
+	if (MikeScript_OnTriggerEnter(triggerNode, gMyNodePtr, GetTriggerScriptId(triggerNode), triggerNode->TriggerType, side, &solid))
+		return solid;
+#endif
+
+	if (triggerNode->TriggerType < 0 || triggerNode->TriggerType >= (int) (sizeof(gTriggerTable) / sizeof(gTriggerTable[0])))
+		return true;
+
+	return gTriggerTable[triggerNode->TriggerType]();
+}
+
+
 /******************** HANDLE TRIGGER ***************************/
 //
 // INPUT: triggerNode = ptr to trigger's node
@@ -74,7 +119,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, Byte side)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BOTTOM)		// if my top hit, then must be bottom-triggerable
 		{
-			return(gTriggerTable[triggerNode->TriggerType]());	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode, side));		// call trigger's handler routine
 		}
 		else
 			return(true);
@@ -84,7 +129,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, Byte side)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_TOP)			// if my bottom hit, then must be top-triggerable
 		{
-			return(gTriggerTable[triggerNode->TriggerType]());	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode, side));		// call trigger's handler routine
 		}
 		else
 			return(true);
@@ -94,7 +139,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, Byte side)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_RIGHT)		// if my left hit, then must be right-triggerable
 		{
-			return(gTriggerTable[triggerNode->TriggerType]());	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode, side));		// call trigger's handler routine
 		}
 		else
 			return(true);
@@ -104,7 +149,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, Byte side)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_LEFT)			// if my right hit, then must be left-triggerable
 		{
-			return(gTriggerTable[triggerNode->TriggerType]());	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode, side));		// call trigger's handler routine
 		}
 		else
 			return(true);
@@ -162,6 +207,10 @@ register	ObjNode		*newObj;
 	CalcObjectBox2(newObj);
 
 	newObj->TeleportNum = itemPtr->parm[1];					// set teleport match #
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.teleport", "trigger");
+#endif
 
 	return(true);											// was added flag
 }
@@ -245,6 +294,10 @@ register	ObjNode		*newObj;
 
 	newObj->KeyNeeded = itemPtr->parm[0];					// remember which key is needed to open
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.door", "trigger");
+#endif
+
 	return(true);											// was added flag
 }
 
@@ -284,6 +337,10 @@ register	ObjNode		*newObj;
 	CalcObjectBox2(newObj);
 
 	newObj->KeyNeeded = itemPtr->parm[0];					// remember which key is needed to open
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.door", "trigger");
+#endif
 
 	return(true);											// was added flag
 }
@@ -325,6 +382,10 @@ register	ObjNode		*newObj;
 
 	newObj->KeyNeeded = itemPtr->parm[0];					// remember which key is needed to open
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.door", "trigger");
+#endif
+
 	return(true);											// was added flag
 }
 
@@ -363,6 +424,10 @@ register	ObjNode		*newObj;
 	CalcObjectBox2(newObj);
 
 	newObj->KeyNeeded = itemPtr->parm[0];					// remember which key is needed to open
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.bargainDoor", "trigger");
+#endif
 
 	return(true);											// was added flag
 }
@@ -442,6 +507,10 @@ register	ObjNode		*newObj;
 	CalcObjectBox2(newObj);
 
 	newObj->KeyNeeded = itemPtr->parm[0];					// remember which key is needed to open
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.fairyDoor", "trigger");
+#endif
 
 	return(true);											// was added flag
 }
@@ -540,6 +609,4 @@ Boolean DoTrig_BargainDoor(void)
 
 	return(true);
 }
-
-
 

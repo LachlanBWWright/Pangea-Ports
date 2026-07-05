@@ -36,6 +36,7 @@ static Boolean DoTrig_WaterValve(ObjNode *theNode, ObjNode *whoNode, Byte sideBi
 static void ShowThePOW(ObjNode *theNode);
 static void MovePowerupShow(ObjNode *theNode);
 static void MoveNut(ObjNode *theNode);
+static Boolean CallTriggerHandler(ObjNode *triggerNode, ObjNode *whoNode, Byte side);
 
 
 /****************************/
@@ -110,6 +111,61 @@ Boolean	(*gTriggerTable[])(ObjNode *, ObjNode *, Byte) =
 	DoTrig_Cage
 };
 
+static const char* GetTriggerScriptId(int triggerType)
+{
+	switch (triggerType)
+	{
+		case TRIGTYPE_NUT:
+			return "bugdom.nut";
+		case TRIGTYPE_WATERBUG:
+			return "bugdom.waterbug";
+		case TRIGTYPE_DRAGONFLY:
+			return "bugdom.dragonfly";
+		case TRIGTYPE_HONEYCOMBPLATFORM:
+			return "bugdom.honeycombPlatform";
+		case TRIGTYPE_DETONATOR:
+			return "bugdom.detonator";
+		case TRIGTYPE_CHECKPOINT:
+			return "bugdom.checkpoint";
+		case TRIGTYPE_TWIGDOOR:
+			return "bugdom.twigDoor";
+		case TRIGTYPE_WEBBULLET:
+			return "bugdom.webBullet";
+		case TRIGTYPE_EXITLOG:
+			return "bugdom.exitLog";
+		case TRIGTYPE_POW:
+			return "bugdom.powerup";
+		case TRIGTYPE_WATERVALVE:
+			return "bugdom.waterValve";
+		case TRIGTYPE_KINGPIPE:
+			return "bugdom.kingPipe";
+		case TRIGTYPE_CAGE:
+			return "bugdom.cage";
+	}
+
+	return "bugdom.trigger";
+}
+
+static Boolean CallTriggerHandler(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
+{
+	Boolean solid = true;
+	int triggerType;
+
+	if (!triggerNode)
+		return true;
+
+	triggerType = triggerNode->Kind;
+	if (triggerType < 0 || triggerType >= (int)(sizeof(gTriggerTable) / sizeof(gTriggerTable[0])))
+		return true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (BugdomScript_OnTriggerEnter(triggerNode, whoNode, GetTriggerScriptId(triggerType), triggerType, side, &solid))
+		return solid;
+#endif
+
+	return gTriggerTable[triggerType](triggerNode, whoNode, side);
+}
+
 
 enum
 {
@@ -162,7 +218,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BACK)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_FRONT)		// if my back hit, then must be front-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -170,7 +226,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_FRONT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BACK)			// if my front hit, then must be back-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -178,7 +234,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_LEFT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_RIGHT)		// if my left hit, then must be right-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -186,7 +242,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_RIGHT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_LEFT)			// if my right hit, then must be left-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -194,7 +250,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_TOP)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BOTTOM)		// if my top hit, then must be bottom-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -202,7 +258,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BOTTOM)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_TOP)			// if my bottom hit, then must be top-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -522,6 +578,10 @@ float	h;
 								200*HONEYCOMB_PLATFORM_SCALE,-200*HONEYCOMB_PLATFORM_SCALE);
 	}
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, isMetal ? "bugdom.honeycombPlatform.metal" : "bugdom.honeycombPlatform.falling", "platform");
+#endif
+
 	return(true);							
 }
 
@@ -647,6 +707,9 @@ u_long			isPlunged;
 	
 	boxObj->DetonatorID		= itemPtr->parm[0];					// save detonator ID#
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(boxObj, "bugdom.detonatorBox", "trigger");
+#endif
 	
 				/***************/
 				/* ADD PLUNGER */
@@ -686,6 +749,10 @@ u_long			isPlunged;
 
 	boxObj->ChainNode = plungerObj;							// plunger is a chain off of the box
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(plungerObj, "bugdom.detonatorPlunger", "trigger");
+#endif
+
 	return(true);											// item was added
 }
 
@@ -832,6 +899,10 @@ Boolean	isOpen;
 				SetObjectCollisionBounds(newObj,700,0,-40,40, 600, 0);
 				break;
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.lawnDoor", "trigger");
+#endif
 	
 	return(true);							// item was added
 }
@@ -1093,6 +1164,10 @@ static const Byte	keyTypes[NUM_LEVEL_TYPES] =
 			
 	SetObjectCollisionBounds(newObj,50,0,-25,25,25,-25);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.powerup", "powerup");
+#endif
+
 
 			/*************************/
 			/* SET POWERUP SPECIFICS */
@@ -1208,6 +1283,15 @@ static Boolean DoTrig_Powerup(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 {
 	(void) whoNode;
 	(void) sideBits;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (BugdomScript_OnPickupCollected(theNode, whoNode, "bugdom.powerup", theNode->NutContents, 1))
+	{
+		PlayEffect3D(EFFECT_GETPOW, &theNode->Coord);
+		ShowThePOW(theNode);
+		return false;
+	}
+#endif
 
 	switch(theNode->NutContents)
 	{
@@ -1391,8 +1475,14 @@ u_long			isOpen;
 	{
 		newObj->ChainNode = handle;	
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_RegisterObject(handle, "bugdom.waterValveHandle", "trigger");
+#endif
 	}
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.waterValve", "trigger");
+#endif
 	
 	return(true);											// item was added
 }
@@ -1458,10 +1548,6 @@ ObjNode *handle;
 	
 	return(true);
 }
-
-
-
-
 
 
 

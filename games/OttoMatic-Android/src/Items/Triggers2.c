@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /*******************/
 /*   PROTOTYPES    */
 /*******************/
@@ -1003,7 +1007,13 @@ short	n,i;
 			enemy->Delta.z *= 2.0f;
 
 			if (enemy->HurtCallback)												// call enemy's hurt function
-				enemy->HurtCallback(enemy, 1.0);
+			{
+				float damage = 1.0f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!OttoScript_OnObjectDamage(theNode, enemy, "ottomatic.mineBlast", enemy->Kind, &damage))
+#endif
+					enemy->HurtCallback(enemy, damage);
+			}
 
 		}
 	}
@@ -1154,8 +1164,6 @@ Boolean DoTrig_TrapDoor(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	return(true);
 }
-
-
 
 
 

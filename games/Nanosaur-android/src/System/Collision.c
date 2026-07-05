@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -359,6 +363,18 @@ CollisionBoxType *boxList = nil;
 				
 		if (gCollisionList[i].type == COLLISION_TYPE_OBJ)
 		{
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (NanosaurScript_OnObjectCollision(theNode, targetObj, "object.contact", (int) targetObj->CType, gCollisionList[i].sides))
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			if (targetObj->CType == INVALID_NODE_FLAG)
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+#endif
 				/* HANDLE TRIGGERS */
 		
 			if ((targetObj->CType & CTYPE_TRIGGER) && (cType & CTYPE_TRIGGER))	// target must be trigger and we must have been looking for them as well
@@ -1407,4 +1423,3 @@ static void AddTriangleCollision(ObjNode *thisNode, float x, float y, float z, f
 		}
 	}
 }
-

@@ -25,6 +25,10 @@
 #include "sound2.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -65,6 +69,10 @@ register	ObjNode		*newObj;
 		return(false);
 
 	newObj->ItemIndex = itemPtr;			// remember where this came from
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.appearZone", "spawner");
+#endif
 
 	return(true);											// was added
 }
@@ -148,6 +156,10 @@ register	ObjNode		*newObj;
 
 	newObj->Flag0 = false;							// clear the action flag
 	newObj->Flag1 = false;							// clear the POD flag
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.manEatingPlant", "hazard");
+#endif
 
 	return(true);									// was added
 }
@@ -236,6 +248,10 @@ ObjNode	*newObj;
 				newObj->DY = -0x50000L;
 
 			newObj->ShadowIndex = MakeShadow(newObj,SHADOWSIZE_SMALL);	// allocate shadow
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.plantPod", "projectile");
+#endif
 		}
 	}
 }
@@ -290,6 +306,10 @@ register	ObjNode		*newObj;
 	newObj->DrawFlag = false;						// start as invisible
 
 	newObj->SproingFinishedFlag = false;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.jackInTheBox", "hazard");
+#endif
 
 	return(true);									// was added
 }
@@ -360,6 +380,10 @@ register	ObjNode		*newObj;
 
 	newObj->CandyMPlatSpeed = (long)itemPtr->parm[0]<<16;		// set speed
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.candyMovingPlatform", "platform");
+#endif
+
 	return(true);									// was added
 }
 
@@ -408,6 +432,10 @@ register	ObjNode		*newObj;
 	newObj->RightOff = 10;
 	CalcObjectBox2(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.star", "hazard");
+#endif
+
 	return(true);									// was added
 }
 
@@ -435,6 +463,10 @@ register	ObjNode		*newObj;
 	newObj->LeftOff = -15;
 	newObj->RightOff = 15;
 	CalcObjectBox2(newObj);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.gumBall", "hazard");
+#endif
 
 	return(true);									// was added
 }
@@ -486,6 +518,10 @@ register	ObjNode		*newObj;
 	newObj->LeftOff = -25;
 	newObj->RightOff = 25;
 	CalcObjectBox2(newObj);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.muffit", "spawner");
+#endif
 
 	return(true);									// was added
 }
@@ -561,6 +597,10 @@ register	ObjNode		*newObj;
 	newObj->RightOff = 15;
 	CalcObjectBox2(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.poisonApple", "hazard");
+#endif
+
 	return(true);									// was added
 }
 
@@ -579,6 +619,10 @@ register	ObjNode		*newObj;
 	newObj->ItemIndex = itemPtr;			// remember where this came from
 
 	newObj->HydrantDirection = itemPtr->parm[0];
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.hydrant", "spawner");
+#endif
 
 	return(true);							// was added
 }
@@ -629,6 +673,10 @@ static	long hydrantDX[2] = {-0x90000L,0x90000L};
 	newNode->DX = dx;
 	newNode->WaterFallDelta = 0;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.hydrantWater", "hazard");
+#endif
+
 	return;
 }
 
@@ -659,7 +707,6 @@ void MoveHydrantWater(void)
 		UpdateObject();
 	}
 }
-
 
 
 

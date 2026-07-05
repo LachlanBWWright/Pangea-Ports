@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -206,6 +210,15 @@ ObjNode	*newObj;
 	newObj->SpecialF[0] = RandomFloat() * 360.0f;
 
 	AttachShadowToObject(newObj, GLOBAL_SObjType_Shadow_Circular, 3,3, false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(
+			newObj,
+			atomType == ATOM_TYPE_HEALTH ? "ottomatic.atom.health" :
+			atomType == ATOM_TYPE_JUMPJET ? "ottomatic.atom.jumpJet" :
+			"ottomatic.atom.fuel",
+			"pickup");
+#endif
 
 	return(newObj);
 }
@@ -645,6 +658,10 @@ float	y;
 							newObj->BBox.max.z * POD_SCALE, newObj->BBox.min.z * POD_SCALE);
 
 	newObj->Kind = TRIGTYPE_POWERUPPOD;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(newObj, "ottomatic.powerupPod", "pickup");
+#endif
 
 
 			/* SET WEAPON HANDLERS */
@@ -1449,6 +1466,11 @@ void AddPowerupToInventory(ObjNode *pow)
 {
 	DisableHelpType(HELP_MESSAGE_PICKUPPOW);					// dont need to show any help now that they've done it
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnPickupCollected(pow, gPlayerInfo.objNode, "ottomatic.powerup", pow->POWType, 1))
+		return;
+#endif
+
 	switch(pow->POWType)
 	{
 		case	POW_TYPE_STUNPULSE:
@@ -1703,6 +1725,10 @@ int		i;
 
 	AttachShadowToObject(balloon, GLOBAL_SObjType_Shadow_Circular, 5,5, true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(string, "ottomatic.powerupBalloonString", "pickup");
+	OttoScript_RegisterTaggedObjectNode(balloon, "ottomatic.powerupBalloon", "pickup");
+#endif
 
 	return(true);													// item was added
 }
@@ -1789,9 +1815,6 @@ float			speed;
 
 
 #pragma mark -
-
-
-
 
 
 

@@ -25,6 +25,10 @@
 #include "io.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -114,47 +118,63 @@ int16_t offset;
 		else
 		if (gCollisionList[i].type == COLLISION_TYPE_OBJ)
 		{
+			ObjNode* targetObj = gCollisionList[i].objectPtr;
+
+			if (targetObj->CType == INVALID_NODE_FLAG)
+				continue;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (MikeScript_OnObjectCollision(gThisNodePtr, targetObj, "enemy.contact", (int) targetObj->CType, gCollisionList[i].sides))
+				continue;
+			if (targetObj->CType == INVALID_NODE_FLAG || gThisNodePtr->CType == INVALID_NODE_FLAG)
+				continue;
+#endif
 					/****************************/
 					/* HANDLE OBJECT COLLISIONS */
 					/****************************/
 
 			if (gCollisionList[i].sides & SIDE_BITS_TOP)	// SEE IF HIT TOP
 			{
-				offset = (gCollisionList[i].objectPtr->BottomSide-gTopSide)+1;	// see how far over it went
+				offset = (targetObj->BottomSide-gTopSide)+1;	// see how far over it went
 				gY.Int = originalY+offset;					// adjust y coord
 			}
 			else
 			if (gCollisionList[i].sides & SIDE_BITS_BOTTOM)	// SEE IF HIT BOTTOM
 			{
-				offset = (gBottomSide-gCollisionList[i].objectPtr->TopSide)+1;	// see how far over it went
+				offset = (gBottomSide-targetObj->TopSide)+1;	// see how far over it went
 				gY.Int = originalY-offset;					// adjust y coord
 			}
 
 
 			if (gCollisionList[i].sides & SIDE_BITS_LEFT)	// SEE IF HIT LEFT
 			{
-				offset = (gCollisionList[i].objectPtr->RightSide-gLeftSide)+1;	// see how far over it went
+				offset = (targetObj->RightSide-gLeftSide)+1;	// see how far over it went
 				gX.Int = originalX+offset;					// adjust x coord
 			}
 			else
 			if (gCollisionList[i].sides & SIDE_BITS_RIGHT)	// SEE IF HIT RIGHT
 			{
-				offset = (gRightSide-gCollisionList[i].objectPtr->LeftSide)+1;	// see how far over it went
+				offset = (gRightSide-targetObj->LeftSide)+1;	// see how far over it went
 				gX.Int = originalX-offset;					// adjust x coord
 			}
 
 						/* SEE IF ENEMY GOT HIT BY BULLET */
 
-			if (gCollisionList[i].objectPtr->CType & CTYPE_MYBULLET)
+			if (targetObj->CType & CTYPE_MYBULLET)
 			{
-				WeaponHitEnemy(gCollisionList[i].objectPtr);				// tell weapon manager what happened
-				if (EnemyLoseHealth(gThisNodePtr,gCollisionList[i].objectPtr->WeaponPower))		// lose health & see if was killed
+				float damage = (float) targetObj->WeaponPower;
+				WeaponHitEnemy(targetObj);				// tell weapon manager what happened
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (MikeScript_OnWeaponHit(targetObj, gThisNodePtr, "mightymike.weaponHit", targetObj->Type, &damage))
+					return(gThisNodePtr->CType == INVALID_NODE_FLAG);
+#endif
+				if (EnemyLoseHealth(gThisNodePtr,(short) damage))		// lose health & see if was killed
 					return(true);
 			}
 			else
 					/* SEE IF ENEMY HIT BY MISC HURT THING */
 
-			if (gCollisionList[i].objectPtr->CType & CTYPE_HURTENEMY)
+			if (targetObj->CType & CTYPE_HURTENEMY)
 			{
 				if (EnemyLoseHealth(gThisNodePtr,10))					// lose health & see if was killed (pass arbitrary hurt power)
 					return(true);
@@ -208,6 +228,14 @@ void CalcEnemyScatterOffset(ObjNode *node)
 
 Boolean EnemyLoseHealth(ObjNode *theEnemy, short amount)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	float scriptDamage = (float) amount;
+	if (MikeScript_OnObjectDamage(nil, theEnemy, "mightymike.enemyDamage", (int) theEnemy->Type, &scriptDamage))
+		return theEnemy->CType == INVALID_NODE_FLAG;
+	if (scriptDamage < 0.0f)
+		scriptDamage = 0.0f;
+	amount = (short) (scriptDamage + 0.5f);
+#endif
 
 	if (gDifficultySetting != DIFFICULTY_EASY)		// no damage thresholds in easy mode
 	{
@@ -388,9 +416,6 @@ void MoveFrozenEnemy(void)
 
 	UpdateObject();
 }
-
-
-
 
 
 

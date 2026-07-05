@@ -7,8 +7,8 @@
         "levelNumber": 3
       },
       "enabled": true,
-      "sourceScript": "Data/Scripts/src/ottomatic/humans.ts",
-      "compiledScript": "Data/Scripts/dist/ottomatic/humans.js",
+      "sourceScript": "Data/Scripts/src/ottomatic/humans.lua",
+      "compiledScript": "Data/Scripts/dist/ottomatic/humans.lua",
       "hooks": ["level.onLoad", "level.onTick"]
     }
   ]

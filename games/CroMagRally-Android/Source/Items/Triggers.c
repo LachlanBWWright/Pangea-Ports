@@ -22,6 +22,7 @@
 static Boolean DoTrig_POW(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
 static void MovePOW(ObjNode *theNode);
 static void MoveToken(ObjNode *theNode);
+static Boolean TryScriptConsumePickup(ObjNode* pickup, ObjNode* player, const char* pickupId, int pickupType, int amount);
 static Boolean DoTrig_Token(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
 static Boolean DoTrig_StickyTiresPOW(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
 static Boolean DoTrig_SuspensionPOW(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
@@ -119,6 +120,101 @@ short	gNumTorches;
 ObjNode	*gTorchObjs[MAX_TORCHES];
 
 
+static const char* GetTriggerScriptId(ObjNode* triggerNode)
+{
+	if (!triggerNode)
+		return "cromag.trigger";
+
+	switch (triggerNode->Kind)
+	{
+		case TRIGTYPE_POW:
+			return "cromag.pow";
+
+		case TRIGTYPE_INVISIBILITY:
+			return "cromag.invisibilityPow";
+
+		case TRIGTYPE_TOKEN:
+			return "cromag.token";
+
+		case TRIGTYPE_TRACTION:
+			return "cromag.stickyTiresPow";
+
+		case TRIGTYPE_SUSPENSION:
+			return "cromag.suspensionPow";
+
+		case TRIGTYPE_CACTUS:
+			return "cromag.cactus";
+
+		case TRIGTYPE_SNOMAN:
+			return "cromag.snowman";
+
+		case TRIGTYPE_CAMPFIRE:
+			return "cromag.campfire";
+
+		case TRIGTYPE_TEAMTORCH:
+			return "cromag.teamTorch";
+
+		case TRIGTYPE_TEAMBASE:
+			return "cromag.teamBase";
+
+		case TRIGTYPE_VASE:
+			return "cromag.vase";
+
+		case TRIGTYPE_CAULDRON:
+			return "cromag.cauldron";
+
+		case TRIGTYPE_GONG:
+			return "cromag.gong";
+
+		case TRIGTYPE_LANDMINE:
+			return "cromag.landMine";
+
+		case TRIGTYPE_SEAMINE:
+			return "cromag.seaMine";
+
+		case TRIGTYPE_LAVA:
+			return "cromag.lava";
+
+		case TRIGTYPE_DRUID:
+			return "cromag.druid";
+
+		default:
+			return "cromag.trigger";
+	}
+}
+
+static Boolean TryScriptConsumePickup(ObjNode* pickup, ObjNode* player, const char* pickupId, int pickupType, int amount)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	return CroMagScript_OnPickupCollected(pickup, player, pickupId, pickupType, amount);
+#else
+	(void) pickup;
+	(void) player;
+	(void) pickupId;
+	(void) pickupType;
+	(void) amount;
+	return false;
+#endif
+}
+
+static Boolean CallTriggerHandler(ObjNode* triggerNode, ObjNode* whoNode, Byte side)
+{
+	if (!triggerNode)
+		return true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Boolean solid = true;
+	if (CroMagScript_OnTriggerEnter(triggerNode, whoNode, GetTriggerScriptId(triggerNode), triggerNode->Kind, side, &solid))
+		return solid;
+#endif
+
+	if (triggerNode->Kind < 0 || triggerNode->Kind >= (int) (sizeof(gTriggerTable) / sizeof(gTriggerTable[0])))
+		return true;
+
+	return gTriggerTable[triggerNode->Kind](triggerNode, whoNode, side);
+}
+
+
 
 /******************** HANDLE TRIGGER ***************************/
 //
@@ -135,7 +231,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 {
 	if (triggerNode->CBits & CBITS_TOUCHABLE)					// see if a non-solid trigger
 	{
-		return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+		return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 	}
 
 			/* CHECK SIDES */
@@ -143,7 +239,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BACK)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_FRONT)		// if my back hit, then must be front-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -151,7 +247,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_FRONT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BACK)			// if my front hit, then must be back-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -159,7 +255,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_LEFT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_RIGHT)		// if my left hit, then must be right-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -167,7 +263,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_RIGHT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_LEFT)			// if my right hit, then must be left-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -175,7 +271,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_TOP)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BOTTOM)		// if my top hit, then must be bottom-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -183,7 +279,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BOTTOM)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_TOP)			// if my bottom hit, then must be top-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -318,6 +414,9 @@ Boolean	thud = false;
 	playerNum = whoNode->PlayerNum;
 	powType = theNode->POWType;
 
+	if (TryScriptConsumePickup(theNode, whoNode, GetTriggerScriptId(theNode), powType, 1))
+		thud = true;
+	else
 	if (gPlayerInfo[playerNum].powType == powType)		// see if we already have this
 	{
 		gPlayerInfo[playerNum].powQuantity += 1;
@@ -454,8 +553,11 @@ short	playerNum;
 	if (gPlayerInfo[playerNum].isComputer)		// CPU players cannot collect these, only real players can
 		return(false);
 
-	gPlayerInfo[playerNum].numTokens++;			// inc token counter
-	gTotalTokens++;
+	if (!TryScriptConsumePickup(theNode, whoNode, "cromag.token", TRIGTYPE_TOKEN, 1))
+	{
+		gPlayerInfo[playerNum].numTokens++;			// inc token counter
+		gTotalTokens++;
+	}
 
 			/* AUDIO */
 
@@ -527,6 +629,9 @@ OGLPoint3D		where;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 12, 8, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.stickyTiresPow", "pickup");
+#endif
 
 	return(true);							// item was added
 }
@@ -549,14 +654,17 @@ short	playerNum;
 
 			/* ANNOUNCE IT */
 
-	if (gPlayerInfo[playerNum].stickyTiresTimer <= 0.0f)
-		if (gPlayerInfo[playerNum].onThisMachine && (!gPlayerInfo[playerNum].isComputer))
-			PlayAnnouncerSound(EFFECT_POW_STICKYTIRES,false, .5);
+	if (!TryScriptConsumePickup(theNode, whoNode, "cromag.stickyTiresPow", TRIGTYPE_TRACTION, 1))
+	{
+		if (gPlayerInfo[playerNum].stickyTiresTimer <= 0.0f)
+			if (gPlayerInfo[playerNum].onThisMachine && (!gPlayerInfo[playerNum].isComputer))
+				PlayAnnouncerSound(EFFECT_POW_STICKYTIRES,false, .5);
 
 
 				/* SET THE TICKY TIRES */
 
-	SetStickyTires(playerNum);
+		SetStickyTires(playerNum);
+	}
 
 	PlayEffect_Parms3D(EFFECT_GETPOW, &theNode->Coord, NORMAL_CHANNEL_RATE, 2.0);
 
@@ -624,6 +732,9 @@ OGLPoint3D		where;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 13, 13, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.suspensionPow", "pickup");
+#endif
 
 	return(true);							// item was added
 }
@@ -645,13 +756,16 @@ short	playerNum;
 
 			/* ANNOUNCE IT */
 
-	if (gPlayerInfo[playerNum].superSuspensionTimer <= 0.0f)
-		if (gPlayerInfo[playerNum].onThisMachine && (!gPlayerInfo[playerNum].isComputer))
-			PlayAnnouncerSound(EFFECT_POW_SUSPENSION,false, .5);
+	if (!TryScriptConsumePickup(theNode, whoNode, "cromag.suspensionPow", TRIGTYPE_SUSPENSION, 1))
+	{
+		if (gPlayerInfo[playerNum].superSuspensionTimer <= 0.0f)
+			if (gPlayerInfo[playerNum].onThisMachine && (!gPlayerInfo[playerNum].isComputer))
+				PlayAnnouncerSound(EFFECT_POW_SUSPENSION,false, .5);
 
 				/* SET THE SUSPENSION */
 
-	SetSuspensionPOW(playerNum);
+		SetSuspensionPOW(playerNum);
+	}
 
 	PlayEffect_Parms3D(EFFECT_GETPOW, &theNode->Coord, NORMAL_CHANNEL_RATE, 2.0);
 
@@ -720,6 +834,9 @@ OGLPoint3D		where;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 13, 13, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.invisibilityPow", "pickup");
+#endif
 
 	return(true);							// item was added
 }
@@ -742,12 +859,15 @@ short	playerNum;
 
 			/* ANNOUNCE IT */
 
-	if (gPlayerInfo[playerNum].invisibilityTimer <= 0.0f)
-		if (gPlayerInfo[playerNum].onThisMachine && (!gPlayerInfo[playerNum].isComputer))
-			PlayAnnouncerSound(EFFECT_POW_INVISIBILITY,false, .5);
+	if (!TryScriptConsumePickup(theNode, whoNode, "cromag.invisibilityPow", TRIGTYPE_INVISIBILITY, 1))
+	{
+		if (gPlayerInfo[playerNum].invisibilityTimer <= 0.0f)
+			if (gPlayerInfo[playerNum].onThisMachine && (!gPlayerInfo[playerNum].isComputer))
+				PlayAnnouncerSound(EFFECT_POW_INVISIBILITY,false, .5);
 
 
-	gPlayerInfo[playerNum].invisibilityTimer = 15.0;				// set duration
+		gPlayerInfo[playerNum].invisibilityTimer = 15.0;				// set duration
+	}
 
 
 	PlayEffect_Parms3D(EFFECT_GETPOW, &theNode->Coord, NORMAL_CHANNEL_RATE, 2.0);
@@ -817,7 +937,9 @@ short	cactusType = itemPtr->parm[0];			// get cactus type
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 	newObj->Flag[0] = false;										// not hit yet
 
-
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.cactus", notSolid ? "obstacle" : "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -949,6 +1071,9 @@ ObjNode	*newObj;
 
 	SetObjectCollisionBounds(newObj, 1000, -10, -300, 300, 300, -300);		// make collision box
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.snowman", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1078,6 +1203,10 @@ ObjNode	*newObj;
 	newObj->SmokeParticleMagic = 0;
 	newObj->SmokeTimer = 0;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.campfire", "hazard");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -1203,6 +1332,10 @@ ObjNode	*newObj;
 		gTorchObjs[gNumTorches] = newObj;
 		gNumTorches++;
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.teamTorch", "objective");
+#endif
 
 	return(true);													// item was added
 }
@@ -1379,6 +1512,9 @@ ObjNode	*newObj;
 
 	newObj->TorchTeam		= itemPtr->parm[0];						// which team?
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.teamBase", "objective");
+#endif
 
 	return(true);													// item was added
 }
@@ -1491,6 +1627,9 @@ ObjNode	*newObj;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 10, 10, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.vase", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1617,6 +1756,9 @@ ObjNode	*newObj;
 
 	CreateCollisionBoxFromBoundingBox_Maximized(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.cauldron", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -1761,6 +1903,11 @@ OGLMatrix3x3	m;
 
 	frame->ChainNode = gong;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(frame, "cromag.gongFrame", "obstacle");
+	CroMagScript_RegisterObject(gong, "cromag.gong", "trigger");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -1884,6 +2031,10 @@ ObjNode	*newObj;
 	SetObjectCollisionBounds(newObj, 300, -300, -300, 300, 300, -300);		// make collision box
 
 	newObj->MineWobble = 0;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.seaMine", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -2019,6 +2170,9 @@ ObjNode	*newObj;
 
 	CreateCollisionBoxFromBoundingBox(newObj,1,1);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.druid", "trigger");
+#endif
 
 	return(true);													// item was added
 }
@@ -2052,9 +2206,5 @@ short	p;
 
 	return(true);
 }
-
-
-
-
 
 

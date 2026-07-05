@@ -2,7 +2,7 @@
   "version": 1,
   "levels": {
     "0": {
-      "script": "Data/Scripts/dist/main.js",
+      "script": "Data/Scripts/dist/main.lua",
       "extraNativeItems": [
         "bugdom2.powerup"
       ],

@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -379,6 +383,20 @@ again:
 			uint32_t	targetCType = targetObj->CType;						// get ctype of hit obj
 			if (targetCType == INVALID_NODE_FLAG)
 				continue;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (OttoScript_OnObjectCollision(theNode, targetObj, "object.contact", (int) targetCType, gCollisionList[i].sides))
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			if (targetObj->CType == INVALID_NODE_FLAG)
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			targetCType = targetObj->CType;
+#endif
 
 						/* HANDLE TRIGGERS */
 
@@ -1454,4 +1472,3 @@ float	ix,iz,iy;
 
 	return(false);
 }
-

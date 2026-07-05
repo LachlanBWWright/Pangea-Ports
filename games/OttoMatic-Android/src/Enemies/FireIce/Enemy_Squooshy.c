@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -515,7 +519,12 @@ static Boolean SquooshyEnemyHitByWeapon(ObjNode *weapon, ObjNode *enemy, OGLPoin
 
 			/* HURT IT */
 
-	if (HurtSquooshy(enemy, weapon->Damage))
+	float damage = weapon->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(weapon, enemy, "ottomatic.weaponHit", weapon->Type, &damage))
+		return(true);
+#endif
+	if (HurtSquooshy(enemy, damage))
 		return(true);
 
 
@@ -803,7 +812,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

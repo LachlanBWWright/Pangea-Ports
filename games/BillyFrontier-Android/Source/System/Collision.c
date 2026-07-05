@@ -10,11 +10,17 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+static const char* GetTriggerScriptId(const ObjNode* triggerObj);
+#endif
 static void AllocateCollisionTriangleMemory(ObjNode *theNode, long numTriangles);
 
 static Boolean RayIntersectTriangle(OGLPoint3D *origin, OGLVector3D *dir,
@@ -42,6 +48,32 @@ enum
 
 CollisionRec	gCollisionList[MAX_COLLISIONS];
 short			gNumCollisions = 0;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+static const char* GetTriggerScriptId(const ObjNode* triggerObj)
+{
+	if (!triggerObj)
+		return "billy.trigger";
+
+	switch (triggerObj->Kind)
+	{
+		case BILLY_SCRIPT_TRIGGER_PESO:
+			return "billy.peso";
+
+		case BILLY_SCRIPT_TRIGGER_FREE_LIFE:
+			return "billy.freeLifePow";
+
+		case BILLY_SCRIPT_TRIGGER_BOOST:
+			return "billy.boost";
+
+		case BILLY_SCRIPT_TRIGGER_EXPLOSIVE_ITEM:
+			return "billy.explosiveItem";
+
+		default:
+			return "billy.trigger";
+	}
+}
+#endif
 Byte			gTotalSides;
 Boolean			gSolidTriggerKeepDelta;
 
@@ -393,6 +425,20 @@ again:
 			uint32_t	targetCType = targetObj->CType;						// get ctype of hit obj
 			if (targetCType == INVALID_NODE_FLAG)				
 				continue;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (BillyScript_OnObjectCollision(theNode, targetObj, "object.contact", (int) targetCType, gCollisionList[i].sides))
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			if (targetObj->CType == INVALID_NODE_FLAG)
+			{
+				gCollisionList[i].sides = 0;
+				continue;
+			}
+			targetCType = targetObj->CType;
+#endif
 		
 						/* HANDLE TRIGGERS */
 		
@@ -403,6 +449,15 @@ again:
 	  			
 	  			if (targetObj->TriggerCallback != nil)							// make sure there's a callback installed
 	  			{
+					Boolean isSolid = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+					if (BillyScript_OnTriggerEnter(targetObj, theNode, GetTriggerScriptId(targetObj), targetObj->Kind, gCollisionList[i].sides, &isSolid))
+					{
+	 					if (!isSolid)
+							gCollisionList[i].sides = 0;
+					}
+					else
+#endif
  					if (!targetObj->TriggerCallback(targetObj,theNode,gCollisionList[i].sides))	// returns false if handle as non-solid trigger
 						gCollisionList[i].sides = 0;
 						
@@ -1798,10 +1853,6 @@ next:
 
 	return(nil);
 }
-
-
-
-
 
 
 

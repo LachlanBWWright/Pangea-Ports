@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -88,6 +92,10 @@ Boolean	playroom = (gLevelNum == LEVEL_NUM_PLAYROOM);
 			/* MAKE SHADOW */
 
 	AttachShadowToObject(ball, 0, 6,6, false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(ball, "bugdom2.rideBall", "vehicle");
+#endif
 
 	return(true);
 }
@@ -340,7 +348,6 @@ ObjNode	*ball = gPlayerInfo.ridingBall;
 	UpdateObject(player);
 	HandlePlayerLineMarkerCrossing(player);
 }
-
 
 
 

@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -278,6 +281,11 @@ Boolean	killed = false;
 
 	if (gPlayerInfo.health < 0.0f)				// see if already dead
 		return(true);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (Bugdom2Script_OnPlayerDamage(&damage, deathType, nil))
+		return false;
+#endif
 
 	gPlayerInfo.health -= damage;
 
@@ -1282,7 +1290,6 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 	UpdateObjectTransforms(theNode);
 }
-
 
 
 

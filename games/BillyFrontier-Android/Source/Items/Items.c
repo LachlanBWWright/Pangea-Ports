@@ -39,6 +39,7 @@ static void MoveTumbleweedOnSpline(ObjNode *theNode);
 static Boolean DoTrig_ExplodeItem(ObjNode *item, ObjNode *who, Byte sideBits);
 static Boolean DoTrig_Peso(ObjNode *item, ObjNode *who, Byte sideBits);
 static void KangaHitByBulletCallback(ObjNode *bullet, ObjNode *cow, const OGLPoint3D *impactPt);
+static Boolean TryScriptConsumePickup(ObjNode* pickup, const char* pickupId, int pickupType, int amount);
 
 
 /****************************/
@@ -157,6 +158,10 @@ ObjNode	*newObj;
 
 	newObj->CType = CTYPE_PICKABLE|CTYPE_HITENEMYBULLET|CTYPE_BUILDING;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.building", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -257,6 +262,11 @@ ObjNode	*newObj;
 	newObj->CBits = CBITS_ALLSOLID | CBITS_ALWAYSTRIGGER;
 	CreateCollisionBoxFromBoundingBox(newObj, .8,1);
 	newObj->TriggerCallback = DoTrig_ExplodeItem;
+	newObj->Kind = BILLY_SCRIPT_TRIGGER_EXPLOSIVE_ITEM;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.explosivePlant", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -285,6 +295,10 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_PICKABLE;
 	newObj->HitByBulletCallback = DefaultBulletHitCallback;
 	newObj->Health = 3.0f;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.coffin", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -318,6 +332,10 @@ ObjNode	*newObj;
 	
 	if (itemPtr->parm[0] == 1)		// is TNT?
 		newObj->What = WHAT_TNT;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, itemPtr->parm[0] == 1 ? "billy.tntBarrel" : "billy.barrel", itemPtr->parm[0] == 1 ? "hazard" : "obstacle");
+#endif
 		
 	return(true);													// item was added
 }
@@ -354,6 +372,10 @@ int		type = itemPtr->parm[0];
 		newObj->HitByBulletCallback = BulletHitWoodCrateCallback;
 
 	newObj->Kind = itemPtr->parm[2];								// remember what kind of contents are in this crate
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.woodCrate", "container");
+#endif
 
 	return(true);													// item was added
 }
@@ -515,6 +537,19 @@ float	y;
 
 /******************** MAKE SHIELD POW **************************/
 
+static Boolean TryScriptConsumePickup(ObjNode* pickup, const char* pickupId, int pickupType, int amount)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	return BillyScript_OnPickupCollected(pickup, gPlayerInfo.objNode, pickupId, pickupType, amount);
+#else
+	(void) pickup;
+	(void) pickupId;
+	(void) pickupType;
+	(void) amount;
+	return false;
+#endif
+}
+
 static void MakeShieldPOW(float x, float z, float rot)
 {
 ObjNode		*newObj;
@@ -537,6 +572,9 @@ ObjNode		*newObj;
 							
 	newObj->CType = CTYPE_PICKABLE;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.shieldPow", "pickup");
+#endif
 
 }
 
@@ -554,6 +592,9 @@ static void BulletHitShieldPOW(ObjNode *bullet, ObjNode *pow, const OGLPoint3D *
 	pow->MoveCall = MoveShieldPOW_Vanish;
 	
 	pow->CType &= ~CTYPE_PICKABLE;			// cant shoot it again
+
+	if (TryScriptConsumePickup(pow, "billy.shieldPow", GLOBAL_ObjType_ShieldPOW, 1))
+		return;
 	
 	gPlayerInfo.shieldPower += 3.0f;
 	if (gPlayerInfo.shieldPower > MAX_SHIELD)
@@ -631,6 +672,10 @@ ObjNode		*newObj;
 	newObj->HitByBulletCallback = BulletHitAmmoPOW;
 	
 	newObj->NumBullets = numBullets;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.ammoPow", "pickup");
+#endif
 						
 }
 
@@ -648,6 +693,9 @@ static void BulletHitAmmoPOW(ObjNode *bullet, ObjNode *pow, const OGLPoint3D *im
 	pow->MoveCall = MovePOW_Vanish;
 	
 	pow->CType &= ~CTYPE_PICKABLE;			// cant shoot it again
+
+	if (TryScriptConsumePickup(pow, "billy.ammoPow", GLOBAL_ObjType_AmmoBoxPOW, pow->NumBullets))
+		return;
 	
 	gPlayerInfo.ammoCount += pow->NumBullets;
 }
@@ -714,10 +762,6 @@ ObjNode	*newObj;
 									
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-	BillyScript_RegisterObject(newObj, "billy.freeLifePow", "pickup");
-#endif
-
 	return(true);													// item was added
 }
 
@@ -746,6 +790,11 @@ ObjNode		*newObj;
 	CreateCollisionBoxFromBoundingBox_Maximized(newObj);
 	newObj->HitByBulletCallback = BulletHitFreeLifePOW;		
 	newObj->TriggerCallback = DoTrig_FreeLife;
+	newObj->Kind = BILLY_SCRIPT_TRIGGER_FREE_LIFE;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.freeLifePow", "pickup");
+#endif
 		
 		
 	return(newObj);				
@@ -766,6 +815,9 @@ static void BulletHitFreeLifePOW(ObjNode *bullet, ObjNode *pow, const OGLPoint3D
 	pow->MoveCall = MovePOW_Vanish;
 	
 	pow->CType = 0;			// cant shoot or touch it again
+
+	if (TryScriptConsumePickup(pow, "billy.freeLifePow", BILLY_SCRIPT_TRIGGER_FREE_LIFE, 1))
+		return;
 	
 	gPlayerInfo.lives++;
 //	if (gPlayerInfo.lives > 3)
@@ -804,10 +856,6 @@ ObjNode	*newObj;
 
 	newObj->Delta.x = newObj->Delta.y = newObj->Delta.z = 0;
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-	BillyScript_RegisterObject(newObj, "billy.peso", "pickup");
-#endif
-
 	return(true);													// item was added
 }
 
@@ -834,6 +882,7 @@ ObjNode		*newObj;
 	CreateCollisionBoxFromBoundingBox_Maximized(newObj);
 	newObj->HitByBulletCallback = BulletHitPesoPOW;
 	newObj->TriggerCallback = DoTrig_Peso;
+	newObj->Kind = BILLY_SCRIPT_TRIGGER_PESO;
 	
 	newObj->Delta.x = RandomFloat2() * 200.0f;
 	newObj->Delta.z = RandomFloat2() * 200.0f;
@@ -841,7 +890,9 @@ ObjNode		*newObj;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 2, 2, false);
 
-
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.peso", "pickup");
+#endif
 
 
 	return(newObj);						
@@ -893,6 +944,9 @@ static void BulletHitPesoPOW(ObjNode *bullet, ObjNode *pow, const OGLPoint3D *im
 	pow->MoveCall = MovePOW_Vanish;
 	
 	pow->CType &= ~CTYPE_PICKABLE;			// cant shoot it again
+
+	if (TryScriptConsumePickup(pow, "billy.peso", BILLY_SCRIPT_TRIGGER_PESO, 1))
+		return;
 	
 	gPlayerInfo.pesos += 1;
 	
@@ -914,6 +968,12 @@ static Boolean DoTrig_Peso(ObjNode *item, ObjNode *who, Byte sideBits)
 
 	item->CType = 0;
 	item->MoveCall = MovePOW_Vanish;
+
+	if (TryScriptConsumePickup(item, "billy.peso", BILLY_SCRIPT_TRIGGER_PESO, 1))
+	{
+		PlayEffect3D(EFFECT_GETCOIN, &item->Coord);
+		return false;
+	}
 
 	gPlayerInfo.pesos += 1;
 
@@ -955,6 +1015,10 @@ ObjNode	*newObj;
 
 	newObj->Health = 2.0f;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.hayBale", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -988,6 +1052,10 @@ int		type = itemPtr->parm[0];
 
 	newObj->CType = CTYPE_PICKABLE;			
 	newObj->HitByBulletCallback = DefaultBulletHitCallback;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.post", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1085,6 +1153,10 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_PICKABLE;			
 	newObj->HitByBulletCallback = KangaHitByBulletCallback;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.sceneryKangaCow", "obstacle");
+#endif
+
 	return(true);
 }
 
@@ -1142,6 +1214,10 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_PICKABLE|CTYPE_HITENEMYBULLET;			
 	newObj->HitByBulletCallback = DefaultBulletHitCallback;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.table", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -1170,6 +1246,10 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_PICKABLE|CTYPE_HITENEMYBULLET;			
 	newObj->HitByBulletCallback = DefaultBulletHitCallback;
 	newObj->Health = 2.0f;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.chair", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1206,6 +1286,11 @@ ObjNode	*newObj;
 	newObj->CBits = CBITS_ALLSOLID | CBITS_ALWAYSTRIGGER;
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj, .9,.7);
 	newObj->TriggerCallback = DoTrig_ExplodeItem;
+	newObj->Kind = BILLY_SCRIPT_TRIGGER_EXPLOSIVE_ITEM;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.deadTree", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -1444,6 +1529,10 @@ ObjNode	*newObj;
 
 	newObj->CType = CTYPE_PICKABLE|CTYPE_HITENEMYBULLET;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.teepee", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -1471,6 +1560,9 @@ ObjNode	*newObj;
 
 	newObj->CType = CTYPE_PICKABLE|CTYPE_HITENEMYBULLET;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.swampCabin", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1501,6 +1593,10 @@ ObjNode	*newObj;
 	CalcObjectBoxFromNode(newObj);
 
 	newObj->CType = CTYPE_PICKABLE|CTYPE_HITENEMYBULLET;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.spearSkull", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1541,13 +1637,11 @@ ObjNode	*newObj;
 	newObj->CBits = CBITS_ALLSOLID | CBITS_ALWAYSTRIGGER;
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj, 1,.7);
 	newObj->TriggerCallback = DoTrig_ExplodeItem;
+	newObj->Kind = BILLY_SCRIPT_TRIGGER_EXPLOSIVE_ITEM;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.electricFence", "hazard");
+#endif
 
 	return(true);													// item was added
 }
-
-
-
-
-
-

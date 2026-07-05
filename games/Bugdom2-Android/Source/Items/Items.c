@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -444,6 +448,10 @@ int		doorColor = itemPtr->parm[1];
 
 	door->TriggerCallback = DoTrig_Door;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(door, "bugdom2.door", "trigger");
+#endif
+
 	return(true);
 }
 
@@ -773,6 +781,10 @@ ObjNode	*newObj;
 	CalcObjectBoxFromNode(newObj);
 	KeepOldCollisionBoxes(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.poolLeaf", "platform");
+#endif
+
 
 				/*******************/
 				/* PUT KEY ON LEAF */
@@ -904,6 +916,10 @@ ObjNode	*newObj;
 	newObj->CType 			= CTYPE_MISC|CTYPE_TRIGGER;
 	newObj->CBits			= CBITS_ALLSOLID;
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj, .7, 1);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.dogHouse", "trigger");
+#endif
 
 	return(true);													// item was added
 }
@@ -1318,7 +1334,6 @@ static Boolean HurtGlassBottle(ObjNode *bottle, float damage)
 	PlayEffect3D(EFFECT_BOTTLECRACK, &bottle->Coord);
 	return(false);
 }
-
 
 
 

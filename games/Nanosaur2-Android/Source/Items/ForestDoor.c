@@ -12,6 +12,9 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -157,6 +160,11 @@ short			type;
 	door->ChainNode = ring;
 	ring->ChainHead = door;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(wall, "nanosaur2.forestDoorWall", "door");
+	Nanosaur2Script_RegisterObject(door, "nanosaur2.forestDoor", "door");
+	Nanosaur2Script_RegisterObject(ring, "nanosaur2.forestDoorRing", "door");
+#endif
 
 	return(true);													// item was added
 }
@@ -254,6 +262,10 @@ Boolean				keyDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 
 	keyHolder->Health = .3f;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(keyHolder, "nanosaur2.forestDoorKeyHolder", "trigger");
+#endif
+
 
 					/************/
 					/* MAKE KEY */
@@ -280,6 +292,9 @@ Boolean				keyDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 		keyHolder->ChainNode = key;
 		key->ChainHead = keyHolder;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_RegisterObject(key, "nanosaur2.forestDoorKey", "pickup");
+#endif
 
 					/* MAKE SPARKLES */
 
@@ -460,7 +475,6 @@ OGLVector3D	v, delta;
 
 	keyHolder->ChainNode = nil;
 }
-
 
 
 

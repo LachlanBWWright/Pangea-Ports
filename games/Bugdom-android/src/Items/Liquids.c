@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -419,6 +423,10 @@ static const float	yTable2[] = {-540,-540,-540,-540,-370,-540,-540,-540};
 
 	tmd->texturingMode = kQ3TexturingModeAlphaBlend;
 	tmd->glTextureName = gLiquidShaders[LIQUID_WATER];
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.waterPatch", "liquid");
+#endif
 
 	return(true);													// item was added
 }
@@ -907,6 +915,23 @@ float				width,depth;
 	tmd->texturingMode = kQ3TexturingModeOpaque;
 	tmd->glTextureName = gLiquidShaders[kind];
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	switch (kind)
+	{
+		case LIQUID_HONEY:
+			BugdomScript_RegisterObject(newObj, "bugdom.honeyPatch", "liquid");
+			break;
+		case LIQUID_SLIME:
+			BugdomScript_RegisterObject(newObj, "bugdom.slimePatch", "liquid");
+			break;
+		case LIQUID_LAVA:
+			BugdomScript_RegisterObject(newObj, "bugdom.lavaPatch", "liquid");
+			break;
+		default:
+			BugdomScript_RegisterObject(newObj, "bugdom.liquidPatch", "liquid");
+			break;
+	}
+#endif
 
 	return(true);													// item was added
 }

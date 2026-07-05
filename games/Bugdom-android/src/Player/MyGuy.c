@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -220,6 +224,13 @@ u_char		sides;
 				continue;
 			
 			ctype = hitObj->CType;								// get collision ctype from hit obj
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (BugdomScript_OnObjectCollision(gPlayerObj, hitObj, "player.contact", (int) ctype, gCollisionList[i].sides))
+				continue;
+			if (hitObj->CType == INVALID_NODE_FLAG)
+				continue;
+#endif
 					
 					
 			/**************************/
@@ -433,7 +444,12 @@ TQ3Vector3D	delta;
 	
 
 			/* LOSE HEALTH & SEE IF WAS KILLED */
-			
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (BugdomScript_OnPlayerDamage(what, &damage))
+		return;
+#endif
+
 	LoseHealth(damage);
 	
 	
@@ -944,8 +960,6 @@ new_groupb:
 	}
 
 }
-
-
 
 
 

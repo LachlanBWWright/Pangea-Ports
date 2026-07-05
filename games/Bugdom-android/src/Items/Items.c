@@ -256,6 +256,10 @@ ObjNode	*newObj;
 								-500*GRASS_SCALE,500*GRASS_SCALE,
 								500*GRASS_SCALE,-500*GRASS_SCALE);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.grass", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -291,6 +295,10 @@ ObjNode	*newObj;
 								-570*WEED_SCALE,570*WEED_SCALE,
 								570*WEED_SCALE,-570*WEED_SCALE);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.weed", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -322,6 +330,10 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_MISC; //|CTYPE_BLOCKCAMERA;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,600,0,-40,40,40,-40);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.sunflower", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -358,6 +370,9 @@ ObjNode	*newObj;
 	SetObjectCollisionBounds(newObj,700*COSMO_SCALE,0,
 							-160*COSMO_SCALE,160*COSMO_SCALE,
 							160*COSMO_SCALE,-160*COSMO_SCALE);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.cosmo", "obstacle");
+#endif
 	return(true);													// item was added
 }
 
@@ -389,6 +404,9 @@ ObjNode	*newObj;
 	SetObjectCollisionBounds(newObj,1900*POPPY_SCALE,0,
 							-300*POPPY_SCALE,300*POPPY_SCALE,
 							300*POPPY_SCALE,-300*POPPY_SCALE);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.poppy", "obstacle");
+#endif
 	return(true);													// item was added
 }
 
@@ -429,6 +447,10 @@ ObjNode	*newObj;
 		SetObjectCollisionBounds(newObj,1100,0,-350,350,350,-350);
 	else
 		SetObjectCollisionBounds(newObj,500,0,-170,170,170,-170);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.wallEnd", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -543,6 +565,10 @@ CollisionBoxType *boxPtr;
 
 	KeepOldCollisionBoxes(newObj);							// set old stuff
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.tree", "obstacle");
+#endif
+
 	return(true);											// item was added
 }
 
@@ -650,7 +676,14 @@ float				y;
 
 		KeepOldCollisionBoxes(hive);							// set old stuff
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_RegisterObject(hive, "bugdom.hive", "destructible");
+#endif
+
 	}
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.stump", "obstacle");
+#endif
 	return(true);													// item was added
 }
 
@@ -845,6 +878,10 @@ ObjNode	*newObj;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,300,0,-20,20,20,-20);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.cattail", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -880,6 +917,10 @@ ObjNode	*newObj;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,1000,0,-20,20,20,-20);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.duckweed", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -913,6 +954,10 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_MISC|CTYPE_BLOCKCAMERA;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,100,-100,-150,150,150,-150);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.lilyFlower", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -950,6 +995,10 @@ ObjNode	*newObj;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,15,-900,-400,400,400,-400);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.lilyPad", "platform");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -986,6 +1035,10 @@ ObjNode	*newObj;
 	newObj->CType = CTYPE_MISC;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,1000,0,-20,20,20,-20);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.pondGrass", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1027,6 +1080,10 @@ ObjNode	*newObj;
 		SetObjectCollisionBounds(newObj,1000,0,-35,35,35,-35);
 	else
 		SetObjectCollisionBounds(newObj,1000,0,-90,90,90,-90);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.reed", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1087,6 +1144,10 @@ static const TQ3Point3D waterPt = {45*BENT_PIPE_SCALE, 178*BENT_PIPE_SCALE, 45*B
 	newObj->InitCoord.x += newObj->Coord.x;
 	newObj->InitCoord.y += newObj->Coord.y;
 	newObj->InitCoord.z += newObj->Coord.z;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.bentAntPipe", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1151,6 +1212,10 @@ static const TQ3Point3D waterPt = {-58*HORIZ_PIPE_SCALE, 400*HORIZ_PIPE_SCALE, 2
 	newObj->InitCoord.x += newObj->Coord.x;
 	newObj->InitCoord.y += newObj->Coord.y;
 	newObj->InitCoord.z += newObj->Coord.z;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.horizontalAntPipe", "obstacle");
+#endif
 
 	return(true);													// item was added
 }
@@ -1268,10 +1333,12 @@ ObjNode	*newObj;
 	newObj->CBits = CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,5000,-300,-550,550,550,-550);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.woodPost", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
-
-
 
 
 

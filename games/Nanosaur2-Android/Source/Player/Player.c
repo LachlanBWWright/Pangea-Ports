@@ -11,6 +11,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -255,6 +258,11 @@ Boolean	killed = false;
 
 	if (gPlayerInfo[playerNum].health < 0.0f)				// see if already dead
 		return(true);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (Nanosaur2Script_OnPlayerDamage(playerNum, &damage, deathType, where))
+		return false;
+#endif
 
 	gPlayerInfo[playerNum].health -= damage;
 

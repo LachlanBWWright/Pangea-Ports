@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -128,6 +132,9 @@ long	id				= -1;
 		SetObjectCollisionBounds(newObj,60,0,-70,70,30,-30);
 		newObj->DetonatorID = id;									// remember ID #
 	}
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.firecracker", "destructible");
+#endif
 	return(true);													// item was added
 }
 
@@ -282,6 +289,9 @@ Byte	rot,color;
 	{
 		newObj = MakeOpenHiveDoor(&gNewObjectDefinition.coord, rot, color);
 		newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_RegisterObject(newObj, "bugdom.hiveDoor.open", "obstacle");
+#endif
 		return(true);
 	}
 
@@ -324,6 +334,9 @@ Byte	rot,color;
 	}
 
 	newObj->DetonatorID = id;									// remember ID #
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.hiveDoor", "obstacle");
+#endif
 	return(true);												// item was added
 }
 
@@ -482,6 +495,10 @@ ObjNode	*newObj;
 	else
 		SetObjectCollisionBounds(newObj,35,-200,-127,127,215,-215);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.dock", "platform");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -581,6 +598,10 @@ float	scaleFactor = itemPtr->parm[2];
 	
 	SetRootAnimTimeIndex(newObj);
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.rootSwing", "ride");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -751,6 +772,10 @@ ObjNode	*newObj;
 				break;
 	}
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.rock", "obstacle");
+#endif
+
 	return(true);														// item was added
 }
 
@@ -801,6 +826,10 @@ int		n;
 	newObj->CBits = CBITS_ALLSOLID;
 	
 	SetObjectCollisionBounds(newObj,400 * s,0,-70*s,70*s,70*s,-70*s);	// normal
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.honeyTube", "obstacle");
+#endif
 
 	return(true);														// item was added
 }
@@ -932,6 +961,10 @@ Boolean			zigzag = itemPtr->parm[3] & (1<<2);
 			
 	AddToSplineObjectList(newObj);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.honeycombPlatform", "platform");
+#endif
+
 	return(true);
 }
 
@@ -1022,8 +1055,9 @@ ObjNode	*newObj;
 	
 	SetObjectCollisionBounds(newObj,600,0,-110,110,110,-110);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.faucet", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
-
-
-

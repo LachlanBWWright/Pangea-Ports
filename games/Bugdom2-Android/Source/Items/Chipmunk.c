@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -148,6 +152,10 @@ int		anim;
 
 	newObj->TriggerCallback = DoTrig_Chipmunk;
 	newObj->ForceLookAtDist	= CHIPMUNK_DIALOG_ACTIVATE_DIST;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.chipmunk", "npc");
+#endif
 
 
 		/***************************/
@@ -510,7 +518,6 @@ const OGLPoint3D	zero = {0,0,0};
 
 
 }
-
 
 
 

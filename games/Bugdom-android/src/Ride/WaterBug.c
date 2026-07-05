@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /*******************/
 /*   PROTOTYPES    */
@@ -100,6 +104,10 @@ Boolean		isPaidFor;
 			/* SET COLLISION INFO */
 
 	SetObjectCollisionBounds(newObj,45,-200,-50,50,50,-50);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.waterBug", "ride");
+#endif
 
 	return(true);							// item was added
 }
@@ -572,4 +580,3 @@ static const TQ3Vector3D up = {0,1,0};
 
 	SetLookAtMatrixAndTranslate(&theNode->BaseTransformMatrix, &up, &theNode->Coord, &gGameViewInfoPtr->currentCameraCoords);
 }
-

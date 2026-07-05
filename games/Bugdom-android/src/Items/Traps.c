@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -184,6 +188,10 @@ float	x,z,placement;
 			/* ADD SPLINE OBJECT TO SPLINE OBJECT LIST */
 			
 	AddToSplineObjectList(newObj);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.foot", "hazard");
+#endif
 
 	return(true);
 }
@@ -720,6 +728,9 @@ int		rot;
 
 	KeepOldCollisionBoxes(newObj);							// set old stuff
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.thorn", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -771,6 +782,10 @@ Byte	r;
 	
 	newObj->WallLength = l;						// get length
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.fireWall", "hazard");
+#endif
+
 	return(true);								// item was added
 }
 
@@ -915,6 +930,9 @@ ObjNode	*newObj;
 
 	newObj->Health = .6;
 	MakeObjectTransparent(newObj, newObj->Health);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.shockwave", "hazard");
+#endif
 }
 
 
@@ -992,6 +1010,10 @@ ObjNode	*newObj;
 							-BOULDER_RADIUS*BOULDER_SCALE,BOULDER_RADIUS*BOULDER_SCALE,
 							BOULDER_RADIUS*BOULDER_SCALE,-BOULDER_RADIUS*BOULDER_SCALE);
 							
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.rollingBoulder", "hazard");
+#endif
+
 	return(true);								// item was added
 }
 
@@ -1175,6 +1197,10 @@ ObjNode	*newObj;
 	newObj->CBits 	= CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj,0,-SPIKE_HEIGHT,-20,20,20,-20);
 							
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.floorSpike", "hazard");
+#endif
+
 	return(true);								// item was added
 }
 
@@ -1229,8 +1255,6 @@ float	y,fps = gFramesPerSecondFrac;
 				break;
 	}
 }
-
-
 
 
 

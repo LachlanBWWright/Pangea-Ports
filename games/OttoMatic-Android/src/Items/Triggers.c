@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /*******************/
 /*   PROTOTYPES    */
 /*******************/
@@ -36,6 +40,7 @@ static Boolean DoTrig_FallingSlimePlatform(ObjNode *theNode, ObjNode *whoNode, B
 
 static void MoveSpinningPlatform(ObjNode *theNode);
 static Boolean DoTrig_SpinningPlatform(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
+static Boolean CallTriggerHandler(ObjNode *triggerNode, ObjNode *whoNode, Byte side);
 
 
 /****************************/
@@ -85,6 +90,79 @@ Boolean	(*gTriggerTable[])(ObjNode *, ObjNode *, Byte) =
 	DoTrig_LavaPlatform
 };
 
+static const char* GetTriggerScriptId(int triggerType)
+{
+	switch (triggerType)
+	{
+		case TRIGTYPE_WOODENGATE:
+			return "ottomatic.woodenGate";
+		case TRIGTYPE_METALGATE:
+			return "ottomatic.metalGate";
+		case TRIGTYPE_HUMAN:
+			return "ottomatic.human";
+		case TRIGTYPE_CORNKERNEL:
+			return "ottomatic.cornKernel";
+		case TRIGTYPE_CHECKPOINT:
+			return "ottomatic.checkpoint";
+		case TRIGTYPE_BUMPERBUBBLE:
+			return "ottomatic.bumperBubble";
+		case TRIGTYPE_FALLINGSLIMEPLATFORM:
+			return "ottomatic.fallingSlimePlatform";
+		case TRIGTYPE_BUBBLEPUMP:
+			return "ottomatic.bubblePump";
+		case TRIGTYPE_CIRCULARPLATFORM:
+			return "ottomatic.spinningPlatform";
+		case TRIGTYPE_JUNGLEGATE:
+			return "ottomatic.jungleGate";
+		case TRIGTYPE_TURTLE:
+			return "ottomatic.turtlePlatform";
+		case TRIGTYPE_SMASHABLE:
+			return "ottomatic.smashable";
+		case TRIGTYPE_LEAFPLATFORM:
+			return "ottomatic.leafPlatform";
+		case TRIGTYPE_POWERUPPOD:
+			return "ottomatic.powerupPod";
+		case TRIGTYPE_DEBRISGATE:
+			return "ottomatic.debrisGate";
+		case TRIGTYPE_CHAINREACTINGMINE:
+			return "ottomatic.chainReactingMine";
+		case TRIGTYPE_CRUNCHDOOR:
+			return "ottomatic.crunchDoor";
+		case TRIGTYPE_BUMPERCAR:
+			return "ottomatic.bumperCar";
+		case TRIGTYPE_BUMPERCARPOWERPOST:
+			return "ottomatic.bumperCarPowerPost";
+		case TRIGTYPE_ROCKETSLED:
+			return "ottomatic.rocketSled";
+		case TRIGTYPE_TRAPDOOR:
+			return "ottomatic.trapDoor";
+		case TRIGTYPE_LAVAPLATFORM:
+			return "ottomatic.lavaPlatform";
+	}
+
+	return "ottomatic.trigger";
+}
+
+static Boolean CallTriggerHandler(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
+{
+	Boolean solid = true;
+	int triggerType;
+
+	if (!triggerNode)
+		return true;
+
+	triggerType = triggerNode->Kind;
+	if (triggerType < 0 || triggerType >= (int)(sizeof(gTriggerTable) / sizeof(gTriggerTable[0])))
+		return true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnTriggerEnter(triggerNode, whoNode, GetTriggerScriptId(triggerType), triggerType, side, &solid))
+		return solid;
+#endif
+
+	return gTriggerTable[triggerType](triggerNode, whoNode, side);
+}
+
 
 #define	ShimmeyTimer		SpecialF[0]
 #define	BumperBubbleSpin	SpecialF[1]
@@ -120,7 +198,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 {
 	if (triggerNode->CBits & (CBITS_TOUCHABLE|CBITS_ALWAYSTRIGGER))			// see if a non-solid trigger
 	{
-		return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+		return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 	}
 
 			/* CHECK SIDES */
@@ -128,7 +206,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BACK)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_FRONT)		// if my back hit, then must be front-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -136,7 +214,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_FRONT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BACK)			// if my front hit, then must be back-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -144,7 +222,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_LEFT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_RIGHT)		// if my left hit, then must be right-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -152,7 +230,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_RIGHT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_LEFT)			// if my right hit, then must be left-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -160,7 +238,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_TOP)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BOTTOM)		// if my top hit, then must be bottom-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -168,7 +246,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BOTTOM)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_TOP)			// if my bottom hit, then must be top-triggerable
-			return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -224,6 +302,10 @@ int		i;
 
 	for (i = 0; i < NUM_WEAPON_TYPES; i++)								// all weapons call this
 		newObj->HitByWeaponHandler[i] = WoodenGate_HitByWeaponHandler;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(newObj, "ottomatic.woodenGate", "trigger");
+#endif
 
 	return(true);													// item was added
 }
@@ -461,6 +543,10 @@ int		i;
 
 	for (i = 0; i < NUM_WEAPON_TYPES; i++)								// all weapons call this
 		newObj->HitByWeaponHandler[i] = MetalGate_HitByWeaponHandler;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(newObj, "ottomatic.metalGate", "trigger");
+#endif
 
 	return(true);													// item was added
 }
@@ -703,6 +789,10 @@ float	y;
 	CreateCollisionBoxFromBoundingBox(base, 1.1, 1);
 
 	base->CheckpointNum = itemPtr->parm[0];						// remember checkpoint # 0..n
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(base, "ottomatic.checkpoint", "trigger");
+#endif
 
 	if (base->CheckpointNum <= gBestCheckpointNum)				// see if this one has already been activated
 	{
@@ -958,6 +1048,10 @@ ObjNode	*newObj;
 	newObj->TriggerSides 	= ALL_SOLID_SIDES;				// side(s) to activate it
 	newObj->Kind		 	= TRIGTYPE_BUMPERBUBBLE;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(newObj, "ottomatic.bumperBubble", "trigger");
+#endif
+
 
 	CreateCollisionBoxFromBoundingBox(newObj, .9, .95);
 
@@ -1110,6 +1204,10 @@ int		i;
 	newObj->Kind		 	= TRIGTYPE_FALLINGSLIMEPLATFORM;
 
 	newObj->Mode			= FALLING_PLATFORM_MODE_WAIT;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(newObj, "ottomatic.fallingSlimePlatform", "platform");
+#endif
 
 	SetObjectCollisionBounds(newObj, 0, -1000,
 							newObj->BBox.min.x * s, newObj->BBox.max.x * s,
@@ -1366,6 +1464,10 @@ static const OGLPoint3D xLights[8] =
 	newObj->CBits			= CBITS_TOP;
 	newObj->TriggerSides 	= SIDE_BITS_TOP;						// side(s) to activate it
 	newObj->Kind		 	= TRIGTYPE_CIRCULARPLATFORM;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterTaggedObjectNode(newObj, "ottomatic.spinningPlatform", "platform");
+#endif
 
 	CreateCollisionBoxFromBoundingBox_Maximized(newObj);			// calc collision box
 	newObj->TopOff 	= 0;											// reset the top to eliminate those light poles
@@ -1735,8 +1837,6 @@ OGLPoint2D		origin,pt,p[12];
 
 	return(true);
 }
-
-
 
 
 

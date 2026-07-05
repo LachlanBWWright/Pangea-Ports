@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -749,7 +753,12 @@ Boolean BrainAlienHitByWeapon(ObjNode *weapon, ObjNode *enemy, OGLPoint3D *weapo
 
 			/* HURT IT */
 
-	HurtBrainAlien(enemy, weapon->Damage);
+	float damage = weapon->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(weapon, enemy, "ottomatic.weaponHit", weapon->Type, &damage))
+		return(true);
+#endif
+	HurtBrainAlien(enemy, damage);
 
 
 			/* GIVE MOMENTUM */
@@ -1305,7 +1314,6 @@ float		r,fps,c,a;
 
 	UpdateBrainAlien(theNode);
 }
-
 
 
 

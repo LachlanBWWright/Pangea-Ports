@@ -107,6 +107,9 @@ parser.add_argument("--dist-dir", metavar="<dir>", default=dist_dir,
 parser.add_argument("--print-artifact-name", default=False, action="store_true",
         help="print artifact name and exit")
 
+parser.add_argument("--wasm", default=False, action="store_true",
+        help="build WebAssembly/Emscripten target instead of the native platform target")
+
 if SYSTEM == "Linux":
     parser.add_argument("--system-sdl", default=False, action="store_true",
         help="use system SDL instead of building SDL from scratch")
@@ -115,6 +118,8 @@ if SYSTEM == "Linux":
         help="don't generate an AppImage in step 4")
 
 args = parser.parse_args()
+if args.wasm and args.G == default_generator:
+    args.G = None
 
 dist_dir = os.path.abspath(args.dist_dir)
 build_dir = os.path.abspath(args.build_dir)
@@ -313,6 +318,7 @@ class WindowsProject(Project):
 class MacProject(Project):
     def __init__(self, dir_name="build-xcode"):
         super().__init__(dir_name)
+        self.gen_args += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"]
         self.build_configs = ["RelWithDebInfo"]
         self.build_args += ["-j", str(NPROC), "-quiet"]
 

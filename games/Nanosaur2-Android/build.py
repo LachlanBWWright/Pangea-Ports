@@ -118,6 +118,8 @@ if SYSTEM == "Linux":
         help="don't generate an AppImage in step 4")
 
 args = parser.parse_args()
+if args.wasm and args.G == default_generator:
+    args.G = None
 
 dist_dir = os.path.abspath(args.dist_dir)
 build_dir = os.path.abspath(args.build_dir)
@@ -316,6 +318,7 @@ class WindowsProject(Project):
 class MacProject(Project):
     def __init__(self, dir_name="build-xcode"):
         super().__init__(dir_name)
+        self.gen_args += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"]
         self.build_configs = ["RelWithDebInfo"]
         self.build_args += ["-j", str(NPROC), "-quiet"]
 
@@ -469,9 +472,14 @@ class EmscriptenProject(Project):
             shutil.unpack_archive(sdl_zip_path, libs_dir)
             shutil.move(f"{libs_dir}/SDL3-{sdl_ver}", sdl_source_dir)
 
+        sdl_config_path = f"{self.sdl_install_dir}/lib/cmake/SDL3/SDL3Config.cmake"
+        sdl_header_path = f"{self.sdl_install_dir}/include/SDL3/SDL.h"
+
         # Build SDL3 for Emscripten and install it if not already done
-        if not os.path.exists(f"{self.sdl_install_dir}/lib/cmake/SDL3/SDL3Config.cmake"):
+        if not os.path.exists(sdl_config_path) or not os.path.exists(sdl_header_path):
             log("Building SDL3 for Emscripten...")
+            rmtree_if_exists(self.sdl_build_dir)
+            rmtree_if_exists(self.sdl_install_dir)
             os.makedirs(self.sdl_build_dir, exist_ok=True)
             call(["emcmake", "cmake",
                   "-S", sdl_source_dir,

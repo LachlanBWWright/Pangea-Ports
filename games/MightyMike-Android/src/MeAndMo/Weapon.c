@@ -26,6 +26,10 @@
 #include "input.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -177,6 +181,10 @@ ObjNode		*newObj;
 		newObj->Special1 = GAME_FPS*6;				// set POW timer
 	else
 		newObj->Special1 = 0xf0000L;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.weaponPow", "pickup");
+#endif
 
 	return(true);									// was added
 }
@@ -1047,4 +1055,3 @@ void MoveToothpaste(void)
 	CalcObjectBox();
 	UpdateObject();
 }
-

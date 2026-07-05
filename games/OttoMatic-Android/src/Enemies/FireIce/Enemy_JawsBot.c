@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -534,7 +538,12 @@ static Boolean JawsBotHitByWeapon(ObjNode *weapon, ObjNode *enemy, OGLPoint3D *w
 
 			/* HURT IT */
 
-	HurtJawsBot(enemy, weapon->Damage);
+	float damage = weapon->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_OnWeaponHit(weapon, enemy, "ottomatic.weaponHit", weapon->Type, &damage))
+		return(true);
+#endif
+	HurtJawsBot(enemy, damage);
 
 
 			/* GIVE MOMENTUM */
@@ -761,7 +770,6 @@ float			throwFactor;
 		MakeSparkExplosion(jawPt.x, jawPt.y, jawPt.z, 300.0f, .8, PARTICLE_SObjType_WhiteSpark3, 0);
 	}
 }
-
 
 
 

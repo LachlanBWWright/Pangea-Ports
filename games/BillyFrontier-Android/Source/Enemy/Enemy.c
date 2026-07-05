@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -233,8 +237,17 @@ int		i;
 			if (ctype & CTYPE_HURTENEMY)
 			{
 				if (theEnemy->HurtCallback != nil)							// if has a hurt callback
-					if (theEnemy->HurtCallback(theEnemy, hitObj->Damage))	// handle hit (returns true if was deleted)
+				{
+					float damage = hitObj->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+					if (BillyScript_OnWeaponHit(hitObj, theEnemy, "billy.weaponHit", hitObj->Type, &damage))
+						return(theEnemy->CType == INVALID_NODE_FLAG);
+					if (BillyScript_OnObjectDamage(hitObj, theEnemy, "billy.enemyDamage", theEnemy->Type, &damage))
+						return(theEnemy->CType == INVALID_NODE_FLAG);
+#endif
+					if (theEnemy->HurtCallback(theEnemy, damage))	// handle hit (returns true if was deleted)
 						return(true);			
+				}
 			}
 			
 				/* TOUCHED PLAYER */
@@ -255,8 +268,14 @@ int		i;
 	{
 		if (ParticleHitObject(theEnemy, PARTICLE_FLAGS_HURTENEMY))
 		{
-		
-			if (theEnemy->HurtCallback(theEnemy, .3))			// handle hit (returns true if was deleted)
+			float damage = .3;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (BillyScript_OnWeaponHit(nil, theEnemy, "billy.particleHit", PARTICLE_FLAGS_HURTENEMY, &damage))
+				return(theEnemy->CType == INVALID_NODE_FLAG);
+			if (BillyScript_OnObjectDamage(nil, theEnemy, "billy.enemyDamage", theEnemy->Type, &damage))
+				return(theEnemy->CType == INVALID_NODE_FLAG);
+#endif
+			if (theEnemy->HurtCallback(theEnemy, damage))			// handle hit (returns true if was deleted)
 				return(true);
 		}
 	}
@@ -547,8 +566,6 @@ void DecEnemiesAtStopPoint(void)
 		gShootoutCanProceedToNextStopPoint = true;
 	}
 }
-
-
 
 
 

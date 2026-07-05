@@ -12,6 +12,9 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -90,6 +93,10 @@ Boolean AddGrass(TerrainItemEntryType *itemPtr, float  x, float z)
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj, .7, .3);
 
 	newObj->TriggerCallback = DoTrig_Grass;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.grass", "trigger");
+#endif
 
 	return(true);													// item was added
 }
@@ -182,6 +189,10 @@ Boolean AddBerryBush(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->TriggerCallback = DoTrig_MiscSmackableObject;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.berryBush", "obstacle");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -263,6 +274,10 @@ Boolean AddDesertBush(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->TriggerCallback = DoTrig_DesertBush;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.desertBush", "hazard");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -337,6 +352,10 @@ Boolean AddCactus(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->TriggerCallback = DoTrig_MiscSmackableObject;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.cactus", "hazard");
+#endif
+
 	return(true);													// item was added
 }
 
@@ -377,6 +396,10 @@ Boolean AddPalmBush(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	newObj->Damage = .5f;
 	newObj->TriggerCallback = DoTrig_DesertBush;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.palmBush", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -423,6 +446,10 @@ Boolean AddGeckoPlant(TerrainItemEntryType *itemPtr, float  x, float z)
 	newObj->Damage = .6f;
 
 	newObj->TriggerCallback = DoTrig_DesertBush;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.geckoPlant", "hazard");
+#endif
 
 	return(true);													// item was added
 }
@@ -506,8 +533,6 @@ short   color = itemPtr->parm[1];
 
 	return(true);													// item was added
 }
-
-
 
 
 

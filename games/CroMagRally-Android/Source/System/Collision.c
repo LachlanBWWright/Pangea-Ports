@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -352,6 +356,19 @@ again:
 		{
 			continue;
 		}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (CroMagScript_OnObjectCollision(theNode, targetObj, "object.contact", (int) targetObj->CType, gCollisionList[i].sides))
+		{
+			gCollisionList[i].sides = 0;
+			continue;
+		}
+		if (targetObj->CType == INVALID_NODE_FLAG)
+		{
+			gCollisionList[i].sides = 0;
+			continue;
+		}
+#endif
 
 				/* SAVE COPY OF TARGET OBJ PROPERTIES WE NEED FOR COLLISIONS */
 				/* (ORIGINAL MAY BECOME INVALID IF TRIGGER DELETES TARGET OBJ) */
@@ -1456,4 +1473,3 @@ float				distToFloor;
 
 	return(hitFoot);
 }
-

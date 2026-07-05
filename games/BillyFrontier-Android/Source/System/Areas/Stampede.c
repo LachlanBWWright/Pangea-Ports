@@ -799,6 +799,15 @@ static void BillyGotTrampled(ObjNode *player)
 {
 	if (player->Skeleton->AnimNum != PLAYER_ANIM_STAMPEDETRAMPLED)
 	{
+		float damage = 1.0f;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (BillyScript_OnPlayerDamage(player, &damage, "billy.stampedeTrample", 3))
+			return;
+		if (damage <= 0.0f)
+			return;
+#endif
+
 		KillPlayer(PLAYER_DEATH_TYPE_TRAMPLED);
 
 		if (!gPlayerIsDead)		// avoid grating endless playback if animation somehow doesn't begin
@@ -1204,6 +1213,7 @@ ObjNode	*newObj;
 	CreateCollisionBoxFromBoundingBox(newObj,2,1);
 
 	newObj->TriggerCallback = DoTrig_Boost;
+	newObj->Kind = BILLY_SCRIPT_TRIGGER_BOOST;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 1, 2, false);
 

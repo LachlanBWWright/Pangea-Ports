@@ -327,6 +327,7 @@ class WindowsProject(Project):
 class MacProject(Project):
     def __init__(self, dir_name="build-xcode"):
         super().__init__(dir_name)
+        self.gen_args += ["-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"]
         self.build_configs = ["RelWithDebInfo"]
         self.build_args += ["-j", str(NPROC), "-quiet"]
 

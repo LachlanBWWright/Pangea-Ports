@@ -26,6 +26,7 @@ static void MoveCrystal(ObjNode *theNode);
 static Boolean DoTrig_Crystal(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
 static void MoveStepStone(ObjNode *theNode);
 static Boolean DoTrig_StepStone(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
+static Boolean CallTriggerHandler(ObjNode *triggerNode, ObjNode *whoNode, Byte side);
 
 
 /****************************/
@@ -74,7 +75,42 @@ Boolean	(*gTriggerTable[])(ObjNode *, ObjNode *, Byte) =
 	DoTrig_Crystal,
 	DoTrig_StepStone
 };
-					
+
+static const char* GetTriggerScriptId(int triggerType)
+{
+	switch (triggerType)
+	{
+		case TRIGTYPE_POWERUP:
+			return "nanosaur.powerup";
+		case TRIGTYPE_CRYSTAL:
+			return "nanosaur.crystal";
+		case TRIGTYPE_STEPSTONE:
+			return "nanosaur.stepstone";
+	}
+
+	return "nanosaur.trigger";
+}
+
+static Boolean CallTriggerHandler(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
+{
+	Boolean solid = true;
+	int triggerType;
+
+	if (!triggerNode)
+		return true;
+
+	triggerType = triggerNode->TriggerType;
+	if (triggerType < 0 || triggerType >= (int)(sizeof(gTriggerTable) / sizeof(gTriggerTable[0])))
+		return true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (NanosaurScript_OnTriggerEnter(triggerNode, whoNode, GetTriggerScriptId(triggerType), triggerType, side, &solid))
+		return solid;
+#endif
+
+	return gTriggerTable[triggerType](triggerNode, whoNode, side);
+}
+
 
 /******************** HANDLE TRIGGER ***************************/
 //
@@ -102,7 +138,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BACK)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_FRONT)		// if my back hit, then must be front-triggerable
-			return(gTriggerTable[triggerNode->TriggerType](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -110,7 +146,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_FRONT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BACK)			// if my front hit, then must be back-triggerable
-			return(gTriggerTable[triggerNode->TriggerType](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -118,7 +154,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_LEFT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_RIGHT)		// if my left hit, then must be right-triggerable
-			return(gTriggerTable[triggerNode->TriggerType](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -126,7 +162,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_RIGHT)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_LEFT)			// if my right hit, then must be left-triggerable
-			return(gTriggerTable[triggerNode->TriggerType](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -134,7 +170,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_TOP)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_BOTTOM)		// if my top hit, then must be bottom-triggerable
-			return(gTriggerTable[triggerNode->TriggerType](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -142,7 +178,7 @@ Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 	if (side & SIDE_BITS_BOTTOM)
 	{
 		if (triggerNode->TriggerSides & SIDE_BITS_TOP)			// if my bottom hit, then must be top-triggerable
-			return(gTriggerTable[triggerNode->TriggerType](triggerNode,whoNode,side));	// call trigger's handler routine
+			return(CallTriggerHandler(triggerNode,whoNode,side));	// call trigger's handler routine
 		else
 			return(true);
 	}
@@ -509,7 +545,9 @@ float	y;
 			
 	SetObjectCollisionBounds(newObj,98,-94,-94,94,94,-94);
 
-
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_RegisterObject(newObj, "nanosaur.stepstone", "trigger");
+#endif
 
 	return(true);							// item was added
 }
@@ -591,5 +629,4 @@ static Boolean DoTrig_StepStone(ObjNode *theNode, ObjNode *whoNode, Byte sideBit
 	}
 	return(true);
 }
-
 

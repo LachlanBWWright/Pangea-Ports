@@ -364,6 +364,10 @@ float		y;
 	}
 
 	KeepOldCollisionBoxes(logObj);							// set old stuff
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(logObj, "bugdom.exitLog", "trigger");
+#endif
 		
 		
 			/*************************/
@@ -415,6 +419,10 @@ float		y;
 	}
 	
 	logObj->ChainNode = end;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(end, "bugdom.exitLogEnd", "trigger");
+#endif
 	
 	return(true);											// item was added
 }
@@ -487,6 +495,9 @@ ObjNode	*newObj;
 	newObj->SpewWater = false;
 	
 	newObj->InitCoord.y += 300.0f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.kingWaterPipe", "trigger");
+#endif
 	return(true);											// item was added
 }
 
@@ -662,6 +673,10 @@ float	y;
 		post[i] = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		GAME_ASSERT(post[i]);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_RegisterObject(post[i], "bugdom.ladybugPost", "trigger");
+#endif
+
 		if (i == 0)
 			post[0]->TerrainItemPtr = itemPtr;			// keep ptr to item list
 		else
@@ -689,6 +704,10 @@ float	y;
 
 	SetObjectCollisionBounds(cage,200,0,-130,130,130,-130);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(cage, "bugdom.ladybugCage", "trigger");
+#endif
+
 	post[3]->ChainNode = cage;	
 	cage->ChainHead = post[0];
 
@@ -706,6 +725,10 @@ float	y;
 	gNewObjectDefinition.scale 		= LADYBUG_SCALE;
 	bug = MakeNewSkeletonObject(&gNewObjectDefinition);
 	GAME_ASSERT(bug);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(bug, "bugdom.ladybug", "npc");
+#endif
 
 	cage->ChainNode = bug;
 
@@ -844,7 +867,6 @@ Boolean DoTrig_Cage(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	
 	return(true);
 }
-
 
 
 
