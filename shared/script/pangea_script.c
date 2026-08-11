@@ -375,7 +375,7 @@ PangeaScriptStatus PangeaScript_Reload(void)
 		return PANGEA_SCRIPT_NOT_ENABLED;
 	}
 
-	const char* scriptPath = gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js";
+	const char* scriptPath = gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.lua";
 	long scriptSize = 0;
 	char* script = read_text_file(scriptPath, &scriptSize);
 	if (!script)
@@ -893,7 +893,6 @@ PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, 
 {
 	if (!id || !id[0])
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-
 	if (gGameInfo.spawnScripted)
 		return gGameInfo.spawnScripted(id, x, y, z, outHandle);
 
@@ -926,6 +925,23 @@ bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle)
 
 	clear_registered_object(object);
 	return true;
+}
+
+bool PangeaScript_ObjectExists(PangeaScriptObjectHandle handle)
+{
+	return resolve_object(handle) != NULL;
+}
+
+int PangeaScript_GetObjectTagCount(PangeaScriptObjectHandle handle)
+{
+	RegisteredObject* object = resolve_object(handle);
+	return object ? object->tagCount : 0;
+}
+
+const char* PangeaScript_GetObjectTag(PangeaScriptObjectHandle handle, int index)
+{
+	RegisteredObject* object = resolve_object(handle);
+	return object && index >= 0 && index < object->tagCount ? object->tags[index] : NULL;
 }
 
 bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition)
@@ -1040,14 +1056,55 @@ PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem
 	return PANGEA_SCRIPT_OK;
 }
 
-PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle)
+int PangeaScript_ResolveNativeItemType(const char* id)
+{
+	char* end = NULL;
+	long type;
+	if (!id || !id[0])
+		return -1;
+	type = strtol(id, &end, 10);
+	if (end && end != id && *end == '\0')
+		return (int) type;
+	for (int i = 0; i < gNativeItemCount; i++)
+		if (gNativeItems[i].id && strcmp(gNativeItems[i].id, id) == 0)
+			return gNativeItems[i].nativeType;
+	return -1;
+}
+
+PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle)
 {
 	if (!id || !id[0])
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!params)
+	{
+		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Native item parameters are required");
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	}
+	for (int i = 0; i < 4; i++)
+	{
+		if (params[i] < 0 || params[i] > 255)
+		{
+			set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Native item parameters must be in the byte range 0-255");
+			return PANGEA_SCRIPT_BAD_ARGUMENT;
+		}
+	}
 
 	if (gGameInfo.spawnNative)
 	{
-		return gGameInfo.spawnNative(id, x, y, z, subtype, amount, outHandle);
+		PangeaScriptStatus status = gGameInfo.spawnNative(id, x, y, z, params, outHandle);
+		if (status == PANGEA_SCRIPT_OK)
+			set_error(status, "");
+		else if (status == PANGEA_SCRIPT_INCOMPATIBLE_ITEM)
+		{
+			char message[256];
+			snprintf(message, sizeof(message), "Native item '%s' has no initializer or its required level assets are unavailable", id);
+			set_error(status, message);
+		}
+		else if (status == PANGEA_SCRIPT_BAD_ARGUMENT)
+			set_error(status, "Native item ID, position, or parameters are invalid");
+		else
+			set_error(status, "Native item initializer failed or synthetic item capacity is exhausted");
+		return status;
 	}
 
 	for (int i = 0; i < gNativeItemCount; i++)
@@ -1095,7 +1152,7 @@ void PangeaScript_GetStatusInfo(PangeaScriptStatusInfo* outInfo)
 	outInfo->enabled = gInitialized;
 	outInfo->configLoaded = gConfigPath[0] != '\0';
 	outInfo->bundleLoaded = gScriptLoaded;
-	snprintf(outInfo->activeScriptPath, sizeof(outInfo->activeScriptPath), "%s", gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js");
+	snprintf(outInfo->activeScriptPath, sizeof(outInfo->activeScriptPath), "%s", gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.lua");
 	snprintf(outInfo->lastError, sizeof(outInfo->lastError), "%s", gLastError);
 	outInfo->errorCount = gErrorCount;
 	outInfo->budgetExceededCount = gBudgetExceededCount;
@@ -1121,7 +1178,7 @@ bool PangeaScript_GetStatusBundleLoaded(void) { return gScriptLoaded; }
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
-const char* PangeaScript_GetStatusActiveScriptPath(void) { return gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.js"; }
+const char* PangeaScript_GetStatusActiveScriptPath(void) { return gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.lua"; }
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
@@ -1217,10 +1274,11 @@ bool PangeaScript_DeleteObjectJS(int id, uint32_t generation)
 }
 
 EMSCRIPTEN_KEEPALIVE
-int PangeaScript_SpawnNativeJS(const char* id, float x, float y, float z, int subtype, int amount, int* outId, uint32_t* outGen)
+int PangeaScript_SpawnNativeJS(const char* id, float x, float y, float z, int param0, int param1, int param2, int param3, int* outId, uint32_t* outGen)
 {
 	PangeaScriptObjectHandle handle = {0, 0};
-	PangeaScriptStatus status = PangeaScript_SpawnNative(id, x, y, z, subtype, amount, &handle);
+	const int params[4] = {param0, param1, param2, param3};
+	PangeaScriptStatus status = PangeaScript_SpawnNative(id, x, y, z, params, &handle);
 	if (status == PANGEA_SCRIPT_OK)
 	{
 		*outId = handle.id;

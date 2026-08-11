@@ -10,6 +10,41 @@
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
+static TerrainItemEntryType gScriptTerrainItems[256];
+static bool gScriptTerrainItemOccupied[256];
+static bool gScriptTerrainItemReclaimable[256];
+
+static TerrainItemEntryType* AcquireScriptTerrainItem(void)
+{
+	for (int i = 0; i < 256; i++)
+	{
+		bool referenced = false;
+		if (gScriptTerrainItemOccupied[i] && !gScriptTerrainItemReclaimable[i]) continue;
+		for (ObjNode* node = gFirstNodePtr; gScriptTerrainItemOccupied[i] && node; node = node->NextNode) referenced |= node->TerrainItemPtr == &gScriptTerrainItems[i];
+		if (referenced) continue;
+		gScriptTerrainItemOccupied[i] = true; gScriptTerrainItemReclaimable[i] = false; memset(&gScriptTerrainItems[i], 0, sizeof(gScriptTerrainItems[i])); return &gScriptTerrainItems[i];
+	}
+	return NULL;
+}
+
+static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle)
+{
+	(void) y;
+	TerrainItemEntryType* item = AcquireScriptTerrainItem();
+	if (!item) return PANGEA_SCRIPT_RUNTIME_ERROR;
+	item->x = (uint32_t) x; item->y = (uint32_t) z;
+	for (int i = 0; i < 4; i++) item->parm[i] = (Byte) params[i];
+	if (!Nanosaur2SpawnTerrainItem(PangeaScript_ResolveNativeItemType(id), item, x, z)) { gScriptTerrainItemOccupied[item - gScriptTerrainItems] = false; return PANGEA_SCRIPT_INCOMPATIBLE_ITEM; }
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode) if (node->TerrainItemPtr == item)
+	{
+		Nanosaur2Script_RegisterObject(node, "nanosaur2.terrain-item", "terrain-item");
+		gScriptTerrainItemReclaimable[item - gScriptTerrainItems] = true;
+		if (outHandle) *outHandle = (PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration};
+		break;
+	}
+	return PANGEA_SCRIPT_OK;
+}
+
 static PangeaScriptFrameContext gScriptFrameContext;
 
 typedef struct ScriptModelCacheEntry
@@ -233,6 +268,8 @@ void Nanosaur2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 void Nanosaur2Script_ResetObjectRegistry(void)
 {
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
+	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
+	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
 	PangeaScript_ResetObjects();
 }
 
@@ -538,6 +575,7 @@ void Nanosaur2Script_Init(void)
 	{
 		.gameId = "Nanosaur2-Android",
 		.gameName = "Nanosaur 2",
+		.spawnNative = SpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
 	};
 

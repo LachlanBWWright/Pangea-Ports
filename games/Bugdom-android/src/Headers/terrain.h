@@ -175,6 +175,7 @@ Boolean IsPositionOutOfRange(float x, float z);
 Boolean IsPositionOutOfRange_Far(float x, float z, float range);
 
 Boolean TrackTerrainItem(ObjNode *theNode);
+Boolean BugdomSpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, long x, long z);
 Boolean TrackTerrainItem_Far(ObjNode* theNode, float range);
 
 void PrimeInitialTerrain(Boolean justReset);
@@ -187,4 +188,3 @@ void CalcTileNormals(long layer, long row, long col, TQ3Vector3D *n1, TQ3Vector3
 void CalculateSplitModeMatrix(void);
 
 void DoItemShadowCasting(void);
-

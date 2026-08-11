@@ -370,6 +370,14 @@ static Boolean NilAdd(TerrainItemEntryType *itemPtr,long x, long z)
 	return(false);
 }
 
+Boolean OttoSpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, long x, long z)
+{
+	if (!itemPtr || type < 0 || type > MAX_ITEM_NUM || gTerrainItemAddRoutines[type] == NilAdd)
+		return false;
+	itemPtr->type = (uint16_t) type;
+	return gTerrainItemAddRoutines[type](itemPtr, x, z);
+}
+
 
 /***************** TRACK TERRAIN ITEM ******************/
 //
@@ -574,7 +582,6 @@ static OGLPoint3D	p4 = {TERRAIN_POLYGON_SIZE, 0, 0};
 		CalcFaceNormal_NotNormalized(&p3, &p4, &p2, n2);		// fr, nl, nr
 	}
 }
-
 
 
 

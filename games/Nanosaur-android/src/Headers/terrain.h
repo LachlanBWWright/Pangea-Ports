@@ -217,6 +217,7 @@ void BuildTerrainItemList(long numItems, TerrainItemEntryType* itemList);
 extern 	void ScanForPlayfieldItems(long top, long bottom, long left, long right);
 extern 	Boolean TrackTerrainItem(ObjNode *theNode);
 extern 	Boolean NilAdd(TerrainItemEntryType *itemPtr,long x, long z);
+Boolean NanosaurSpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, long x, long z);
 extern	void PrimeInitialTerrain(void);
 extern 	void FindMyStartCoordItem(void);
 extern 	Boolean TrackTerrainItem_Far(ObjNode *theNode, long range);
@@ -225,4 +226,3 @@ extern 	void MakeBackupOfItemList(void);
 extern	UInt16	GetPathTileNumAtRowCol(long row, long col);
 extern	void RotateOnTerrain(ObjNode *theNode, float sideOff, float endOff);
 extern	void DoMyTerrainUpdate(void);
-

@@ -211,6 +211,7 @@ void InitCurrentScrollSettings(void);
 
 void BuildTerrainItemList(void);
 void AddTerrainItemsOnSuperTile(long row, long col);
+Boolean OttoSpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, long x, long z);
 Boolean TrackTerrainItem(ObjNode *theNode);
 Boolean TrackTerrainItem_FromInit(ObjNode *theNode);
 Boolean SeeIfCoordsOutOfRange(float x, float z);
@@ -227,4 +228,3 @@ uint16_t GetTileAttribsAtRowCol(int row, int col);
 short NewSuperTileDeformation(DeformationType *data);
 void DeleteTerrainDeformation(short	i);
 void UpdateDeformationCoords(short defNum, float x, float z);
-

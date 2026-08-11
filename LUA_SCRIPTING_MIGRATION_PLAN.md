@@ -12,10 +12,10 @@ The existing implementation already provides most of the engine-facing architect
 
 - `games/pangea-ports/shared/script` owns the shared host, configuration, object handles, status reporting, and JavaScript backends.
 - Each game has a `Scripting/ScriptBindings.c` adapter.
-- Native desktop builds use Duktape when available.
+- Native desktop, Android, and WebAssembly builds use the shared embedded Lua 5.4 runtime.
 - WebAssembly builds execute JavaScript through an Emscripten backend.
 - `games/pangea-ports/shared/script-types` describes the TypeScript API and examples.
-- The frontend Scripts workspace stores `.ts` source, compiles it in the browser, emits `Data/Scripts/dist/main.js`, and injects the result into the game preview.
+- The frontend Scripts workspace stores Lua source, emits `Data/Scripts/dist/main.lua`, and injects it into the game preview.
 - Monaco currently uses the TypeScript worker, generated `.d.ts` files, and custom snippets.
 - Script package metadata and level bindings are JSON sidecars under `Data/Scripts/config`.
 
@@ -153,7 +153,7 @@ Actions:
 9. Add instruction budgets through a hook, with separate limits for load, item, frame, and object-frame callbacks.
 10. Seed script randomness through a game-provided deterministic API rather than exposing uncontrolled randomness to simulation scripts.
 
-Keep `pangea_script_backend_duktape.c` and `pangea_script_backend_emscripten.c` during the compatibility period, but stop adding features to them.
+The former platform-specific compatibility backends have been removed; all targets use `pangea_script_backend_lua.c`.
 
 ### Acceptance criteria
 
@@ -484,7 +484,7 @@ Do not advance to removal of the old path until all gates pass:
 - [ ] All eight games pass scripting smoke tests.
 - [ ] Networked scripting remains safely gated.
 - [ ] Version 1 projects have a non-destructive migration workflow.
-- [ ] Duktape and JavaScript scripting dependencies are removed.
+- [x] Duktape and JavaScript scripting dependencies are removed.
 
 ## Recommended Delivery Order
 

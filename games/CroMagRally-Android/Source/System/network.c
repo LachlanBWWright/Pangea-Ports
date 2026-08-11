@@ -669,12 +669,12 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 		interp->fromState.health = source->health;
 		interp->fromState.tagTimer = source->tagTimer;
 		interp->fromState.isIt = source->isIt;
-		interp->fromState.isEliminated = 0;
-		interp->fromState.frozenTimer = 0.0f;
-		interp->fromState.greasedTiresTimer = 0.0f;
-		interp->fromState.nitroTimer = 0.0f;
-		interp->fromState.stickyTiresTimer = 0.0f;
-		interp->fromState.invisibilityTimer = 0.0f;
+		interp->fromState.isEliminated = source->isEliminated;
+		interp->fromState.frozenTimer = source->frozenTimer;
+		interp->fromState.greasedTiresTimer = source->greasedTiresTimer;
+		interp->fromState.nitroTimer = source->nitroTimer;
+		interp->fromState.stickyTiresTimer = source->stickyTiresTimer;
+		interp->fromState.invisibilityTimer = source->invisibilityTimer;
 		interp->fromState.movingBackwards = source->movingBackwards;
 		interp->fromState.accelBackwards = source->accelBackwards;
 		interp->fromState.braking = source->braking;
@@ -706,12 +706,12 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 	interp->toState.health = source->health;
 	interp->toState.tagTimer = source->tagTimer;
 	interp->toState.isIt = source->isIt;
-	interp->toState.isEliminated = 0;
-	interp->toState.frozenTimer = 0.0f;
-	interp->toState.greasedTiresTimer = 0.0f;
-	interp->toState.nitroTimer = 0.0f;
-	interp->toState.stickyTiresTimer = 0.0f;
-	interp->toState.invisibilityTimer = 0.0f;
+	interp->toState.isEliminated = source->isEliminated;
+	interp->toState.frozenTimer = source->frozenTimer;
+	interp->toState.greasedTiresTimer = source->greasedTiresTimer;
+	interp->toState.nitroTimer = source->nitroTimer;
+	interp->toState.stickyTiresTimer = source->stickyTiresTimer;
+	interp->toState.invisibilityTimer = source->invisibilityTimer;
 	interp->toState.movingBackwards = source->movingBackwards;
 	interp->toState.accelBackwards = source->accelBackwards;
 	interp->toState.braking = source->braking;
@@ -3128,12 +3128,17 @@ void ClientApplyPendingSnapshot(void)
 			gPlayerInfo[i].currentRPM = s->currentRPM;
 			gPlayerInfo[i].skidDot = s->skidDot;
 			gPlayerInfo[i].tagTimer = s->tagTimer;
+			gPlayerInfo[i].frozenTimer = s->frozenTimer;
+			gPlayerInfo[i].greasedTiresTimer = s->greasedTiresTimer;
+			gPlayerInfo[i].nitroTimer = s->nitroTimer;
+			gPlayerInfo[i].stickyTiresTimer = s->stickyTiresTimer;
+			gPlayerInfo[i].invisibilityTimer = s->invisibilityTimer;
 			gPlayerInfo[i].isIt = s->isIt != 0;
 			gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
 			gPlayerInfo[i].accelBackwards = s->accelBackwards != 0;
 			gPlayerInfo[i].braking = s->braking != 0;
 			gPlayerInfo[i].onWater = s->onWater != 0;
-			gPlayerInfo[i].isEliminated = gPlayerInfo[i].isEliminated || (s->health <= 0.0f);
+			gPlayerInfo[i].isEliminated = s->isEliminated != 0;
 
 			if (gPlayerInfo[i].objNode)
 			{
@@ -3188,7 +3193,13 @@ void ClientApplyPendingSnapshot(void)
 		gPlayerInfo[i].currentRPM = interp->toState.currentRPM;
 		gPlayerInfo[i].skidDot = interp->toState.skidDot;
 		gPlayerInfo[i].tagTimer = interp->toState.tagTimer;
+		gPlayerInfo[i].frozenTimer = interp->toState.frozenTimer;
+		gPlayerInfo[i].greasedTiresTimer = interp->toState.greasedTiresTimer;
+		gPlayerInfo[i].nitroTimer = interp->toState.nitroTimer;
+		gPlayerInfo[i].stickyTiresTimer = interp->toState.stickyTiresTimer;
+		gPlayerInfo[i].invisibilityTimer = interp->toState.invisibilityTimer;
 		gPlayerInfo[i].isIt = interp->toState.isIt != 0;
+		gPlayerInfo[i].isEliminated = interp->toState.isEliminated != 0;
 		gPlayerInfo[i].movingBackwards = interp->toState.movingBackwards != 0;
 		gPlayerInfo[i].accelBackwards = interp->toState.accelBackwards != 0;
 		gPlayerInfo[i].braking = interp->toState.braking != 0;

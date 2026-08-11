@@ -15,6 +15,42 @@
 #include <stdio.h>
 #include <string.h>
 
+static ObjectEntryType gScriptItems[256];
+static bool gScriptItemOccupied[256];
+static bool gScriptItemReclaimable[256];
+
+static ObjectEntryType* AcquireScriptItem(void)
+{
+	for (int i = 0; i < 256; i++)
+	{
+		bool referenced = false;
+		if (gScriptItemOccupied[i] && !gScriptItemReclaimable[i]) continue;
+		for (ObjNode* node = FirstNodePtr; gScriptItemOccupied[i] && node; node = node->NextNode) referenced |= node->ItemIndex == &gScriptItems[i];
+		if (referenced) continue;
+		gScriptItemOccupied[i] = true; gScriptItemReclaimable[i] = false; memset(&gScriptItems[i], 0, sizeof(gScriptItems[i])); return &gScriptItems[i];
+	}
+	return NULL;
+}
+
+static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle)
+{
+	(void) z;
+	ObjectEntryType* item = AcquireScriptItem();
+	if (!item) return PANGEA_SCRIPT_RUNTIME_ERROR;
+	item->x = (int32_t) x; item->y = (int32_t) y;
+	for (int i = 0; i < 4; i++) item->parm[i] = (Byte) params[i];
+	if (!MightyMikeSpawnItem(PangeaScript_ResolveNativeItemType(id), item)) { gScriptItemOccupied[item - gScriptItems] = false; return PANGEA_SCRIPT_INCOMPATIBLE_ITEM; }
+	for (ObjNode* node = FirstNodePtr; node; node = node->NextNode) if (node->ItemIndex == item)
+	{
+		MikeScript_RegisterObject(node, "mightymike.item", "item");
+		gScriptItemReclaimable[item - gScriptItems] = true;
+		if (outHandle) *outHandle = (PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration};
+		break;
+	}
+	return PANGEA_SCRIPT_OK;
+}
+#include <string.h>
+
 static PangeaScriptFrameContext gScriptFrameContext;
 
 #define MIKE_SCRIPT_SHAPE_GROUP_BASE 7
@@ -238,6 +274,8 @@ void MikeScript_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 void MikeScript_ResetObjectRegistry(void)
 {
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
+	memset(gScriptItemOccupied, 0, sizeof(gScriptItemOccupied));
+	memset(gScriptItemReclaimable, 0, sizeof(gScriptItemReclaimable));
 	PangeaScript_ResetObjects();
 }
 
@@ -444,6 +482,7 @@ void MikeScript_Init(void)
 	{
 		.gameId = "MightyMike-Android",
 		.gameName = "Mighty Mike",
+		.spawnNative = SpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
 	};
 

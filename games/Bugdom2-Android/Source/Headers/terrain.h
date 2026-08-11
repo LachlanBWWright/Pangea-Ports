@@ -176,6 +176,7 @@ void InitCurrentScrollSettings(void);
 
 void BuildTerrainItemList(void);
 void AddTerrainItemsOnSuperTile(int row, int col);
+Boolean Bugdom2SpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, float x, float z);
 Boolean TrackTerrainItem(ObjNode *theNode);
 Boolean TrackTerrainItem_FromInit(ObjNode *theNode);
 Boolean SeeIfCoordsOutOfRange(float x, float z);

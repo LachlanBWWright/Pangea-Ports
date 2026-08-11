@@ -14,6 +14,16 @@ struct PangeaScriptBackend {
 static PangeaScriptStatus g_mock_load_status = PANGEA_SCRIPT_OK;
 static PangeaScriptStatus g_mock_hook_status = PANGEA_SCRIPT_OK;
 static int g_mock_scripted_spawn_count;
+static int g_mock_native_spawn_count;
+
+static PangeaScriptStatus mock_spawn_native(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle)
+{
+	(void) x; (void) y; (void) z; (void) outHandle;
+	assert(strcmp(id, "6") == 0);
+	assert(params[0] == 2);
+	g_mock_native_spawn_count++;
+	return PANGEA_SCRIPT_OK;
+}
 
 static PangeaScriptStatus mock_spawn_scripted(
 	const char* id,
@@ -261,7 +271,7 @@ void test_config_parsing_and_sandbox(void)
 	system("mkdir -p Data/Scripts/dist");
 
 	// Write dummy script files
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
 	write_temp_file("Data/Scripts/dist/level1.js", "console.log('level1');");
 
 	// 1. Valid config
@@ -380,14 +390,14 @@ void test_level_settings_accessors(void)
 
 	system("mkdir -p Data/Scripts/config");
 	system("mkdir -p Data/Scripts/dist");
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
 
 	const char* valid_config =
 		"{\n"
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/main.js\",\n"
+		"      \"script\": \"Data/Scripts/dist/main.lua\",\n"
 		"      \"levelSettings\": {\n"
 		"        \"gravity\": 3900,\n"
 		"        \"debugSplineFlatY\": 500.5,\n"
@@ -483,8 +493,8 @@ void test_consecutive_failures(void)
 	g_mock_load_status = PANGEA_SCRIPT_OK;
 	// Create a dummy startup script path and simulate successful load
 	system("mkdir -p Data/Scripts/dist");
-	write_temp_file("Data/Scripts/dist/main.js", "console.log('main');");
-	status = PangeaScript_SetStartupScript("Data/Scripts/dist/main.js");
+	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
+	status = PangeaScript_SetStartupScript("Data/Scripts/dist/main.lua");
 	assert(status == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_HasRunnableModule());
 
@@ -544,6 +554,22 @@ static void test_scripted_spawn_adapter(void)
 	printf("Game-owned scripted spawn adapter tests passed!\n");
 }
 
+static void test_native_spawn_validation(void)
+{
+	const PangeaScriptGameInfo gameInfo = { .gameId = "TestGame", .gameName = "Test Game", .spawnNative = mock_spawn_native };
+	PangeaScriptObjectHandle handle = {0};
+	const int validParams[4] = {2, 0, 0, 0};
+	const int invalidParams[4] = {256, 0, 0, 0};
+	g_mock_native_spawn_count = 0;
+	assert(PangeaScript_Init(&gameInfo) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SpawnNative("6", 1, 2, 3, validParams, &handle) == PANGEA_SCRIPT_OK);
+	assert(g_mock_native_spawn_count == 1);
+	assert(PangeaScript_SpawnNative("6", 1, 2, 3, invalidParams, &handle) == PANGEA_SCRIPT_BAD_ARGUMENT);
+	assert(g_mock_native_spawn_count == 1);
+	assert(strstr(PangeaScript_GetLastError(), "0-255") != NULL);
+	PangeaScript_Shutdown();
+}
+
 int main(void)
 {
 	printf("========================================\n");
@@ -555,6 +581,7 @@ int main(void)
 	test_level_settings_accessors();
 	test_consecutive_failures();
 	test_scripted_spawn_adapter();
+	test_native_spawn_validation();
 
 	printf("========================================\n");
 	printf(" All Native Unit Tests Passed!          \n");

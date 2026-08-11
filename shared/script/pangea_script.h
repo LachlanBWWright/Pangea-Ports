@@ -52,7 +52,7 @@ typedef struct PangeaScriptGameInfo
 {
 	const char* gameId;
 	const char* gameName;
-	PangeaScriptStatus (*spawnNative)(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle);
+	PangeaScriptStatus (*spawnNative)(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle);
 	PangeaScriptStatus (*spawnScripted)(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 } PangeaScriptGameInfo;
 
@@ -275,6 +275,9 @@ void PangeaScript_ResetObjects(void);
 PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistration* registration, PangeaScriptObjectHandle* outHandle);
 PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle);
+bool PangeaScript_ObjectExists(PangeaScriptObjectHandle handle);
+int PangeaScript_GetObjectTagCount(PangeaScriptObjectHandle handle);
+const char* PangeaScript_GetObjectTag(PangeaScriptObjectHandle handle, int index);
 bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition);
 bool PangeaScript_SetObjectPosition(PangeaScriptObjectHandle handle, const PangeaScriptVector3* position);
 bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const PangeaScriptVector3* velocity);
@@ -285,7 +288,8 @@ bool PangeaScript_SetObjectAnimationNamed(PangeaScriptObjectHandle handle, const
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle);
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count);
-PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle);
+int PangeaScript_ResolveNativeItemType(const char* id);
+PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle);
 
 typedef enum PangeaScriptLogLevel
 {

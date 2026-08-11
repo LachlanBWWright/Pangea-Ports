@@ -114,6 +114,6 @@ void	StartShakeyScreen(short);
 void	UpdateShakeyScreen(void);
 short	MoveOnPath(long, Boolean);
 Boolean	NilAdd(ObjectEntryType *);
+Boolean MightyMikeSpawnItem(int type, ObjectEntryType* itemPtr);
 void	CreatePlayfieldPermanentMemory(void);
 void	UpdateTileAnimation(void);
-

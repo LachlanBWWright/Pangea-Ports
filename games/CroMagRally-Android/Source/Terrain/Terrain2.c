@@ -350,6 +350,14 @@ static Boolean NilAdd(TerrainItemEntryType *itemPtr,long x, long z)
 	return(false);
 }
 
+Boolean CroMagSpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, long x, long z)
+{
+	if (!itemPtr || type < 0 || type > MAX_ITEM_NUM || gTerrainItemAddRoutines[type] == NilAdd)
+		return false;
+	itemPtr->type = (uint16_t) type;
+	return gTerrainItemAddRoutines[type](itemPtr, x, z);
+}
+
 
 /***************** TRACK TERRAIN ITEM ******************/
 //

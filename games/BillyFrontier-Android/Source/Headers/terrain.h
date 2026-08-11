@@ -178,6 +178,7 @@ void InitCurrentScrollSettings(void);
 
 extern 	void BuildTerrainItemList(void);
 void AddTerrainItemsOnSuperTile(long row, long col);
+Boolean BillySpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, float x, float z);
 extern 	Boolean TrackTerrainItem(ObjNode *theNode);
 Boolean TrackTerrainItem_FromInit(ObjNode *theNode);
 Boolean SeeIfCoordsOutOfRange(float x, float z);

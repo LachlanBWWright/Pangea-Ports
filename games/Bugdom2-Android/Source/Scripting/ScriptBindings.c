@@ -7,6 +7,22 @@
 #include <string.h>
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
+static TerrainItemEntryType gScriptTerrainItems[256];
+static bool gScriptTerrainItemOccupied[256];
+static bool gScriptTerrainItemReclaimable[256];
+
+static TerrainItemEntryType* AcquireScriptTerrainItem(void)
+{
+	for (int i = 0; i < 256; i++)
+	{
+		bool referenced = false;
+		if (gScriptTerrainItemOccupied[i] && !gScriptTerrainItemReclaimable[i]) continue;
+		for (ObjNode* node = gFirstNodePtr; gScriptTerrainItemOccupied[i] && node; node = node->NextNode) referenced |= node->TerrainItemPtr == &gScriptTerrainItems[i];
+		if (referenced) continue;
+		gScriptTerrainItemOccupied[i] = true; gScriptTerrainItemReclaimable[i] = false; memset(&gScriptTerrainItems[i], 0, sizeof(gScriptTerrainItems[i])); return &gScriptTerrainItems[i];
+	}
+	return NULL;
+}
 
 static PangeaScriptFrameContext gScriptFrameContext;
 
@@ -229,6 +245,8 @@ void Bugdom2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 void Bugdom2Script_ResetObjectRegistry(void)
 {
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
+	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
+	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
 	PangeaScript_ResetObjects();
 }
 
@@ -603,9 +621,8 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 	SDL_Log("Bugdom2 scripting %s failed: %s", action, PangeaScript_GetLastError());
 }
 
-static PangeaScriptStatus Bugdom2Script_SpawnNativeCallback(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle)
+static PangeaScriptStatus Bugdom2Script_SpawnNativeCallback(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle)
 {
-	(void) amount;
 	if (strcmp(id, "bugdom2.dcell") == 0)
 	{
 		if (gBG3DContainerList[MODEL_GROUP_LEVELSPECIFIC] == nil)
@@ -646,7 +663,7 @@ static PangeaScriptStatus Bugdom2Script_SpawnNativeCallback(const char* id, floa
 
 	if (strcmp(id, "bugdom2.powerup") == 0)
 	{
-		int powKind = subtype >= 0 ? subtype : 0;
+		int powKind = params[0] >= 0 ? params[0] : 0;
 		OGLPoint3D where = { x, y, z };
 		ObjNode* pow = MakePOW(powKind, &where);
 		if (!pow)
@@ -663,7 +680,24 @@ static PangeaScriptStatus Bugdom2Script_SpawnNativeCallback(const char* id, floa
 		return PANGEA_SCRIPT_OK;
 	}
 
-	return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	TerrainItemEntryType* item = AcquireScriptTerrainItem();
+	if (!item) return PANGEA_SCRIPT_RUNTIME_ERROR;
+	item->x = (uint32_t) x; item->y = (uint32_t) z;
+	for (int i = 0; i < 4; i++) item->parm[i] = (Byte) params[i];
+	if (!Bugdom2SpawnTerrainItem(PangeaScript_ResolveNativeItemType(id), item, x, z))
+	{
+		gScriptTerrainItemOccupied[item - gScriptTerrainItems] = false;
+		return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	}
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node->TerrainItemPtr != item) continue;
+		Bugdom2Script_RegisterObject(node, "bugdom2.terrain-item", "terrain-item");
+		gScriptTerrainItemReclaimable[item - gScriptTerrainItems] = true;
+		if (outHandle) *outHandle = (PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration};
+		break;
+	}
+	return PANGEA_SCRIPT_OK;
 }
 
 void Bugdom2Script_Init(void)

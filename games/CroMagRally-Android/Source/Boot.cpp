@@ -346,7 +346,7 @@ extern "C"
 		const int explicitIsHost = ParseJsonInt(json, "\"isHost\"", -1);
 		gPangeaNetLocalPlayerIndex = ParseJsonInt(json, "\"localPlayerIndex\"", 0);
 		gPangeaNetHostPlayerIndex = ParseJsonInt(json, "\"hostPlayerIndex\"", 0);
-		gPangeaNetPlayerCount = ParseJsonInt(json, "\"playerCount\"", 2);
+		gPangeaNetPlayerCount = SDL_clamp(ParseJsonInt(json, "\"playerCount\"", 2), 1, MAX_PLAYERS);
 		gPangeaNetMatchSeed = ParseJsonU32(json, "\"seed\"", 1);
 		gPangeaNetMatchIdLow = ParseJsonU32(json, "\"matchIdLow\"", gPangeaNetMatchSeed);
 		gPangeaNetMatchIdHigh = ParseJsonU32(json, "\"matchIdHigh\"", 0);
@@ -363,10 +363,6 @@ extern "C"
 		const int trackNumber = ParseCroMagTrackNumber(json, gTrackNum);
 		const int tagDurationMinutes = ParseJsonInt(json, "\"tagDurationMinutes\"", gGamePrefs.tagDuration);
 
-		if (gPangeaNetPlayerCount < 1)
-		{
-			gPangeaNetPlayerCount = 1;
-		}
 		if (gPangeaNetHostPlayerIndex < 0 || gPangeaNetHostPlayerIndex >= gPangeaNetPlayerCount)
 		{
 			gPangeaNetHostPlayerIndex = 0;

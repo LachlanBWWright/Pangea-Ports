@@ -25,7 +25,7 @@ extern void PangeaNet_ReportMatchResult(const char* resultJson);
 #define PANGEA_NET_LIFECYCLE_MATCH_RESULT 2u
 #define PANGEA_NET_LIFECYCLE_BUFFER_SIZE 4096
 #define PANGEA_NET_LIFECYCLE_BACKLOG_CAPACITY 64
-#define PANGEA_NET_LIFECYCLE_RESULT_PLAYERS 2
+#define PANGEA_NET_LIFECYCLE_RESULT_PLAYERS MAX_PLAYERS
 
 typedef struct
 {
@@ -46,7 +46,9 @@ typedef struct
 	int16_t score;
 	uint16_t lapsCompleted;
 	uint16_t checkpoint;
-	uint16_t reserved;
+	int8_t team;
+	uint8_t reserved;
+	uint32_t timeMs;
 } PangeaNetResultPlayer;
 
 typedef struct
@@ -158,15 +160,45 @@ static int PangeaNetBuildMatchResultPacket(int reason, PangeaNetMatchResultPacke
 
 	const int playerCount = SDL_clamp(PangeaNetBridge_GetPlayerCount(), 1, PANGEA_NET_LIFECYCLE_RESULT_PLAYERS);
 	int winnerPlayerIndex = -1;
-	int bestPlacement = 9999;
-	for (int i = 0; i < playerCount; i++)
+	int winningTeam = -1;
+	if (gGameMode == GAME_MODE_MULTIPLAYERRACE)
 	{
-		const int placement = (int) gPlayerInfo[i].place;
-		const int normalizedPlacement = placement > 0 ? placement : i + 1;
-		if (normalizedPlacement < bestPlacement)
+		int bestPlace = MAX_PLAYERS;
+		for (int i = 0; i < playerCount; i++)
 		{
-			bestPlacement = normalizedPlacement;
-			winnerPlayerIndex = i;
+			if (gPlayerInfo[i].place < bestPlace)
+			{
+				bestPlace = gPlayerInfo[i].place;
+				winnerPlayerIndex = i;
+			}
+		}
+	}
+	else if (gGameMode == GAME_MODE_TAG2)
+	{
+		winnerPlayerIndex = gWhoIsIt >= 0 && gWhoIsIt < playerCount ? gWhoIsIt : -1;
+	}
+	else if (gGameMode == GAME_MODE_CAPTUREFLAG)
+	{
+		winningTeam = gCapturedFlagCount[0] >= NUM_FLAGS_TO_GET ? 0
+			: gCapturedFlagCount[1] >= NUM_FLAGS_TO_GET ? 1
+			: -1;
+		for (int i = 0; i < playerCount && winnerPlayerIndex < 0; i++)
+		{
+			if (winningTeam >= 0 && (gPlayerInfo[i].team & 1) == winningTeam)
+			{
+				winnerPlayerIndex = i;
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < playerCount; i++)
+		{
+			if (!gPlayerInfo[i].isEliminated)
+			{
+				winnerPlayerIndex = i;
+				break;
+			}
 		}
 	}
 
@@ -179,7 +211,7 @@ static int PangeaNetBuildMatchResultPacket(int reason, PangeaNetMatchResultPacke
 	outPacket->seed = PangeaNetBridge_GetMatchSeed();
 	outPacket->endReason = reason;
 	outPacket->winnerPlayerIndex = winnerPlayerIndex;
-	outPacket->winningTeam = -1;
+	outPacket->winningTeam = winningTeam;
 	outPacket->mode = gGameMode;
 	outPacket->trackOrLevel = gTrackNum;
 	outPacket->playerCount = playerCount;
@@ -189,14 +221,25 @@ static int PangeaNetBuildMatchResultPacket(int reason, PangeaNetMatchResultPacke
 	for (int i = 0; i < playerCount; i++)
 	{
 		PangeaNetResultPlayer* resultPlayer = &outPacket->players[i];
-		const int placement = (int) gPlayerInfo[i].place;
 		resultPlayer->playerIndex = (uint8_t) i;
-		resultPlayer->placement = (uint8_t) (placement > 0 ? placement : i + 1);
+		resultPlayer->placement = (uint8_t) (gGameMode == GAME_MODE_MULTIPLAYERRACE
+			? SDL_clamp((int) gPlayerInfo[i].place + 1, 1, playerCount)
+			: gGameMode == GAME_MODE_CAPTUREFLAG
+				? ((gPlayerInfo[i].team & 1) == winningTeam ? 1 : 2)
+				: i == winnerPlayerIndex ? 1 : 2);
 		resultPlayer->finished = gPlayerInfo[i].raceComplete ? 1u : 0u;
 		resultPlayer->eliminated = gPlayerInfo[i].isEliminated ? 1u : 0u;
-		resultPlayer->score = (int16_t) gCapturedFlagCount[gPlayerInfo[i].team & 1];
+		resultPlayer->score = (int16_t) (gGameMode == GAME_MODE_CAPTUREFLAG
+			? gCapturedFlagCount[gPlayerInfo[i].team & 1]
+			: gGameMode == GAME_MODE_TAG1 || gGameMode == GAME_MODE_TAG2
+				? SDL_clamp((int) (TAG_TIME_LIMIT - gPlayerInfo[i].tagTimer), 0, INT16_MAX)
+				: gGameMode == GAME_MODE_SURVIVAL && !gPlayerInfo[i].isEliminated ? 1 : 0);
 		resultPlayer->lapsCompleted = (uint16_t) SDL_max(0, gPlayerInfo[i].lapNum);
 		resultPlayer->checkpoint = (uint16_t) SDL_max(0, gPlayerInfo[i].checkpointNum);
+		resultPlayer->team = (int8_t) (gPlayerInfo[i].team & 1);
+		resultPlayer->timeMs = gGameMode == GAME_MODE_MULTIPLAYERRACE
+			? (uint32_t) SDL_max(0.0f, GetRaceTime(i) * 1000.0f)
+			: 0u;
 	}
 
 	return 1;
@@ -235,9 +278,9 @@ static void PangeaNetEmitMatchResultJson(const PangeaNetMatchResultPacket* packe
 			break;
 	}
 
-	char json[1024];
-	char playersJson[768];
-	char placementsJson[128];
+	char json[2048];
+	char playersJson[1536];
+	char placementsJson[192];
 	playersJson[0] = '\0';
 	placementsJson[0] = '\0';
 	for (int i = 0; i < packet->playerCount && i < PANGEA_NET_LIFECYCLE_RESULT_PLAYERS; i++)
@@ -248,16 +291,17 @@ static void PangeaNetEmitMatchResultJson(const PangeaNetMatchResultPacket* packe
 		SDL_snprintf(
 			entry,
 			(int) sizeof(entry),
-			"%s{\"participantId\":\"player%d\",\"playerIndex\":%d,\"displayName\":\"Player %d\",\"team\":\"%d\",\"placement\":%d,\"finished\":%s,\"eliminated\":%s,\"score\":%d,\"timeMs\":0,\"lapsCompleted\":%d,\"checkpoint\":%d}",
+			"%s{\"participantId\":\"player%d\",\"playerIndex\":%d,\"displayName\":\"Player %d\",\"team\":\"%d\",\"placement\":%d,\"finished\":%s,\"eliminated\":%s,\"score\":%d,\"timeMs\":%u,\"lapsCompleted\":%d,\"checkpoint\":%d}",
 			i > 0 ? "," : "",
 			i,
 			(int) player->playerIndex,
 			i + 1,
-			(int) (gPlayerInfo[i].team & 1),
+			(int) player->team,
 			(int) player->placement,
 			player->finished ? "true" : "false",
 			player->eliminated ? "true" : "false",
 			(int) player->score,
+			(unsigned) player->timeMs,
 			(int) player->lapsCompleted,
 			(int) player->checkpoint);
 		SDL_strlcat(playersJson, entry, sizeof(playersJson));
@@ -281,12 +325,21 @@ static void PangeaNetEmitMatchResultJson(const PangeaNetMatchResultPacket* packe
 		matchId = "00000000-0000-0000-0000-000000000000";
 	}
 	char trackOrLevel[64];
-	SDL_snprintf(trackOrLevel, (int) sizeof(trackOrLevel), "track-%d", packet->trackOrLevel);
+	char winningTeam[16];
+	SDL_snprintf(trackOrLevel, (int) sizeof(trackOrLevel), "%d", packet->trackOrLevel + 1);
+	if (packet->winningTeam >= 0)
+	{
+		SDL_snprintf(winningTeam, (int) sizeof(winningTeam), "%d", packet->winningTeam);
+	}
+	else
+	{
+		SDL_strlcpy(winningTeam, "none", sizeof(winningTeam));
+	}
 
 	SDL_snprintf(
 		json,
 		(int) sizeof(json),
-		"{\"lobbyId\":\"%s\",\"matchId\":\"%s\",\"gameId\":\"cromagrally\",\"mode\":\"%s\",\"trackOrLevel\":\"%s\",\"seed\":%u,\"endedAt\":\"1970-01-01T00:00:00Z\",\"endReason\":\"%s\",\"winnerPlayerIndex\":%d,\"winningTeam\":\"none\",\"placements\":[%s],\"players\":[%s]}",
+		"{\"lobbyId\":\"%s\",\"matchId\":\"%s\",\"gameId\":\"cromagrally\",\"mode\":\"%s\",\"trackOrLevel\":\"%s\",\"seed\":%u,\"endedAt\":\"1970-01-01T00:00:00Z\",\"endReason\":\"%s\",\"winnerPlayerIndex\":%d,\"winningTeam\":\"%s\",\"placements\":[%s],\"players\":[%s]}",
 		lobbyId,
 		matchId,
 		modeName,
@@ -294,6 +347,7 @@ static void PangeaNetEmitMatchResultJson(const PangeaNetMatchResultPacket* packe
 		(unsigned) packet->seed,
 		PangeaNetEndReasonName(packet->endReason),
 		packet->winnerPlayerIndex,
+		winningTeam,
 		placementsJson,
 		playersJson);
 
@@ -556,7 +610,6 @@ void PangeaNetBridge_PublishLocalMatchLifecycle(void)
 	{
 		gPangeaNetLastSentLifecycleReason = reason;
 		gPangeaNetLastMatchEndReason = reason;
-		PangeaNetBridge_ReportMatchEnded(reason);
 		if (!gPangeaNetResultPublished)
 		{
 			PangeaNetMatchResultPacket resultPacket;
@@ -569,5 +622,6 @@ void PangeaNetBridge_PublishLocalMatchLifecycle(void)
 				}
 			}
 		}
+		PangeaNetBridge_ReportMatchEnded(reason);
 	}
 }

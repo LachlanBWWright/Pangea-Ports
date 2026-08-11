@@ -147,6 +147,7 @@ void InitCurrentScrollSettings(void);
 
 extern 	void BuildTerrainItemList(void);
 void AddTerrainItemsOnSuperTile(long row, long col);
+Boolean Nanosaur2SpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, float x, float z);
 extern 	Boolean TrackTerrainItem(ObjNode *theNode);
 void DrawTerrain(ObjNode *theNode);
 Boolean SeeIfCoordsOutOfRange(float x, float z);

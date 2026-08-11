@@ -9,7 +9,7 @@ Script config files live under `Data/Scripts/config`.
   "version": 1,
   "levels": {
     "0": {
-      "script": "Data/Scripts/dist/main.js",
+      "script": "Data/Scripts/dist/main.lua",
       "extraNativeItems": ["bugdom2.powerup"],
       "itemOverrides": [
         { "from": 12, "to": 240 }

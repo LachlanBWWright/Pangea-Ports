@@ -23,7 +23,7 @@ Otto Matic currently supports optional scripting behind `PANGEA_ENABLE_SCRIPTING
 
 The integration can:
 
-- Load `Data/Scripts/dist/main.js`, or a per-level script path from `Data/Scripts/config/levels.json`.
+- Load `Data/Scripts/dist/main.lua`, or a per-level script path from `Data/Scripts/config/levels.json`.
 - Call level lifecycle hooks: `onLevelLoad`, `onLevelStart`, `onFrame`, `onLevelComplete`, `onLevelUnload`.
 - Call terrain and spline item spawn hooks before native object creation.
 - Remap terrain item types from level config.
@@ -243,7 +243,7 @@ Recommended layout:
 
 ```text
 Data/Scripts/config/levels.json
-Data/Scripts/dist/main.js
+Data/Scripts/dist/main.lua
 Data/Scripts/src/*.ts
 ```
 
@@ -254,7 +254,7 @@ The editor should avoid writing custom item types into legacy level files just t
 Editor responsibilities:
 
 - Validate sidecar script config with the shared TypeScript schemas before saving.
-- Compile or bundle TypeScript into `Data/Scripts/dist/main.js` or a per-level script path.
+- Bundle Lua into `Data/Scripts/dist/main.lua` or a per-level script path.
 - Show script diagnostics separately from level validation errors.
 - Let authors enable, disable, or remove scripting sidecars without rewriting level geometry or item data.
 - Preserve original level-file import/export fidelity when no native level edits were made.
@@ -399,7 +399,7 @@ The expected outcome is one shared scripting model with game-specific adapters, 
 
 ## Rollout Steps
 
-1. Fix the Duktape backend structure and add tests or a small build target that catches malformed backend code.
+1. Keep the shared Lua backend covered by its native and WebAssembly compile checks and integration tests.
 2. Add the shared object handle registry.
 3. Bind read-only `pangea.object.position`.
 4. Register Otto humans and expose `onObjectFrame` read-only.
@@ -408,7 +408,7 @@ The expected outcome is one shared scripting model with game-specific adapters, 
 7. Update TypeScript types and examples.
 8. Document the Otto human jumping example.
 9. Audit the other 7 games and create per-game adapter tasks.
-10. Promote shared decisions into `typescript-scripting.md`, `typescript-api.md`, and `script-game-matrix.md`.
+10. Promote shared decisions into `lua-scripting.md` and `script-game-matrix.md`.
 
 ## Risks
 

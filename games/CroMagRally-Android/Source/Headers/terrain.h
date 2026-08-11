@@ -170,6 +170,7 @@ void InitCurrentScrollSettings(void);
 
 extern 	void BuildTerrainItemList(void);
 void AddTerrainItemsOnSuperTile(long row, long col, short playerNum);
+Boolean CroMagSpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, long x, long z);
 extern 	Boolean TrackTerrainItem(ObjNode *theNode);
 Boolean SeeIfCoordsOutOfRange(float x, float z, short playerToSkip);
 extern 	void FindPlayerStartCoordItems(void);

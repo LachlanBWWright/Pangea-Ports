@@ -100,7 +100,18 @@ export interface ScriptedObjectDefinition {
 
 export interface NativeSpawnOptions {
   readonly amount?: number;
+  readonly param0?: number;
+  readonly param1?: number;
+  readonly param2?: number;
+  readonly param3?: number;
   readonly subtype?: number;
+}
+
+export interface NativeSpawnResult {
+  readonly ok: boolean;
+  readonly code: number;
+  readonly message: string;
+  readonly primary?: ObjectHandle;
 }
 
 export interface ScriptedSpawnOptions {
@@ -129,7 +140,7 @@ export interface PangeaExperimentalApi {
   };
   readonly spawn?: {
     readonly scripted?: (
-      id: string,
+      id: string | number,
       position: Vector3,
       options?: ScriptedSpawnOptions,
     ) => ObjectHandle | undefined;
@@ -162,6 +173,11 @@ export interface PangeaApi {
       position: Vector3,
       options?: NativeSpawnOptions,
     ): ObjectHandle | undefined;
+    nativeResult(
+      id: string | number,
+      position: Vector3,
+      options?: NativeSpawnOptions,
+    ): NativeSpawnResult;
   };
   readonly experimental?: PangeaExperimentalApi;
 }

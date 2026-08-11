@@ -6,6 +6,28 @@
 #include <stdio.h>
 #include <string.h>
 
+#define SCRIPT_TERRAIN_ITEM_CAPACITY 256
+static TerrainItemEntryType gScriptTerrainItems[SCRIPT_TERRAIN_ITEM_CAPACITY];
+static bool gScriptTerrainItemOccupied[SCRIPT_TERRAIN_ITEM_CAPACITY];
+static bool gScriptTerrainItemReclaimable[SCRIPT_TERRAIN_ITEM_CAPACITY];
+
+static TerrainItemEntryType* AcquireScriptTerrainItem(void)
+{
+	for (int i = 0; i < SCRIPT_TERRAIN_ITEM_CAPACITY; i++)
+	{
+		bool referenced = false;
+		if (gScriptTerrainItemOccupied[i] && !gScriptTerrainItemReclaimable[i]) continue;
+		for (ObjNode* node = gFirstNodePtr; gScriptTerrainItemOccupied[i] && node; node = node->NextNode)
+			referenced |= node->TerrainItemPtr == &gScriptTerrainItems[i];
+		if (referenced) continue;
+		gScriptTerrainItemOccupied[i] = true;
+		gScriptTerrainItemReclaimable[i] = false;
+		memset(&gScriptTerrainItems[i], 0, sizeof(gScriptTerrainItems[i]));
+		return &gScriptTerrainItems[i];
+	}
+	return NULL;
+}
+
 static const PangeaScriptNativeItem kNativeItems[] =
 {
 	{
@@ -33,6 +55,35 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.dependencySummary = "teleporter state, terrain, and level transition systems",
 	},
 };
+
+static PangeaScriptStatus OttoSpawnNativeItem(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle)
+{
+	(void) y;
+	int type = PangeaScript_ResolveNativeItemType(id);
+	TerrainItemEntryType* item = AcquireScriptTerrainItem();
+	if (!item) return PANGEA_SCRIPT_RUNTIME_ERROR;
+	item->x = (uint32_t) x;
+	item->y = (uint32_t) z;
+	for (int i = 0; i < 4; i++)
+		item->parm[i] = (Byte) params[i];
+	if (!OttoSpawnTerrainItem(type, item, (long) x, (long) z))
+	{
+		gScriptTerrainItemOccupied[item - gScriptTerrainItems] = false;
+		return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	}
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node->TerrainItemPtr != item)
+			continue;
+		gScriptTerrainItemReclaimable[item - gScriptTerrainItems] = true;
+		static const char* tags[] = {"native", "terrain-item"};
+		OttoScript_RegisterObjectNode(node, "ottomatic.terrain-item", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+		if (outHandle)
+			*outHandle = (PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration};
+		return PANGEA_SCRIPT_OK;
+	}
+	return PANGEA_SCRIPT_OK;
+}
 
 static PangeaScriptFrameContext gCurrentFrameContext;
 static ObjNode* gCurrentScriptObject;
@@ -580,10 +631,13 @@ void OttoScript_Init(void)
 	{
 		.gameId = "OttoMatic-Android",
 		.gameName = "Otto Matic",
+		.spawnNative = OttoSpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
+	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
+	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
 	LogScriptStatus("init", status);
 	gCurrentFrameContext = (PangeaScriptFrameContext){0};
 	gCurrentScriptObject = NULL;

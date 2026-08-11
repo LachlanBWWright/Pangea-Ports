@@ -1283,6 +1283,15 @@ Boolean NilAdd(ObjectEntryType *itemPtr)
 	return(false);
 }
 
+Boolean MightyMikeSpawnItem(int type, ObjectEntryType* itemPtr)
+{
+	const int itemCount = (int)(sizeof(gItemAddPtrs) / sizeof(gItemAddPtrs[0]));
+	if (!itemPtr || type < 0 || type >= itemCount || gItemAddPtrs[type] == NilAdd)
+		return false;
+	itemPtr->type = (int16_t) type;
+	return gItemAddPtrs[type](itemPtr);
+}
+
 
 /******************* CREATE PLAYFIELD PERMANENT MEMORY ***********************/
 //

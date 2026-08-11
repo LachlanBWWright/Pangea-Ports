@@ -480,15 +480,33 @@ static int PangeaNetBuildMatchResultPacket(int reason, PangeaNetMatchResultPacke
 
 	const int playerCount = SDL_clamp(gPangeaNetPlayerCount, 1, PANGEA_NET_RESULT_PLAYERS);
 	int winnerPlayerIndex = -1;
-	int bestPlacement = 9999;
-	for (int i = 0; i < playerCount; i++)
+	if (gVSMode == VS_MODE_RACE)
 	{
-		const int placement = (int) gPlayerInfo[i].place;
-		const int normalizedPlacement = placement > 0 ? placement : i + 1;
-		if (normalizedPlacement < bestPlacement)
+		int bestPlace = PANGEA_NET_RESULT_PLAYERS;
+		for (int i = 0; i < playerCount; i++)
 		{
-			bestPlacement = normalizedPlacement;
-			winnerPlayerIndex = i;
+			if (gPlayerInfo[i].place < bestPlace)
+			{
+				bestPlace = gPlayerInfo[i].place;
+				winnerPlayerIndex = i;
+			}
+		}
+	}
+	else if (gVSMode == VS_MODE_CAPTURETHEFLAG)
+	{
+		winnerPlayerIndex = gNumEggsSaved[1] >= gNumEggsToSave[1] ? 0
+			: gNumEggsSaved[0] >= gNumEggsToSave[0] ? 1
+			: -1;
+	}
+	else
+	{
+		for (int i = 0; i < playerCount; i++)
+		{
+			if (gPlayerInfo[i].health > 0.0f)
+			{
+				winnerPlayerIndex = i;
+				break;
+			}
 		}
 	}
 
@@ -511,13 +529,16 @@ static int PangeaNetBuildMatchResultPacket(int reason, PangeaNetMatchResultPacke
 	for (int i = 0; i < playerCount; i++)
 	{
 		PangeaNetResultPlayer* resultPlayer = &outPacket->players[i];
-		const int placement = (int) gPlayerInfo[i].place;
 		const int lapsCompleted = SDL_max(0, (int) gPlayerInfo[i].lapNum);
 		resultPlayer->playerIndex = (uint8_t) i;
-		resultPlayer->placement = (uint8_t) (placement > 0 ? placement : i + 1);
+		resultPlayer->placement = (uint8_t) (gVSMode == VS_MODE_RACE
+			? SDL_clamp((int) gPlayerInfo[i].place + 1, 1, playerCount)
+			: i == winnerPlayerIndex ? 1 : 2);
 		resultPlayer->finished = gPlayerInfo[i].raceComplete ? 1u : 0u;
 		resultPlayer->eliminated = gPlayerInfo[i].health <= 0.0f ? 1u : 0u;
-		resultPlayer->score = (int16_t) (gVSMode == VS_MODE_CAPTURETHEFLAG ? gNumEggsSaved[Nanosaur2PlayerTeam(i)] : (resultPlayer->finished ? 1 : 0));
+		resultPlayer->score = (int16_t) (gVSMode == VS_MODE_CAPTURETHEFLAG
+			? gNumEggsSaved[Nanosaur2PlayerTeam(i) ^ 1]
+			: i == winnerPlayerIndex ? 1 : 0);
 		resultPlayer->lapsCompleted = (uint16_t) lapsCompleted;
 		resultPlayer->checkpoint = 0;
 	}
@@ -639,7 +660,7 @@ EMSCRIPTEN_KEEPALIVE void PangeaGame_SetNetworkMatchConfig(const char* json, int
 	const int explicitIsHost = ParseJsonInt(json, "\"isHost\"", -1);
 	gPangeaNetLocalPlayerIndex = ParseJsonInt(json, "\"localPlayerIndex\"", 0);
 	gPangeaNetHostPlayerIndex = ParseJsonInt(json, "\"hostPlayerIndex\"", 0);
-	gPangeaNetPlayerCount = ParseJsonInt(json, "\"playerCount\"", 2);
+	gPangeaNetPlayerCount = SDL_clamp(ParseJsonInt(json, "\"playerCount\"", 2), 1, 2);
 	gPangeaNetMatchSeed = ParseJsonU32(json, "\"seed\"", 1);
 	gPangeaNetMatchIdLow = ParseJsonU32(json, "\"matchIdLow\"", gPangeaNetMatchSeed);
 	gPangeaNetMatchIdHigh = ParseJsonU32(json, "\"matchIdHigh\"", 0);
@@ -655,10 +676,6 @@ EMSCRIPTEN_KEEPALIVE void PangeaGame_SetNetworkMatchConfig(const char* json, int
 	}
 	const int levelNumber = ParseNanosaur2LevelNumber(json, gLevelNum);
 
-	if (gPangeaNetPlayerCount < 1)
-	{
-		gPangeaNetPlayerCount = 1;
-	}
 	if (gPangeaNetHostPlayerIndex < 0 || gPangeaNetHostPlayerIndex >= gPangeaNetPlayerCount)
 	{
 		gPangeaNetHostPlayerIndex = 0;
@@ -917,7 +934,6 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_PublishLocalMatchLifecycle(void)
 	{
 		gPangeaNetLastSentLifecycleReason = reason;
 		gPangeaNetLastMatchEndReason = reason;
-		PangeaNet_ReportMatchEnded(reason);
 		SDL_Log(
 			"PangeaNet lifecycle sent host match-end reason=%d sequence=%u",
 			reason,
@@ -934,6 +950,7 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_PublishLocalMatchLifecycle(void)
 				}
 			}
 		}
+		PangeaNet_ReportMatchEnded(reason);
 	}
 }
 EMSCRIPTEN_KEEPALIVE uint32_t PangeaGame_DebugGetFrameNumber(void) { return gPangeaDebugFrameNumber; }
@@ -1018,7 +1035,8 @@ enum
 	kNS2InputBitFire = 1 << 0,
 	kNS2InputBitJetpack = 1 << 1,
 	kNS2InputBitNextWeapon = 1 << 2,
-	kNS2InputBitPrevWeapon = 1 << 3
+	kNS2InputBitPrevWeapon = 1 << 3,
+	kNS2InputBitDrop = 1 << 4
 };
 
 enum
@@ -2376,6 +2394,8 @@ EMSCRIPTEN_KEEPALIVE int PangeaNet_HostIsRemoteNeedActive(int playerNum, int nee
 			return (gNetInputBitsHeld[playerNum] & kNS2InputBitNextWeapon) != 0;
 		case kNeed_PrevWeapon:
 			return (gNetInputBitsHeld[playerNum] & kNS2InputBitPrevWeapon) != 0;
+		case kNeed_Drop:
+			return (gNetInputBitsHeld[playerNum] & kNS2InputBitDrop) != 0;
 		default:
 			return 0;
 	}
@@ -2399,6 +2419,8 @@ EMSCRIPTEN_KEEPALIVE int PangeaNet_HostIsRemoteNeedDown(int playerNum, int needI
 			return (gNetInputBitsNew[playerNum] & kNS2InputBitFire) != 0;
 		case kNeed_Jetpack:
 			return (gNetInputBitsNew[playerNum] & kNS2InputBitJetpack) != 0;
+		case kNeed_Drop:
+			return (gNetInputBitsNew[playerNum] & kNS2InputBitDrop) != 0;
 		default:
 			return 0;
 	}
@@ -2457,10 +2479,12 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientSendInput(void)
 	if (IsNeedActive(kNeed_Jetpack, me)) heldBits |= kNS2InputBitJetpack;
 	if (IsNeedActive(kNeed_NextWeapon, me)) heldBits |= kNS2InputBitNextWeapon;
 	if (IsNeedActive(kNeed_PrevWeapon, me)) heldBits |= kNS2InputBitPrevWeapon;
+	if (IsNeedActive(kNeed_Drop, me)) heldBits |= kNS2InputBitDrop;
 	if (IsNeedDown(kNeed_Fire, me)) newBits |= kNS2InputBitFire;
 	if (IsNeedDown(kNeed_Jetpack, me)) newBits |= kNS2InputBitJetpack;
 	if (IsNeedDown(kNeed_NextWeapon, me)) newBits |= kNS2InputBitNextWeapon;
 	if (IsNeedDown(kNeed_PrevWeapon, me)) newBits |= kNS2InputBitPrevWeapon;
+	if (IsNeedDown(kNeed_Drop, me)) newBits |= kNS2InputBitDrop;
 
 	NS2Writer_F32(&writer, gPlayerInfo[me].analogControlX);
 	NS2Writer_F32(&writer, gPlayerInfo[me].analogControlZ);
