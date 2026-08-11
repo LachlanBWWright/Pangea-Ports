@@ -134,6 +134,11 @@ SplinePointType	*points;
 				DoFatalAlert("PrimeSplines: type > MAX_SPLINE_ITEM_NUM");
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+			if (BillyScript_TryReplaceSplineItem(itemPtr, (int)s, (int)i))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
 			if (BillyScript_OnSplineItem(itemPtr, gCurrentArea, (int)s))
 			{
 				itemPtr->flags |= ITEM_FLAGS_INUSE;
@@ -575,6 +580,5 @@ void DetachObjectFromSpline(ObjNode *theNode, movecall_t moveCall)
 	theNode->MoveCall = moveCall;
 
 }
-
 
 

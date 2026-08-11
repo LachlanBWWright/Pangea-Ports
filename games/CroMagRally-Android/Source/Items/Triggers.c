@@ -53,6 +53,9 @@ static Boolean DoTrig_SeaMine(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 static void MoveSeaMine(ObjNode *theNode);
 
 static Boolean DoTrig_Druid(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
+#ifdef PANGEA_ENABLE_SCRIPTING
+static Boolean DoTrig_Scripted(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
+#endif
 
 
 /****************************/
@@ -101,7 +104,18 @@ Boolean	(*gTriggerTable[])(ObjNode *, ObjNode *, Byte) =
 	DoTrig_SeaMine,
 	DoTrig_Lava,
 	DoTrig_Druid,
+#ifdef PANGEA_ENABLE_SCRIPTING
+	DoTrig_Scripted,
+#endif
 };
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+static Boolean DoTrig_Scripted(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
+{
+	CroMagScript_OnCustomTrigger(theNode, whoNode, sideBits);
+	return true;
+}
+#endif
 
 
 
@@ -2052,7 +2066,6 @@ short	p;
 
 	return(true);
 }
-
 
 
 

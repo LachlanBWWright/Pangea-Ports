@@ -136,6 +136,9 @@ struct ObjNode
 	int32_t			ScriptVisualOffsetY;
 	uint32_t		ScriptObjectID;
 	uint32_t		ScriptObjectGeneration;
+	char			ScriptDefinitionID[96];
+	Boolean			ScriptDeleteRequested;
+	Boolean			ScriptAnimationCompletionSent;
 
 	long			Worth;				// "worth" of object / # coins to give
 	long		InjuryThreshold;	// threshold for weapon to do damage to enemy
@@ -312,4 +315,3 @@ struct PrefsType
 typedef struct PrefsType PrefsType;
 
 #define PREFS_MAGIC "Mighty Mike Prefs v5"
-

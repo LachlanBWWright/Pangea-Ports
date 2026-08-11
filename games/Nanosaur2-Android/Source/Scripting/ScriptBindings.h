@@ -27,5 +27,8 @@ void Nanosaur2Script_UnregisterObject(ObjNode* obj);
 void Nanosaur2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj);
 void Nanosaur2Script_RunObjectFrame(ObjNode* obj);
+void Nanosaur2Script_OnObjectDeleted(ObjNode* obj);
+Boolean Nanosaur2Script_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
+Boolean Nanosaur2Script_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 
 #endif

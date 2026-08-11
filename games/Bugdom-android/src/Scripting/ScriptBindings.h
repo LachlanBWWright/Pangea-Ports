@@ -16,6 +16,8 @@ void BugdomScript_OnLevelUnload(int levelNum);
 int BugdomScript_RemapTerrainItemType(int levelNum, int itemType);
 Boolean BugdomScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
 Boolean BugdomScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splineNum);
+Boolean BugdomScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
+Boolean BugdomScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 
 // --- Live-object scripting extension ---
 typedef struct ObjNode ObjNode;
@@ -27,5 +29,7 @@ void BugdomScript_UnregisterObject(ObjNode* obj);
 void BugdomScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void BugdomScript_ApplyObjectScripting(ObjNode* obj);
 void BugdomScript_RunObjectFrame(ObjNode* obj);
+void BugdomScript_OnCustomTrigger(ObjNode* triggerNode, ObjNode* whoNode, Byte sideBits);
+void BugdomScript_OnObjectDeleted(ObjNode* obj);
 
 #endif

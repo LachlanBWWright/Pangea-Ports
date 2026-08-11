@@ -28,8 +28,9 @@ enum
 	SKELETON_TYPE_POLARBEAR,
 	SKELETON_TYPE_FLOWER,
 	SKELETON_TYPE_VIKING,
-
-	MAX_SKELETON_TYPES
+	SKELETON_TYPE_SCRIPT_CUSTOM_BASE,
+	SKELETON_TYPE_SCRIPT_CUSTOM_COUNT = 4,
+	MAX_SKELETON_TYPES = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + SKELETON_TYPE_SCRIPT_CUSTOM_COUNT
 };
 
 
@@ -43,6 +44,8 @@ extern	void AllocSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 extern	void InitSkeletonManager(void);
 void ShutdownSkeletonManager(void);
 void LoadASkeleton(Byte num);
+Boolean IsSkeletonTypeLoaded(short skeletonType);
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec);
 extern	void FreeSkeletonFile(Byte skeletonType);
 extern	void FreeAllSkeletonFiles(short skipMe);
 extern	void FreeSkeletonBaseData(SkeletonObjDataType *data);

@@ -663,12 +663,6 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	for (gCurrentSplitScreenPane = 0; gCurrentSplitScreenPane < numPasses; gCurrentSplitScreenPane++)
 	{
 		gDrawingOverlayPane = gCurrentSplitScreenPane == GetOverlayPaneNumber();
-		if (gDrawingOverlayPane)
-		{
-			StartProfilePhase(PROFILE_PHASE_UI);
-			if (gIsInGame)
-				DrawInfobar(nil);
-		}
 
 		OGL_UpdatePaneDimensions(gCurrentSplitScreenPane);
 		glViewport(

@@ -275,6 +275,9 @@ long			realX,realZ;
 				realZ = itemPtr->y * MAP2UNIT_VALUE;
 #ifdef PANGEA_ENABLE_SCRIPTING
 				long remappedType = BugdomScript_RemapTerrainItemType(gRealLevel, (int)type);
+				int itemIndex = (int)(itemPtr - *gMasterItemList);
+				if (BugdomScript_TryReplaceTerrainItem(itemPtr, itemIndex, (int)type, (float)realX, (float)realZ))
+					goto skip;
 				if (BugdomScript_OnTerrainItem(itemPtr, gRealLevel, (int)type, (int)remappedType, (float)realX, (float)realZ))
 				{
 					itemPtr->flags |= ITEM_FLAGS_INUSE;
@@ -686,7 +689,6 @@ Byte				**shadowFlags;
 	Free2DArray((void**) shadowFlags);
 	shadowFlags = nil;
 }
-
 
 
 

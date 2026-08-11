@@ -65,6 +65,7 @@ static PangeaScriptStatus TestSpawnNativeCallback(const char* id, float x, float
 		PangeaScriptObjectRegistration reg = {
 			.nativeObject = &gSpawnedNativeDummy,
 			.ops = &kDummyOps,
+			.objectType = "test.native",
 			.tags = tags,
 			.tagCount = 2,
 			.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL
@@ -142,6 +143,7 @@ void test_duktape_integration(void)
 		"};\n"
 		"\n"
 		"onObjectFrame = function(ctx) {\n"
+		"  if (ctx.objectType !== 'test.native') { throw new Error('unexpected object type'); }\n"
 		"  var pos = pangea.object.position(ctx.object);\n"
 		"  if (pos) {\n"
 		"    pangea.object.setPosition(ctx.object, {x: pos.x + 1, y: pos.y + 1, z: pos.z + 1});\n"

@@ -38,6 +38,326 @@ static PangeaScriptFrameContext gCurrentFrameContext;
 static ObjNode* gCurrentScriptObject;
 static Boolean gCurrentScriptObjectUsesGlobals;
 
+typedef struct ScriptModelCacheEntry
+{
+	char path[260];
+} ScriptModelCacheEntry;
+
+static ScriptModelCacheEntry gScriptModelCache[MODEL_GROUP_SCRIPT_CUSTOM_COUNT];
+
+typedef struct ScriptSkeletonCacheEntry
+{
+	char modelPath[260];
+	char skeletonPath[260];
+} ScriptSkeletonCacheEntry;
+
+static ScriptSkeletonCacheEntry gScriptSkeletonCache[SKELETON_TYPE_SCRIPT_CUSTOM_COUNT];
+
+static void MoveScriptedCustomObject(ObjNode* theNode)
+{
+	GetObjectInfo(theNode);
+	OttoScript_RunObjectFrame(theNode, true);
+	if (theNode->ScriptDeleteRequested)
+	{
+		PangeaScriptObjectHandle handle = { theNode->ScriptObjectID, theNode->ScriptObjectGeneration };
+		(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "destroy");
+		OttoScript_UnregisterObjectNode(theNode);
+		DeleteObject(theNode);
+		return;
+	}
+	if (theNode->Skeleton && theNode->Skeleton->AnimHasStopped && !theNode->ScriptAnimationCompletionSent)
+	{
+		PangeaScriptObjectHandle handle = { theNode->ScriptObjectID, theNode->ScriptObjectGeneration };
+		(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "animationComplete");
+		theNode->ScriptAnimationCompletionSent = true;
+	}
+	UpdateObject(theNode);
+	OttoScript_ApplyObjectVisualOffset(theNode);
+}
+
+static bool MakeDataAssetPath(const char* source, char* destination, size_t capacity)
+{
+	const char prefix[] = "Data/";
+	size_t sourceLength;
+
+	if (!source || strncmp(source, prefix, sizeof(prefix) - 1) != 0)
+		return false;
+
+	sourceLength = strlen(source + sizeof(prefix) - 1);
+	if (sourceLength + 2 > capacity)
+		return false;
+
+	destination[0] = ':';
+	for (size_t i = 0; i <= sourceLength; i++)
+	{
+		char c = source[sizeof(prefix) - 1 + i];
+		destination[i + 1] = c == '/' ? ':' : c;
+	}
+	return true;
+}
+
+static int GetCustomModelGroup(const char* modelPath)
+{
+	char dataPath[260];
+	FSSpec spec;
+	short refNum;
+	long fileSize;
+
+	for (int i = 0; i < MODEL_GROUP_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		int group = MODEL_GROUP_SCRIPT_CUSTOM_BASE + i;
+		if (!gBG3DContainerList[group])
+			gScriptModelCache[i].path[0] = '\0';
+		if (strcmp(gScriptModelCache[i].path, modelPath) == 0)
+			return group;
+	}
+
+	if (!MakeDataAssetPath(modelPath, dataPath, sizeof(dataPath)))
+		return -1;
+	if (FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, dataPath, &spec) != noErr)
+		return -1;
+	if (FSpOpenDF(&spec, fsRdPerm, &refNum) != noErr)
+		return -1;
+	if (GetEOF(refNum, &fileSize) != noErr || fileSize <= 0 || fileSize > 16 * 1024 * 1024)
+	{
+		FSClose(refNum);
+		return -1;
+	}
+	FSClose(refNum);
+
+	for (int i = 0; i < MODEL_GROUP_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		int group = MODEL_GROUP_SCRIPT_CUSTOM_BASE + i;
+		if (gBG3DContainerList[group])
+			continue;
+
+		ImportBG3D(&spec, group);
+		snprintf(gScriptModelCache[i].path, sizeof(gScriptModelCache[i].path), "%s", modelPath);
+		return group;
+	}
+
+	return -1;
+}
+
+static int GetCustomSkeletonType(const PangeaScriptCustomObjectDefinition* definition)
+{
+	char modelDataPath[260];
+	char skeletonDataPath[260];
+	FSSpec modelSpec;
+	FSSpec skeletonSpec;
+	short modelRefNum;
+	long modelFileSize;
+
+	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		int skeletonType = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i;
+		if (!gBG3DContainerList[MODEL_GROUP_SKELETONBASE + skeletonType])
+		{
+			gScriptSkeletonCache[i].modelPath[0] = '\0';
+			gScriptSkeletonCache[i].skeletonPath[0] = '\0';
+		}
+		if (strcmp(gScriptSkeletonCache[i].modelPath, definition->modelPath) == 0 &&
+			strcmp(gScriptSkeletonCache[i].skeletonPath, definition->skeletonPath) == 0)
+			return skeletonType;
+	}
+
+	if (!MakeDataAssetPath(definition->modelPath, modelDataPath, sizeof(modelDataPath)) ||
+		!MakeDataAssetPath(definition->skeletonPath, skeletonDataPath, sizeof(skeletonDataPath)))
+		return -1;
+	if (FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, modelDataPath, &modelSpec) != noErr ||
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, skeletonDataPath, &skeletonSpec) != noErr)
+		return -1;
+	if (FSpOpenDF(&modelSpec, fsRdPerm, &modelRefNum) != noErr)
+		return -1;
+	if (GetEOF(modelRefNum, &modelFileSize) != noErr || modelFileSize <= 0 || modelFileSize > 16 * 1024 * 1024)
+	{
+		FSClose(modelRefNum);
+		return -1;
+	}
+	FSClose(modelRefNum);
+
+	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		int skeletonType = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i;
+		if (gBG3DContainerList[MODEL_GROUP_SKELETONBASE + skeletonType])
+			continue;
+		if (!LoadCustomSkeleton(skeletonType, &skeletonSpec, &modelSpec))
+			return -1;
+		snprintf(gScriptSkeletonCache[i].modelPath, sizeof(gScriptSkeletonCache[i].modelPath), "%s", definition->modelPath);
+		snprintf(gScriptSkeletonCache[i].skeletonPath, sizeof(gScriptSkeletonCache[i].skeletonPath), "%s", definition->skeletonPath);
+		return skeletonType;
+	}
+
+	return -1;
+}
+
+static int ResolveInitialAnimation(const PangeaScriptCustomObjectDefinition* definition)
+{
+	if (definition->initialAnimationName[0] == '\0')
+		return definition->initialAnimation;
+	for (int i = 0; i < definition->animationCount; i++)
+	{
+		if (strcmp(definition->animationNames[i], definition->initialAnimationName) == 0)
+			return definition->animationIndices[i];
+	}
+	return -1;
+}
+
+static int ResolveDisplayGroup(const PangeaScriptCustomObjectDefinition* definition)
+{
+	if (definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP)
+		return GetCustomModelGroup(definition->modelPath);
+	if (strcmp(definition->nativeGroup, "global") == 0)
+		return MODEL_GROUP_GLOBAL;
+	if (strcmp(definition->nativeGroup, "levelSpecific") == 0)
+		return MODEL_GROUP_LEVELSPECIFIC;
+	return -1;
+}
+
+static void ApplyScriptedCollision(ObjNode* object, PangeaScriptCollisionPreset preset)
+{
+	float scale = object->Scale.x;
+	short top = (short)(object->BBox.max.y * scale);
+	short bottom = (short)(object->BBox.min.y * scale);
+	short left = (short)(object->BBox.min.x * scale);
+	short right = (short)(object->BBox.max.x * scale);
+	short front = (short)(object->BBox.max.z * scale);
+	short back = (short)(object->BBox.min.z * scale);
+
+	if (preset == PANGEA_SCRIPT_COLLISION_NONE)
+		return;
+
+	SetObjectCollisionBounds(object, top, bottom, left, right, front, back);
+	object->CBits = preset == PANGEA_SCRIPT_COLLISION_TRIGGER_BOX ? CBITS_ALWAYSTRIGGER : CBITS_ALLSOLID;
+	switch (preset)
+	{
+		case PANGEA_SCRIPT_COLLISION_TRIGGER_BOX:
+		case PANGEA_SCRIPT_COLLISION_PICKUP:
+			object->CType = CTYPE_TRIGGER;
+			object->CBits = CBITS_ALWAYSTRIGGER;
+			object->Kind = TRIGTYPE_SCRIPTED;
+			object->TriggerSides = ALL_SOLID_SIDES;
+			break;
+		case PANGEA_SCRIPT_COLLISION_ENEMY: object->CType = CTYPE_ENEMY | CTYPE_HURTENEMY; break;
+		case PANGEA_SCRIPT_COLLISION_PLATFORM: object->CType = CTYPE_MPLATFORM | CTYPE_MISC; break;
+		case PANGEA_SCRIPT_COLLISION_SOLID_BOX: object->CType = CTYPE_MISC; break;
+		case PANGEA_SCRIPT_COLLISION_NONE: break;
+	}
+}
+
+void OttoScript_OnCustomTrigger(ObjNode* triggerNode, ObjNode* whoNode, Byte sideBits)
+{
+	(void) whoNode;
+	(void) sideBits;
+	if (triggerNode && triggerNode->ScriptObjectID > 0)
+	{
+		PangeaScriptObjectHandle handle = { triggerNode->ScriptObjectID, triggerNode->ScriptObjectGeneration };
+		(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "triggerEnter");
+	}
+}
+
+void OttoScript_OnAnimationEvent(ObjNode* node)
+{
+	if (node && node->ScriptDefinitionID[0] && node->ScriptObjectID > 0)
+	{
+		PangeaScriptObjectHandle handle = { node->ScriptObjectID, node->ScriptObjectGeneration };
+		(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "animationEvent");
+	}
+}
+
+static ObjNode* MakeScriptedVisual(const PangeaScriptCustomObjectDefinition* definition, float x, float y, float z)
+{
+	if (definition->visualKind == PANGEA_SCRIPT_VISUAL_NATIVE_DISPLAY_GROUP ||
+		definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP)
+	{
+		int group = ResolveDisplayGroup(definition);
+		if (group < 0 || definition->modelObject < 0 || definition->modelObject >= gNumObjectsInBG3DGroupList[group])
+			return NULL;
+
+		gNewObjectDefinition = (NewObjectDefinitionType)
+		{
+			.group = group,
+			.type = definition->modelObject,
+			.coord = {x, y, z},
+			.flags = gAutoFadeStatusBits,
+			.slot = definition->slot,
+			.moveCall = MoveScriptedCustomObject,
+			.rot = 0.0f,
+			.scale = definition->scale,
+		};
+		return MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	}
+
+	if (definition->visualKind == PANGEA_SCRIPT_VISUAL_NATIVE_SKELETON ||
+		definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_SKELETON)
+	{
+		int skeletonType = definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_SKELETON
+			? GetCustomSkeletonType(definition)
+			: definition->skeletonType;
+		int initialAnimation = ResolveInitialAnimation(definition);
+		if (skeletonType < 0 || skeletonType >= MAX_SKELETON_TYPES ||
+			initialAnimation < 0 || !gBG3DContainerList[MODEL_GROUP_SKELETONBASE + skeletonType])
+			return NULL;
+
+		gNewObjectDefinition = (NewObjectDefinitionType)
+		{
+			.type = skeletonType,
+			.animNum = initialAnimation,
+			.coord = {x, y, z},
+			.flags = gAutoFadeStatusBits,
+			.slot = definition->slot,
+			.moveCall = MoveScriptedCustomObject,
+			.rot = 0.0f,
+			.scale = definition->scale,
+		};
+		ObjNode* object = MakeNewSkeletonObject(&gNewObjectDefinition);
+		if (object && object->Skeleton)
+			object->Skeleton->AnimSpeed = definition->animationSpeed;
+		return object;
+	}
+
+	return NULL;
+}
+
+static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle)
+{
+	const PangeaScriptCustomObjectDefinition* definition = PangeaScript_GetCustomObjectDefinition(id);
+	static const char* tags[] = { "customObject" };
+	ObjNode* object;
+
+	if (!definition)
+		return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+
+	object = MakeScriptedVisual(definition, x, y, z);
+	if (!object)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+
+	ApplyScriptedCollision(object, definition->collisionPreset);
+	snprintf(object->ScriptDefinitionID, sizeof(object->ScriptDefinitionID), "%s", definition->id);
+	OttoScript_RegisterObjectNode(
+		object,
+		definition->id,
+		PANGEA_SCRIPT_CAPABILITY_FULL,
+		tags,
+		1);
+
+	if (object->ScriptObjectID <= 0)
+	{
+		DeleteObject(object);
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	}
+
+	if (outHandle)
+	{
+		outHandle->id = object->ScriptObjectID;
+		outHandle->generation = object->ScriptObjectGeneration;
+	}
+	PangeaScriptObjectHandle handle = { object->ScriptObjectID, object->ScriptObjectGeneration };
+	(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "spawn");
+
+	return PANGEA_SCRIPT_OK;
+}
+
 static const char* const kHumanFarmerTags[] =
 {
 	"ottomatic.human",
@@ -145,12 +465,74 @@ static bool OttoObjectSetVelocity(void* nativeObject, const PangeaScriptVector3*
 	return true;
 }
 
+static bool OttoObjectSetRotation(void* nativeObject, const PangeaScriptVector3* rotation)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node || !rotation)
+		return false;
+	node->Rot.x = rotation->x;
+	node->Rot.y = rotation->y;
+	node->Rot.z = rotation->z;
+	UpdateObjectTransforms(node);
+	return true;
+}
+
+static bool OttoObjectSetScale(void* nativeObject, float scale)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node || scale <= 0.0f)
+		return false;
+	node->Scale.x = scale;
+	node->Scale.y = scale;
+	node->Scale.z = scale;
+	UpdateObjectTransforms(node);
+	return true;
+}
+
+static bool OttoObjectSetAnimation(void* nativeObject, int animation, float speed, float blendSeconds)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node || !node->Skeleton || animation < 0 || animation >= node->Skeleton->skeletonDefinition->NumAnims)
+		return false;
+	if (blendSeconds > 0.0f)
+		MorphToSkeletonAnim(node->Skeleton, animation, 1.0f / blendSeconds);
+	else
+		SetSkeletonAnim(node->Skeleton, animation);
+	node->Skeleton->AnimSpeed = speed;
+	node->ScriptAnimationCompletionSent = false;
+	return true;
+}
+
+static bool OttoObjectSetAnimationNamed(void* nativeObject, const char* animation, float speed, float blendSeconds)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node || !animation || !node->ScriptDefinitionID[0])
+		return false;
+	const PangeaScriptCustomObjectDefinition* definition =
+		PangeaScript_GetCustomObjectDefinition(node->ScriptDefinitionID);
+	if (!definition)
+		return false;
+	for (int i = 0; i < definition->animationCount; i++)
+	{
+		if (strcmp(definition->animationNames[i], animation) == 0)
+			return OttoObjectSetAnimation(node, definition->animationIndices[i], speed, blendSeconds);
+	}
+	return false;
+}
+
 static bool OttoObjectDelete(void* nativeObject)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
-	if (!node || node == gCurrentScriptObject)
+	if (!node)
 		return false;
+	if (node == gCurrentScriptObject || (node->CType & CTYPE_TRIGGER))
+	{
+		node->ScriptDeleteRequested = true;
+		return true;
+	}
 
+	PangeaScriptObjectHandle handle = { node->ScriptObjectID, node->ScriptObjectGeneration };
+	(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "destroy");
 	OttoScript_UnregisterObjectNode(node);
 	DeleteObject(node);
 	return true;
@@ -161,6 +543,10 @@ static const PangeaScriptObjectOps kOttoObjectNodeOps =
 	.getPosition = OttoObjectGetPosition,
 	.setPosition = OttoObjectSetPosition,
 	.setVelocity = OttoObjectSetVelocity,
+	.setRotation = OttoObjectSetRotation,
+	.setScale = OttoObjectSetScale,
+	.setAnimation = OttoObjectSetAnimation,
+	.setAnimationNamed = OttoObjectSetAnimationNamed,
 	.deleteObject = OttoObjectDelete,
 };
 
@@ -194,6 +580,7 @@ void OttoScript_Init(void)
 	{
 		.gameId = "OttoMatic-Android",
 		.gameName = "Otto Matic",
+		.spawnScripted = SpawnScriptedObject,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -248,6 +635,7 @@ void OttoScript_OnLevelLoad(int levelNum)
 
 void OttoScript_OnLevelStart(int levelNum)
 {
+	gCurrentFrameContext.levelNum = levelNum;
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_START, levelNum, "onLevelStart");
 }
 
@@ -273,6 +661,14 @@ void OttoScript_OnLevelComplete(int levelNum)
 
 void OttoScript_OnLevelUnload(int levelNum)
 {
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node->ScriptDefinitionID[0] && node->ScriptObjectID > 0)
+		{
+			PangeaScriptObjectHandle handle = { node->ScriptObjectID, node->ScriptObjectGeneration };
+			(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "destroy");
+		}
+	}
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, levelNum, "onLevelUnload");
 	PangeaScript_ResetObjects();
 	gCurrentScriptObject = NULL;
@@ -282,6 +678,24 @@ void OttoScript_OnLevelUnload(int levelNum)
 int OttoScript_RemapTerrainItemType(int levelNum, int itemType)
 {
 	return PangeaScript_RemapTerrainItemType(levelNum, itemType);
+}
+
+Boolean OttoScript_TryReplaceTerrainItem(int itemIndex, int nativeType, float x, float z)
+{
+	const PangeaScriptTerrainReplacement* replacement =
+		PangeaScript_GetTerrainReplacement(itemIndex, nativeType, x, z);
+	PangeaScriptObjectHandle handle = {0};
+	PangeaScriptStatus status;
+
+	if (!replacement)
+		return false;
+
+	status = SpawnScriptedObject(replacement->customObjectId, x, GetTerrainY(x, z), z, &handle);
+	if (status == PANGEA_SCRIPT_OK)
+		return true;
+
+	LogScriptStatus("terrain replacement", status);
+	return replacement->strict;
 }
 
 Boolean OttoScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z)
@@ -340,7 +754,26 @@ Boolean OttoScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splin
 	return context.handled && context.markInUse;
 }
 
-void OttoScript_RegisterObjectNode(ObjNode* theNode, PangeaScriptCapabilityLevel capabilityLevel, const char* const* tags, int tagCount)
+Boolean OttoScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex)
+{
+	const PangeaScriptSplineReplacement* replacement = PangeaScript_GetSplineReplacement(
+		splineNum, itemIndex, itemPtr->type, itemPtr->placement);
+	if (!replacement)
+		return false;
+
+	float x;
+	float z;
+	GetCoordOnSpline(&(*gSplineList)[splineNum], itemPtr->placement, &x, &z);
+	PangeaScriptObjectHandle handle = {0};
+	PangeaScriptStatus status = SpawnScriptedObject(
+		replacement->customObjectId, x, GetTerrainY(x, z), z, &handle);
+	if (status == PANGEA_SCRIPT_OK)
+		return true;
+	LogScriptStatus("spline replacement", status);
+	return replacement->strict;
+}
+
+void OttoScript_RegisterObjectNode(ObjNode* theNode, const char* objectType, PangeaScriptCapabilityLevel capabilityLevel, const char* const* tags, int tagCount)
 {
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptObjectRegistration registration;
@@ -356,6 +789,7 @@ void OttoScript_RegisterObjectNode(ObjNode* theNode, PangeaScriptCapabilityLevel
 	{
 		.nativeObject = theNode,
 		.ops = &kOttoObjectNodeOps,
+		.objectType = objectType,
 		.tags = tags,
 		.tagCount = tagCount,
 		.capabilityLevel = capabilityLevel,
@@ -489,7 +923,8 @@ void OttoScript_RegisterHuman(ObjNode* human)
 {
 	int tagCount = 0;
 	const char* const* tags = GetHumanTags(human->HumanType, &tagCount);
-	OttoScript_RegisterObjectNode(human, PANGEA_SCRIPT_CAPABILITY_FULL, tags, tagCount);
+	const char* objectType = tagCount > 1 ? tags[1] : NULL;
+	OttoScript_RegisterObjectNode(human, objectType, PANGEA_SCRIPT_CAPABILITY_FULL, tags, tagCount);
 }
 
 void OttoScript_UnregisterHuman(ObjNode* human)

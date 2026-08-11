@@ -1374,6 +1374,7 @@ int		i;
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (theNode->ScriptObjectID != 0)
 	{
+		Nanosaur2Script_OnObjectDeleted(theNode);
 		Nanosaur2Script_UnregisterObject(theNode);
 	}
 #endif

@@ -293,6 +293,8 @@ Boolean			flag;
 		type = itemPtr[i].type;									// get item #
 #ifdef PANGEA_ENABLE_SCRIPTING
 		long originalType = type;
+		if (Nanosaur2Script_TryReplaceTerrainItem(&itemPtr[i], (int)(&itemPtr[i] - gMasterItemList), (int)type, x, z))
+			continue;
 		type = Nanosaur2Script_RemapTerrainItemType(gLevelNum, (int)type);
 #endif
 		if (type > MAX_ITEM_NUM)								// error check!
@@ -752,5 +754,4 @@ float	intersectX, intersectZ;
 	*whichLine = -1;
 	return(false);
 }
-
 

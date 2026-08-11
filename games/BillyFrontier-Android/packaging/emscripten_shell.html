@@ -295,6 +295,15 @@
       }
     }
 
+    function stabilizeStartupCanvasSize() {
+      var startedAt = performance.now();
+      function stabilize() {
+        syncCanvasSize();
+        if (performance.now() - startedAt < 3000) requestAnimationFrame(stabilize);
+      }
+      requestAnimationFrame(stabilize);
+    }
+
     // ── Emscripten Module ─────────────────────────────────
     var Module = {
       canvas: document.getElementById('canvas'),
@@ -326,6 +335,7 @@
       },
 
       onRuntimeInitialized: function() {
+        stabilizeStartupCanvasSize();
         console.log('[BillyFrontier] Runtime initialized');
         var el = document.getElementById('status-text');
         if (el) el.textContent = 'Starting game\u2026';

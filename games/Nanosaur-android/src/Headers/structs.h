@@ -239,6 +239,9 @@ struct ObjNode
 	TQ3Vector3D		ScriptVisualOffset;
 	uint32_t		ScriptObjectID;
 	uint32_t		ScriptObjectGeneration;
+	char			ScriptDefinitionID[96];
+	Boolean			ScriptDeleteRequested;
+	Boolean			ScriptAnimationCompletionSent;
 	float			Health;				// health 0..1
 	float			Damage;				// damage
 	
@@ -320,4 +323,3 @@ typedef struct
 }PrefsType;
 
 #define PREFS_MAGIC "Nanosaur Prefs v5"
-

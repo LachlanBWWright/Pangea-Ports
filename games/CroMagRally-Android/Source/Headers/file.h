@@ -122,6 +122,7 @@ typedef struct
 //=================================================
 
 SkeletonDefType *LoadSkeletonFile(short skeletonType);
+SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec);
 
 OSErr LoadUserDataFile(const char* path, const char* magic, long payloadLength, Ptr payloadPtr);
 OSErr SaveUserDataFile(const char* path, const char* magic, long payloadLength, Ptr payloadPtr);

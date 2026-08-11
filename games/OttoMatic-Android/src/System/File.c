@@ -18,7 +18,7 @@
 /*    PROTOTYPES            */
 /****************************/
 
-static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, int skeletonType);
+static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, FSSpec* modelSpec, int skeletonType);
 static void ReadDataFromPlayfieldFile(FSSpec *specPtr);
 static void	ConvertTexture16To16(uint16_t *textureBuffer, int width, int height);
 static inline void Blit16(
@@ -148,7 +148,7 @@ const char *fileNames[MAX_SKELETON_TYPES] =
 };
 
 
-	if (skeletonType < MAX_SKELETON_TYPES)
+	if (skeletonType < SKELETON_TYPE_SCRIPT_CUSTOM_BASE)
 		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, fileNames[skeletonType], &fsSpec);
 	else
 		DoFatalAlert("LoadSkeleton: Unknown skeletonType!");
@@ -177,7 +177,7 @@ const char *fileNames[MAX_SKELETON_TYPES] =
 
 			/* READ SKELETON RESOURCES */
 
-	ReadDataFromSkeletonFile(skeleton,&fsSpec,skeletonType);
+	ReadDataFromSkeletonFile(skeleton, &fsSpec, nil, skeletonType);
 	PrimeBoneData(skeleton);
 
 			/* CLOSE REZ FILE */
@@ -187,13 +187,44 @@ const char *fileNames[MAX_SKELETON_TYPES] =
 	return(skeleton);
 }
 
+SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	short fRefNum;
+	SkeletonDefType* skeleton;
+
+	if (!skeletonSpec || !modelSpec || skeletonType < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || skeletonType >= MAX_SKELETON_TYPES)
+		return nil;
+
+	fRefNum = FSpOpenResFile(skeletonSpec, fsRdPerm);
+	if (fRefNum == -1)
+		return nil;
+	UseResFile(fRefNum);
+	if (ResError())
+	{
+		CloseResFile(fRefNum);
+		return nil;
+	}
+
+	skeleton = (SkeletonDefType*) AllocPtr(sizeof(SkeletonDefType));
+	if (!skeleton)
+	{
+		CloseResFile(fRefNum);
+		return nil;
+	}
+
+	ReadDataFromSkeletonFile(skeleton, skeletonSpec, modelSpec, skeletonType);
+	PrimeBoneData(skeleton);
+	CloseResFile(fRefNum);
+	return skeleton;
+}
+
 
 /************* READ DATA FROM SKELETON FILE *******************/
 //
 // Current rez file is set to the file.
 //
 
-static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, int skeletonType)
+static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, FSSpec* modelSpec, int skeletonType)
 {
 Handle				hand;
 int					i,k,j;
@@ -242,6 +273,12 @@ SkeletonFile_AnimHeader_Type	*animHeaderPtr;
 		/* 	LOAD THE REFERENCE GEOMETRY */
 		/********************************/
 
+	if (modelSpec)
+	{
+		LoadBonesReferenceModel(modelSpec, skeleton, skeletonType);
+	}
+	else
+	{
 	alias = (AliasHandle)GetResource(rAliasType,1001);				// alias to geometry BG3D file
 	if (alias != nil)
 	{
@@ -254,6 +291,7 @@ SkeletonFile_AnimHeader_Type	*animHeaderPtr;
 	}
 	else
 		DoFatalAlert("ReadDataFromSkeletonFile: file is missing the Alias resource");
+	}
 
 
 

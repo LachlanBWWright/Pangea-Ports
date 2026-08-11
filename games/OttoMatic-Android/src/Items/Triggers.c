@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /*******************/
 /*   PROTOTYPES    */
@@ -83,7 +86,20 @@ Boolean	(*gTriggerTable[])(ObjNode *, ObjNode *, Byte) =
 	DoTrig_RocketSled,
 	DoTrig_TrapDoor,
 	DoTrig_LavaPlatform
+	,DoTrig_Scripted
 };
+
+Boolean DoTrig_Scripted(ObjNode* triggerNode, ObjNode* whoNode, Byte sideBits)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnCustomTrigger(triggerNode, whoNode, sideBits);
+#else
+	(void) triggerNode;
+	(void) whoNode;
+	(void) sideBits;
+#endif
+	return false;
+}
 
 
 #define	ShimmeyTimer		SpecialF[0]
@@ -1735,8 +1751,6 @@ OGLPoint2D		origin,pt,p[12];
 
 	return(true);
 }
-
-
 
 
 

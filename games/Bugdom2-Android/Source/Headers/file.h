@@ -100,6 +100,7 @@ typedef struct
 //=================================================
 
 SkeletonDefType *LoadSkeletonFile(short skeletonType);
+SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec);
 extern	void	OpenGameFile(Str255 filename,short *fRefNumPtr, Str255 errString);
 extern	OSErr LoadPrefs(void);
 void SavePrefs(void);

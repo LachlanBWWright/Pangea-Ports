@@ -12,6 +12,8 @@
 #define PANGEA_SCRIPT_MAX_LEVEL_SETTINGS 64
 #define PANGEA_SCRIPT_MAX_ASSET_DEPENDENCIES 64
 #define PANGEA_SCRIPT_MAX_NATIVE_ITEMS 128
+#define PANGEA_SCRIPT_MAX_CUSTOM_OBJECTS 64
+#define PANGEA_SCRIPT_MAX_TERRAIN_REPLACEMENTS 128
 #define PANGEA_SCRIPT_MAX_OBJECTS 2048
 #define PANGEA_SCRIPT_MAX_OBJECT_TAGS 8
 
@@ -23,6 +25,7 @@ typedef struct RegisteredObject
 	uint32_t generation;
 	void* nativeObject;
 	const PangeaScriptObjectOps* ops;
+	const char* objectType;
 	const char* tags[PANGEA_SCRIPT_MAX_OBJECT_TAGS];
 	int tagCount;
 	PangeaScriptCapabilityLevel capabilityLevel;
@@ -45,6 +48,12 @@ static PangeaScriptAssetDependency gLevelAssetDependencies[PANGEA_SCRIPT_MAX_ASS
 static int gLevelAssetDependencyCount;
 static PangeaScriptNativeItem gNativeItems[PANGEA_SCRIPT_MAX_NATIVE_ITEMS];
 static int gNativeItemCount;
+static PangeaScriptCustomObjectDefinition gCustomObjects[PANGEA_SCRIPT_MAX_CUSTOM_OBJECTS];
+static int gCustomObjectCount;
+static PangeaScriptTerrainReplacement gTerrainReplacements[PANGEA_SCRIPT_MAX_TERRAIN_REPLACEMENTS];
+static int gTerrainReplacementCount;
+static PangeaScriptSplineReplacement gSplineReplacements[PANGEA_CONFIG_MAX_SPLINE_REPLACEMENTS];
+static int gSplineReplacementCount;
 static RegisteredObject gRegisteredObjects[PANGEA_SCRIPT_MAX_OBJECTS];
 static int gBudgetExceededCount;
 static int gHooksCalledCount;
@@ -102,6 +111,12 @@ static void clear_level_settings(void)
 	gLevelSettingCount = 0;
 	memset(gLevelAssetDependencies, 0, sizeof(gLevelAssetDependencies));
 	gLevelAssetDependencyCount = 0;
+	memset(gCustomObjects, 0, sizeof(gCustomObjects));
+	gCustomObjectCount = 0;
+	memset(gTerrainReplacements, 0, sizeof(gTerrainReplacements));
+	gTerrainReplacementCount = 0;
+	memset(gSplineReplacements, 0, sizeof(gSplineReplacements));
+	gSplineReplacementCount = 0;
 }
 
 
@@ -130,6 +145,7 @@ static void clear_registered_object(RegisteredObject* object)
 	object->active = false;
 	object->nativeObject = NULL;
 	object->ops = NULL;
+	object->objectType = NULL;
 	object->tagCount = 0;
 	memset(object->tags, 0, sizeof(object->tags));
 	object->generation++;
@@ -157,6 +173,7 @@ static void configure_registered_object(RegisteredObject* object, const PangeaSc
 	object->active = true;
 	object->nativeObject = registration->nativeObject;
 	object->ops = registration->ops;
+	object->objectType = registration->objectType;
 	object->tagCount = registration->tagCount;
 	if (registration->capabilityLevel == PANGEA_SCRIPT_CAPABILITY_DEFAULT)
 	{
@@ -470,6 +487,18 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		{
 			gLevelAssetDependencies[i] = parsedConfig.level.assetDependencies[i];
 		}
+
+		gCustomObjectCount = parsedConfig.level.customObjectCount;
+		for (int i = 0; i < gCustomObjectCount; i++)
+		{
+			gCustomObjects[i] = parsedConfig.level.customObjects[i];
+		}
+		gTerrainReplacementCount = parsedConfig.level.terrainReplacementCount;
+		for (int i = 0; i < gTerrainReplacementCount; i++)
+			gTerrainReplacements[i] = parsedConfig.level.terrainReplacements[i];
+		gSplineReplacementCount = parsedConfig.level.splineReplacementCount;
+		for (int i = 0; i < gSplineReplacementCount; i++)
+			gSplineReplacements[i] = parsedConfig.level.splineReplacements[i];
 	}
 
 	if (found && scriptPath[0])
@@ -526,6 +555,51 @@ bool PangeaScript_GetLevelAssetDependency(int index, PangeaScriptAssetDependency
 
 	*outDependency = gLevelAssetDependencies[index];
 	return true;
+}
+
+int PangeaScript_GetCustomObjectDefinitionCount(void)
+{
+	return gCustomObjectCount;
+}
+
+const PangeaScriptCustomObjectDefinition* PangeaScript_GetCustomObjectDefinition(const char* id)
+{
+	if (!id || !id[0])
+		return NULL;
+
+	for (int i = 0; i < gCustomObjectCount; i++)
+	{
+		if (strcmp(gCustomObjects[i].id, id) == 0)
+			return &gCustomObjects[i];
+	}
+	return NULL;
+}
+
+const PangeaScriptTerrainReplacement* PangeaScript_GetTerrainReplacement(int itemIndex, int nativeType, float x, float z)
+{
+	for (int i = 0; i < gTerrainReplacementCount; i++)
+	{
+		const PangeaScriptTerrainReplacement* replacement = &gTerrainReplacements[i];
+		float dx = replacement->x - x;
+		float dz = replacement->z - z;
+		if (replacement->itemIndex == itemIndex && replacement->nativeType == nativeType &&
+			dx > -0.5f && dx < 0.5f && dz > -0.5f && dz < 0.5f)
+			return replacement;
+	}
+	return NULL;
+}
+
+const PangeaScriptSplineReplacement* PangeaScript_GetSplineReplacement(int splineNum, int itemIndex, int nativeType, float placement)
+{
+	for (int i = 0; i < gSplineReplacementCount; i++)
+	{
+		const PangeaScriptSplineReplacement* replacement = &gSplineReplacements[i];
+		float delta = replacement->placement - placement;
+		if (replacement->splineNum == splineNum && replacement->itemIndex == itemIndex &&
+			replacement->nativeType == nativeType && delta > -0.0001f && delta < 0.0001f)
+			return replacement;
+	}
+	return NULL;
 }
 
 bool PangeaScript_GetLevelFloatSetting(const char* key, float* outValue)
@@ -688,7 +762,7 @@ PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* cont
 	return status;
 }
 
-PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult)
+static PangeaScriptStatus call_object_event(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, const char* event, PangeaScriptObjectFrameResult* outResult)
 {
 	if (!frameContext || !outResult)
 	{
@@ -739,8 +813,10 @@ PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle,
 		.levelTimeSeconds = frameContext->levelTimeSeconds,
 		.object = handle,
 		.position = position,
+		.objectType = object->objectType,
 		.tags = object->tags,
 		.tagCount = object->tagCount,
+		.event = event,
 	};
 
 	char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
@@ -749,6 +825,19 @@ PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle,
 	if (status != PANGEA_SCRIPT_OK)
 		set_backend_error(status, backendError);
 	return status;
+}
+
+PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult)
+{
+	return call_object_event(handle, frameContext, "update", outResult);
+}
+
+PangeaScriptStatus PangeaScript_CallObjectEvent(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, const char* event)
+{
+	PangeaScriptObjectFrameResult ignoredResult;
+	if (!event || !event[0])
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	return call_object_event(handle, frameContext, event, &ignoredResult);
 }
 
 void PangeaScript_ResetObjects(void)
@@ -802,6 +891,12 @@ PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistrat
 
 PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle)
 {
+	if (!id || !id[0])
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+
+	if (gGameInfo.spawnScripted)
+		return gGameInfo.spawnScripted(id, x, y, z, outHandle);
+
 	if (gScriptedObjectCount >= PANGEA_SCRIPT_MAX_SCRIPTED_OBJECTS)
 		return PANGEA_SCRIPT_BUDGET_EXCEEDED;
 
@@ -814,6 +909,7 @@ PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, 
 	PangeaScriptObjectRegistration reg = {
 		.nativeObject = state,
 		.ops = &kScriptedOps,
+		.objectType = state->id,
 		.tags = NULL,
 		.tagCount = 0,
 		.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL
@@ -875,6 +971,46 @@ bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const Pange
 	}
 
 	return object->ops->setVelocity(object->nativeObject, velocity);
+}
+
+bool PangeaScript_SetObjectRotation(PangeaScriptObjectHandle handle, const PangeaScriptVector3* rotation)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !rotation || !object->ops || !object->ops->setRotation)
+		return false;
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_BASE)
+		return false;
+	return object->ops->setRotation(object->nativeObject, rotation);
+}
+
+bool PangeaScript_SetObjectScale(PangeaScriptObjectHandle handle, float scale)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !object->ops || !object->ops->setScale || scale <= 0.0f)
+		return false;
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_BASE)
+		return false;
+	return object->ops->setScale(object->nativeObject, scale);
+}
+
+bool PangeaScript_SetObjectAnimation(PangeaScriptObjectHandle handle, int animation, float speed, float blendSeconds)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !object->ops || !object->ops->setAnimation || animation < 0 || speed < 0.0f || blendSeconds < 0.0f)
+		return false;
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_FULL)
+		return false;
+	return object->ops->setAnimation(object->nativeObject, animation, speed, blendSeconds);
+}
+
+bool PangeaScript_SetObjectAnimationNamed(PangeaScriptObjectHandle handle, const char* animation, float speed, float blendSeconds)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !animation || !animation[0] || !object->ops || !object->ops->setAnimationNamed || speed < 0.0f || blendSeconds < 0.0f)
+		return false;
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_FULL)
+		return false;
+	return object->ops->setAnimationNamed(object->nativeObject, animation, speed, blendSeconds);
 }
 
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
@@ -1045,6 +1181,35 @@ bool PangeaScript_SetObjectVelocityJS(int id, uint32_t generation, float x, floa
 }
 
 EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_SetObjectRotationJS(int id, uint32_t generation, float x, float y, float z)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	PangeaScriptVector3 rotation = { x, y, z };
+	return PangeaScript_SetObjectRotation(handle, &rotation);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_SetObjectScaleJS(int id, uint32_t generation, float scale)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	return PangeaScript_SetObjectScale(handle, scale);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_SetObjectAnimationJS(int id, uint32_t generation, int animation, float speed, float blendSeconds)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	return PangeaScript_SetObjectAnimation(handle, animation, speed, blendSeconds);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool PangeaScript_SetObjectAnimationNamedJS(int id, uint32_t generation, const char* animation, float speed, float blendSeconds)
+{
+	PangeaScriptObjectHandle handle = { id, generation };
+	return PangeaScript_SetObjectAnimationNamed(handle, animation, speed, blendSeconds);
+}
+
+EMSCRIPTEN_KEEPALIVE
 bool PangeaScript_DeleteObjectJS(int id, uint32_t generation)
 {
 	PangeaScriptObjectHandle handle = { id, generation };
@@ -1092,6 +1257,10 @@ void* gPangeaScriptPreserveStatus[] = {
 	(void*)PangeaScript_GetObjectPositionJS,
 	(void*)PangeaScript_SetObjectPositionJS,
 	(void*)PangeaScript_SetObjectVelocityJS,
+	(void*)PangeaScript_SetObjectRotationJS,
+	(void*)PangeaScript_SetObjectScaleJS,
+	(void*)PangeaScript_SetObjectAnimationJS,
+	(void*)PangeaScript_SetObjectAnimationNamedJS,
 	(void*)PangeaScript_DeleteObjectJS,
 	(void*)PangeaScript_SpawnNativeJS,
 	(void*)PangeaScript_RegisterScriptedObjectJS

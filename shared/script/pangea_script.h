@@ -53,6 +53,7 @@ typedef struct PangeaScriptGameInfo
 	const char* gameId;
 	const char* gameName;
 	PangeaScriptStatus (*spawnNative)(const char* id, float x, float y, float z, int subtype, int amount, PangeaScriptObjectHandle* outHandle);
+	PangeaScriptStatus (*spawnScripted)(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 } PangeaScriptGameInfo;
 
 typedef struct PangeaScriptLevelContext
@@ -116,6 +117,10 @@ typedef struct PangeaScriptObjectOps
 	bool (*getPosition)(void* nativeObject, PangeaScriptVector3* outPosition);
 	bool (*setPosition)(void* nativeObject, const PangeaScriptVector3* position);
 	bool (*setVelocity)(void* nativeObject, const PangeaScriptVector3* velocity);
+	bool (*setRotation)(void* nativeObject, const PangeaScriptVector3* rotation);
+	bool (*setScale)(void* nativeObject, float scale);
+	bool (*setAnimation)(void* nativeObject, int animation, float speed, float blendSeconds);
+	bool (*setAnimationNamed)(void* nativeObject, const char* animation, float speed, float blendSeconds);
 	bool (*deleteObject)(void* nativeObject);
 } PangeaScriptObjectOps;
 
@@ -132,6 +137,7 @@ typedef struct PangeaScriptObjectRegistration
 {
 	void* nativeObject;
 	const PangeaScriptObjectOps* ops;
+	const char* objectType;
 	const char* const* tags;
 	int tagCount;
 	PangeaScriptCapabilityLevel capabilityLevel;
@@ -145,8 +151,10 @@ typedef struct PangeaScriptObjectFrameContext
 	float levelTimeSeconds;
 	PangeaScriptObjectHandle object;
 	PangeaScriptVector3 position;
+	const char* objectType;
 	const char* const* tags;
 	int tagCount;
+	const char* event;
 } PangeaScriptObjectFrameContext;
 
 typedef struct PangeaScriptObjectFrameResult
@@ -169,6 +177,65 @@ typedef struct PangeaScriptAssetDependency
 	char id[96];
 } PangeaScriptAssetDependency;
 
+typedef enum PangeaScriptVisualKind
+{
+	PANGEA_SCRIPT_VISUAL_NONE = 0,
+	PANGEA_SCRIPT_VISUAL_NATIVE_DISPLAY_GROUP,
+	PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP,
+	PANGEA_SCRIPT_VISUAL_NATIVE_SKELETON,
+	PANGEA_SCRIPT_VISUAL_CUSTOM_SKELETON,
+} PangeaScriptVisualKind;
+
+typedef enum PangeaScriptCollisionPreset
+{
+	PANGEA_SCRIPT_COLLISION_NONE = 0,
+	PANGEA_SCRIPT_COLLISION_SOLID_BOX,
+	PANGEA_SCRIPT_COLLISION_TRIGGER_BOX,
+	PANGEA_SCRIPT_COLLISION_PICKUP,
+	PANGEA_SCRIPT_COLLISION_ENEMY,
+	PANGEA_SCRIPT_COLLISION_PLATFORM,
+} PangeaScriptCollisionPreset;
+
+typedef struct PangeaScriptCustomObjectDefinition
+{
+	char id[96];
+	PangeaScriptVisualKind visualKind;
+	char modelPath[260];
+	char skeletonPath[260];
+	char nativeGroup[32];
+	int modelObject;
+	int skeletonType;
+	int initialAnimation;
+	char initialAnimationName[64];
+	char animationNames[16][64];
+	int animationIndices[16];
+	int animationCount;
+	float animationSpeed;
+	float scale;
+	int slot;
+	PangeaScriptCollisionPreset collisionPreset;
+} PangeaScriptCustomObjectDefinition;
+
+typedef struct PangeaScriptTerrainReplacement
+{
+	int itemIndex;
+	int nativeType;
+	float x;
+	float z;
+	char customObjectId[96];
+	bool strict;
+} PangeaScriptTerrainReplacement;
+
+typedef struct PangeaScriptSplineReplacement
+{
+	int splineNum;
+	int itemIndex;
+	int nativeType;
+	float placement;
+	char customObjectId[96];
+	bool strict;
+} PangeaScriptSplineReplacement;
+
 PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo);
 void PangeaScript_Shutdown(void);
 
@@ -187,6 +254,10 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum);
 int PangeaScript_RemapTerrainItemType(int levelNum, int itemType);
 int PangeaScript_GetLevelAssetDependencyCount(void);
 bool PangeaScript_GetLevelAssetDependency(int index, PangeaScriptAssetDependency* outDependency);
+int PangeaScript_GetCustomObjectDefinitionCount(void);
+const PangeaScriptCustomObjectDefinition* PangeaScript_GetCustomObjectDefinition(const char* id);
+const PangeaScriptTerrainReplacement* PangeaScript_GetTerrainReplacement(int itemIndex, int nativeType, float x, float z);
+const PangeaScriptSplineReplacement* PangeaScript_GetSplineReplacement(int splineNum, int itemIndex, int nativeType, float placement);
 bool PangeaScript_GetLevelFloatSetting(const char* key, float* outValue);
 bool PangeaScript_GetLevelIntSetting(const char* key, int* outValue);
 bool PangeaScript_GetLevelBoolSetting(const char* key, bool* outValue);
@@ -198,6 +269,7 @@ PangeaScriptStatus PangeaScript_CallTerrainItemHook(PangeaScriptTerrainItemConte
 PangeaScriptStatus PangeaScript_CallSplineItemHook(PangeaScriptSplineItemContext* context);
 PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* context);
 PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult);
+PangeaScriptStatus PangeaScript_CallObjectEvent(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, const char* event);
 
 void PangeaScript_ResetObjects(void);
 PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistration* registration, PangeaScriptObjectHandle* outHandle);
@@ -206,6 +278,10 @@ bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle);
 bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition);
 bool PangeaScript_SetObjectPosition(PangeaScriptObjectHandle handle, const PangeaScriptVector3* position);
 bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const PangeaScriptVector3* velocity);
+bool PangeaScript_SetObjectRotation(PangeaScriptObjectHandle handle, const PangeaScriptVector3* rotation);
+bool PangeaScript_SetObjectScale(PangeaScriptObjectHandle handle, float scale);
+bool PangeaScript_SetObjectAnimation(PangeaScriptObjectHandle handle, int animation, float speed, float blendSeconds);
+bool PangeaScript_SetObjectAnimationNamed(PangeaScriptObjectHandle handle, const char* animation, float speed, float blendSeconds);
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle);
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count);

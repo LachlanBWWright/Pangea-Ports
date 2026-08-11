@@ -444,6 +444,7 @@ Rect	box;
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (theNode->ScriptObjectID != 0)
 	{
+		MikeScript_OnObjectDeleted(theNode);
 		MikeScript_UnregisterObject(theNode);
 	}
 #endif

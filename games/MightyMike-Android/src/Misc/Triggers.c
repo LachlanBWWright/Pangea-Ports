@@ -22,6 +22,9 @@
 #include "sound2.h"
 #include "bonus.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -45,6 +48,10 @@ static	ObjNode		*gTriggerNode;						// pointer to current trigger
 static	Byte		gTriggerSides;						// side bits of current trigger collision (which of MyGuy's sides hit trigger?)
 Boolean		gTeleportingFlag = false;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+static Boolean DoTrig_Scripted(void);
+#endif
+
 
 										// TRIGGER HANDLER TABLE
 										//========================
@@ -53,8 +60,19 @@ static	Boolean	(*gTriggerTable[])(void) = {
 					DoTrig_Teleport,
 					DoTrig_Door,
 					DoTrig_FairyDoor,
-					DoTrig_BargainDoor
+					DoTrig_BargainDoor,
+#ifdef PANGEA_ENABLE_SCRIPTING
+					DoTrig_Scripted
+#endif
 					};
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+static Boolean DoTrig_Scripted(void)
+{
+	MikeScript_OnCustomTrigger(gTriggerNode, gTriggerSides);
+	return true;
+}
+#endif
 
 
 /******************** HANDLE TRIGGER ***************************/
@@ -540,6 +558,5 @@ Boolean DoTrig_BargainDoor(void)
 
 	return(true);
 }
-
 
 

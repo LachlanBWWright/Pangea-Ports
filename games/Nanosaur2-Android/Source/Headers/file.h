@@ -127,6 +127,7 @@ typedef struct
 //=================================================
 
 SkeletonDefType *LoadSkeletonFile(short skeletonType);
+SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec);
 OSErr InitPrefsFolder(Boolean createIt);
 OSErr LoadPrefs(void);
 OSErr SavePrefs(void);

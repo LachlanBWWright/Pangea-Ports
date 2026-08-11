@@ -23,7 +23,10 @@ void MikeScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* c
 void MikeScript_UnregisterObject(ObjNode* obj);
 void MikeScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void MikeScript_RunObjectFrame(ObjNode* obj);
+void MikeScript_OnObjectDeleted(ObjNode* obj);
 int MikeScript_RemapMapItemType(int sceneNum, int areaNum, int itemType);
 Boolean MikeScript_OnMapItem(ObjectEntryType* itemPtr, int sceneNum, int areaNum, int itemType);
+Boolean MikeScript_TryReplaceMapItem(ObjectEntryType* itemPtr, int itemIndex, int nativeType);
+void MikeScript_OnCustomTrigger(ObjNode* trigger, Byte sideBits);
 
 #endif

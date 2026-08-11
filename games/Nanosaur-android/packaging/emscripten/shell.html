@@ -396,6 +396,15 @@
     }
   }
 
+  function stabilizeStartupCanvasSize() {
+    var startedAt = performance.now();
+    function stabilize() {
+      syncCanvasSize();
+      if (performance.now() - startedAt < 3000) requestAnimationFrame(stabilize);
+    }
+    requestAnimationFrame(stabilize);
+  }
+
   var Module = {
     canvas: document.getElementById('canvas'),
 
@@ -479,6 +488,7 @@
     },
 
     onRuntimeInitialized: function() {
+      stabilizeStartupCanvasSize();
       console.log('[Nanosaur] Runtime initialized');
       var stext = document.getElementById('status-text');
       if (stext) stext.textContent = 'Starting game…';

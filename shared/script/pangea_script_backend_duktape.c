@@ -219,6 +219,46 @@ static duk_ret_t object_set_velocity(duk_context* ctx)
 	return 1;
 }
 
+static duk_ret_t object_set_rotation(duk_context* ctx)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptVector3 rotation;
+	if (!read_object_handle(ctx, 0, &handle) || !read_vector3(ctx, 1, &rotation))
+	{
+		duk_push_false(ctx);
+		return 1;
+	}
+	duk_push_boolean(ctx, PangeaScript_SetObjectRotation(handle, &rotation));
+	return 1;
+}
+
+static duk_ret_t object_set_scale(duk_context* ctx)
+{
+	PangeaScriptObjectHandle handle;
+	if (!read_object_handle(ctx, 0, &handle) || !duk_is_string(ctx, 1))
+	{
+		duk_push_false(ctx);
+		return 1;
+	}
+	duk_push_boolean(ctx, PangeaScript_SetObjectScale(handle, (float)duk_get_number(ctx, 1)));
+	return 1;
+}
+
+static duk_ret_t object_set_animation(duk_context* ctx)
+{
+	PangeaScriptObjectHandle handle;
+	if (!read_object_handle(ctx, 0, &handle) || !duk_is_number(ctx, 1))
+	{
+		duk_push_false(ctx);
+		return 1;
+	}
+	const char* animation = duk_get_string(ctx, 1);
+	float speed = duk_is_number(ctx, 2) ? (float)duk_get_number(ctx, 2) : 1.0f;
+	float blendSeconds = duk_is_number(ctx, 3) ? (float)duk_get_number(ctx, 3) : 0.0f;
+	duk_push_boolean(ctx, PangeaScript_SetObjectAnimationNamed(handle, animation, speed, blendSeconds));
+	return 1;
+}
+
 static duk_ret_t object_delete(duk_context* ctx)
 {
 	PangeaScriptObjectHandle handle;
@@ -300,12 +340,16 @@ static void install_pangea_api(PangeaScriptBackend* backend)
 
 	duk_push_object(ctx);
 	put_function(ctx, "native", spawn_native);
+	put_function(ctx, "scripted", spawn_scripted);
 	duk_put_prop_string(ctx, -2, "spawn");
 
 	duk_push_object(ctx);
 	put_function(ctx, "position", object_position);
 	put_function(ctx, "setPosition", object_set_position);
 	put_function(ctx, "setVelocity", object_set_velocity);
+	put_function(ctx, "setRotation", object_set_rotation);
+	put_function(ctx, "setScale", object_set_scale);
+	put_function(ctx, "setAnimation", object_set_animation);
 	put_function(ctx, "delete", object_delete);
 	duk_put_prop_string(ctx, -2, "object");
 
@@ -512,9 +556,13 @@ static void push_object_frame_context(PangeaScriptBackend* backend, const Pangea
 
 	push_vector3(backend->ctx, &context->position);
 	duk_put_prop_string(backend->ctx, -2, "position");
+	duk_push_string(backend->ctx, context->objectType ? context->objectType : "");
+	duk_put_prop_string(backend->ctx, -2, "objectType");
 
 	push_tags_array(backend->ctx, context->tags, context->tagCount);
 	duk_put_prop_string(backend->ctx, -2, "tags");
+	duk_push_string(backend->ctx, context->event ? context->event : "update");
+	duk_put_prop_string(backend->ctx, -2, "event");
 }
 
 static PangeaScriptStatus call_function_on_top(PangeaScriptBackend* backend, char* error, int errorCapacity)

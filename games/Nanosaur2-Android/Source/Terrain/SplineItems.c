@@ -147,6 +147,11 @@ SplinePointType	*points;
 				DoFatalAlert("PrimeSplines: type > MAX_SPLINE_ITEM_NUM");
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+			if (Nanosaur2Script_TryReplaceSplineItem(itemPtr, (int)s, (int)i))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
 			if (Nanosaur2Script_OnSplineItem(itemPtr, gLevelNum, (int)s))
 			{
 				itemPtr->flags |= ITEM_FLAGS_INUSE;

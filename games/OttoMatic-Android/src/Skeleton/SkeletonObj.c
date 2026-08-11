@@ -80,6 +80,28 @@ short	i,numDecomp;
 
 }
 
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	short i;
+	short numDecomp;
+
+	if (num < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || num >= MAX_SKELETON_TYPES || !skeletonSpec || !modelSpec)
+		return false;
+	if (gLoadedSkeletonsList[num])
+		return true;
+
+	gLoadedSkeletonsList[num] = LoadSkeletonFileFromSpecs(num, skeletonSpec, modelSpec);
+	if (!gLoadedSkeletonsList[num])
+		return false;
+
+	numDecomp = gLoadedSkeletonsList[num]->numDecomposedTriMeshes;
+	gNumDecomposedTriMeshesInSkeleton[num] = numDecomp;
+	for (i = 0; i < numDecomp; i++)
+		MO_DuplicateVertexArrayData(&gLoadedSkeletonsList[num]->decomposedTriMeshes[i], &gLocalTriMeshesOfSkelType[num][i]);
+
+	return true;
+}
+
 
 
 
@@ -276,9 +298,8 @@ ObjNode	*newNode;
 
 		if (nativeId && category)
 		{
-			const char* tags[2];
+			const char* tags[1];
 			int tagCount = 0;
-			tags[tagCount++] = nativeId;
 			if (strcmp(category, "human") == 0)
 			{
 				tags[tagCount++] = "ottomatic.human";
@@ -287,7 +308,7 @@ ObjNode	*newNode;
 			{
 				tags[tagCount++] = category;
 			}
-			OttoScript_RegisterObjectNode(newNode, PANGEA_SCRIPT_CAPABILITY_FULL, tags, tagCount);
+			OttoScript_RegisterObjectNode(newNode, nativeId, PANGEA_SCRIPT_CAPABILITY_FULL, tags, tagCount);
 		}
 	}
 #endif
@@ -503,4 +524,3 @@ void FinalizeSkeletonObjectScale(ObjNode* theNode, float scale, long collisionRe
 	UpdateSkeletonAnimation(theNode);
 	UpdateSkinnedGeometry(theNode);
 }
-

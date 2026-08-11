@@ -13,6 +13,27 @@ struct PangeaScriptBackend {
 
 static PangeaScriptStatus g_mock_load_status = PANGEA_SCRIPT_OK;
 static PangeaScriptStatus g_mock_hook_status = PANGEA_SCRIPT_OK;
+static int g_mock_scripted_spawn_count;
+
+static PangeaScriptStatus mock_spawn_scripted(
+	const char* id,
+	float x,
+	float y,
+	float z,
+	PangeaScriptObjectHandle* outHandle)
+{
+	assert(strcmp(id, "custom.test") == 0);
+	assert(x == 10.0f);
+	assert(y == 20.0f);
+	assert(z == 30.0f);
+	g_mock_scripted_spawn_count++;
+	if (outHandle)
+	{
+		outHandle->id = 41;
+		outHandle->generation = 7;
+	}
+	return PANGEA_SCRIPT_OK;
+}
 
 PangeaScriptBackend* PangeaScriptBackend_Create(const PangeaScriptGameInfo* gameInfo)
 {
@@ -249,7 +270,18 @@ void test_config_parsing_and_sandbox(void)
 		"  \"version\": 1,\n"
 		"  \"levels\": {\n"
 		"    \"1\": {\n"
-		"      \"script\": \"Data/Scripts/dist/level1.js\"\n"
+		"      \"script\": \"Data/Scripts/dist/level1.js\",\n"
+		"      \"customObjects\": [{\n"
+		"        \"id\": \"custom.test-model\",\n"
+		"        \"visual\": {\"kind\": \"customDisplayGroup\", \"modelPath\": \"Data/Scripts/assets/models/test.bg3d\", \"modelObject\": 2, \"scale\": 1.5, \"slot\": 400},\n"
+		"        \"collision\": {\"kind\": \"preset\", \"preset\": \"solidBox\"}\n"
+		"      }, {\n"
+		"        \"id\": \"custom.test-skeleton\",\n"
+		"        \"visual\": {\"kind\": \"customSkeleton\", \"modelPath\": \"Data/Scripts/assets/skeletons/test.bg3d\", \"skeletonPath\": \"Data/Scripts/assets/skeletons/test.skeleton\", \"animations\": {\"idle\": 0, \"walk\": 2}, \"initialAnimation\": \"idle\", \"animationSpeed\": 1, \"scale\": 1, \"slot\": 450},\n"
+		"        \"collision\": {\"kind\": \"none\"}\n"
+		"      }],\n"
+		"      \"terrainReplacements\": [{\"id\": \"replace-3\", \"itemIndex\": 3, \"nativeType\": 12, \"x\": 100, \"z\": 200, \"customObjectId\": \"custom.test-model\", \"strict\": false}],\n"
+		"      \"splineReplacements\": [{\"id\": \"replace-spline\", \"splineNum\": 2, \"itemIndex\": 4, \"nativeType\": 7, \"placement\": 0.25, \"customObjectId\": \"custom.test-model\", \"strict\": false}]\n"
 		"    }\n"
 		"  }\n"
 		"}\n";
@@ -258,6 +290,34 @@ void test_config_parsing_and_sandbox(void)
 	status = PangeaScript_LoadLevelConfig(1);
 	assert(status == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_HasRunnableModule());
+	assert(PangeaScript_GetCustomObjectDefinitionCount() == 2);
+	const PangeaScriptCustomObjectDefinition* customDefinition =
+		PangeaScript_GetCustomObjectDefinition("custom.test-model");
+	assert(customDefinition != NULL);
+	assert(customDefinition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP);
+	assert(strcmp(customDefinition->modelPath, "Data/Scripts/assets/models/test.bg3d") == 0);
+	assert(customDefinition->modelObject == 2);
+	assert(customDefinition->scale == 1.5f);
+	assert(customDefinition->slot == 400);
+	assert(customDefinition->collisionPreset == PANGEA_SCRIPT_COLLISION_SOLID_BOX);
+	const PangeaScriptCustomObjectDefinition* skeletonDefinition =
+		PangeaScript_GetCustomObjectDefinition("custom.test-skeleton");
+	assert(skeletonDefinition != NULL);
+	assert(skeletonDefinition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_SKELETON);
+	assert(strcmp(skeletonDefinition->initialAnimationName, "idle") == 0);
+	assert(skeletonDefinition->animationCount == 2);
+	assert(strcmp(skeletonDefinition->animationNames[1], "walk") == 0);
+	assert(skeletonDefinition->animationIndices[1] == 2);
+	const PangeaScriptTerrainReplacement* replacement =
+		PangeaScript_GetTerrainReplacement(3, 12, 100.0f, 200.0f);
+	assert(replacement != NULL);
+	assert(strcmp(replacement->customObjectId, "custom.test-model") == 0);
+	assert(!replacement->strict);
+	assert(PangeaScript_GetTerrainReplacement(4, 12, 100.0f, 200.0f) == NULL);
+	const PangeaScriptSplineReplacement* splineReplacement =
+		PangeaScript_GetSplineReplacement(2, 4, 7, 0.25f);
+	assert(splineReplacement != NULL);
+	assert(strcmp(splineReplacement->customObjectId, "custom.test-model") == 0);
 
 	// 2. Traversal path rejection: using ".."
 	const char* traversal_config = 
@@ -464,6 +524,26 @@ void test_consecutive_failures(void)
 	printf("Consecutive failures tests passed!\n");
 }
 
+static void test_scripted_spawn_adapter(void)
+{
+	printf("Testing game-owned scripted spawn adapter...\n");
+	const PangeaScriptGameInfo gameInfo =
+	{
+		.gameId = "test-game",
+		.gameName = "Test Game",
+		.spawnScripted = mock_spawn_scripted,
+	};
+	PangeaScriptObjectHandle handle = {0};
+	g_mock_scripted_spawn_count = 0;
+	assert(PangeaScript_Init(&gameInfo) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_RegisterScriptedObject("custom.test", 10.0f, 20.0f, 30.0f, &handle) == PANGEA_SCRIPT_OK);
+	assert(g_mock_scripted_spawn_count == 1);
+	assert(handle.id == 41);
+	assert(handle.generation == 7);
+	PangeaScript_Shutdown();
+	printf("Game-owned scripted spawn adapter tests passed!\n");
+}
+
 int main(void)
 {
 	printf("========================================\n");
@@ -474,6 +554,7 @@ int main(void)
 	test_config_parsing_and_sandbox();
 	test_level_settings_accessors();
 	test_consecutive_failures();
+	test_scripted_spawn_adapter();
 
 	printf("========================================\n");
 	printf(" All Native Unit Tests Passed!          \n");

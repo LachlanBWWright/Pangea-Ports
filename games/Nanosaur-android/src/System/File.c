@@ -114,6 +114,23 @@ const char* modelName = "Unknown";
 	return(skeleton);
 }
 
+SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	short refNum;
+	SkeletonDefType* skeleton;
+	if (!skeletonSpec || !modelSpec || skeletonType < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || skeletonType >= MAX_SKELETON_TYPES) return nil;
+	refNum = FSpOpenResFile(skeletonSpec, fsRdPerm);
+	if (refNum < 0) return nil;
+	UseResFile(refNum);
+	if (ResError()) { CloseResFile(refNum); return nil; }
+	skeleton = (SkeletonDefType*)AllocPtr(sizeof(SkeletonDefType));
+	if (!skeleton) { CloseResFile(refNum); return nil; }
+	ReadDataFromSkeletonFile(skeleton, modelSpec);
+	PrimeBoneData(skeleton);
+	CloseResFile(refNum);
+	return skeleton;
+}
+
 
 /************* READ DATA FROM SKELETON FILE *******************/
 //
@@ -803,4 +820,3 @@ FSSpec	spec;
 				DoFatalAlert("LoadLevelArt: unsupported level #");
 	}
 }
-

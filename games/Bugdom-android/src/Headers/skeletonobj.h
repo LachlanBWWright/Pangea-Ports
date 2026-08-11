@@ -3,7 +3,9 @@
 //
 #pragma once
 
-#define 	MAX_SKELETON_TYPES	24
+#define 	SKELETON_TYPE_SCRIPT_CUSTOM_BASE	24
+#define 	SKELETON_TYPE_SCRIPT_CUSTOM_COUNT	4
+#define 	MAX_SKELETON_TYPES	(SKELETON_TYPE_SCRIPT_CUSTOM_BASE + SKELETON_TYPE_SCRIPT_CUSTOM_COUNT)
 
 enum
 {
@@ -44,8 +46,8 @@ extern	ObjNode	*MakeNewSkeletonObject(NewObjectDefinitionType *newObjDef);
 extern	void AllocSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 extern	void InitSkeletonManager(void);
 extern	void LoadASkeleton(Byte num);
+extern	Boolean IsSkeletonTypeLoaded(Byte skeletonType);
+extern	Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec);
 extern	void FreeSkeletonFile(Byte skeletonType);
 extern	void FreeAllSkeletonFiles(short skipMe);
 extern	void FreeSkeletonBaseData(SkeletonObjDataType *data);
-
-

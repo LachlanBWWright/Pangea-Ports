@@ -26,6 +26,10 @@ void CroMagScript_UnregisterObject(ObjNode* obj);
 void CroMagScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void CroMagScript_ApplyObjectScripting(ObjNode* obj);
 void CroMagScript_RunObjectFrame(ObjNode* obj);
+void CroMagScript_OnObjectDeleted(ObjNode* obj);
+Boolean CroMagScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
+Boolean CroMagScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
+void CroMagScript_OnCustomTrigger(ObjNode* trigger, ObjNode* who, Byte sideBits);
 
 
 #endif

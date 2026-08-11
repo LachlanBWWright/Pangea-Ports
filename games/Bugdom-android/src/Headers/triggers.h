@@ -21,7 +21,8 @@ enum
 	TRIGTYPE_POW,
 	TRIGTYPE_WATERVALVE,
 	TRIGTYPE_KINGPIPE,
-	TRIGTYPE_CAGE
+	TRIGTYPE_CAGE,
+	TRIGTYPE_SCRIPTED
 };
 
 
@@ -93,7 +94,6 @@ void KickKingWaterPipe(ObjNode *theNode);
 Boolean AddLadyBugBonus(TerrainItemEntryType *itemPtr, long  x, long z);
 Boolean KickLadyBugBox(ObjNode *cage);
 Boolean DoTrig_Cage(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
-
 
 
 

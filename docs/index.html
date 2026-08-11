@@ -986,7 +986,7 @@
         },
         onRuntimeInitialized: function() {
           card.classList.add('hidden');
-          syncCanvasSize();
+          stabilizeStartupCanvasSize();
         },
         print: function(t) { console.log(t); },
         printErr: function(t) { console.error(t); }
@@ -1035,6 +1035,35 @@
       syncCanvasSize();
       requestAnimationFrame(syncCanvasSize);
       requestAnimationFrame(function() { requestAnimationFrame(syncCanvasSize); });
+    }
+
+    function stabilizeStartupCanvasSize() {
+      var startedAt = performance.now();
+      var matchingFrames = 0;
+
+      function stabilize() {
+        syncCanvasSize();
+        var canvas = document.getElementById('canvas');
+        var cssW = canvas ? canvas.clientWidth : 0;
+        var cssH = canvas ? canvas.clientHeight : 0;
+        var dpr = window.devicePixelRatio || 1;
+        var expectedW = Math.max(1, Math.round(cssW * dpr));
+        var expectedH = Math.max(1, Math.round(cssH * dpr));
+        if (activeGameConfig && !isGameStageFullscreen()) {
+          expectedW = Math.min(expectedW, activeGameConfig.canvas.width);
+          expectedH = Math.min(expectedH, activeGameConfig.canvas.height);
+        }
+        matchingFrames = canvas && cssW > 0 && cssH > 0 &&
+          canvas.width === expectedW && canvas.height === expectedH
+          ? matchingFrames + 1
+          : 0;
+        var elapsed = performance.now() - startedAt;
+        if (elapsed < 3000 && (elapsed < 1000 || matchingFrames < 8)) {
+          requestAnimationFrame(stabilize);
+        }
+      }
+
+      requestAnimationFrame(stabilize);
     }
 
     function installResizeObservers() {

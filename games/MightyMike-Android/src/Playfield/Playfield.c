@@ -888,6 +888,12 @@ Boolean		flag;
 					type = itemPtr->type&ITEM_NUM;						// mask out status bits 15..12
 #ifdef PANGEA_ENABLE_SCRIPTING
 					long originalType = type;
+					if (MikeScript_TryReplaceMapItem(itemPtr, (int)(itemPtr - gMasterItemList), (int)type))
+					{
+						itemPtr++;
+						if ((Ptr)itemPtr > gMaxItemAddress) break;
+						continue;
+					}
 					type = MikeScript_RemapMapItemType(gSceneNum, gAreaNum, (int)type);
 #endif
 					if (type > MAX_ITEM_NUM)							// error check!

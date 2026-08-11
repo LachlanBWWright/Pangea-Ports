@@ -71,6 +71,7 @@ void InitPrefsFolder(bool createIt);
 OSErr MakePrefsFSSpec(const char* filename, bool createFolder, FSSpec* spec);
 
 extern	SkeletonDefType *LoadSkeletonFile(short skeletonType);
+extern	SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec);
 short OpenGameFile(const char* filename);
 extern	OSErr LoadPrefs(PrefsType *prefBlock);
 extern	void SavePrefs(PrefsType *prefs);
@@ -82,7 +83,6 @@ extern	OSErr DeleteSavedGame(int slot);
 void LoadPlayfield(FSSpec *specPtr);
 
 void LoadLevelArt(void);
-
 
 
 

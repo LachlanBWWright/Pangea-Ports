@@ -36,6 +36,11 @@ static void DisposeSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 
 static SkeletonDefType		*gLoadedSkeletonsList[MAX_SKELETON_TYPES];
 
+Boolean IsSkeletonTypeLoaded(short skeletonType)
+{
+	return skeletonType >= 0 && skeletonType < MAX_SKELETON_TYPES && gLoadedSkeletonsList[skeletonType] != nil;
+}
+
 short	    gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
 
 
@@ -70,6 +75,16 @@ void LoadASkeleton(Byte num)
 
 
 	gNumDecomposedTriMeshesInSkeleton[num] = gLoadedSkeletonsList[num]->numDecomposedTriMeshes;		// keep easy access version of this value
+}
+
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	if (num < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || num >= MAX_SKELETON_TYPES || !skeletonSpec || !modelSpec) return false;
+	if (gLoadedSkeletonsList[num]) return true;
+	gLoadedSkeletonsList[num] = LoadSkeletonFileFromSpecs(num, skeletonSpec, modelSpec);
+	if (!gLoadedSkeletonsList[num]) return false;
+	gNumDecomposedTriMeshesInSkeleton[num] = gLoadedSkeletonsList[num]->numDecomposedTriMeshes;
+	return true;
 }
 
 
@@ -494,8 +509,6 @@ Byte				buffNum;
 #endif
 
 }
-
-
 
 
 

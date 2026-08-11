@@ -543,6 +543,7 @@ void DeleteObject(ObjNode	*theNode)
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (theNode->ScriptObjectID != 0)
 	{
+		BugdomScript_OnObjectDeleted(theNode);
 		BugdomScript_UnregisterObject(theNode);
 	}
 #endif

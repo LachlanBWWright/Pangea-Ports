@@ -75,6 +75,21 @@ void LoadASkeleton(Byte num)
 	}
 }
 
+Boolean IsSkeletonTypeLoaded(Byte skeletonType)
+{
+	return skeletonType < MAX_SKELETON_TYPES && gLoadedSkeletonsList[skeletonType] != nil;
+}
+
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	if (num < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || num >= MAX_SKELETON_TYPES || !skeletonSpec || !modelSpec) return false;
+	if (gLoadedSkeletonsList[num]) return true;
+	gLoadedSkeletonsList[num] = LoadSkeletonFileFromSpecs(num, skeletonSpec, modelSpec);
+	if (!gLoadedSkeletonsList[num]) return false;
+	QD3D_CalcObjectBoundingSphere(gLoadedSkeletonsList[num]->numDecomposedTriMeshes, gLoadedSkeletonsList[num]->decomposedTriMeshPtrs, &gSkeletonBoundingSpheres[num]);
+	return true;
+}
+
 
 
 /****************** FREE SKELETON FILE **************************/
@@ -463,4 +478,3 @@ void FreeSkeletonBaseData(SkeletonObjDataType *data)
 			
 	DisposePtr((Ptr)data);			
 }
-

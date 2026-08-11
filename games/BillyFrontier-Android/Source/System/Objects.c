@@ -1265,6 +1265,7 @@ int		i;
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (theNode->ScriptObjectID != 0)
 	{
+		BillyScript_OnObjectDeleted(theNode);
 		BillyScript_UnregisterObject(theNode);
 	}
 #endif
@@ -1818,7 +1819,6 @@ ObjNode	*node = theNode;
 		node = node->ChainNode;
 	}
 }
-
 
 
 

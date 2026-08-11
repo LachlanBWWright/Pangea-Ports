@@ -33,6 +33,7 @@ static void MovePowerup(ObjNode *theNode);
 static Boolean DoTrig_Powerup(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
 static void MoveWaterValve(ObjNode *theNode);
 static Boolean DoTrig_WaterValve(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
+static Boolean DoTrig_Scripted(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
 static void ShowThePOW(ObjNode *theNode);
 static void MovePowerupShow(ObjNode *theNode);
 static void MoveNut(ObjNode *theNode);
@@ -107,8 +108,21 @@ Boolean	(*gTriggerTable[])(ObjNode *, ObjNode *, Byte) =
 	DoTrig_Powerup,
 	DoTrig_WaterValve,
 	DoTrig_KingWaterPipe,
-	DoTrig_Cage
+	DoTrig_Cage,
+	DoTrig_Scripted
 };
+
+static Boolean DoTrig_Scripted(ObjNode* theNode, ObjNode* whoNode, Byte sideBits)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_OnCustomTrigger(theNode, whoNode, sideBits);
+#else
+	(void) theNode;
+	(void) whoNode;
+	(void) sideBits;
+#endif
+	return false;
+}
 
 
 enum
@@ -1458,7 +1472,6 @@ ObjNode *handle;
 	
 	return(true);
 }
-
 
 
 

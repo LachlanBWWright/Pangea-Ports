@@ -16,8 +16,9 @@ enum
 	SKELETON_TYPE_BRACH,
 	SKELETON_TYPE_WORM,
 	SKELETON_TYPE_RAMPHOR,
-
-	MAX_SKELETON_TYPES
+	SKELETON_TYPE_SCRIPT_CUSTOM_BASE,
+	SKELETON_TYPE_SCRIPT_CUSTOM_COUNT = 4,
+	MAX_SKELETON_TYPES = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + SKELETON_TYPE_SCRIPT_CUSTOM_COUNT
 };
 
 
@@ -75,6 +76,8 @@ extern	void AllocSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 extern	void InitSkeletonManager(void);
 extern	short	gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
 void LoadASkeleton(Byte num);
+Boolean IsSkeletonTypeLoaded(short skeletonType);
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec);
 extern	void FreeSkeletonFile(Byte skeletonType);
 extern	void FreeAllSkeletonFiles(short skipMe);
 void FreeSkeletonBaseData(SkeletonObjDataType *skeletonData, short skeletonType);

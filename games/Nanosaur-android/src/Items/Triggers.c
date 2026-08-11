@@ -26,6 +26,9 @@ static void MoveCrystal(ObjNode *theNode);
 static Boolean DoTrig_Crystal(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
 static void MoveStepStone(ObjNode *theNode);
 static Boolean DoTrig_StepStone(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
+#ifdef PANGEA_ENABLE_SCRIPTING
+static Boolean DoTrig_Scripted(ObjNode *theNode, ObjNode *whoNode, Byte sideBits);
+#endif
 
 
 /****************************/
@@ -72,8 +75,19 @@ Boolean	(*gTriggerTable[])(ObjNode *, ObjNode *, Byte) =
 {
 	DoTrig_PowerUp,
 	DoTrig_Crystal,
-	DoTrig_StepStone
+	DoTrig_StepStone,
+#ifdef PANGEA_ENABLE_SCRIPTING
+	DoTrig_Scripted
+#endif
 };
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+static Boolean DoTrig_Scripted(ObjNode* theNode, ObjNode* whoNode, Byte sideBits)
+{
+	NanosaurScript_OnCustomTrigger(theNode, whoNode, sideBits);
+	return true;
+}
+#endif
 					
 
 /******************** HANDLE TRIGGER ***************************/
@@ -591,5 +605,4 @@ static Boolean DoTrig_StepStone(ObjNode *theNode, ObjNode *whoNode, Byte sideBit
 	}
 	return(true);
 }
-
 

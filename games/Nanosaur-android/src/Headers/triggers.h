@@ -10,7 +10,8 @@ enum
 {
 	TRIGTYPE_POWERUP,
 	TRIGTYPE_CRYSTAL,
-	TRIGTYPE_STEPSTONE
+	TRIGTYPE_STEPSTONE,
+	TRIGTYPE_SCRIPTED
 };
 
 
@@ -20,4 +21,3 @@ extern	Boolean AddPowerUp(TerrainItemEntryType *itemPtr, long  x, long z);
 extern	Boolean AddCrystal(TerrainItemEntryType *itemPtr, long  x, long z);
 extern	Boolean AddStepStone(TerrainItemEntryType *itemPtr, long  x, long z);
 extern	void ExplodeCrystal(ObjNode *theNode);
-

@@ -341,6 +341,9 @@ struct ObjNode
 		OGLVector3D	ScriptVisualOffset;
 		int			ScriptObjectID;
 		int			ScriptObjectGeneration;
+		char		ScriptDefinitionID[96];
+		Boolean		ScriptDeleteRequested;
+		Boolean		ScriptAnimationCompletionSent;
 };
 typedef struct ObjNode ObjNode;
 

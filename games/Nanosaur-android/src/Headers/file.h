@@ -50,6 +50,7 @@ typedef struct
 //=================================================
 
 extern	SkeletonDefType *LoadSkeletonFile(short skeletonType);
+extern	SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec);
 void	OpenGameFile(const char* filename, short *fRefNumPtr, const char* errString);
 void InitDefaultPrefs(void);
 OSErr MakePrefsFSSpec(const char* prefFileName, FSSpec* spec);
@@ -63,4 +64,3 @@ extern	void LoadTerrain(FSSpec *fsSpec);
 extern	void LoadLevelArt(short levelNum);
 
 void FSMakeCustomSpec(const char* hostPath, FSSpec* outSpec);
-

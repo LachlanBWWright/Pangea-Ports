@@ -32,8 +32,9 @@ enum
 	SKELETON_TYPE_ROACH,
 	SKELETON_TYPE_ANT,
 	SKELETON_TYPE_FISH,
-
-	MAX_SKELETON_TYPES
+	SKELETON_TYPE_SCRIPT_CUSTOM_BASE,
+	SKELETON_TYPE_SCRIPT_CUSTOM_COUNT = 4,
+	MAX_SKELETON_TYPES = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + SKELETON_TYPE_SCRIPT_CUSTOM_COUNT
 };
 
 
@@ -46,6 +47,8 @@ void AllocSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 void InitSkeletonManager(void);
 void DisposeSkeletonManager(void);
 void LoadASkeleton(Byte num);
+Boolean IsSkeletonTypeLoaded(short skeletonType);
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec);
 extern	void FreeSkeletonFile(Byte skeletonType);
 extern	void FreeAllSkeletonFiles(short skipMe);
 extern	void FreeSkeletonBaseData(SkeletonObjDataType *data);

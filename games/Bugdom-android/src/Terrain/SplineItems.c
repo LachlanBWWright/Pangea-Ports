@@ -143,6 +143,11 @@ Boolean			flag;
 				type = itemPtr->type;								// get item type
 				GAME_ASSERT(type <= MAX_SPLINE_ITEM_NUM);
 #ifdef PANGEA_ENABLE_SCRIPTING
+				if (BugdomScript_TryReplaceSplineItem(itemPtr, (int)s, (int)i))
+				{
+					itemPtr->flags |= ITEM_FLAGS_INUSE;
+					continue;
+				}
 				if (BugdomScript_OnSplineItem(itemPtr, gRealLevel, (int)s))
 				{
 					itemPtr->flags |= ITEM_FLAGS_INUSE;

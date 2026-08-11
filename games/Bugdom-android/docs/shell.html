@@ -427,10 +427,20 @@
       }
     }
 
+    function stabilizeStartupCanvasSize() {
+      var startedAt = performance.now();
+      function stabilize() {
+        syncCanvasSize();
+        if (performance.now() - startedAt < 3000) requestAnimationFrame(stabilize);
+      }
+      requestAnimationFrame(stabilize);
+    }
+
     var Module = {
       canvas: document.getElementById('canvas'),
 
       onRuntimeInitialized: function () {
+        stabilizeStartupCanvasSize();
         // Change loading card to "Click to Play"
         var card = document.getElementById('loading-card');
         var st = document.getElementById('status-text');

@@ -157,6 +157,11 @@ void PrimeSplines(void)
 			GAME_ASSERT(type <= MAX_SPLINE_ITEM_NUM);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+			if (Bugdom2Script_TryReplaceSplineItem(itemPtr, s, i))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
 			if (Bugdom2Script_OnSplineItem(itemPtr, gLevelNum, s))
 			{
 				itemPtr->flags |= ITEM_FLAGS_INUSE;

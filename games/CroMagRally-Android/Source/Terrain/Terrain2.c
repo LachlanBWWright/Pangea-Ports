@@ -319,6 +319,8 @@ Boolean			flag;
 #ifdef PANGEA_ENABLE_SCRIPTING
 		if (!gNetGameInProgress)
 		{
+			if (CroMagScript_TryReplaceTerrainItem(&itemPtr[i], (int)(&itemPtr[i] - *gMasterItemList), originalType, x, z))
+				continue;
 			if (CroMagScript_OnTerrainItem(&itemPtr[i], gTrackNum, playerNum, originalType, (int)type, x, z))
 			{
 				itemPtr[i].flags |= ITEM_FLAGS_INUSE;

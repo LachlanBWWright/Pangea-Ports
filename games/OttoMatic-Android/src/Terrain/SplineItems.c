@@ -207,6 +207,11 @@ SplinePointType	*points;
 				DoFatalAlert("PrimeSplines: type > MAX_SPLINE_ITEM_NUM");
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+			if (OttoScript_TryReplaceSplineItem(itemPtr, (int)s, (int)i))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
 			if (OttoScript_OnSplineItem(itemPtr, gLevelNum, (int)s))
 			{
 				itemPtr->flags |= ITEM_FLAGS_INUSE;

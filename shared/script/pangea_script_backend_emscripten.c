@@ -145,6 +145,29 @@ EM_JS(void, pangea_script_install_game_info_js, (const char* gameIdJson, const c
 			}
 		},
 	};
+	const spawnScripted = (id, pos) => {
+		if (typeof id !== "string" || !pos || typeof pos.x !== "number" || typeof pos.y !== "number" || typeof pos.z !== "number") return undefined;
+		const idLen = lengthBytesUTF8(id) + 1;
+		const idPtr = _malloc(idLen);
+		stringToUTF8(id, idPtr, idLen);
+		const outHandleIdPtr = _malloc(4);
+		const outHandleGenPtr = _malloc(4);
+		const status = _PangeaScript_RegisterScriptedObjectJS(idPtr, pos.x, pos.y, pos.z, outHandleIdPtr, outHandleGenPtr);
+		_free(idPtr);
+		if (status === 0) {
+			const handleId = HEAP32[outHandleIdPtr >> 2];
+			const handleGen = HEAP32[outHandleGenPtr >> 2];
+			_free(outHandleIdPtr);
+			_free(outHandleGenPtr);
+			if (handleId > 0) {
+				return { id: handleId, generation: handleGen };
+			}
+		} else {
+			_free(outHandleIdPtr);
+			_free(outHandleGenPtr);
+		}
+		return undefined;
+	};
 	globalThis.pangea.spawn = {
 		native: (id, pos, options) => {
 			if (typeof id !== "string" || !pos || typeof pos.x !== "number" || typeof pos.y !== "number" || typeof pos.z !== "number") return undefined;
@@ -179,7 +202,8 @@ EM_JS(void, pangea_script_install_game_info_js, (const char* gameIdJson, const c
 				_free(outHandleGenPtr);
 			}
 			return undefined;
-		}
+		},
+		scripted: spawnScripted
 	};
 	globalThis.pangea.object = {
 		position: (handle) => {
@@ -208,6 +232,23 @@ EM_JS(void, pangea_script_install_game_info_js, (const char* gameIdJson, const c
 			if (!vel || typeof vel.x !== "number" || typeof vel.y !== "number" || typeof vel.z !== "number") return false;
 			return !!_PangeaScript_SetObjectVelocityJS(handle.id, handle.generation, vel.x, vel.y, vel.z);
 		},
+		setRotation: (handle, rotation) => {
+			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number") return false;
+			if (!rotation || typeof rotation.x !== "number" || typeof rotation.y !== "number" || typeof rotation.z !== "number") return false;
+			return !!_PangeaScript_SetObjectRotationJS(handle.id, handle.generation, rotation.x, rotation.y, rotation.z);
+		},
+		setScale: (handle, scale) => {
+			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number" || typeof scale !== "number") return false;
+			return !!_PangeaScript_SetObjectScaleJS(handle.id, handle.generation, scale);
+		},
+		setAnimation: (handle, animation, speed = 1, blendSeconds = 0) => {
+			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number") return false;
+			if (typeof animation !== "string" || typeof speed !== "number" || typeof blendSeconds !== "number") return false;
+			const animationPtr = stringToNewUTF8(animation);
+			const ok = !!_PangeaScript_SetObjectAnimationNamedJS(handle.id, handle.generation, animationPtr, speed, blendSeconds);
+			_free(animationPtr);
+			return ok;
+		},
 		delete: (handle) => {
 			if (!handle || typeof handle.id !== "number" || typeof handle.generation !== "number") return false;
 			return !!_PangeaScript_DeleteObjectJS(handle.id, handle.generation);
@@ -216,31 +257,7 @@ EM_JS(void, pangea_script_install_game_info_js, (const char* gameIdJson, const c
 	globalThis.pangea.experimental = {
 		level: { current: () => null },
 		player: { get: () => null },
-		spawn: {
-			scripted: (id, pos) => {
-				if (typeof id !== "string" || !pos || typeof pos.x !== "number" || typeof pos.y !== "number" || typeof pos.z !== "number") return undefined;
-				const idLen = lengthBytesUTF8(id) + 1;
-				const idPtr = _malloc(idLen);
-				stringToUTF8(id, idPtr, idLen);
-				const outHandleIdPtr = _malloc(4);
-				const outHandleGenPtr = _malloc(4);
-				const status = _PangeaScript_RegisterScriptedObjectJS(idPtr, pos.x, pos.y, pos.z, outHandleIdPtr, outHandleGenPtr);
-				_free(idPtr);
-				if (status === 0) {
-					const handleId = HEAP32[outHandleIdPtr >> 2];
-					const handleGen = HEAP32[outHandleGenPtr >> 2];
-					_free(outHandleIdPtr);
-					_free(outHandleGenPtr);
-					if (handleId > 0) {
-						return { id: handleId, generation: handleGen };
-					}
-				} else {
-					_free(outHandleIdPtr);
-					_free(outHandleGenPtr);
-				}
-				return undefined;
-			}
-		}
+		spawn: { scripted: spawnScripted }
 	};
 	globalThis.exports = {};
 	globalThis.module = { exports: globalThis.exports };
@@ -494,6 +511,7 @@ PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* back
 PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* backend, const PangeaScriptObjectFrameContext* context, PangeaScriptObjectFrameResult* result, char* error, int errorCapacity)
 {
 	char tagsJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
+	char objectTypeJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
 	char contextJson[EMSCRIPTEN_SCRIPT_JSON_CAPACITY];
 	double x = 0.0;
 	double y = 0.0;
@@ -509,10 +527,11 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 	result->positionOffset.z = 0.0f;
 
 	write_tags_json(context->tags, context->tagCount, tagsJson, (int)sizeof(tagsJson));
+	write_json_string(objectTypeJson, (int)sizeof(objectTypeJson), context->objectType ? context->objectType : "");
 	snprintf(
 		contextJson,
 		sizeof(contextJson),
-		"{\"levelNum\":%d,\"frameNum\":%u,\"deltaSeconds\":%.9g,\"levelTimeSeconds\":%.9g,\"object\":{\"id\":%d,\"generation\":%u},\"position\":{\"x\":%.9g,\"y\":%.9g,\"z\":%.9g},\"tags\":%s}",
+		"{\"levelNum\":%d,\"frameNum\":%u,\"deltaSeconds\":%.9g,\"levelTimeSeconds\":%.9g,\"object\":{\"id\":%d,\"generation\":%u},\"position\":{\"x\":%.9g,\"y\":%.9g,\"z\":%.9g},\"objectType\":%s,\"tags\":%s,\"event\":\"%s\"}",
 		context->levelNum,
 		context->frameNum,
 		context->deltaSeconds,
@@ -522,7 +541,9 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 		context->position.x,
 		context->position.y,
 		context->position.z,
-		tagsJson);
+		objectTypeJson,
+		tagsJson,
+		context->event ? context->event : "update");
 
 	if (pangea_script_call_js("onObjectFrame", contextJson, &x, &y, &z, &hasOffset, NULL, NULL) != 0)
 		return copy_js_error(error, errorCapacity);

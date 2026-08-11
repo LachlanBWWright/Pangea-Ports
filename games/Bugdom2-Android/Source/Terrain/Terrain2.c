@@ -289,6 +289,8 @@ Boolean			flag;
 		type = itemPtr[i].type;									// get item #
 #ifdef PANGEA_ENABLE_SCRIPTING
 		{
+			if (Bugdom2Script_TryReplaceTerrainItem(&itemPtr[i], (int)(&itemPtr[i] - gMasterItemList), type, x, z))
+				continue;
 			int remappedType = Bugdom2Script_RemapTerrainItemType(gLevelNum, type);
 			if (Bugdom2Script_OnTerrainItem(&itemPtr[i], gLevelNum, type, remappedType, x, z))
 			{
@@ -762,5 +764,4 @@ float	intersectX, intersectZ;
 	*whichLine = -1;
 	return(false);
 }
-
 

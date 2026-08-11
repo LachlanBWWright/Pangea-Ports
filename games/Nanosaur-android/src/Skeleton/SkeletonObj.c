@@ -56,6 +56,19 @@ void LoadASkeleton(Byte num)
 		gLoadedSkeletonsList[num] = LoadSkeletonFile(num);
 }
 
+Boolean IsSkeletonTypeLoaded(Byte skeletonType)
+{
+	return skeletonType < MAX_SKELETON_TYPES && gLoadedSkeletonsList[skeletonType] != nil;
+}
+
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	if (num < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || num >= MAX_SKELETON_TYPES || !skeletonSpec || !modelSpec) return false;
+	if (gLoadedSkeletonsList[num]) return true;
+	gLoadedSkeletonsList[num] = LoadSkeletonFileFromSpecs(num, skeletonSpec, modelSpec);
+	return gLoadedSkeletonsList[num] != nil;
+}
+
 
 /****************** FREE SKELETON FILE **************************/
 //

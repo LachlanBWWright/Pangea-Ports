@@ -28,5 +28,8 @@ void BillyScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void BillyScript_ApplyObjectScripting(ObjNode* obj);
 // Utility for MoveObjects loop
 void BillyScript_RunObjectFrame(ObjNode* obj);
+void BillyScript_OnObjectDeleted(ObjNode* obj);
+Boolean BillyScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
+Boolean BillyScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 
 #endif

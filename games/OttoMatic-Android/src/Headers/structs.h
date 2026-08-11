@@ -307,6 +307,9 @@ struct ObjNode
 	OGLVector3D		ScriptVisualOffset;
 	int32_t			ScriptObjectID;
 	uint32_t		ScriptObjectGeneration;
+	char			ScriptDefinitionID[96];
+	Boolean			ScriptAnimationCompletionSent;
+	Boolean			ScriptDeleteRequested;
 	
 	float			Health;				// health 0..1
 	float			Damage;				// damage

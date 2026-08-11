@@ -28,5 +28,8 @@ void Bugdom2Script_UnregisterObject(ObjNode* obj);
 void Bugdom2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void Bugdom2Script_ApplyObjectScripting(ObjNode* obj);
 void Bugdom2Script_RunObjectFrame(ObjNode* obj);
+void Bugdom2Script_OnObjectDeleted(ObjNode* obj);
+Boolean Bugdom2Script_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
+Boolean Bugdom2Script_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 
 #endif

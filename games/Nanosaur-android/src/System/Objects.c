@@ -473,6 +473,7 @@ ObjNode *tempNode;
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (theNode->ScriptObjectID != 0)
 	{
+		NanosaurScript_OnObjectDeleted(theNode);
 		NanosaurScript_UnregisterObject(theNode);
 	}
 #endif

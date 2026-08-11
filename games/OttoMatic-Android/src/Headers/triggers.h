@@ -35,7 +35,8 @@ enum
 	TRIGTYPE_BUMPERCARPOWERPOST,
 	TRIGTYPE_ROCKETSLED,
 	TRIGTYPE_TRAPDOOR,
-	TRIGTYPE_LAVAPLATFORM
+	TRIGTYPE_LAVAPLATFORM,
+	TRIGTYPE_SCRIPTED
 };
 
 
@@ -64,6 +65,7 @@ enum
 //===============================================================================
 
 Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side);
+Boolean DoTrig_Scripted(ObjNode* triggerNode, ObjNode* whoNode, Byte sideBits);
 void SpewAtoms(OGLPoint3D *where, short numRed, short numGreen, short numBlue, Boolean regenerate);
 Boolean AddAtom(TerrainItemEntryType *itemPtr, long  x, long z);
 Boolean AddWoodenGate(TerrainItemEntryType *itemPtr, long  x, long z);

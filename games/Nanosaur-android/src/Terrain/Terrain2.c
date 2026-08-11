@@ -229,6 +229,8 @@ long			realX,realZ;
 #ifdef PANGEA_ENABLE_SCRIPTING
 					realX = itemPtr->x * MAP2UNIT_VALUE;
 					realZ = itemPtr->y * MAP2UNIT_VALUE;
+					if (NanosaurScript_TryReplaceTerrainItem(itemPtr, (int)(itemPtr - gMasterItemList), (int)type, (float)realX, (float)realZ))
+						continue;
 					long remappedType = NanosaurScript_RemapTerrainItemType(gStartLevelNum, (int)type);
 					if (NanosaurScript_OnTerrainItem(itemPtr, gStartLevelNum, (int)type, (int)remappedType, (float)realX, (float)realZ))
 					{

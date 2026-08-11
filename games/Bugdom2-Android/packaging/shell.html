@@ -379,6 +379,15 @@
       }
     }
 
+    function stabilizeStartupCanvasSize() {
+      var startedAt = performance.now();
+      function stabilize() {
+        syncCanvasSize();
+        if (performance.now() - startedAt < 3000) requestAnimationFrame(stabilize);
+      }
+      requestAnimationFrame(stabilize);
+    }
+
     function showPlayButton() {
       spinnerEl.style.display   = 'none';
       statusEl.style.display    = 'none';
@@ -438,6 +447,7 @@
       },
 
       onRuntimeInitialized: function() {
+        stabilizeStartupCanvasSize();
         console.log('[Bugdom2] Runtime initialized');
         runtimeReady = true;
         finishLoading();

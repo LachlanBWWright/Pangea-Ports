@@ -32,8 +32,10 @@ enum
 	SKELETON_TYPE_SKIRTLADY,
 	SKELETON_TYPE_ICECUBE,
 	SKELETON_TYPE_ELITEBRAINALIEN,
-	
-	MAX_SKELETON_TYPES				
+
+	SKELETON_TYPE_SCRIPT_CUSTOM_BASE,
+	SKELETON_TYPE_SCRIPT_CUSTOM_COUNT = 4,
+	MAX_SKELETON_TYPES = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + SKELETON_TYPE_SCRIPT_CUSTOM_COUNT,
 };
 
 
@@ -46,6 +48,7 @@ extern	void DisposeSkeletonObjectMemory(SkeletonDefType *skeleton);
 extern	void AllocSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 extern	void InitSkeletonManager(void);
 void LoadASkeleton(Byte num);
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec);
 extern	void FreeSkeletonFile(Byte skeletonType);
 extern	void FreeAllSkeletonFiles(short skipMe);
 extern	void FreeSkeletonBaseData(SkeletonObjDataType *data);

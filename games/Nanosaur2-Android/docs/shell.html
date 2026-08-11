@@ -280,6 +280,15 @@
       }
     }
 
+    function stabilizeStartupCanvasSize() {
+      var startedAt = performance.now();
+      function stabilize() {
+        syncCanvasSize();
+        if (performance.now() - startedAt < 3000) requestAnimationFrame(stabilize);
+      }
+      requestAnimationFrame(stabilize);
+    }
+
     var Module = {
       canvas: document.getElementById('canvas'),
 
@@ -318,6 +327,7 @@
       },
 
       onRuntimeInitialized: function() {
+        stabilizeStartupCanvasSize();
         // Hide loading overlay, show toolbar
         var card = document.getElementById('loading-card');
         if (card) card.style.display = 'none';

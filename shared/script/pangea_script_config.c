@@ -517,6 +517,266 @@ static bool parse_item_overrides_array(Parser* p, PangeaConfigLevel* level, int 
 	return true;
 }
 
+static PangeaScriptVisualKind parse_visual_kind(const char* value)
+{
+	if (strcmp(value, "nativeDisplayGroup") == 0) return PANGEA_SCRIPT_VISUAL_NATIVE_DISPLAY_GROUP;
+	if (strcmp(value, "customDisplayGroup") == 0) return PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP;
+	if (strcmp(value, "nativeSkeleton") == 0) return PANGEA_SCRIPT_VISUAL_NATIVE_SKELETON;
+	if (strcmp(value, "customSkeleton") == 0) return PANGEA_SCRIPT_VISUAL_CUSTOM_SKELETON;
+	return PANGEA_SCRIPT_VISUAL_NONE;
+}
+
+static PangeaScriptCollisionPreset parse_collision_preset(const char* value)
+{
+	if (strcmp(value, "solidBox") == 0) return PANGEA_SCRIPT_COLLISION_SOLID_BOX;
+	if (strcmp(value, "triggerBox") == 0) return PANGEA_SCRIPT_COLLISION_TRIGGER_BOX;
+	if (strcmp(value, "pickup") == 0) return PANGEA_SCRIPT_COLLISION_PICKUP;
+	if (strcmp(value, "enemy") == 0) return PANGEA_SCRIPT_COLLISION_ENEMY;
+	if (strcmp(value, "platform") == 0) return PANGEA_SCRIPT_COLLISION_PLATFORM;
+	return PANGEA_SCRIPT_COLLISION_NONE;
+}
+
+static bool parse_custom_visual(Parser* p, PangeaScriptCustomObjectDefinition* definition)
+{
+	if (!match_char(p, '{')) return false;
+	while (true)
+	{
+		if (match_char(p, '}')) return true;
+		char key[64];
+		if (!parse_string(p, key, sizeof(key)) || !match_char(p, ':')) return false;
+		if (strcmp(key, "kind") == 0)
+		{
+			char value[64];
+			if (!parse_string(p, value, sizeof(value))) return false;
+			definition->visualKind = parse_visual_kind(value);
+		}
+		else if (strcmp(key, "group") == 0)
+		{
+			if (!parse_string(p, definition->nativeGroup, sizeof(definition->nativeGroup))) return false;
+		}
+		else if (strcmp(key, "modelPath") == 0)
+		{
+			if (!parse_string(p, definition->modelPath, sizeof(definition->modelPath))) return false;
+		}
+		else if (strcmp(key, "skeletonPath") == 0)
+		{
+			if (!parse_string(p, definition->skeletonPath, sizeof(definition->skeletonPath))) return false;
+		}
+		else if (strcmp(key, "initialAnimation") == 0)
+		{
+			skip_whitespace(p);
+			if (*p->cursor == '"')
+			{
+				if (!parse_string(p, definition->initialAnimationName, sizeof(definition->initialAnimationName))) return false;
+			}
+			else
+			{
+				double value;
+				if (!parse_number(p, &value)) return false;
+				definition->initialAnimation = (int)value;
+			}
+		}
+		else if (strcmp(key, "animations") == 0)
+		{
+			if (!match_char(p, '{')) return false;
+			while (true)
+			{
+				if (match_char(p, '}')) break;
+				char animationName[64];
+				double animationIndex;
+				if (!parse_string(p, animationName, sizeof(animationName)) ||
+					!match_char(p, ':') || !parse_number(p, &animationIndex)) return false;
+				if (definition->animationCount < 16)
+				{
+					int index = definition->animationCount++;
+					snprintf(definition->animationNames[index], sizeof(definition->animationNames[index]), "%s", animationName);
+					definition->animationIndices[index] = (int) animationIndex;
+				}
+				if (match_char(p, ',')) continue;
+				if (*p->cursor != '}') return false;
+			}
+		}
+		else if (strcmp(key, "modelObject") == 0 || strcmp(key, "skeletonType") == 0 || strcmp(key, "slot") == 0)
+		{
+			double value;
+			if (!parse_number(p, &value)) return false;
+			if (strcmp(key, "modelObject") == 0) definition->modelObject = (int)value;
+			else if (strcmp(key, "skeletonType") == 0) definition->skeletonType = (int)value;
+			else definition->slot = (int)value;
+		}
+		else if (strcmp(key, "scale") == 0 || strcmp(key, "animationSpeed") == 0)
+		{
+			double value;
+			if (!parse_number(p, &value)) return false;
+			if (strcmp(key, "scale") == 0) definition->scale = (float)value;
+			else definition->animationSpeed = (float)value;
+		}
+		else if (!skip_value(p)) return false;
+		if (match_char(p, ',')) continue;
+		if (*p->cursor != '}') return false;
+	}
+}
+
+static bool parse_custom_collision(Parser* p, PangeaScriptCustomObjectDefinition* definition)
+{
+	if (!match_char(p, '{')) return false;
+	while (true)
+	{
+		if (match_char(p, '}')) return true;
+		char key[64];
+		if (!parse_string(p, key, sizeof(key)) || !match_char(p, ':')) return false;
+		if (strcmp(key, "preset") == 0)
+		{
+			char value[64];
+			if (!parse_string(p, value, sizeof(value))) return false;
+			definition->collisionPreset = parse_collision_preset(value);
+		}
+		else if (!skip_value(p)) return false;
+		if (match_char(p, ',')) continue;
+		if (*p->cursor != '}') return false;
+	}
+}
+
+static bool has_safe_custom_asset_path(const char* path, const char* prefix)
+{
+	return path && strncmp(path, prefix, strlen(prefix)) == 0 && strstr(path, "..") == NULL && strchr(path, '\\') == NULL;
+}
+
+static bool parse_custom_objects_array(Parser* p, PangeaConfigLevel* level)
+{
+	if (!match_char(p, '[')) return false;
+	while (true)
+	{
+		if (match_char(p, ']')) return true;
+		if (level->customObjectCount >= PANGEA_CONFIG_MAX_CUSTOM_OBJECTS) return false;
+		if (!match_char(p, '{')) return false;
+		PangeaScriptCustomObjectDefinition* definition = &level->customObjects[level->customObjectCount];
+		memset(definition, 0, sizeof(*definition));
+		definition->scale = 1.0f;
+		definition->animationSpeed = 1.0f;
+		definition->slot = 300;
+		while (true)
+		{
+			if (match_char(p, '}')) break;
+			char key[64];
+			if (!parse_string(p, key, sizeof(key)) || !match_char(p, ':')) return false;
+			if (strcmp(key, "id") == 0)
+			{
+				if (!parse_string(p, definition->id, sizeof(definition->id))) return false;
+			}
+			else if (strcmp(key, "visual") == 0)
+			{
+				if (!parse_custom_visual(p, definition)) return false;
+			}
+			else if (strcmp(key, "collision") == 0)
+			{
+				if (!parse_custom_collision(p, definition)) return false;
+			}
+			else if (!skip_value(p)) return false;
+			if (match_char(p, ',')) continue;
+			if (*p->cursor != '}') return false;
+		}
+		if (!definition->id[0]) return false;
+		if (definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP &&
+			!has_safe_custom_asset_path(definition->modelPath, "Data/Scripts/assets/models/")) return false;
+		if (definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_SKELETON &&
+			(!has_safe_custom_asset_path(definition->modelPath, "Data/Scripts/assets/skeletons/") ||
+			 !has_safe_custom_asset_path(definition->skeletonPath, "Data/Scripts/assets/skeletons/"))) return false;
+		level->customObjectCount++;
+		if (match_char(p, ',')) continue;
+		if (*p->cursor != ']') return false;
+	}
+}
+
+static bool parse_terrain_replacements_array(Parser* p, PangeaConfigLevel* level)
+{
+	if (!match_char(p, '[')) return false;
+	while (true)
+	{
+		if (match_char(p, ']')) return true;
+		if (level->terrainReplacementCount >= PANGEA_CONFIG_MAX_TERRAIN_REPLACEMENTS || !match_char(p, '{')) return false;
+		PangeaScriptTerrainReplacement* replacement = &level->terrainReplacements[level->terrainReplacementCount];
+		replacement->itemIndex = -1;
+		replacement->nativeType = -1;
+		while (true)
+		{
+			if (match_char(p, '}')) break;
+			char key[64];
+			if (!parse_string(p, key, sizeof(key)) || !match_char(p, ':')) return false;
+			if (strcmp(key, "customObjectId") == 0)
+			{
+				if (!parse_string(p, replacement->customObjectId, sizeof(replacement->customObjectId))) return false;
+			}
+			else if (strcmp(key, "strict") == 0)
+			{
+				if (!parse_bool(p, &replacement->strict)) return false;
+			}
+			else if (strcmp(key, "itemIndex") == 0 || strcmp(key, "nativeType") == 0 ||
+				strcmp(key, "x") == 0 || strcmp(key, "z") == 0)
+			{
+				double value;
+				if (!parse_number(p, &value)) return false;
+				if (strcmp(key, "itemIndex") == 0) replacement->itemIndex = (int)value;
+				else if (strcmp(key, "nativeType") == 0) replacement->nativeType = (int)value;
+				else if (strcmp(key, "x") == 0) replacement->x = (float)value;
+				else replacement->z = (float)value;
+			}
+			else if (!skip_value(p)) return false;
+			if (match_char(p, ',')) continue;
+			if (*p->cursor != '}') return false;
+		}
+		if (replacement->itemIndex < 0 || replacement->nativeType < 0 || !replacement->customObjectId[0]) return false;
+		level->terrainReplacementCount++;
+		if (match_char(p, ',')) continue;
+		if (*p->cursor != ']') return false;
+	}
+}
+
+static bool parse_spline_replacements_array(Parser* p, PangeaConfigLevel* level)
+{
+	if (!match_char(p, '[')) return false;
+	while (true)
+	{
+		if (match_char(p, ']')) return true;
+		if (level->splineReplacementCount >= PANGEA_CONFIG_MAX_SPLINE_REPLACEMENTS || !match_char(p, '{')) return false;
+		PangeaScriptSplineReplacement* replacement = &level->splineReplacements[level->splineReplacementCount];
+		replacement->splineNum = -1;
+		replacement->itemIndex = -1;
+		replacement->nativeType = -1;
+		while (true)
+		{
+			if (match_char(p, '}')) break;
+			char key[64];
+			if (!parse_string(p, key, sizeof(key)) || !match_char(p, ':')) return false;
+			if (strcmp(key, "customObjectId") == 0)
+			{
+				if (!parse_string(p, replacement->customObjectId, sizeof(replacement->customObjectId))) return false;
+			}
+			else if (strcmp(key, "strict") == 0)
+			{
+				if (!parse_bool(p, &replacement->strict)) return false;
+			}
+			else if (strcmp(key, "splineNum") == 0 || strcmp(key, "itemIndex") == 0 ||
+				strcmp(key, "nativeType") == 0 || strcmp(key, "placement") == 0)
+			{
+				double value;
+				if (!parse_number(p, &value)) return false;
+				if (strcmp(key, "splineNum") == 0) replacement->splineNum = (int)value;
+				else if (strcmp(key, "itemIndex") == 0) replacement->itemIndex = (int)value;
+				else if (strcmp(key, "nativeType") == 0) replacement->nativeType = (int)value;
+				else replacement->placement = (float)value;
+			}
+			else if (!skip_value(p)) return false;
+			if (match_char(p, ',')) continue;
+			if (*p->cursor != '}') return false;
+		}
+		if (replacement->splineNum < 0 || replacement->itemIndex < 0 || replacement->nativeType < 0 || !replacement->customObjectId[0]) return false;
+		level->splineReplacementCount++;
+		if (match_char(p, ',')) continue;
+		if (*p->cursor != ']') return false;
+	}
+}
+
 static bool parse_level_object(Parser* p, PangeaConfigLevel* level, int targetLevelNum)
 {
 	if (!match_char(p, '{'))
@@ -558,6 +818,21 @@ static bool parse_level_object(Parser* p, PangeaConfigLevel* level, int targetLe
 		else if (strcmp(key, "itemOverrides") == 0)
 		{
 			if (!parse_item_overrides_array(p, level, targetLevelNum))
+				return false;
+		}
+		else if (strcmp(key, "customObjects") == 0)
+		{
+			if (!parse_custom_objects_array(p, level))
+				return false;
+		}
+		else if (strcmp(key, "terrainReplacements") == 0)
+		{
+			if (!parse_terrain_replacements_array(p, level))
+				return false;
+		}
+		else if (strcmp(key, "splineReplacements") == 0)
+		{
+			if (!parse_spline_replacements_array(p, level))
 				return false;
 		}
 		else if (strcmp(key, "levelSettings") == 0)

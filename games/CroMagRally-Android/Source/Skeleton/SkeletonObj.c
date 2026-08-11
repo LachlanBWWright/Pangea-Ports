@@ -36,6 +36,11 @@ static void DisposeSkeletonDefinitionMemory(SkeletonDefType *skeleton);
 
 static SkeletonDefType		*gLoadedSkeletonsList[MAX_SKELETON_TYPES];
 
+Boolean IsSkeletonTypeLoaded(short skeletonType)
+{
+	return skeletonType >= 0 && skeletonType < MAX_SKELETON_TYPES && gLoadedSkeletonsList[skeletonType] != nil;
+}
+
 static short	    gNumDecomposedTriMeshesInSkeleton[MAX_SKELETON_TYPES];
 MOVertexArrayData	**gLocalTriMeshesOfSkelType = nil;
 
@@ -92,6 +97,20 @@ short	i,numDecomp;
 	for (i=0; i < numDecomp; i++)
 		MO_DuplicateVertexArrayData(&gLoadedSkeletonsList[num]->decomposedTriMeshes[i],&gLocalTriMeshesOfSkelType[num][i]);
 
+}
+
+Boolean LoadCustomSkeleton(Byte num, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	short numDecomp;
+	if (num < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || num >= MAX_SKELETON_TYPES || !skeletonSpec || !modelSpec) return false;
+	if (gLoadedSkeletonsList[num]) return true;
+	gLoadedSkeletonsList[num] = LoadSkeletonFileFromSpecs(num, skeletonSpec, modelSpec);
+	if (!gLoadedSkeletonsList[num]) return false;
+	numDecomp = gLoadedSkeletonsList[num]->numDecomposedTriMeshes;
+	gNumDecomposedTriMeshesInSkeleton[num] = numDecomp;
+	for (short i = 0; i < numDecomp; i++)
+		MO_DuplicateVertexArrayData(&gLoadedSkeletonsList[num]->decomposedTriMeshes[i], &gLocalTriMeshesOfSkelType[num][i]);
+	return true;
 }
 
 
@@ -419,8 +438,6 @@ void FreeSkeletonBaseData(SkeletonObjDataType *data)
 
 	SafeDisposePtr((Ptr)data);
 }
-
-
 
 
 

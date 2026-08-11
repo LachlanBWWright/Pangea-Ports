@@ -351,6 +351,9 @@ struct ObjNode
 	OGLVector3D ScriptVisualOffset;
 	uint32_t ScriptObjectID;
 	uint32_t ScriptObjectGeneration;
+	char ScriptDefinitionID[96];
+	Boolean ScriptDeleteRequested;
+	Boolean ScriptAnimationCompletionSent;
 
 			/* 3D CALCULATION STUFF */
 

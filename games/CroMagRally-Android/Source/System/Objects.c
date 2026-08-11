@@ -1153,6 +1153,7 @@ void DeleteObject(ObjNode	*theNode)
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (theNode->ScriptObjectID != 0)
 	{
+		CroMagScript_OnObjectDeleted(theNode);
 		CroMagScript_UnregisterObject(theNode);
 	}
 #endif

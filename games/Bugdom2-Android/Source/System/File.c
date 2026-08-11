@@ -197,6 +197,24 @@ const char*	fileNames[MAX_SKELETON_TYPES][2] =
 	return(skeleton);
 }
 
+SkeletonDefType* LoadSkeletonFileFromSpecs(short skeletonType, FSSpec* skeletonSpec, FSSpec* modelSpec)
+{
+	short fRefNum;
+	SkeletonDefType* skeleton;
+	if (!skeletonSpec || !modelSpec || skeletonType < SKELETON_TYPE_SCRIPT_CUSTOM_BASE || skeletonType >= MAX_SKELETON_TYPES)
+		return nil;
+	fRefNum = FSpOpenResFile(skeletonSpec, fsRdPerm);
+	if (fRefNum < 0) return nil;
+	UseResFile(fRefNum);
+	if (ResError()) { CloseResFile(fRefNum); return nil; }
+	skeleton = (SkeletonDefType*)AllocPtr(sizeof(SkeletonDefType));
+	if (!skeleton) { CloseResFile(fRefNum); return nil; }
+	ReadDataFromSkeletonResourceFork(skeleton, modelSpec, skeletonType);
+	PrimeBoneData(skeleton);
+	CloseResFile(fRefNum);
+	return skeleton;
+}
+
 
 /************* READ DATA FROM SKELETON FILE *******************/
 //

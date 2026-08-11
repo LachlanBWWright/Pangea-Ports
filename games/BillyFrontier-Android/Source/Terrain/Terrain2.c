@@ -294,6 +294,8 @@ Boolean			flag;
 		type = itemPtr[i].type;									// get item #
 #ifdef PANGEA_ENABLE_SCRIPTING
 		long originalType = type;
+		if (BillyScript_TryReplaceTerrainItem(&itemPtr[i], (int)(&itemPtr[i] - *gMasterItemList), (int)type, x, z))
+			continue;
 		type = BillyScript_RemapTerrainItemType(gCurrentArea, (int)type);
 #endif
 		if (type > MAX_ITEM_NUM)								// error check!
@@ -729,5 +731,4 @@ float	intersectX, intersectZ;
 	*whichLine = -1;
 	return(false);	
 }
-
 

@@ -8,6 +8,9 @@
 
 #include "game.h"
 #include "mytraps.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -163,6 +166,13 @@ SplinePointType	*points;
 			if (type > MAX_SPLINE_ITEM_NUM)
 				DoFatalAlert("PrimeSplines: type > MAX_SPLINE_ITEM_NUM");
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (!gNetGameInProgress && CroMagScript_TryReplaceSplineItem(itemPtr, (int)s, (int)i))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
+#endif
 			flag = gSplineItemPrimeRoutines[type](s,itemPtr); 	// call item's Prime routine
 			if (flag)
 				itemPtr->flags |= ITEM_FLAGS_INUSE;				// set in-use flag
@@ -427,7 +437,6 @@ float			numPointsInSpline;
 		}
 	}
 }
-
 
 
 
