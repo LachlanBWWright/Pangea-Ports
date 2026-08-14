@@ -111,13 +111,15 @@ export interface NativeSpawnResult {
   readonly ok: boolean;
   readonly code: number;
   readonly message: string;
+  readonly reason: "ok" | "not-enabled" | "file-not-found" | "parse-error" | "runtime-error" | "bad-argument" | "budget-exceeded" | "incompatible-item" | "config-error" | "unknown";
   readonly primary?: ObjectHandle;
 }
 
 export interface ScriptedSpawnOptions {
-  readonly speed?: number;
-  readonly amount?: number;
-  readonly radius?: number;
+  readonly scale?: number;
+  readonly animation?: string | number;
+  readonly animationSpeed?: number;
+  readonly blendSeconds?: number;
 }
 
 export interface PangeaCapabilities {
@@ -125,32 +127,40 @@ export interface PangeaCapabilities {
   readonly objectMutation: boolean;
   readonly spawnNative: boolean;
   readonly spawnScripted: boolean;
+  readonly objectQueries: boolean;
+  readonly timers: boolean;
+  readonly tasks: boolean;
+  readonly events: boolean;
+  readonly memoryLimitBytes: number;
+  readonly loadInstructionBudget: number;
+  readonly eventInstructionBudget: number;
+  readonly frameInstructionBudget: number;
+  readonly timerLimit: number;
+  readonly taskLimit: number;
+  readonly subscriptionLimit: number;
   readonly levelSettings: boolean;
+  readonly playerLookup: boolean;
+  readonly terrainItems: boolean;
+  readonly splineItems: boolean;
+  readonly mapItems: boolean;
 }
 
-export interface PangeaExperimentalApi {
-  readonly level?: {
-    current(): number;
-  };
-  readonly time?: {
-    delta(): number;
-  };
-  readonly player?: {
-    get(playerNum: number): ObjectHandle | undefined;
-  };
-  readonly spawn?: {
-    readonly scripted?: (
-      id: string | number,
-      position: Vector3,
-      options?: ScriptedSpawnOptions,
-    ) => ObjectHandle | undefined;
-  };
+export interface PangeaDiagnostics {
+  readonly memoryUsedBytes: number;
+  readonly memoryLimitBytes: number;
+  readonly activeTimers: number;
+  readonly activeTasks: number;
+  readonly activeSubscriptions: number;
+  readonly frameNum: number;
 }
 
 export interface PangeaApi {
   readonly api: {
     readonly version: 1;
+    readonly minimumVersion: 1;
+    requireVersion(minimum: number, maximum?: number): true;
     capabilities(): PangeaCapabilities;
+    diagnostics(): PangeaDiagnostics;
   };
   readonly game: {
     readonly id: GameId;
@@ -162,9 +172,24 @@ export interface PangeaApi {
     error(message: string): void;
   };
   readonly object: {
+    all(): readonly ObjectHandle[];
+    findByTag(tag: string): readonly ObjectHandle[];
+    nearest(origin: Vector3, tag?: string): ObjectHandle | undefined;
+    exists(handle: ObjectHandle): boolean;
     position(handle: ObjectHandle): Vector3 | undefined;
     setPosition(handle: ObjectHandle, position: Vector3): boolean;
     setVelocity(handle: ObjectHandle, velocity: Vector3): boolean;
+    setRotation(handle: ObjectHandle, rotation: Vector3): boolean;
+    setScale(handle: ObjectHandle, scale: number): boolean;
+    setAnimation(
+      handle: ObjectHandle,
+      animation: string | number,
+      speed?: number,
+      blendSeconds?: number,
+    ): boolean;
+    tags(handle: ObjectHandle): readonly string[];
+    hasTag(handle: ObjectHandle, tag: string): boolean;
+    state(handle: ObjectHandle): Record<string, unknown> | undefined;
     delete(handle: ObjectHandle): boolean;
   };
   readonly spawn: {
@@ -178,8 +203,50 @@ export interface PangeaApi {
       position: Vector3,
       options?: NativeSpawnOptions,
     ): NativeSpawnResult;
+    scripted(
+      id: string,
+      position: Vector3,
+      options?: ScriptedSpawnOptions,
+    ): ObjectHandle | undefined;
   };
-  readonly experimental?: PangeaExperimentalApi;
+  readonly level: {
+    current(): number;
+    setting(key: string): string | number | boolean | undefined;
+  };
+  readonly time: {
+    frame(): number;
+    delta(): number;
+    level(): number;
+    after(delaySeconds: number, callback: () => void): number;
+    every(intervalSeconds: number, callback: () => void): number;
+    cancel(timerId: number): boolean;
+    isActive(timerId: number): boolean;
+  };
+  readonly task: {
+    start(callback: () => void): number;
+    wait(delaySeconds: number): void;
+    cancel(taskId: number): boolean;
+    isActive(taskId: number): boolean;
+  };
+  readonly events: {
+    on(eventName: string, callback: (payload: unknown) => void): number;
+    once(eventName: string, callback: (payload: unknown) => void): number;
+    off(subscriptionId: number): boolean;
+    emit(eventName: string, payload?: unknown): number;
+  };
+  readonly random: {
+    number(): number;
+    integer(minimum: number, maximum: number): number;
+    seed(seed: number): void;
+  };
+  readonly player: {
+    count(): number;
+    get(playerNum: number): Readonly<{
+      playerNum: number;
+      position: Vector3;
+      health?: number;
+    }> | undefined;
+  };
 }
 
 export declare const pangea: PangeaApi;

@@ -553,14 +553,13 @@ static void ApplyScriptedCollision(ObjNode* object, PangeaScriptCollisionPreset 
 void BugdomScript_OnCustomTrigger(ObjNode* triggerNode, ObjNode* whoNode, Byte sideBits)
 {
 	(void) whoNode;
-	(void) sideBits;
 	if (triggerNode && triggerNode->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {
 			triggerNode->ScriptObjectID,
 			triggerNode->ScriptObjectGeneration,
 		};
-		(void) PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "triggerEnter");
+		(void) PangeaScript_CallObjectTrigger(handle, &gScriptFrameContext, sideBits, true);
 	}
 }
 
@@ -640,6 +639,15 @@ static void BugdomScript_UpdateObjectCollisionBox(ObjNode* obj)
 	CalcObjectBoxFromNode(obj);
 }
 
+static int GetScriptPlayerCount(void) { return gPlayerObj ? 1 : 0; }
+
+static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
+{
+	if (playerNum != 0 || !outPlayer || !gPlayerObj) return false;
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .active = true};
+	return true;
+}
+
 void BugdomScript_Init(void)
 {
 	const PangeaScriptGameInfo gameInfo =
@@ -648,6 +656,8 @@ void BugdomScript_Init(void)
 		.gameName = "Bugdom",
 		.spawnNative = SpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
+		.getPlayerCount = GetScriptPlayerCount,
+		.getPlayer = GetScriptPlayer,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -656,13 +666,16 @@ void BugdomScript_Init(void)
 	status = PangeaScript_RegisterNativeItems(kNativeItems, (int)(sizeof(kNativeItems) / sizeof(kNativeItems[0])));
 	LogScriptStatus("native item registration", status);
 
+	BugdomScript_ResetObjectRegistry();
 	status = PangeaScript_Reload();
 	LogScriptStatus("reload", status);
-	BugdomScript_ResetObjectRegistry();
+	if (status == PANGEA_SCRIPT_OK)
+		LogScriptStatus("onGameStart", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_START, &(PangeaScriptLevelContext){0}));
 }
 
 void BugdomScript_Shutdown(void)
 {
+	LogScriptStatus("onGameShutdown", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_SHUTDOWN, &(PangeaScriptLevelContext){0}));
 	BugdomScript_ResetObjectRegistry();
 	PangeaScript_Shutdown();
 }

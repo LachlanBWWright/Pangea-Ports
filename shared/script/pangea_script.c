@@ -101,6 +101,8 @@ static const PangeaScriptObjectOps kScriptedOps = {
 
 static void reset_objects(void)
 {
+	if (gBackend)
+		PangeaScriptBackend_ResetObjectStates(gBackend);
 	memset(gRegisteredObjects, 0, sizeof(gRegisteredObjects));
 	gScriptedObjectCount = 0;
 }
@@ -226,7 +228,7 @@ static void set_backend_error(PangeaScriptStatus status, const char* message)
 	if (message && message[0])
 		set_error(status, message);
 	else if (status == PANGEA_SCRIPT_RUNTIME_ERROR)
-		set_error(status, "JavaScript engine is not linked; script execution is unavailable");
+		set_error(status, "Lua runtime could not be created; script execution is unavailable");
 	else
 		set_error(status, "Script execution failed");
 }
@@ -406,12 +408,14 @@ PangeaScriptStatus PangeaScript_Reload(void)
 			return status;
 		}
 
+		gConsecutiveHookFailures = 0;
+		gScriptsDisabled = false;
 		set_error(PANGEA_SCRIPT_OK, "");
 		return PANGEA_SCRIPT_OK;
 	}
 
 	free(script);
-	set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "JavaScript engine is not linked; script execution is unavailable");
+	set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Lua runtime is not linked; script execution is unavailable");
 	return PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
@@ -840,6 +844,91 @@ PangeaScriptStatus PangeaScript_CallObjectEvent(PangeaScriptObjectHandle handle,
 	return call_object_event(handle, frameContext, event, &ignoredResult);
 }
 
+static PangeaScriptStatus prepare_gameplay_hook(const void* context, const void* result)
+{
+	if (!context || !result)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!gInitialized)
+		return PANGEA_SCRIPT_NOT_ENABLED;
+	if (gScriptsDisabled || !gBackend)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (!gScriptLoaded)
+		return PANGEA_SCRIPT_FILE_NOT_FOUND;
+	gHooksCalledCount++;
+	return PANGEA_SCRIPT_OK;
+}
+
+PangeaScriptStatus PangeaScript_CallTriggerHook(const PangeaScriptTriggerContext* context, PangeaScriptTriggerResult* outResult)
+{
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult);
+	if (ready != PANGEA_SCRIPT_OK) return ready;
+	memset(outResult, 0, sizeof(*outResult));
+	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
+	PangeaScriptStatus status = PangeaScriptBackend_CallTriggerHook(gBackend, context, outResult, error, sizeof(error));
+	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	return status;
+}
+
+PangeaScriptStatus PangeaScript_CallPickupHook(const PangeaScriptPickupContext* context, PangeaScriptPickupResult* outResult)
+{
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult);
+	if (ready != PANGEA_SCRIPT_OK) return ready;
+	memset(outResult, 0, sizeof(*outResult));
+	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
+	PangeaScriptStatus status = PangeaScriptBackend_CallPickupHook(gBackend, context, outResult, error, sizeof(error));
+	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	return status;
+}
+
+PangeaScriptStatus PangeaScript_CallWeaponHitHook(const PangeaScriptWeaponHitContext* context, PangeaScriptWeaponHitResult* outResult)
+{
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult);
+	if (ready != PANGEA_SCRIPT_OK) return ready;
+	memset(outResult, 0, sizeof(*outResult));
+	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
+	PangeaScriptStatus status = PangeaScriptBackend_CallWeaponHitHook(gBackend, context, outResult, error, sizeof(error));
+	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	return status;
+}
+
+bool PangeaScript_CallObjectTrigger(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, unsigned int sideBits, bool defaultSolid)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !frameContext || !object->ops || !object->ops->getPosition)
+		return defaultSolid;
+	PangeaScriptVector3 position;
+	if (!object->ops->getPosition(object->nativeObject, &position))
+		return defaultSolid;
+	PangeaScriptTriggerContext context = {
+		.levelNum = frameContext->levelNum,
+		.triggerId = object->objectType,
+		.self = handle,
+		.position = position,
+		.sideBits = sideBits,
+	};
+	PangeaScriptTriggerResult result;
+	PangeaScriptStatus status = PangeaScript_CallTriggerHook(&context, &result);
+	(void) PangeaScript_CallObjectEvent(handle, frameContext, "triggerEnter");
+	const PangeaScriptCustomObjectDefinition* definition = PangeaScript_GetCustomObjectDefinition(object->objectType);
+	if (definition && definition->collisionPreset == PANGEA_SCRIPT_COLLISION_PICKUP)
+	{
+		PangeaScriptPickupContext pickupContext = {
+			.levelNum = frameContext->levelNum,
+			.pickupId = object->objectType,
+			.pickup = handle,
+			.position = position,
+		};
+		PangeaScriptPickupResult pickupResult;
+		if (PangeaScript_CallPickupHook(&pickupContext, &pickupResult) == PANGEA_SCRIPT_OK && pickupResult.hasConsumePickup && pickupResult.consumePickup)
+			PangeaScript_DeleteObject(handle);
+	}
+	if (status != PANGEA_SCRIPT_OK)
+		return defaultSolid;
+	if (result.deleteSelf)
+		PangeaScript_DeleteObject(handle);
+	return result.hasSolid ? result.solid : defaultSolid;
+}
+
 void PangeaScript_ResetObjects(void)
 {
 	reset_objects();
@@ -923,6 +1012,8 @@ bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle)
 	if (!object)
 		return false;
 
+	if (gBackend)
+		PangeaScriptBackend_ClearObjectState(gBackend, handle);
 	clear_registered_object(object);
 	return true;
 }
@@ -930,6 +1021,28 @@ bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle)
 bool PangeaScript_ObjectExists(PangeaScriptObjectHandle handle)
 {
 	return resolve_object(handle) != NULL;
+}
+
+int PangeaScript_GetRegisteredObjectCount(void)
+{
+	int count = 0;
+	for (int i = 0; i < PANGEA_SCRIPT_MAX_OBJECTS; i++)
+		if (gRegisteredObjects[i].active) count++;
+	return count;
+}
+
+bool PangeaScript_GetRegisteredObjectHandle(int index, PangeaScriptObjectHandle* outHandle)
+{
+	if (index < 0 || !outHandle) return false;
+	int activeIndex = 0;
+	for (int i = 0; i < PANGEA_SCRIPT_MAX_OBJECTS; i++)
+	{
+		if (!gRegisteredObjects[i].active) continue;
+		if (activeIndex++ != index) continue;
+		*outHandle = (PangeaScriptObjectHandle){i + 1, gRegisteredObjects[i].generation};
+		return true;
+	}
+	return false;
 }
 
 int PangeaScript_GetObjectTagCount(PangeaScriptObjectHandle handle)
@@ -1110,9 +1223,13 @@ PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, fl
 	for (int i = 0; i < gNativeItemCount; i++)
 	{
 		if (gNativeItems[i].id && strcmp(gNativeItems[i].id, id) == 0)
+		{
+			set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "The game adapter did not provide a native spawn callback");
 			return PANGEA_SCRIPT_RUNTIME_ERROR;
+		}
 	}
 
+	set_error(PANGEA_SCRIPT_INCOMPATIBLE_ITEM, "The native item ID is not registered for this game");
 	return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
 }
 
@@ -1140,7 +1257,7 @@ void PangeaScript_Log(PangeaScriptLogLevel level, const char* source, const char
 EMSCRIPTEN_KEEPALIVE
 void PangeaScript_LogJS(int level, const char* message)
 {
-	PangeaScript_Log((PangeaScriptLogLevel)level, "JS", message);
+	PangeaScript_Log((PangeaScriptLogLevel)level, "Web", message);
 }
 #endif
 

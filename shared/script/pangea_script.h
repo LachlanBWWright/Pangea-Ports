@@ -48,12 +48,22 @@ typedef struct PangeaScriptObjectHandle
 	uint32_t generation;
 } PangeaScriptObjectHandle;
 
+typedef struct PangeaScriptPlayerSnapshot
+{
+	PangeaScriptVector3 position;
+	float health;
+	bool hasHealth;
+	bool active;
+} PangeaScriptPlayerSnapshot;
+
 typedef struct PangeaScriptGameInfo
 {
 	const char* gameId;
 	const char* gameName;
 	PangeaScriptStatus (*spawnNative)(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle);
 	PangeaScriptStatus (*spawnScripted)(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
+	int (*getPlayerCount)(void);
+	bool (*getPlayer)(int playerNum, PangeaScriptPlayerSnapshot* outPlayer);
 } PangeaScriptGameInfo;
 
 typedef struct PangeaScriptLevelContext
@@ -163,6 +173,77 @@ typedef struct PangeaScriptObjectFrameResult
 	PangeaScriptVector3 positionOffset;
 } PangeaScriptObjectFrameResult;
 
+typedef struct PangeaScriptTriggerContext
+{
+	int levelNum;
+	int playerNum;
+	int triggerType;
+	int otherType;
+	unsigned int sideBits;
+	unsigned int otherFlags;
+	const char* triggerId;
+	PangeaScriptObjectHandle self;
+	PangeaScriptObjectHandle other;
+	PangeaScriptVector3 position;
+} PangeaScriptTriggerContext;
+
+typedef struct PangeaScriptTriggerResult
+{
+	bool handled;
+	bool hasSolid;
+	bool solid;
+	bool deleteSelf;
+	bool deleteOther;
+	float damagePlayer;
+	float healthDelta;
+	int scoreDelta;
+} PangeaScriptTriggerResult;
+
+typedef struct PangeaScriptPickupContext
+{
+	int levelNum;
+	int playerNum;
+	int pickupType;
+	float amount;
+	const char* pickupId;
+	PangeaScriptObjectHandle pickup;
+	PangeaScriptObjectHandle player;
+	PangeaScriptVector3 position;
+} PangeaScriptPickupContext;
+
+typedef struct PangeaScriptPickupResult
+{
+	bool handled;
+	bool hasConsumePickup;
+	bool consumePickup;
+	float healthDelta;
+	int scoreDelta;
+} PangeaScriptPickupResult;
+
+typedef struct PangeaScriptWeaponHitContext
+{
+	int levelNum;
+	int playerNum;
+	int weaponType;
+	int targetType;
+	unsigned int targetFlags;
+	float damage;
+	const char* weaponId;
+	PangeaScriptObjectHandle weapon;
+	PangeaScriptObjectHandle target;
+	PangeaScriptVector3 position;
+} PangeaScriptWeaponHitContext;
+
+typedef struct PangeaScriptWeaponHitResult
+{
+	bool handled;
+	bool hasApplyDamage;
+	bool applyDamage;
+	bool destroyTarget;
+	float damage;
+	int scoreDelta;
+} PangeaScriptWeaponHitResult;
+
 typedef struct PangeaScriptNativeItem
 {
 	const char* id;
@@ -270,12 +351,18 @@ PangeaScriptStatus PangeaScript_CallSplineItemHook(PangeaScriptSplineItemContext
 PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* context);
 PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult);
 PangeaScriptStatus PangeaScript_CallObjectEvent(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, const char* event);
+bool PangeaScript_CallObjectTrigger(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, unsigned int sideBits, bool defaultSolid);
+PangeaScriptStatus PangeaScript_CallTriggerHook(const PangeaScriptTriggerContext* context, PangeaScriptTriggerResult* outResult);
+PangeaScriptStatus PangeaScript_CallPickupHook(const PangeaScriptPickupContext* context, PangeaScriptPickupResult* outResult);
+PangeaScriptStatus PangeaScript_CallWeaponHitHook(const PangeaScriptWeaponHitContext* context, PangeaScriptWeaponHitResult* outResult);
 
 void PangeaScript_ResetObjects(void);
 PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistration* registration, PangeaScriptObjectHandle* outHandle);
 PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle);
 bool PangeaScript_ObjectExists(PangeaScriptObjectHandle handle);
+int PangeaScript_GetRegisteredObjectCount(void);
+bool PangeaScript_GetRegisteredObjectHandle(int index, PangeaScriptObjectHandle* outHandle);
 int PangeaScript_GetObjectTagCount(PangeaScriptObjectHandle handle);
 const char* PangeaScript_GetObjectTag(PangeaScriptObjectHandle handle, int index);
 bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition);

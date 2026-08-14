@@ -448,10 +448,9 @@ static void ApplyScriptedCollision(ObjNode* object, PangeaScriptCollisionPreset 
 
 void MikeScript_OnCustomTrigger(ObjNode* trigger, Byte sideBits)
 {
-	(void)sideBits;
 	if (!trigger || !trigger->ScriptObjectID) return;
 	PangeaScriptObjectHandle handle = {(int)trigger->ScriptObjectID, trigger->ScriptObjectGeneration};
-	(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "triggerEnter");
+	(void)PangeaScript_CallObjectTrigger(handle, &gScriptFrameContext, sideBits, true);
 }
 
 static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle)
@@ -476,6 +475,15 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 	return PANGEA_SCRIPT_OK;
 }
 
+static int GetScriptPlayerCount(void) { return gMyNodePtr ? 1 : 0; }
+
+static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
+{
+	if (playerNum != 0 || !outPlayer || !gMyNodePtr) return false;
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {(float)gMyNodePtr->X.Int, (float)gMyNodePtr->Y.Int, (float)gMyNodePtr->Z}, .active = true};
+	return true;
+}
+
 void MikeScript_Init(void)
 {
 	const PangeaScriptGameInfo gameInfo =
@@ -484,6 +492,8 @@ void MikeScript_Init(void)
 		.gameName = "Mighty Mike",
 		.spawnNative = SpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
+		.getPlayerCount = GetScriptPlayerCount,
+		.getPlayer = GetScriptPlayer,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -492,13 +502,16 @@ void MikeScript_Init(void)
 	status = PangeaScript_RegisterNativeItems(kNativeItems, (int)(sizeof(kNativeItems) / sizeof(kNativeItems[0])));
 	LogScriptStatus("native item registration", status);
 
+	MikeScript_ResetObjectRegistry();
 	status = PangeaScript_Reload();
 	LogScriptStatus("reload", status);
-	MikeScript_ResetObjectRegistry();
+	if (status == PANGEA_SCRIPT_OK)
+		LogScriptStatus("onGameStart", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_START, &(PangeaScriptLevelContext){0}));
 }
 
 void MikeScript_Shutdown(void)
 {
+	LogScriptStatus("onGameShutdown", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_SHUTDOWN, &(PangeaScriptLevelContext){0}));
 	MikeScript_ResetObjectRegistry();
 	PangeaScript_Shutdown();
 }

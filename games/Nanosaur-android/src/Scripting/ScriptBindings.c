@@ -512,11 +512,10 @@ void NanosaurScript_OnCustomTrigger(ObjNode* triggerNode, ObjNode* whoNode, Byte
 {
 	PangeaScriptObjectHandle handle;
 	(void)whoNode;
-	(void)sideBits;
 	if (!triggerNode || triggerNode->ScriptObjectID == 0)
 		return;
 	handle = (PangeaScriptObjectHandle){(int)triggerNode->ScriptObjectID, triggerNode->ScriptObjectGeneration};
-	(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "triggerEnter");
+	(void)PangeaScript_CallObjectTrigger(handle, &gScriptFrameContext, sideBits, true);
 }
 
 static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle)
@@ -601,6 +600,15 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 	SDL_Log("Nanosaur scripting %s failed: %s", action, PangeaScript_GetLastError());
 }
 
+static int GetScriptPlayerCount(void) { return gPlayerObj ? 1 : 0; }
+
+static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
+{
+	if (playerNum != 0 || !outPlayer || !gPlayerObj) return false;
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .active = true};
+	return true;
+}
+
 void NanosaurScript_Init(void)
 {
 	const PangeaScriptGameInfo gameInfo =
@@ -609,6 +617,8 @@ void NanosaurScript_Init(void)
 		.gameName = "Nanosaur",
 		.spawnNative = SpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
+		.getPlayerCount = GetScriptPlayerCount,
+		.getPlayer = GetScriptPlayer,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -617,13 +627,16 @@ void NanosaurScript_Init(void)
 	status = PangeaScript_RegisterNativeItems(kNativeItems, (int)(sizeof(kNativeItems) / sizeof(kNativeItems[0])));
 	LogScriptStatus("native item registration", status);
 
+	NanosaurScript_ResetObjectRegistry();
 	status = PangeaScript_Reload();
 	LogScriptStatus("reload", status);
-	NanosaurScript_ResetObjectRegistry();
+	if (status == PANGEA_SCRIPT_OK)
+		LogScriptStatus("onGameStart", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_START, &(PangeaScriptLevelContext){0}));
 }
 
 void NanosaurScript_Shutdown(void)
 {
+	LogScriptStatus("onGameShutdown", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_SHUTDOWN, &(PangeaScriptLevelContext){0}));
 	NanosaurScript_ResetObjectRegistry();
 	PangeaScript_Shutdown();
 }

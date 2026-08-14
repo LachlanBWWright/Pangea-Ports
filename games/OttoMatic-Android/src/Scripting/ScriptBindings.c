@@ -299,11 +299,10 @@ static void ApplyScriptedCollision(ObjNode* object, PangeaScriptCollisionPreset 
 void OttoScript_OnCustomTrigger(ObjNode* triggerNode, ObjNode* whoNode, Byte sideBits)
 {
 	(void) whoNode;
-	(void) sideBits;
 	if (triggerNode && triggerNode->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = { triggerNode->ScriptObjectID, triggerNode->ScriptObjectGeneration };
-		(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "triggerEnter");
+		(void) PangeaScript_CallObjectTrigger(handle, &gCurrentFrameContext, sideBits, true);
 	}
 }
 
@@ -625,6 +624,15 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 	SDL_Log("Otto Matic scripting %s failed: %s", action, error);
 }
 
+static int GetScriptPlayerCount(void) { return gPlayerInfo.objNode ? 1 : 0; }
+
+static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
+{
+	if (playerNum != 0 || !outPlayer || !gPlayerInfo.objNode) return false;
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .active = true};
+	return true;
+}
+
 void OttoScript_Init(void)
 {
 	const PangeaScriptGameInfo gameInfo =
@@ -633,6 +641,8 @@ void OttoScript_Init(void)
 		.gameName = "Otto Matic",
 		.spawnNative = OttoSpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
+		.getPlayerCount = GetScriptPlayerCount,
+		.getPlayer = GetScriptPlayer,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -648,10 +658,13 @@ void OttoScript_Init(void)
 
 	status = PangeaScript_Reload();
 	LogScriptStatus("reload", status);
+	if (status == PANGEA_SCRIPT_OK)
+		LogScriptStatus("onGameStart", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_START, &(PangeaScriptLevelContext){0}));
 }
 
 void OttoScript_Shutdown(void)
 {
+	LogScriptStatus("onGameShutdown", PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_GAME_SHUTDOWN, &(PangeaScriptLevelContext){.levelNum = gCurrentFrameContext.levelNum}));
 	gCurrentFrameContext = (PangeaScriptFrameContext){0};
 	gCurrentScriptObject = NULL;
 	gCurrentScriptObjectUsesGlobals = false;
