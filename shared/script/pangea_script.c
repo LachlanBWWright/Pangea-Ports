@@ -54,6 +54,7 @@ static PangeaScriptTerrainReplacement gTerrainReplacements[PANGEA_SCRIPT_MAX_TER
 static int gTerrainReplacementCount;
 static PangeaScriptSplineReplacement gSplineReplacements[PANGEA_CONFIG_MAX_SPLINE_REPLACEMENTS];
 static int gSplineReplacementCount;
+static PangeaConfig gParsedConfig;
 static RegisteredObject gRegisteredObjects[PANGEA_SCRIPT_MAX_OBJECTS];
 static int gBudgetExceededCount;
 static int gHooksCalledCount;
@@ -456,11 +457,10 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
 
-	PangeaConfig parsedConfig;
 	char errorMsg[512];
 	errorMsg[0] = '\0';
 
-	PangeaScriptStatus parseStatus = PangeaScript_ParseConfig(config, levelNum, &parsedConfig, errorMsg, sizeof(errorMsg));
+	PangeaScriptStatus parseStatus = PangeaScript_ParseConfig(config, levelNum, &gParsedConfig, errorMsg, sizeof(errorMsg));
 	if (parseStatus != PANGEA_SCRIPT_OK)
 	{
 		free(config);
@@ -469,40 +469,40 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		return parseStatus;
 	}
 
-	bool found = parsedConfig.level.hasConfig;
-	const char* scriptPath = parsedConfig.level.scriptPath;
+	bool found = gParsedConfig.level.hasConfig;
+	const char* scriptPath = gParsedConfig.level.scriptPath;
 
 	if (found)
 	{
-		gItemRemapCount = parsedConfig.level.itemRemapCount;
+		gItemRemapCount = gParsedConfig.level.itemRemapCount;
 		for (int i = 0; i < gItemRemapCount; i++)
 		{
-			gItemRemaps[i] = parsedConfig.level.itemRemaps[i];
+			gItemRemaps[i] = gParsedConfig.level.itemRemaps[i];
 		}
 
-		gLevelSettingCount = parsedConfig.level.levelSettingCount;
+		gLevelSettingCount = gParsedConfig.level.levelSettingCount;
 		for (int i = 0; i < gLevelSettingCount; i++)
 		{
-			gLevelSettings[i] = parsedConfig.level.levelSettings[i];
+			gLevelSettings[i] = gParsedConfig.level.levelSettings[i];
 		}
 
-		gLevelAssetDependencyCount = parsedConfig.level.assetDependencyCount;
+		gLevelAssetDependencyCount = gParsedConfig.level.assetDependencyCount;
 		for (int i = 0; i < gLevelAssetDependencyCount; i++)
 		{
-			gLevelAssetDependencies[i] = parsedConfig.level.assetDependencies[i];
+			gLevelAssetDependencies[i] = gParsedConfig.level.assetDependencies[i];
 		}
 
-		gCustomObjectCount = parsedConfig.level.customObjectCount;
+		gCustomObjectCount = gParsedConfig.level.customObjectCount;
 		for (int i = 0; i < gCustomObjectCount; i++)
 		{
-			gCustomObjects[i] = parsedConfig.level.customObjects[i];
+			gCustomObjects[i] = gParsedConfig.level.customObjects[i];
 		}
-		gTerrainReplacementCount = parsedConfig.level.terrainReplacementCount;
+		gTerrainReplacementCount = gParsedConfig.level.terrainReplacementCount;
 		for (int i = 0; i < gTerrainReplacementCount; i++)
-			gTerrainReplacements[i] = parsedConfig.level.terrainReplacements[i];
-		gSplineReplacementCount = parsedConfig.level.splineReplacementCount;
+			gTerrainReplacements[i] = gParsedConfig.level.terrainReplacements[i];
+		gSplineReplacementCount = gParsedConfig.level.splineReplacementCount;
 		for (int i = 0; i < gSplineReplacementCount; i++)
-			gSplineReplacements[i] = parsedConfig.level.splineReplacements[i];
+			gSplineReplacements[i] = gParsedConfig.level.splineReplacements[i];
 	}
 
 	if (found && scriptPath[0])
