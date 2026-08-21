@@ -7,6 +7,11 @@
 extern "C" {
 #endif
 
+#define PANGEA_SCRIPT_CONTRACT_VERSION 1
+#define PANGEA_SCRIPT_API_VERSION 1
+#define PANGEA_SCRIPT_COMMAND_ID_CAPACITY 64
+#define PANGEA_SCRIPT_COMMAND_TRACE_CAPACITY 256
+
 typedef enum PangeaScriptStatus
 {
 	PANGEA_SCRIPT_OK = 0,
@@ -56,6 +61,13 @@ typedef struct PangeaScriptPlayerSnapshot
 	bool active;
 } PangeaScriptPlayerSnapshot;
 
+typedef struct PangeaScriptGameCapabilities
+{
+	bool terrainItems;
+	bool splineItems;
+	bool mapItems;
+} PangeaScriptGameCapabilities;
+
 typedef struct PangeaScriptGameInfo
 {
 	const char* gameId;
@@ -64,6 +76,9 @@ typedef struct PangeaScriptGameInfo
 	PangeaScriptStatus (*spawnScripted)(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 	int (*getPlayerCount)(void);
 	bool (*getPlayer)(int playerNum, PangeaScriptPlayerSnapshot* outPlayer);
+	PangeaScriptStatus (*loadPersistent)(const char* key, unsigned char* outData, int capacity, int* outSize);
+	PangeaScriptStatus (*savePersistent)(const char* key, const unsigned char* data, int size);
+	PangeaScriptGameCapabilities capabilities;
 } PangeaScriptGameInfo;
 
 typedef struct PangeaScriptLevelContext
@@ -143,6 +158,64 @@ typedef enum PangeaScriptCapabilityLevel
 	PANGEA_SCRIPT_CAPABILITY_FULL
 } PangeaScriptCapabilityLevel;
 
+typedef struct PangeaScriptCommandDescriptor
+{
+	const char* id;
+	const char* capability;
+	const char* authority;
+	const char* applicationPhase;
+	const char* validation;
+} PangeaScriptCommandDescriptor;
+
+typedef struct PangeaScriptEventDescriptor
+{
+	const char* id;
+	const char* applicationPhase;
+	const char* payload;
+	const char* result;
+} PangeaScriptEventDescriptor;
+
+typedef struct PangeaScriptObjectEventDescriptor
+{
+	const char* id;
+	const char* handler;
+	const char* applicationPhase;
+	const char* cleanup;
+	const char* statePolicy;
+	bool invalidatesHandle;
+} PangeaScriptObjectEventDescriptor;
+
+typedef struct PangeaScriptCommandTrace
+{
+	uint32_t commandCount;
+	uint32_t hash;
+	uint32_t entryCount;
+	bool overflow;
+} PangeaScriptCommandTrace;
+
+typedef struct PangeaScriptCommandTraceEntry
+{
+	char commandId[PANGEA_SCRIPT_COMMAND_ID_CAPACITY];
+	PangeaScriptObjectHandle target;
+	PangeaScriptStatus status;
+} PangeaScriptCommandTraceEntry;
+
+typedef struct PangeaScriptCommandTraceComparison
+{
+	bool matches;
+	uint32_t firstMismatchIndex;
+	uint32_t expectedCommandCount;
+	uint32_t actualCommandCount;
+	uint32_t expectedHash;
+	uint32_t actualHash;
+	char expectedCommandId[PANGEA_SCRIPT_COMMAND_ID_CAPACITY];
+	char actualCommandId[PANGEA_SCRIPT_COMMAND_ID_CAPACITY];
+	PangeaScriptObjectHandle expectedTarget;
+	PangeaScriptObjectHandle actualTarget;
+	PangeaScriptStatus expectedStatus;
+	PangeaScriptStatus actualStatus;
+} PangeaScriptCommandTraceComparison;
+
 typedef struct PangeaScriptObjectRegistration
 {
 	void* nativeObject;
@@ -152,6 +225,26 @@ typedef struct PangeaScriptObjectRegistration
 	int tagCount;
 	PangeaScriptCapabilityLevel capabilityLevel;
 } PangeaScriptObjectRegistration;
+
+typedef enum PangeaScriptObjectSourceKind
+{
+	PANGEA_SCRIPT_SOURCE_NONE = 0,
+	PANGEA_SCRIPT_SOURCE_TERRAIN,
+	PANGEA_SCRIPT_SOURCE_SPLINE,
+	PANGEA_SCRIPT_SOURCE_MAP
+} PangeaScriptObjectSourceKind;
+
+typedef struct PangeaScriptObjectSource
+{
+	PangeaScriptObjectSourceKind kind;
+	int itemIndex;
+	int nativeType;
+	int splineNum;
+	float x;
+	float y;
+	float z;
+	float placement;
+} PangeaScriptObjectSource;
 
 typedef struct PangeaScriptObjectFrameContext
 {
@@ -165,6 +258,8 @@ typedef struct PangeaScriptObjectFrameContext
 	const char* const* tags;
 	int tagCount;
 	const char* event;
+	bool hasEventValue;
+	int eventValue;
 } PangeaScriptObjectFrameContext;
 
 typedef struct PangeaScriptObjectFrameResult
@@ -172,6 +267,16 @@ typedef struct PangeaScriptObjectFrameResult
 	bool hasPositionOffset;
 	PangeaScriptVector3 positionOffset;
 } PangeaScriptObjectFrameResult;
+
+typedef enum PangeaScriptObjectLifecycle
+{
+	PANGEA_SCRIPT_OBJECT_ACTIVATE = 0,
+	PANGEA_SCRIPT_OBJECT_DEACTIVATE,
+	PANGEA_SCRIPT_OBJECT_STREAM_IN,
+	PANGEA_SCRIPT_OBJECT_STREAM_OUT,
+	PANGEA_SCRIPT_OBJECT_CHECKPOINT_RESET,
+	PANGEA_SCRIPT_OBJECT_DESTROY
+} PangeaScriptObjectLifecycle;
 
 typedef struct PangeaScriptTriggerContext
 {
@@ -244,6 +349,35 @@ typedef struct PangeaScriptWeaponHitResult
 	int scoreDelta;
 } PangeaScriptWeaponHitResult;
 
+typedef struct PangeaScriptDamageContext
+{
+	int levelNum;
+	int playerNum;
+	int cause;
+	float damage;
+	PangeaScriptObjectHandle source;
+	PangeaScriptObjectHandle target;
+	PangeaScriptVector3 position;
+} PangeaScriptDamageContext;
+
+typedef struct PangeaScriptDamageResult
+{
+	bool handled;
+	bool hasApplyDamage;
+	bool applyDamage;
+	bool hasDamage;
+	float damage;
+} PangeaScriptDamageResult;
+
+typedef struct PangeaScriptPlayerEventContext
+{
+	int levelNum;
+	int playerNum;
+	int eventValue;
+	PangeaScriptObjectHandle player;
+	PangeaScriptVector3 position;
+} PangeaScriptPlayerEventContext;
+
 typedef struct PangeaScriptNativeItem
 {
 	const char* id;
@@ -295,6 +429,10 @@ typedef struct PangeaScriptCustomObjectDefinition
 	float scale;
 	int slot;
 	PangeaScriptCollisionPreset collisionPreset;
+	bool collisionBoundsSet;
+	float collisionWidth;
+	float collisionHeight;
+	float collisionDepth;
 } PangeaScriptCustomObjectDefinition;
 
 typedef struct PangeaScriptTerrainReplacement
@@ -306,6 +444,16 @@ typedef struct PangeaScriptTerrainReplacement
 	char customObjectId[96];
 	bool strict;
 } PangeaScriptTerrainReplacement;
+
+typedef struct PangeaScriptMapReplacement
+{
+	int itemIndex;
+	int nativeType;
+	float x;
+	float y;
+	char customObjectId[96];
+	bool strict;
+} PangeaScriptMapReplacement;
 
 typedef struct PangeaScriptSplineReplacement
 {
@@ -322,6 +470,8 @@ void PangeaScript_Shutdown(void);
 
 bool PangeaScript_IsEnabled(void);
 bool PangeaScript_HasRunnableModule(void);
+void PangeaScript_SetNetworkedMode(bool networked);
+bool PangeaScript_IsNetworkedMode(void);
 
 PangeaScriptStatus PangeaScript_SetStartupScript(const char* path);
 PangeaScriptStatus PangeaScript_SetConfigPath(const char* path);
@@ -338,6 +488,7 @@ bool PangeaScript_GetLevelAssetDependency(int index, PangeaScriptAssetDependency
 int PangeaScript_GetCustomObjectDefinitionCount(void);
 const PangeaScriptCustomObjectDefinition* PangeaScript_GetCustomObjectDefinition(const char* id);
 const PangeaScriptTerrainReplacement* PangeaScript_GetTerrainReplacement(int itemIndex, int nativeType, float x, float z);
+const PangeaScriptMapReplacement* PangeaScript_GetMapReplacement(int itemIndex, int nativeType, float x, float y);
 const PangeaScriptSplineReplacement* PangeaScript_GetSplineReplacement(int splineNum, int itemIndex, int nativeType, float placement);
 bool PangeaScript_GetLevelFloatSetting(const char* key, float* outValue);
 bool PangeaScript_GetLevelIntSetting(const char* key, int* outValue);
@@ -351,16 +502,27 @@ PangeaScriptStatus PangeaScript_CallSplineItemHook(PangeaScriptSplineItemContext
 PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* context);
 PangeaScriptStatus PangeaScript_CallObjectFrame(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectFrameResult* outResult);
 PangeaScriptStatus PangeaScript_CallObjectEvent(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, const char* event);
+PangeaScriptStatus PangeaScript_CallObjectEventWithValue(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, const char* event, int eventValue);
+PangeaScriptStatus PangeaScript_ApplyObjectLifecycle(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, PangeaScriptObjectLifecycle lifecycle);
+PangeaScriptStatus PangeaScript_ApplyObjectLifecycleToAll(const PangeaScriptFrameContext* frameContext, PangeaScriptObjectLifecycle lifecycle);
 bool PangeaScript_CallObjectTrigger(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, unsigned int sideBits, bool defaultSolid);
+bool PangeaScript_CallObjectTriggerWithOther(PangeaScriptObjectHandle handle, const PangeaScriptFrameContext* frameContext, unsigned int sideBits, bool defaultSolid, PangeaScriptObjectHandle other);
 PangeaScriptStatus PangeaScript_CallTriggerHook(const PangeaScriptTriggerContext* context, PangeaScriptTriggerResult* outResult);
 PangeaScriptStatus PangeaScript_CallPickupHook(const PangeaScriptPickupContext* context, PangeaScriptPickupResult* outResult);
 PangeaScriptStatus PangeaScript_CallWeaponHitHook(const PangeaScriptWeaponHitContext* context, PangeaScriptWeaponHitResult* outResult);
+PangeaScriptStatus PangeaScript_CallDamageHook(const PangeaScriptDamageContext* context, PangeaScriptDamageResult* outResult);
+PangeaScriptStatus PangeaScript_CallDamageAppliedHook(const PangeaScriptDamageContext* context);
+PangeaScriptStatus PangeaScript_CallPlayerEvent(const PangeaScriptPlayerEventContext* context, const char* event);
 
 void PangeaScript_ResetObjects(void);
 PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistration* registration, PangeaScriptObjectHandle* outHandle);
 PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle);
 bool PangeaScript_ObjectExists(PangeaScriptObjectHandle handle);
+bool PangeaScript_GetObjectNativeObject(PangeaScriptObjectHandle handle, void** outNativeObject);
+PangeaScriptStatus PangeaScript_AssociateObjectSource(PangeaScriptObjectHandle handle, const PangeaScriptObjectSource* source);
+bool PangeaScript_GetObjectSource(PangeaScriptObjectHandle handle, PangeaScriptObjectSource* outSource);
+bool PangeaScript_FindObjectBySource(const PangeaScriptObjectSource* source, PangeaScriptObjectHandle* outHandle);
 int PangeaScript_GetRegisteredObjectCount(void);
 bool PangeaScript_GetRegisteredObjectHandle(int index, PangeaScriptObjectHandle* outHandle);
 int PangeaScript_GetObjectTagCount(PangeaScriptObjectHandle handle);
@@ -372,11 +534,28 @@ bool PangeaScript_SetObjectRotation(PangeaScriptObjectHandle handle, const Pange
 bool PangeaScript_SetObjectScale(PangeaScriptObjectHandle handle, float scale);
 bool PangeaScript_SetObjectAnimation(PangeaScriptObjectHandle handle, int animation, float speed, float blendSeconds);
 bool PangeaScript_SetObjectAnimationNamed(PangeaScriptObjectHandle handle, const char* animation, float speed, float blendSeconds);
+bool PangeaScript_SetObjectActive(PangeaScriptObjectHandle handle, bool active);
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle);
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count);
+int PangeaScript_GetNativeItemCount(void);
+const PangeaScriptNativeItem* PangeaScript_GetNativeItem(int index);
 int PangeaScript_ResolveNativeItemType(const char* id);
 PangeaScriptStatus PangeaScript_SpawnNative(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle);
+int PangeaScript_GetCommandDescriptorCount(void);
+const PangeaScriptCommandDescriptor* PangeaScript_GetCommandDescriptor(int index);
+int PangeaScript_GetEventDescriptorCount(void);
+const PangeaScriptEventDescriptor* PangeaScript_GetEventDescriptor(int index);
+int PangeaScript_GetObjectEventDescriptorCount(void);
+const PangeaScriptObjectEventDescriptor* PangeaScript_GetObjectEventDescriptor(int index);
+void PangeaScript_ResetCommandTrace(void);
+void PangeaScript_GetCommandTrace(PangeaScriptCommandTrace* outTrace);
+bool PangeaScript_GetCommandTraceEntry(int index, PangeaScriptCommandTraceEntry* outEntry);
+PangeaScriptStatus PangeaScript_CompareCommandTrace(
+	const PangeaScriptCommandTrace* expectedTrace,
+	const PangeaScriptCommandTraceEntry* expectedEntries,
+	uint32_t expectedEntryCount,
+	PangeaScriptCommandTraceComparison* outComparison);
 
 typedef enum PangeaScriptLogLevel
 {

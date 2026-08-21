@@ -332,7 +332,7 @@ Boolean			flag;
 #ifdef PANGEA_ENABLE_SCRIPTING
 		long originalType = type;
 		type = OttoScript_RemapTerrainItemType(gLevelNum, (int)type);
-		if (OttoScript_TryReplaceTerrainItem((int)(startIndex + i), (int)originalType, x, z))
+		if (OttoScript_TryReplaceTerrainItem(&itemPtr[i], (int)(startIndex + i), (int)originalType, x, z))
 		{
 			itemPtr[i].flags |= ITEM_FLAGS_INUSE;
 			continue;
@@ -582,6 +582,5 @@ static OGLPoint3D	p4 = {TERRAIN_POLYGON_SIZE, 0, 0};
 		CalcFaceNormal_NotNormalized(&p3, &p4, &p2, n2);		// fr, nl, nr
 	}
 }
-
 
 

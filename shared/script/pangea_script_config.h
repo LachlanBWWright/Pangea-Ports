@@ -7,6 +7,7 @@
 #define PANGEA_CONFIG_MAX_ASSET_DEPENDENCIES 64
 #define PANGEA_CONFIG_MAX_CUSTOM_OBJECTS 64
 #define PANGEA_CONFIG_MAX_TERRAIN_REPLACEMENTS 128
+#define PANGEA_CONFIG_MAX_MAP_REPLACEMENTS 128
 #define PANGEA_CONFIG_MAX_SPLINE_REPLACEMENTS 128
 
 typedef enum LevelSettingType
@@ -51,6 +52,8 @@ typedef struct PangeaConfigLevel
 	int customObjectCount;
 	PangeaScriptTerrainReplacement terrainReplacements[PANGEA_CONFIG_MAX_TERRAIN_REPLACEMENTS];
 	int terrainReplacementCount;
+	PangeaScriptMapReplacement mapReplacements[PANGEA_CONFIG_MAX_MAP_REPLACEMENTS];
+	int mapReplacementCount;
 	PangeaScriptSplineReplacement splineReplacements[PANGEA_CONFIG_MAX_SPLINE_REPLACEMENTS];
 	int splineReplacementCount;
 } PangeaConfigLevel;

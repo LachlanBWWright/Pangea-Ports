@@ -115,7 +115,7 @@ ObjNode			*newObj;
 	AttachShadowToObject(newObj, SHADOW_TYPE_CAR_SUBMARINE, 13, 13, false);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	CroMagScript_RegisterPlayerObject(newObj);
+	CroMagScript_RegisterPlayerObject(newObj, playerNum);
 #endif
 
 
@@ -849,7 +849,6 @@ OGLPoint3D		coord;
 		MakeBubbles(theCar, &coord, .5, 1.0);
 	}
 }
-
 
 
 

@@ -24,6 +24,11 @@ typedef struct GameSampleCase
 	bool terrainItems;
 	bool splineItems;
 	bool mapItems;
+	bool weaponHitEvents;
+	bool damageEvents;
+	bool playerSpawn;
+	bool playerRespawn;
+	bool playerDeath;
 } GameSampleCase;
 
 typedef struct TestVisualObject
@@ -34,14 +39,14 @@ typedef struct TestVisualObject
 
 static const GameSampleCase kGameCases[] =
 {
-	{"ottomatic", "OttoMatic-Android", "Otto Matic", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "ottomatic.human", "ottomatic.human.scientist", 8, 32, 56, true, true, false},
-	{"bugdom", "Bugdom-android", "Bugdom", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom.buddy", NULL, 6, 20, 20, true, true, false},
-	{"bugdom2", "Bugdom2-Android", "Bugdom 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom2.collectible", NULL, 5, 15, 15, true, true, false},
-	{"cromag", "CroMagRally-Android", "Cro-Mag Rally", "onRaceLoad", "onRaceStart", "onRaceFrame", "onRaceComplete", "onRaceUnload", "cromag.pickup", NULL, 7, 25, 25, true, false, false},
-	{"nanosaur", "Nanosaur-android", "Nanosaur", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur.egg", NULL, 4, 12, 12, true, false, false},
-	{"nanosaur2", "Nanosaur2-Android", "Nanosaur 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur2.powerup", NULL, 6, 18, 18, true, true, false},
-	{"billy", "BillyFrontier-Android", "Billy Frontier", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "billy.cacti", NULL, 5, 14, 14, true, true, false},
-	{"mightymike", "MightyMike-Android", "Mighty Mike", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "mightymike.box", NULL, 5, 16, 16, false, false, true},
+	{"ottomatic", "OttoMatic-Android", "Otto Matic", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "ottomatic.human", "ottomatic.human.scientist", 8, 32, 56, true, true, false, false, true, true, true, true},
+	{"bugdom", "Bugdom-android", "Bugdom", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom.buddy", NULL, 6, 20, 20, true, true, false, false, true, true, true, true},
+	{"bugdom2", "Bugdom2-Android", "Bugdom 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom2.collectible", NULL, 5, 15, 15, true, true, false, true, true, true, true, true},
+	{"cromag", "CroMagRally-Android", "Cro-Mag Rally", "onRaceLoad", "onRaceStart", "onRaceFrame", "onRaceComplete", "onRaceUnload", "cromag.pickup", NULL, 7, 25, 25, true, false, false, false, true, false, false, true},
+	{"nanosaur", "Nanosaur-android", "Nanosaur", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur.egg", NULL, 4, 12, 12, true, false, false, false, true, true, true, true},
+	{"nanosaur2", "Nanosaur2-Android", "Nanosaur 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur2.powerup", NULL, 6, 18, 18, true, true, false, false, true, true, true, true},
+	{"billy", "BillyFrontier-Android", "Billy Frontier", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "billy.cacti", NULL, 5, 14, 14, true, true, false, false, true, false, false, true},
+	{"mightymike", "MightyMike-Android", "Mighty Mike", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "mightymike.box", NULL, 5, 16, 16, false, false, true, false, false, false, false, false},
 };
 
 static int gNativeSpawnCount;
@@ -95,6 +100,14 @@ static const PangeaScriptObjectOps kVisualOps =
 static bool nearly_equal(float actual, float expected)
 {
 	return fabsf(actual - expected) < 0.001f;
+}
+
+static void write_text_file(const char* path, const char* source)
+{
+	FILE* file = fopen(path, "w");
+	assert(file != NULL);
+	assert(fputs(source, file) >= 0);
+	assert(fclose(file) == 0);
 }
 
 static const GameSampleCase* find_game_case(const char* argument)
@@ -151,6 +164,9 @@ static void test_game_runtime_apis(const GameSampleCase* game, PangeaScriptBacke
 		"pangea.api.requireVersion(1)\n"
 		"assert(pangea.player.count()==1)\n"
 		"local player=pangea.player.get(0); assert(player and player.playerNum==0 and player.position.x==7 and player.health==0.75)\n"
+		"assert(not pangea.api.capabilities().persistence)\n"
+		"assert(pangea.api.capabilities().terrainItems == %s and pangea.api.capabilities().splineItems == %s and pangea.api.capabilities().mapItems == %s)\n"
+		"assert(pangea.persistence.get('unsupported',1)==nil and not pangea.persistence.set('unsupported',1,true))\n"
 		"pangea.random.seed(123); local random=pangea.random.integer(1,100); pangea.random.seed(123); assert(random==pangea.random.integer(1,100))\n"
 		"local eventValue=0; local subscription=pangea.events.on('conformance',function(payload) eventValue=payload.value end)\n"
 		"assert(pangea.events.emit('conformance',{value=9})==1 and eventValue==9); assert(pangea.events.off(subscription))\n"
@@ -161,9 +177,12 @@ static void test_game_runtime_apis(const GameSampleCase* game, PangeaScriptBacke
 		" local diagnostics=pangea.api.diagnostics(); assert(diagnostics.activeSubscriptions==0)\n"
 		" pangea.spawn.native('test.native',{x=1,y=2,z=3},{param0=4})\n"
 		" local scripted=pangea.spawn.scripted('test.scripted',{x=4,y=5,z=6}); assert(scripted and pangea.object.position(scripted).y==5)\n"
-		" assert(pangea.object.setPosition(scripted,{x=8,y=9,z=10})); assert(pangea.object.position(scripted).x==8)\n"
-		" assert(pangea.object.delete(scripted))\n"
+		" local moved=pangea.object.setPositionResult(scripted,{x=8,y=9,z=10}); assert(moved.ok and moved.reason=='ok' and moved.primary.id==scripted.id); assert(pangea.object.position(scripted).x==8)\n"
+		" local deleted=pangea.object.deleteResult(scripted); assert(deleted.ok and deleted.reason=='ok' and not pangea.object.exists(scripted))\n"
 		"end }",
+		game->terrainItems ? "true" : "false",
+		game->splineItems ? "true" : "false",
+		game->mapItems ? "true" : "false",
 		game->frameHook);
 	PangeaScriptStatus loadStatus = PangeaScriptBackend_Load(backend, source, error, errorCapacity);
 	if (loadStatus != PANGEA_SCRIPT_OK) fprintf(stderr, "runtime API fixture failed to load: %s\n", error);
@@ -174,6 +193,43 @@ static void test_game_runtime_apis(const GameSampleCase* game, PangeaScriptBacke
 	PangeaScriptFrameContext frame = {.levelNum = 4, .frameNum = 20, .deltaSeconds = 0.25f, .levelTimeSeconds = 0.25f};
 	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	assert(gNativeSpawnCount == 1);
+	PangeaScriptCommandTrace firstTrace;
+	PangeaScript_GetCommandTrace(&firstTrace);
+	assert(firstTrace.commandCount > 0 && !firstTrace.overflow);
+	PangeaScript_ResetObjects();
+	TestVisualObject traceVisual = {.position = {1, 2, 3}};
+	PangeaScriptObjectRegistration traceRegistration =
+	{
+		.nativeObject = &traceVisual,
+		.ops = &kVisualOps,
+		.objectType = "trace-test",
+		.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL,
+	};
+	PangeaScriptObjectHandle traceHandle;
+	assert(PangeaScript_RegisterObject(&traceRegistration, &traceHandle) == PANGEA_SCRIPT_OK);
+	char traceSource[512];
+	snprintf(traceSource, sizeof(traceSource),
+		"return { %s=function() local result=pangea.object.setPositionResult({id=%d,generation=%u},{x=4,y=5,z=6}); assert(result.ok) end }",
+		game->frameHook, traceHandle.id, traceHandle.generation);
+	assert(PangeaScriptBackend_Load(backend, traceSource, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptCommandTrace secondTrace;
+	PangeaScript_GetCommandTrace(&secondTrace);
+	assert(secondTrace.commandCount == 1 && !secondTrace.overflow);
+	assert(secondTrace.entryCount == 1 && secondTrace.hash == 0xd3237928u);
+	PangeaScriptCommandTraceEntry secondEntry;
+	assert(PangeaScript_GetCommandTraceEntry(0, &secondEntry));
+	assert(strcmp(secondEntry.commandId, "pangea.object.setPosition") == 0);
+	assert(secondEntry.target.id == traceHandle.id && secondEntry.target.generation == traceHandle.generation);
+	assert(secondEntry.status == PANGEA_SCRIPT_OK);
+	uint32_t firstDeterministicHash = secondTrace.hash;
+	assert(PangeaScriptBackend_Load(backend, traceSource, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptCommandTrace replayTrace;
+	PangeaScript_GetCommandTrace(&replayTrace);
+	assert(replayTrace.commandCount == secondTrace.commandCount);
+	assert(replayTrace.hash == firstDeterministicHash);
+	assert(!replayTrace.overflow);
 }
 
 static void test_game_object_sample(const GameSampleCase* game, PangeaScriptBackend* backend, char* error, int errorCapacity)
@@ -281,6 +337,58 @@ static void test_custom_object_sample(const GameSampleCase* game, PangeaScriptBa
 	assert(nearly_equal(beacon.rotation.y, 0.78539816f));
 }
 
+static void test_public_object_lifecycle(const GameSampleCase* game)
+{
+	const char* scriptPath = "pangea-sample-lifecycle.lua";
+	const char* source =
+		"return { onObjectFrame = function(ctx)"
+		" local source = pangea.object.source(ctx.object)"
+		" if ctx.event == 'spawn' then assert(source and source.kind == 'terrain' and source.itemIndex == 12) end"
+		" if ctx.event == 'streamOut' then assert(source and source.nativeType == 7) end"
+		" if ctx.event == 'streamIn' then assert(source and source.x == 10 and source.z == 30) end"
+		" end }";
+	write_text_file(scriptPath, source);
+	assert(PangeaScript_SetStartupScript(scriptPath) == PANGEA_SCRIPT_OK);
+
+	PangeaScript_ResetObjects();
+	TestVisualObject firstObject = {.position = {10, 2, 30}};
+	const PangeaScriptObjectRegistration registration = {
+		.nativeObject = &firstObject,
+		.ops = &kVisualOps,
+		.objectType = "sample.lifecycle",
+		.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL,
+	};
+	PangeaScriptObjectHandle firstHandle;
+	assert(PangeaScript_RegisterObject(&registration, &firstHandle) == PANGEA_SCRIPT_OK);
+	const PangeaScriptObjectSource sourceIdentity = {
+		.kind = PANGEA_SCRIPT_SOURCE_TERRAIN,
+		.itemIndex = 12,
+		.nativeType = 7,
+		.x = 10,
+		.y = 2,
+		.z = 30,
+	};
+	assert(PangeaScript_AssociateObjectSource(firstHandle, &sourceIdentity) == PANGEA_SCRIPT_OK);
+	PangeaScriptFrameContext frame = {.levelNum = 4, .frameNum = 1};
+	assert(PangeaScript_CallObjectEvent(firstHandle, &frame, "spawn") == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_ApplyObjectLifecycle(firstHandle, &frame, PANGEA_SCRIPT_OBJECT_STREAM_OUT) == PANGEA_SCRIPT_OK);
+	assert(!PangeaScript_ObjectExists(firstHandle));
+
+	TestVisualObject recreatedObject = {.position = {11, 3, 31}};
+	PangeaScriptObjectRegistration recreatedRegistration = registration;
+	recreatedRegistration.nativeObject = &recreatedObject;
+	PangeaScriptObjectHandle recreatedHandle;
+	assert(PangeaScript_RegisterObject(&recreatedRegistration, &recreatedHandle) == PANGEA_SCRIPT_OK);
+	assert(recreatedHandle.id == firstHandle.id && recreatedHandle.generation != firstHandle.generation);
+	assert(PangeaScript_AssociateObjectSource(recreatedHandle, &sourceIdentity) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_ApplyObjectLifecycle(recreatedHandle, &frame, PANGEA_SCRIPT_OBJECT_STREAM_IN) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_ObjectExists(recreatedHandle));
+	PangeaScriptLevelContext unload = {.levelNum = 4, .levelName = game->gameName};
+	assert(PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, &unload) == PANGEA_SCRIPT_OK);
+	assert(!PangeaScript_ObjectExists(recreatedHandle));
+	assert(remove(scriptPath) == 0);
+}
+
 static void test_supported_item_hooks(const GameSampleCase* game, PangeaScriptBackend* backend, char* error, int errorCapacity)
 {
 	const char* source =
@@ -297,17 +405,32 @@ static void test_supported_item_hooks(const GameSampleCase* game, PangeaScriptBa
 		assert(PangeaScriptBackend_CallTerrainItemHook(backend, &terrain, error, errorCapacity) == PANGEA_SCRIPT_OK);
 		assert(terrain.handled && terrain.markInUse && terrain.remappedItemType == 7);
 	}
+	else
+	{
+		PangeaScriptTerrainItemContext terrain = {.levelNum = 4, .itemType = 2, .x = 10, .z = 20, .params = params, .paramCount = 4};
+		assert(PangeaScript_CallTerrainItemHook(&terrain) == PANGEA_SCRIPT_INCOMPATIBLE_ITEM);
+	}
 	if (game->splineItems)
 	{
 		PangeaScriptSplineItemContext spline = {.levelNum = 4, .splineNum = 4, .itemType = 3, .placement = 0.5f, .params = params, .paramCount = 4};
 		assert(PangeaScriptBackend_CallSplineItemHook(backend, &spline, error, errorCapacity) == PANGEA_SCRIPT_OK);
 		assert(spline.handled && spline.markInUse);
 	}
+	else
+	{
+		PangeaScriptSplineItemContext spline = {.levelNum = 4, .splineNum = 4, .itemType = 3, .placement = 0.5f, .params = params, .paramCount = 4};
+		assert(PangeaScript_CallSplineItemHook(&spline) == PANGEA_SCRIPT_INCOMPATIBLE_ITEM);
+	}
 	if (game->mapItems)
 	{
 		PangeaScriptMapItemContext map = {.sceneNum = 6, .areaNum = 7, .itemType = 5, .x = 10, .y = 20, .params = params, .paramCount = 4};
 		assert(PangeaScriptBackend_CallMapItemHook(backend, &map, error, errorCapacity) == PANGEA_SCRIPT_OK);
 		assert(map.handled && map.markInUse);
+	}
+	else
+	{
+		PangeaScriptMapItemContext map = {.sceneNum = 6, .areaNum = 7, .itemType = 5, .x = 10, .y = 20, .params = params, .paramCount = 4};
+		assert(PangeaScript_CallMapItemHook(&map) == PANGEA_SCRIPT_INCOMPATIBLE_ITEM);
 	}
 }
 
@@ -332,6 +455,84 @@ static void test_structured_gameplay_hooks(PangeaScriptBackend* backend, char* e
 	PangeaScriptWeaponHitResult hitResult = {0};
 	assert(PangeaScriptBackend_CallWeaponHitHook(backend, &hit, &hitResult, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	assert(hitResult.handled && hitResult.applyDamage && hitResult.destroyTarget && hitResult.damage == 10 && hitResult.scoreDelta == 7);
+}
+
+static void test_player_event_sample(const GameSampleCase* game, PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+	TestVisualObject player = {.position = {4, 5, 6}};
+	PangeaScriptObjectRegistration registration =
+	{
+		.nativeObject = &player,
+		.ops = &kVisualOps,
+		.objectType = "sample.player",
+		.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL,
+	};
+	PangeaScriptObjectHandle handle;
+	char source[2048];
+	PangeaScriptDamageContext damageContext =
+	{
+		.levelNum = 4,
+		.playerNum = 0,
+		.cause = 3,
+		.damage = 2,
+		.target = {1, 1},
+		.position = player.position,
+	};
+	PangeaScriptDamageResult damageResult = {0};
+	PangeaScriptWeaponHitContext weaponContext =
+	{
+		.levelNum = 4,
+		.playerNum = 0,
+		.weaponType = 1,
+		.targetType = 2,
+		.damage = 3,
+		.weaponId = "bugdom2.projectile",
+		.targetFlags = 0,
+		.position = player.position,
+	};
+	PangeaScriptWeaponHitResult weaponResult = {0};
+	PangeaScriptPlayerEventContext playerContext =
+	{
+		.levelNum = 4,
+		.playerNum = 0,
+		.eventValue = 7,
+		.player = {1, 1},
+		.position = player.position,
+	};
+
+	assert(PangeaScript_RegisterObject(&registration, &handle) == PANGEA_SCRIPT_OK);
+	damageContext.target = handle;
+	playerContext.player = handle;
+	snprintf(source, sizeof(source),
+		"return {"
+		" onWeaponHit=function(ctx) assert(ctx.weaponId=='bugdom2.projectile' and ctx.damage==3); return {handled=true,damage=1,applyDamage=true} end,"
+		" onDamage=function(ctx) assert(ctx.target.id==%d and ctx.damage==2 and ctx.cause==3); return {handled=true,damage=.5,applyDamage=true} end,"
+		" onDamageApplied=function(ctx) assert(ctx.target.id==%d and ctx.damage==.5 and ctx.cause==3) end,"
+		" onPlayerSpawn=function(ctx) assert(ctx.player.id==%d and ctx.position.x==4) end,"
+		" onPlayerRespawn=function(ctx) assert(ctx.player.id==%d and ctx.position.z==6) end,"
+		" onDeath=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==7) end"
+		"}",
+		handle.id, handle.id, handle.id, handle.id, handle.id);
+	assert(PangeaScriptBackend_Load(backend, source, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	if (game->weaponHitEvents)
+	{
+		assert(PangeaScriptBackend_CallWeaponHitHook(backend, &weaponContext, &weaponResult, error, errorCapacity) == PANGEA_SCRIPT_OK);
+		assert(weaponResult.handled && weaponResult.hasApplyDamage && weaponResult.applyDamage && nearly_equal(weaponResult.damage, 1));
+	}
+	if (game->damageEvents)
+	{
+		assert(PangeaScriptBackend_CallDamageHook(backend, &damageContext, &damageResult, error, errorCapacity) == PANGEA_SCRIPT_OK);
+		assert(damageResult.handled && damageResult.hasDamage && nearly_equal(damageResult.damage, .5f));
+		damageContext.damage = damageResult.damage;
+		assert(PangeaScriptBackend_CallDamageAppliedHook(backend, &damageContext, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	}
+	if (game->playerSpawn)
+		assert(PangeaScriptBackend_CallPlayerEvent(backend, &playerContext, "onPlayerSpawn", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	if (game->playerRespawn)
+		assert(PangeaScriptBackend_CallPlayerEvent(backend, &playerContext, "onPlayerRespawn", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	if (game->playerDeath)
+		assert(PangeaScriptBackend_CallPlayerEvent(backend, &playerContext, "onDeath", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_UnregisterObject(handle));
 }
 
 static void test_error_isolation(const GameSampleCase* game, PangeaScriptBackend* backend, char* error, int errorCapacity)
@@ -368,6 +569,11 @@ int main(int argc, char** argv)
 		.spawnNative = spawn_native,
 		.getPlayerCount = get_player_count,
 		.getPlayer = get_player,
+		.capabilities = {
+			.terrainItems = game->terrainItems,
+			.splineItems = game->splineItems,
+			.mapItems = game->mapItems,
+		},
 	};
 	assert(PangeaScript_Init(&gameInfo) == PANGEA_SCRIPT_OK);
 	PangeaScriptBackend* backend = PangeaScriptBackend_Create(&gameInfo);
@@ -377,8 +583,10 @@ int main(int argc, char** argv)
 	test_game_runtime_apis(game, backend, error, sizeof(error));
 	test_supported_item_hooks(game, backend, error, sizeof(error));
 	test_structured_gameplay_hooks(backend, error, sizeof(error));
+	test_player_event_sample(game, backend, error, sizeof(error));
 	test_game_object_sample(game, backend, error, sizeof(error));
 	test_custom_object_sample(game, backend, error, sizeof(error));
+	test_public_object_lifecycle(game);
 	test_error_isolation(game, backend, error, sizeof(error));
 	PangeaScriptBackend_Destroy(backend);
 	PangeaScript_Shutdown();

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -108,6 +112,10 @@ void ResetPlayer(void)
 {
 	gCurrentEatingFish = NULL;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_OnCheckpointReset();
+#endif
+
 		/* RETURN PLAYER TO STANDING MODE */
 		
 	if (gPlayerMode == PLAYER_MODE_BALL)				// see if turn into bug
@@ -154,6 +162,10 @@ void ResetPlayer(void)
 		DeleteObject(gMyBuddy);
 		gMyBuddy = nil;
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_OnPlayerRespawn(gPlayerObj);
+#endif
 }
 
 
@@ -428,6 +440,11 @@ TQ3Vector3D	delta;
 	if (gPlayerObj->InvincibleTimer > 0.0f)						// cant be harmed if invincible
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!BugdomScript_OnDamage(what, damage, 0, &damage))
+		return;
+#endif
+
 	if (gPlayerObj->InvincibleTimer < invincibleDuration)
 		gPlayerObj->InvincibleTimer = invincibleDuration;	// make me invincible for a while
 	
@@ -435,6 +452,10 @@ TQ3Vector3D	delta;
 			/* LOSE HEALTH & SEE IF WAS KILLED */
 			
 	LoseHealth(damage);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_OnDamageApplied(damage, 0);
+#endif
 	
 	
 				/*****************/
@@ -488,6 +509,9 @@ void KillPlayer(Boolean changeAnims)
 				SetSkeletonAnim(gPlayerObj->Skeleton, PLAYER_ANIM_DEATH);
 		}	
 		gPlayerGotKilledFlag = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_OnDeath(changeAnims ? 1 : 0);
+#endif
 	}
 }
 
@@ -944,10 +968,5 @@ new_groupb:
 	}
 
 }
-
-
-
-
-
 
 

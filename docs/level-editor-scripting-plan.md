@@ -1,5 +1,10 @@
 # Level Editor Scripting Plan
 
+> Historical TypeScript/JavaScript planning document. The active scripting
+> roadmap is `SCRIPTING_ROADMAP.md`; production game scripts use the shared
+> Lua 5.4 contract and generated LuaLS declarations documented in
+> `lua-scripting.md`.
+
 ## Goal
 
 Add level-editor scripting support for all eight Pangea Ports games without
@@ -295,7 +300,7 @@ Required editor features:
 
 - TypeScript and JavaScript syntax highlighting.
 - Inline diagnostics.
-- Autocomplete for `@pangea-ports/script-types`.
+- Autocomplete from the generated per-game LuaLS declarations.
 - Hover docs for game hooks and context objects.
 - Multi-file editing.
 - Basic project file tree.

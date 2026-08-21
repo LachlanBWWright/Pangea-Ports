@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -279,7 +283,16 @@ Boolean	killed = false;
 	if (gPlayerInfo.health < 0.0f)				// see if already dead
 		return(true);
 
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!Bugdom2Script_OnDamage(nil, damage, deathType, &damage))
+		return false;
+	#endif
+
 	gPlayerInfo.health -= damage;
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnDamageApplied(damage, deathType);
+	#endif
 
 		/* SEE IF DEAD */
 
@@ -368,9 +381,9 @@ ObjNode	*player = gPlayerInfo.objNode;
 				break;
 	}
 
-
-
-
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnDeath(deathType);
+#endif
 }
 
 
@@ -424,6 +437,10 @@ ObjNode	*player = gPlayerInfo.objNode;
 		gGameOver = true;
 		return;
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnCheckpointReset();
+#endif
 
 
 				/****************************/
@@ -485,6 +502,9 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 	InitCamera_Terrain();
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnPlayerRespawn(player);
+#endif
 
 	MakeFadeEvent(true, 1);
 
@@ -1282,11 +1302,6 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 	UpdateObjectTransforms(theNode);
 }
-
-
-
-
-
 
 
 

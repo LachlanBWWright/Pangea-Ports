@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -681,7 +685,15 @@ void PlayerLoseHealth(short p, float damage)
 	if (gPlayerInfo[p].isEliminated)
 		return;
 
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!CroMagScript_OnDamage(p, damage, 0, &damage))
+		return;
+	#endif
 	gPlayerInfo[p].health -= damage;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_OnDamageApplied(p, damage, 0);
+#endif
 
 			/* SEE IF DEAD */
 
@@ -689,6 +701,9 @@ void PlayerLoseHealth(short p, float damage)
 	{
 		gPlayerInfo[p].health = 0;
 		gPlayerInfo[p].isEliminated = true;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		CroMagScript_OnDeath(p, 0);
+	#endif
 		gNumPlayersEliminated++;
 
 		if (gNumPlayersEliminated < (gNumTotalPlayers-1))		// if more than 1 player remaining, then post ELIMINATED message
@@ -748,9 +763,6 @@ ObjNode *obj;
 		obj = obj->ChainNode;
 	}
 }
-
-
-
 
 
 

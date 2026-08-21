@@ -424,6 +424,9 @@ if(EMSCRIPTEN)
 	target_link_options(${GAME_TARGET} PRIVATE
 		# Allow the heap to grow as needed (game allocates significant memory)
 		"SHELL:-s ALLOW_MEMORY_GROWTH=1"
+		# The scripting runtime and embedded game data exceed Emscripten's default
+		# initial heap; growth still handles larger levels at runtime.
+		"SHELL:-s INITIAL_MEMORY=67108864"
 		"SHELL:-s MAXIMUM_MEMORY=512mb"
 		# Require a WebGL 2.0 context so UNSIGNED_INT index buffers are available
 		# without emulation.  Falling back to WebGL 1.0 could leave the renderer

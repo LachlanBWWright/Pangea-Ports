@@ -10,6 +10,7 @@ void Nanosaur2Script_Shutdown(void);
 void Nanosaur2Script_LoadLevelConfig(int levelNum);
 void Nanosaur2Script_OnLevelLoad(int levelNum);
 void Nanosaur2Script_OnLevelStart(int levelNum);
+void Nanosaur2Script_OnCheckpointReset(void);
 void Nanosaur2Script_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds);
 void Nanosaur2Script_OnLevelComplete(int levelNum);
 void Nanosaur2Script_OnLevelUnload(int levelNum);
@@ -27,8 +28,14 @@ void Nanosaur2Script_UnregisterObject(ObjNode* obj);
 void Nanosaur2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj);
 void Nanosaur2Script_RunObjectFrame(ObjNode* obj);
+void Nanosaur2Script_OnAnimationEvent(ObjNode* obj, int eventValue);
 void Nanosaur2Script_OnObjectDeleted(ObjNode* obj);
 Boolean Nanosaur2Script_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
 Boolean Nanosaur2Script_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
+Boolean Nanosaur2Script_OnDamage(short playerNum, ObjNode* source, float damage, int cause, float* outDamage);
+void Nanosaur2Script_OnDamageApplied(short playerNum, float damage, int cause);
+void Nanosaur2Script_OnPlayerSpawn(ObjNode* playerObj);
+void Nanosaur2Script_OnPlayerRespawn(ObjNode* playerObj);
+void Nanosaur2Script_OnDeath(short playerNum, int eventValue);
 
 #endif

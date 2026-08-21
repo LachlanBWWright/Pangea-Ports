@@ -284,13 +284,14 @@ void test_config_parsing_and_sandbox(void)
 		"      \"customObjects\": [{\n"
 		"        \"id\": \"custom.test-model\",\n"
 		"        \"visual\": {\"kind\": \"customDisplayGroup\", \"modelPath\": \"Data/Scripts/assets/models/test.bg3d\", \"modelObject\": 2, \"scale\": 1.5, \"slot\": 400},\n"
-		"        \"collision\": {\"kind\": \"preset\", \"preset\": \"solidBox\"}\n"
+		"        \"collision\": {\"kind\": \"preset\", \"preset\": \"solidBox\", \"bounds\": {\"width\": 2, \"height\": 3, \"depth\": 4}}\n"
 		"      }, {\n"
 		"        \"id\": \"custom.test-skeleton\",\n"
 		"        \"visual\": {\"kind\": \"customSkeleton\", \"modelPath\": \"Data/Scripts/assets/skeletons/test.bg3d\", \"skeletonPath\": \"Data/Scripts/assets/skeletons/test.skeleton\", \"animations\": {\"idle\": 0, \"walk\": 2}, \"initialAnimation\": \"idle\", \"animationSpeed\": 1, \"scale\": 1, \"slot\": 450},\n"
 		"        \"collision\": {\"kind\": \"none\"}\n"
 		"      }],\n"
 		"      \"terrainReplacements\": [{\"id\": \"replace-3\", \"itemIndex\": 3, \"nativeType\": 12, \"x\": 100, \"z\": 200, \"customObjectId\": \"custom.test-model\", \"strict\": false}],\n"
+		"      \"mapReplacements\": [{\"id\": \"replace-map-5\", \"itemIndex\": 5, \"nativeType\": 8, \"x\": 12, \"y\": 24, \"customObjectId\": \"custom.test-model\", \"strict\": true}],\n"
 		"      \"splineReplacements\": [{\"id\": \"replace-spline\", \"splineNum\": 2, \"itemIndex\": 4, \"nativeType\": 7, \"placement\": 0.25, \"customObjectId\": \"custom.test-model\", \"strict\": false}]\n"
 		"    }\n"
 		"  }\n"
@@ -310,6 +311,10 @@ void test_config_parsing_and_sandbox(void)
 	assert(customDefinition->scale == 1.5f);
 	assert(customDefinition->slot == 400);
 	assert(customDefinition->collisionPreset == PANGEA_SCRIPT_COLLISION_SOLID_BOX);
+	assert(customDefinition->collisionBoundsSet);
+	assert(customDefinition->collisionWidth == 2.0f);
+	assert(customDefinition->collisionHeight == 3.0f);
+	assert(customDefinition->collisionDepth == 4.0f);
 	const PangeaScriptCustomObjectDefinition* skeletonDefinition =
 		PangeaScript_GetCustomObjectDefinition("custom.test-skeleton");
 	assert(skeletonDefinition != NULL);
@@ -324,6 +329,12 @@ void test_config_parsing_and_sandbox(void)
 	assert(strcmp(replacement->customObjectId, "custom.test-model") == 0);
 	assert(!replacement->strict);
 	assert(PangeaScript_GetTerrainReplacement(4, 12, 100.0f, 200.0f) == NULL);
+	const PangeaScriptMapReplacement* mapReplacement =
+		PangeaScript_GetMapReplacement(5, 8, 12.0f, 24.0f);
+	assert(mapReplacement != NULL);
+	assert(strcmp(mapReplacement->customObjectId, "custom.test-model") == 0);
+	assert(mapReplacement->strict);
+	assert(PangeaScript_GetMapReplacement(5, 8, 12.0f, 25.0f) == NULL);
 	const PangeaScriptSplineReplacement* splineReplacement =
 		PangeaScript_GetSplineReplacement(2, 4, 7, 0.25f);
 	assert(splineReplacement != NULL);
@@ -554,6 +565,29 @@ static void test_scripted_spawn_adapter(void)
 	printf("Game-owned scripted spawn adapter tests passed!\n");
 }
 
+static void test_scripted_object_reuse(void)
+{
+	const PangeaScriptGameInfo gameInfo = {
+		.gameId = "test-game",
+		.gameName = "Test Game",
+	};
+	PangeaScriptObjectHandle previous = {0};
+	assert(PangeaScript_Init(&gameInfo) == PANGEA_SCRIPT_OK);
+	for (int iteration = 0; iteration < 4096; iteration++)
+	{
+		PangeaScriptObjectHandle handle = {0};
+		assert(PangeaScript_RegisterScriptedObject("custom.reusable", 1.0f, 2.0f, 3.0f, &handle) == PANGEA_SCRIPT_OK);
+		assert(PangeaScript_ObjectExists(handle));
+		if (previous.id == handle.id)
+			assert(previous.generation != handle.generation);
+		assert(PangeaScript_UnregisterObject(handle));
+		assert(!PangeaScript_ObjectExists(handle));
+		previous = handle;
+	}
+	PangeaScript_Shutdown();
+	printf("Scripted object reuse tests passed!\n");
+}
+
 static void test_native_spawn_validation(void)
 {
 	const PangeaScriptGameInfo gameInfo = { .gameId = "TestGame", .gameName = "Test Game", .spawnNative = mock_spawn_native };
@@ -581,6 +615,7 @@ int main(void)
 	test_level_settings_accessors();
 	test_consecutive_failures();
 	test_scripted_spawn_adapter();
+	test_scripted_object_reuse();
 	test_native_spawn_validation();
 
 	printf("========================================\n");

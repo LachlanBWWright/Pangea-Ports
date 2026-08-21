@@ -4,15 +4,51 @@
 #include "ScriptBindings.h"
 
 #include "structs.h"
+#include "splineitems.h"
 
 #include <stdio.h>
 #include <string.h>
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
+static PangeaScriptFrameContext gScriptFrameContext;
+
+static bool CompleteScriptReplacement(PangeaScriptObjectHandle handle, const char* action)
+{
+	PangeaScriptStatus status = PangeaScript_ApplyObjectLifecycle(
+		handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_IN);
+	if (status == PANGEA_SCRIPT_OK && PangeaScript_ObjectExists(handle))
+		return true;
+	LogScriptStatus(action, status);
+	if (PangeaScript_ObjectExists(handle))
+		(void)PangeaScript_DeleteObject(handle);
+	return false;
+}
 
 static TerrainItemEntryType gScriptTerrainItems[256];
 static bool gScriptTerrainItemOccupied[256];
 static bool gScriptTerrainItemReclaimable[256];
+
+static void MoveScriptedSplineObject(ObjNode* object)
+{
+	bool wasAttached;
+	bool isAttached;
+	PangeaScriptObjectHandle handle;
+
+	if (!object || object->ScriptObjectID == 0)
+		return;
+	wasAttached = (object->StatusBits & STATUS_BIT_DETACHED) == 0;
+	(void) IsSplineItemOnActiveTerrain(object);
+	if (object->ScriptObjectID == 0)
+		return;
+	isAttached = (object->StatusBits & STATUS_BIT_DETACHED) == 0;
+	if (wasAttached == isAttached)
+		return;
+	handle = (PangeaScriptObjectHandle){(int)object->ScriptObjectID, object->ScriptObjectGeneration};
+	(void) PangeaScript_ApplyObjectLifecycle(
+		handle,
+		&gScriptFrameContext,
+		isAttached ? PANGEA_SCRIPT_OBJECT_ACTIVATE : PANGEA_SCRIPT_OBJECT_DEACTIVATE);
+}
 
 static TerrainItemEntryType* AcquireScriptTerrainItem(void)
 {
@@ -44,8 +80,6 @@ static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, floa
 	}
 	return PANGEA_SCRIPT_OK;
 }
-
-static PangeaScriptFrameContext gScriptFrameContext;
 
 typedef struct ScriptModelCacheEntry
 {
@@ -106,6 +140,11 @@ static int GetCustomModelGroup(const char* modelPath)
 		if (gNumObjectsInBG3DGroupList[group] != 0)
 			continue;
 		ImportBG3D(&spec, group, VERTEX_ARRAY_RANGE_TYPE_BG3DMODELS);
+		if (gNumObjectsInBG3DGroupList[group] <= 0)
+		{
+			gNumObjectsInBG3DGroupList[group] = 0;
+			return -1;
+		}
 		snprintf(gScriptModelCache[i].path, sizeof(gScriptModelCache[i].path), "%s", modelPath);
 		return group;
 	}
@@ -238,7 +277,10 @@ static bool Nanosaur2Script_DeleteObject(void* nativeObject)
 		return false;
 
 	if (obj->ScriptDefinitionID[0])
+	{
+		Nanosaur2Script_UnregisterObject(obj);
 		obj->ScriptDeleteRequested = true;
+	}
 	else
 	{
 		Nanosaur2Script_UnregisterObject(obj);
@@ -267,6 +309,7 @@ void Nanosaur2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 
 void Nanosaur2Script_ResetObjectRegistry(void)
 {
+	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
 	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
 	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
@@ -337,11 +380,125 @@ void Nanosaur2Script_UnregisterObject(ObjNode* obj)
 void Nanosaur2Script_RegisterPlayerObject(ObjNode* playerObj)
 {
 	Nanosaur2Script_RegisterObject(playerObj, "nanosaur2.player", "player");
+	Nanosaur2Script_OnPlayerSpawn(playerObj);
 }
 
 void Nanosaur2Script_UnregisterPlayerObject(ObjNode* playerObj)
 {
 	Nanosaur2Script_UnregisterObject(playerObj);
+}
+
+Boolean Nanosaur2Script_OnDamage(short playerNum, ObjNode* source, float damage, int cause, float* outDamage)
+{
+	PangeaScriptDamageContext context;
+	PangeaScriptDamageResult result = {0};
+	PangeaScriptStatus status;
+	ObjNode* player;
+
+	if (!outDamage)
+		return true;
+	*outDamage = damage;
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+		return true;
+	player = gPlayerInfo[playerNum].objNode;
+	if (!player || player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+		return true;
+
+	context = (PangeaScriptDamageContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = playerNum,
+		.cause = cause,
+		.damage = damage,
+		.source = {0},
+		.target = {player->ScriptObjectID, player->ScriptObjectGeneration},
+		.position = {player->Coord.x, player->Coord.y, player->Coord.z},
+	};
+	if (source && source->ScriptObjectID > 0 && source->ScriptObjectGeneration > 0)
+		context.source = (PangeaScriptObjectHandle){source->ScriptObjectID, source->ScriptObjectGeneration};
+
+	status = PangeaScript_CallDamageHook(&context, &result);
+	LogScriptStatus("onDamage", status);
+	if (status != PANGEA_SCRIPT_OK)
+		return true;
+	if (result.hasDamage)
+		*outDamage = result.damage;
+	return result.hasApplyDamage ? result.applyDamage : true;
+}
+
+void Nanosaur2Script_OnPlayerSpawn(ObjNode* playerObj)
+{
+	PangeaScriptPlayerEventContext context;
+	if (!playerObj || playerObj->ScriptObjectID <= 0 || playerObj->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptPlayerEventContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = playerObj->PlayerNum,
+		.eventValue = 0,
+		.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
+		.position = {playerObj->Coord.x, playerObj->Coord.y, playerObj->Coord.z},
+	};
+	LogScriptStatus("onPlayerSpawn", PangeaScript_CallPlayerEvent(&context, "onPlayerSpawn"));
+}
+
+void Nanosaur2Script_OnPlayerRespawn(ObjNode* playerObj)
+{
+	PangeaScriptPlayerEventContext context;
+	if (!playerObj || playerObj->ScriptObjectID <= 0 || playerObj->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptPlayerEventContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = playerObj->PlayerNum,
+		.eventValue = 0,
+		.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
+		.position = {playerObj->Coord.x, playerObj->Coord.y, playerObj->Coord.z},
+	};
+	LogScriptStatus("onPlayerRespawn", PangeaScript_CallPlayerEvent(&context, "onPlayerRespawn"));
+}
+
+void Nanosaur2Script_OnDamageApplied(short playerNum, float damage, int cause)
+{
+	PangeaScriptDamageContext context;
+	ObjNode* player;
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+		return;
+	player = gPlayerInfo[playerNum].objNode;
+	if (!player || player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptDamageContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = playerNum,
+		.cause = cause,
+		.damage = damage,
+		.source = {0},
+		.target = {player->ScriptObjectID, player->ScriptObjectGeneration},
+		.position = {player->Coord.x, player->Coord.y, player->Coord.z},
+	};
+	LogScriptStatus("onDamageApplied", PangeaScript_CallDamageAppliedHook(&context));
+}
+
+void Nanosaur2Script_OnDeath(short playerNum, int eventValue)
+{
+	PangeaScriptPlayerEventContext context;
+	ObjNode* player;
+
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS)
+		return;
+	player = gPlayerInfo[playerNum].objNode;
+	if (!player || player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptPlayerEventContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = playerNum,
+		.eventValue = eventValue,
+		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
+		.position = {player->Coord.x, player->Coord.y, player->Coord.z},
+	};
+	LogScriptStatus("onDeath", PangeaScript_CallPlayerEvent(&context, "onDeath"));
 }
 
 void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj)
@@ -408,7 +565,10 @@ void Nanosaur2Script_OnObjectDeleted(ObjNode* obj)
 	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
-		(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "destroy");
+		PangeaScriptObjectLifecycle lifecycle = obj->TerrainItemPtr || obj->SplineItemPtr
+			? PANGEA_SCRIPT_OBJECT_STREAM_OUT
+			: PANGEA_SCRIPT_OBJECT_DESTROY;
+		(void)PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, lifecycle);
 	}
 }
 
@@ -474,22 +634,40 @@ static ObjNode* MakeScriptedVisual(const PangeaScriptCustomObjectDefinition* def
 
 static Boolean ScriptedTriggerCallback(ObjNode* trigger, ObjNode* who)
 {
-	(void)who;
 	if (trigger && trigger->ScriptObjectID)
 	{
 		PangeaScriptObjectHandle handle = {(int)trigger->ScriptObjectID, trigger->ScriptObjectGeneration};
-		return PangeaScript_CallObjectTrigger(handle, &gScriptFrameContext, 0, true);
+		PangeaScriptObjectHandle other = {0};
+		if (who && who->ScriptObjectID)
+			other = (PangeaScriptObjectHandle){(int)who->ScriptObjectID, who->ScriptObjectGeneration};
+		return PangeaScript_CallObjectTriggerWithOther(handle, &gScriptFrameContext, 0, true, other);
 	}
 	return true;
 }
 
-static void ApplyScriptedCollision(ObjNode* object, PangeaScriptCollisionPreset preset)
+void Nanosaur2Script_OnAnimationEvent(ObjNode* obj, int eventValue)
 {
+	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID)
+	{
+		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
+		(void)PangeaScript_CallObjectEventWithValue(handle, &gScriptFrameContext, "animationEvent", eventValue);
+	}
+}
+
+static void ApplyScriptedCollision(ObjNode* object, const PangeaScriptCustomObjectDefinition* definition)
+{
+	PangeaScriptCollisionPreset preset = definition->collisionPreset;
 	float radius;
+	float halfWidth;
+	float halfHeight;
+	float halfDepth;
 	if (preset == PANGEA_SCRIPT_COLLISION_NONE)
 		return;
 	radius = object->BoundingSphereRadius;
-	SetObjectCollisionBounds(object, radius, -radius, -radius, radius, radius, -radius);
+	halfWidth = definition->collisionBoundsSet ? definition->collisionWidth * 0.5f : radius;
+	halfHeight = definition->collisionBoundsSet ? definition->collisionHeight * 0.5f : radius;
+	halfDepth = definition->collisionBoundsSet ? definition->collisionDepth * 0.5f : radius;
+	SetObjectCollisionBounds(object, halfHeight, -halfHeight, -halfWidth, halfWidth, halfDepth, -halfDepth);
 	object->CBits = CBITS_ALLSOLID;
 	if (preset == PANGEA_SCRIPT_COLLISION_ENEMY)
 		object->CType = CTYPE_ENEMY | CTYPE_MISC;
@@ -516,7 +694,7 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 	object = MakeScriptedVisual(definition, x, y, z);
 	if (!object)
 		return PANGEA_SCRIPT_RUNTIME_ERROR;
-	ApplyScriptedCollision(object, definition->collisionPreset);
+	ApplyScriptedCollision(object, definition);
 	snprintf(object->ScriptDefinitionID, sizeof(object->ScriptDefinitionID), "%s", definition->id);
 	Nanosaur2Script_RegisterObject(object, definition->id, "customObject");
 	if (object->ScriptObjectID == 0)
@@ -527,7 +705,13 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 	if (outHandle)
 		*outHandle = (PangeaScriptObjectHandle){(int)object->ScriptObjectID, object->ScriptObjectGeneration};
 	PangeaScriptObjectHandle handle = {(int)object->ScriptObjectID, object->ScriptObjectGeneration};
-	(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "spawn");
+	PangeaScriptStatus spawnStatus = PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "spawn");
+	if (spawnStatus != PANGEA_SCRIPT_OK || !PangeaScript_ObjectExists(handle))
+	{
+		(void)PangeaScript_DeleteObject(handle);
+		if (outHandle) *outHandle = (PangeaScriptObjectHandle){0};
+		return spawnStatus == PANGEA_SCRIPT_OK ? PANGEA_SCRIPT_RUNTIME_ERROR : spawnStatus;
+	}
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -588,6 +772,7 @@ void Nanosaur2Script_Init(void)
 		.spawnScripted = SpawnScriptedObject,
 		.getPlayerCount = GetScriptPlayerCount,
 		.getPlayer = GetScriptPlayer,
+		.capabilities = {.terrainItems = true, .splineItems = true, .mapItems = false},
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -638,6 +823,12 @@ void Nanosaur2Script_OnLevelStart(int levelNum)
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_START, levelNum, "onLevelStart");
 }
 
+void Nanosaur2Script_OnCheckpointReset(void)
+{
+	(void) PangeaScript_ApplyObjectLifecycleToAll(
+		&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_CHECKPOINT_RESET);
+}
+
 void Nanosaur2Script_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds)
 {
 	const PangeaScriptFrameContext context =
@@ -661,6 +852,7 @@ void Nanosaur2Script_OnLevelComplete(int levelNum)
 void Nanosaur2Script_OnLevelUnload(int levelNum)
 {
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, levelNum, "onLevelUnload");
+	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	PangeaScript_ResetObjects();
 }
 
@@ -730,12 +922,31 @@ Boolean Nanosaur2Script_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int
 	const PangeaScriptTerrainReplacement* replacement = PangeaScript_GetTerrainReplacement(itemIndex, nativeType, x, z);
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptStatus status;
+	void* nativeObject = NULL;
+	const PangeaScriptObjectSource source = {
+		.kind = PANGEA_SCRIPT_SOURCE_TERRAIN, .itemIndex = itemIndex, .nativeType = nativeType,
+		.x = x, .y = GetTerrainY(x, z), .z = z};
 	if (!replacement)
 		return false;
-	status = SpawnScriptedObject(replacement->customObjectId, x, GetTerrainY(x, z), z, &handle);
-	if (status == PANGEA_SCRIPT_OK)
+	if (PangeaScript_FindObjectBySource(&source, &handle))
 	{
 		itemPtr->flags |= ITEM_FLAGS_INUSE;
+		return true;
+	}
+	status = SpawnScriptedObject(replacement->customObjectId, source.x, source.y, source.z, &handle);
+	if (status == PANGEA_SCRIPT_OK && PangeaScript_GetObjectNativeObject(handle, &nativeObject))
+	{
+		((ObjNode*)nativeObject)->TerrainItemPtr = itemPtr;
+		status = PangeaScript_AssociateObjectSource(handle, &source);
+		if (status != PANGEA_SCRIPT_OK)
+		{
+			LogScriptStatus("terrain replacement source association", status);
+			(void)PangeaScript_DeleteObject(handle);
+			return replacement->strict;
+		}
+		itemPtr->flags |= ITEM_FLAGS_INUSE;
+		if (!CompleteScriptReplacement(handle, "terrain replacement stream-in"))
+			return replacement->strict;
 		return true;
 	}
 	LogScriptStatus("terrain replacement", status);
@@ -748,14 +959,40 @@ Boolean Nanosaur2Script_TryReplaceSplineItem(SplineItemType* itemPtr, int spline
 		splineNum, itemIndex, itemPtr->type, itemPtr->placement);
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptStatus status;
+	void* nativeObject = NULL;
 	float x;
 	float z;
 	if (!replacement)
 		return false;
 	GetCoordOnSpline(&gSplineList[splineNum], itemPtr->placement, &x, &z);
-	status = SpawnScriptedObject(replacement->customObjectId, x, GetTerrainY(x, z), z, &handle);
-	if (status == PANGEA_SCRIPT_OK)
+	const PangeaScriptObjectSource source = {
+		.kind = PANGEA_SCRIPT_SOURCE_SPLINE, .itemIndex = itemIndex, .nativeType = itemPtr->type,
+		.splineNum = splineNum, .x = x, .y = GetTerrainY(x, z), .z = z,
+		.placement = itemPtr->placement};
+	if (PangeaScript_FindObjectBySource(&source, &handle))
 		return true;
+	status = SpawnScriptedObject(replacement->customObjectId, source.x, source.y, source.z, &handle);
+	if (status == PANGEA_SCRIPT_OK && PangeaScript_GetObjectNativeObject(handle, &nativeObject))
+	{
+		ObjNode* object = (ObjNode*)nativeObject;
+		object->SplineItemPtr = itemPtr;
+		object->SplineNum = (uint8_t)splineNum;
+		object->SplinePlacement = itemPtr->placement;
+		object->SplineMoveCall = MoveScriptedSplineObject;
+		object->StatusBits |= STATUS_BIT_ONSPLINE;
+		DetachObject(object, true);
+		AddToSplineObjectList(object, true);
+		status = PangeaScript_AssociateObjectSource(handle, &source);
+		if (status != PANGEA_SCRIPT_OK)
+		{
+			LogScriptStatus("spline replacement source association", status);
+			(void)PangeaScript_DeleteObject(handle);
+			return replacement->strict;
+		}
+		if (!CompleteScriptReplacement(handle, "spline replacement stream-in"))
+			return replacement->strict;
+		return true;
+	}
 	LogScriptStatus("spline replacement", status);
 	return replacement->strict;
 }

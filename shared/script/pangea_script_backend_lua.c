@@ -1,4 +1,5 @@
 #include "pangea_script_backend.h"
+#include "pangea_script_contract.h"
 
 #include <lauxlib.h>
 #include <lua.h>
@@ -9,6 +10,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define PANGEA_LUA_PERSISTENCE_MAX_ENTRIES 64
+#define PANGEA_LUA_PERSISTENCE_MAX_KEY_BYTES 64
+#define PANGEA_LUA_PERSISTENCE_MAX_VALUE_BYTES 4096
+#define PANGEA_LUA_PERSISTENCE_MAX_TOTAL_BYTES 16384
+
+typedef struct PangeaScriptPersistenceEntry
+{
+	bool active;
+	char key[PANGEA_LUA_PERSISTENCE_MAX_KEY_BYTES];
+	int encodedBytes;
+} PangeaScriptPersistenceEntry;
 
 struct PangeaScriptBackend
 {
@@ -22,6 +35,9 @@ struct PangeaScriptBackend
 	float currentDeltaSeconds;
 	float currentLevelTimeSeconds;
 	uint32_t randomState;
+	bool hasCurrentObject;
+	PangeaScriptObjectHandle currentObject;
+	int runningTaskIndex;
 	struct
 	{
 		bool active;
@@ -30,6 +46,8 @@ struct PangeaScriptBackend
 		float dueTimeSeconds;
 		float intervalSeconds;
 		bool repeating;
+		bool hasOwner;
+		PangeaScriptObjectHandle owner;
 	} timers[128];
 	int nextTimerId;
 	struct
@@ -39,6 +57,8 @@ struct PangeaScriptBackend
 		int threadReference;
 		lua_State* thread;
 		float dueTimeSeconds;
+		bool hasOwner;
+		PangeaScriptObjectHandle owner;
 	} tasks[64];
 	int nextTaskId;
 	struct
@@ -48,8 +68,12 @@ struct PangeaScriptBackend
 		char eventName[64];
 		int callbackReference;
 		bool once;
+		bool hasOwner;
+		PangeaScriptObjectHandle owner;
 	} subscriptions[128];
 	int nextSubscriptionId;
+	PangeaScriptPersistenceEntry persistence[PANGEA_LUA_PERSISTENCE_MAX_ENTRIES];
+	int persistentBytes;
 };
 
 enum
@@ -58,8 +82,8 @@ enum
 	PANGEA_LUA_LOAD_BUDGET = 1000000,
 	PANGEA_LUA_EVENT_BUDGET = 100000,
 	PANGEA_LUA_FRAME_BUDGET = 50000,
-	PANGEA_LUA_API_VERSION = 1,
-	PANGEA_LUA_MIN_API_VERSION = 1,
+	PANGEA_LUA_API_VERSION = PANGEA_SCRIPT_API_VERSION,
+	PANGEA_LUA_MIN_API_VERSION = PANGEA_SCRIPT_API_VERSION,
 };
 
 static int reject_context_write(lua_State* lua)
@@ -192,6 +216,7 @@ static const LuaResultField kObjectResultFields[] = {{"positionOffset", LUA_TTAB
 static const LuaResultField kTriggerResultFields[] = {{"handled", LUA_TBOOLEAN, false}, {"solid", LUA_TBOOLEAN, false}, {"deleteSelf", LUA_TBOOLEAN, false}, {"deleteOther", LUA_TBOOLEAN, false}, {"damagePlayer", LUA_TNUMBER, false}, {"healthDelta", LUA_TNUMBER, false}, {"scoreDelta", LUA_TNUMBER, true}};
 static const LuaResultField kPickupResultFields[] = {{"handled", LUA_TBOOLEAN, false}, {"consumePickup", LUA_TBOOLEAN, false}, {"healthDelta", LUA_TNUMBER, false}, {"scoreDelta", LUA_TNUMBER, true}};
 static const LuaResultField kWeaponResultFields[] = {{"handled", LUA_TBOOLEAN, false}, {"applyDamage", LUA_TBOOLEAN, false}, {"destroyTarget", LUA_TBOOLEAN, false}, {"damage", LUA_TNUMBER, false}, {"scoreDelta", LUA_TNUMBER, true}};
+static const LuaResultField kDamageResultFields[] = {{"handled", LUA_TBOOLEAN, false}, {"applyDamage", LUA_TBOOLEAN, false}, {"damage", LUA_TNUMBER, false}};
 
 static PangeaScriptStatus validate_result_fields(lua_State* lua, const char* hookName, const LuaResultField* fields, int fieldCount, char* error, int errorCapacity)
 {
@@ -257,6 +282,16 @@ static void push_handle(lua_State* lua, PangeaScriptObjectHandle handle)
 	lua_createtable(lua, 0, 2);
 	lua_pushinteger(lua, handle.id); lua_setfield(lua, -2, "id");
 	lua_pushinteger(lua, handle.generation); lua_setfield(lua, -2, "generation");
+}
+
+static void push_optional_handle(lua_State* lua, PangeaScriptObjectHandle handle)
+{
+	if (handle.id <= 0 || handle.generation == 0)
+	{
+		lua_pushnil(lua);
+		return;
+	}
+	push_handle(lua, handle);
 }
 
 static bool read_handle(lua_State* lua, int index, PangeaScriptObjectHandle* handle)
@@ -331,6 +366,29 @@ static int lua_spawn_native_result(lua_State* lua)
 	return 1;
 }
 
+static const char* status_name(PangeaScriptStatus status)
+{
+	static const char* names[] = {"ok", "not-enabled", "file-not-found", "parse-error", "runtime-error", "bad-argument", "budget-exceeded", "incompatible-item", "config-error"};
+	int index = (int) status;
+	return index >= 0 && index < (int)(sizeof(names) / sizeof(names[0])) ? names[index] : "unknown";
+}
+
+static int push_object_command_result(lua_State* lua, PangeaScriptStatus status, const char* message, bool hasPrimary, PangeaScriptObjectHandle primary)
+{
+	lua_createtable(lua, 0, 5);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK); lua_setfield(lua, -2, "ok");
+	lua_pushinteger(lua, status); lua_setfield(lua, -2, "code");
+	lua_pushstring(lua, status_name(status)); lua_setfield(lua, -2, "reason");
+	lua_pushstring(lua, message ? message : ""); lua_setfield(lua, -2, "message");
+	if (hasPrimary) { push_handle(lua, primary); lua_setfield(lua, -2, "primary"); }
+	return 1;
+}
+
+static int push_object_argument_error(lua_State* lua, const char* message)
+{
+	return push_object_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, message, false, (PangeaScriptObjectHandle){0});
+}
+
 static int lua_spawn_scripted(lua_State* lua)
 {
 	const char* id = luaL_checkstring(lua, 1);
@@ -372,10 +430,48 @@ static int lua_object_position(lua_State* lua)
 	return 1;
 }
 
+static const char* object_source_kind_name(PangeaScriptObjectSourceKind kind)
+{
+	if (kind == PANGEA_SCRIPT_SOURCE_TERRAIN) return "terrain";
+	if (kind == PANGEA_SCRIPT_SOURCE_SPLINE) return "spline";
+	if (kind == PANGEA_SCRIPT_SOURCE_MAP) return "map";
+	return "none";
+}
+
+static int lua_object_source(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptObjectSource source;
+	if (!read_handle(lua, 1, &handle) || !PangeaScript_GetObjectSource(handle, &source))
+	{
+		lua_pushnil(lua);
+		return 1;
+	}
+	lua_createtable(lua, 0, 8);
+	lua_pushstring(lua, object_source_kind_name(source.kind)); lua_setfield(lua, -2, "kind");
+	lua_pushinteger(lua, source.itemIndex); lua_setfield(lua, -2, "itemIndex");
+	lua_pushinteger(lua, source.nativeType); lua_setfield(lua, -2, "nativeType");
+	lua_pushinteger(lua, source.splineNum); lua_setfield(lua, -2, "splineNum");
+	lua_pushnumber(lua, source.x); lua_setfield(lua, -2, "x");
+	lua_pushnumber(lua, source.y); lua_setfield(lua, -2, "y");
+	lua_pushnumber(lua, source.z); lua_setfield(lua, -2, "z");
+	lua_pushnumber(lua, source.placement); lua_setfield(lua, -2, "placement");
+	return 1;
+}
+
 static int lua_object_set_position(lua_State* lua)
 {
 	PangeaScriptObjectHandle handle; PangeaScriptVector3 position;
 	lua_pushboolean(lua, read_handle(lua, 1, &handle) && read_vector(lua, 2, &position) && PangeaScript_SetObjectPosition(handle, &position)); return 1;
+}
+
+static int lua_object_set_position_result(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle; PangeaScriptVector3 position;
+	if (!read_handle(lua, 1, &handle)) return push_object_argument_error(lua, "Object handle must contain a positive id and generation");
+	if (!read_vector(lua, 2, &position)) return push_object_argument_error(lua, "Object position must contain finite x, y, and z values");
+	(void) PangeaScript_SetObjectPosition(handle, &position);
+	return push_object_command_result(lua, PangeaScript_GetLastStatus(), PangeaScript_GetLastError(), true, handle);
 }
 
 static int lua_object_set_velocity(lua_State* lua)
@@ -384,9 +480,92 @@ static int lua_object_set_velocity(lua_State* lua)
 	lua_pushboolean(lua, read_handle(lua, 1, &handle) && read_vector(lua, 2, &velocity) && PangeaScript_SetObjectVelocity(handle, &velocity)); return 1;
 }
 
+static int lua_object_set_velocity_result(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle; PangeaScriptVector3 velocity;
+	if (!read_handle(lua, 1, &handle)) return push_object_argument_error(lua, "Object handle must contain a positive id and generation");
+	if (!read_vector(lua, 2, &velocity)) return push_object_argument_error(lua, "Object velocity must contain finite x, y, and z values");
+	(void) PangeaScript_SetObjectVelocity(handle, &velocity);
+	return push_object_command_result(lua, PangeaScript_GetLastStatus(), PangeaScript_GetLastError(), true, handle);
+}
+
+static int lua_object_set_rotation_result(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle; PangeaScriptVector3 rotation;
+	if (!read_handle(lua, 1, &handle)) return push_object_argument_error(lua, "Object handle must contain a positive id and generation");
+	if (!read_vector(lua, 2, &rotation)) return push_object_argument_error(lua, "Object rotation must contain finite x, y, and z values");
+	(void) PangeaScript_SetObjectRotation(handle, &rotation);
+	return push_object_command_result(lua, PangeaScript_GetLastStatus(), PangeaScript_GetLastError(), true, handle);
+}
+
+static int lua_object_set_scale_result(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	if (!read_handle(lua, 1, &handle)) return push_object_argument_error(lua, "Object handle must contain a positive id and generation");
+	if (!lua_isnumber(lua, 2)) return push_object_argument_error(lua, "Object scale must be a number");
+	(void) PangeaScript_SetObjectScale(handle, (float) lua_tonumber(lua, 2));
+	return push_object_command_result(lua, PangeaScript_GetLastStatus(), PangeaScript_GetLastError(), true, handle);
+}
+
+static bool read_animation_values(lua_State* lua, float* speed, float* blend)
+{
+	if (lua_isnoneornil(lua, 3)) *speed = 1.0f;
+	else if (lua_isnumber(lua, 3)) *speed = (float) lua_tonumber(lua, 3);
+	else return false;
+	if (lua_isnoneornil(lua, 4)) *blend = 0.0f;
+	else if (lua_isnumber(lua, 4)) *blend = (float) lua_tonumber(lua, 4);
+	else return false;
+	return isfinite(*speed) && isfinite(*blend) && *speed >= 0.0f && *blend >= 0.0f;
+}
+
+static int lua_object_set_animation_result(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	float speed; float blend;
+	if (!read_handle(lua, 1, &handle)) return push_object_argument_error(lua, "Object handle must contain a positive id and generation");
+	if (!read_animation_values(lua, &speed, &blend)) return push_object_argument_error(lua, "Animation speed and blend must be finite and non-negative");
+	if (lua_isinteger(lua, 2))
+		(void) PangeaScript_SetObjectAnimation(handle, (int) lua_tointeger(lua, 2), speed, blend);
+	else if (lua_isstring(lua, 2))
+		(void) PangeaScript_SetObjectAnimationNamed(handle, lua_tostring(lua, 2), speed, blend);
+	else return push_object_argument_error(lua, "Animation must be a string or integer");
+	return push_object_command_result(lua, PangeaScript_GetLastStatus(), PangeaScript_GetLastError(), true, handle);
+}
+
+static int lua_object_set_active(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	if (!read_handle(lua, 1, &handle) || !lua_isboolean(lua, 2))
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	lua_pushboolean(lua, PangeaScript_SetObjectActive(handle, lua_toboolean(lua, 2)));
+	return 1;
+}
+
+static int lua_object_set_active_result(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	if (!read_handle(lua, 1, &handle))
+		return push_object_argument_error(lua, "Object handle must contain a positive id and generation");
+	if (!lua_isboolean(lua, 2))
+		return push_object_argument_error(lua, "Object active state must be boolean");
+	(void) PangeaScript_SetObjectActive(handle, lua_toboolean(lua, 2));
+	return push_object_command_result(lua, PangeaScript_GetLastStatus(), PangeaScript_GetLastError(), true, handle);
+}
+
 static int lua_object_delete(lua_State* lua)
 {
 	PangeaScriptObjectHandle handle; lua_pushboolean(lua, read_handle(lua, 1, &handle) && PangeaScript_DeleteObject(handle)); return 1;
+}
+
+static int lua_object_delete_result(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	if (!read_handle(lua, 1, &handle)) return push_object_argument_error(lua, "Object handle must contain a positive id and generation");
+	(void) PangeaScript_DeleteObject(handle);
+	return push_object_command_result(lua, PangeaScript_GetLastStatus(), PangeaScript_GetLastError(), true, handle);
 }
 
 static int lua_object_exists(lua_State* lua)
@@ -484,25 +663,237 @@ static int lua_object_state(lua_State* lua)
 	lua_remove(lua, -2); return 1;
 }
 
+static bool clone_checkpoint_value(lua_State* lua, int index, int depth)
+{
+	int stackBase = lua_gettop(lua);
+	if (lua_isnil(lua, index))
+	{
+		lua_pushnil(lua);
+		return true;
+	}
+	if (lua_isboolean(lua, index))
+	{
+		lua_pushboolean(lua, lua_toboolean(lua, index));
+		return true;
+	}
+	if (lua_isnumber(lua, index))
+	{
+		lua_pushnumber(lua, lua_tonumber(lua, index));
+		return true;
+	}
+	if (lua_isstring(lua, index))
+	{
+		size_t length = 0;
+		const char* value = lua_tolstring(lua, index, &length);
+		if (!value) return false;
+		lua_pushlstring(lua, value, length);
+		return true;
+	}
+	if (!lua_istable(lua, index) || depth >= 8)
+		return false;
+
+	int sourceIndex = lua_absindex(lua, index);
+	lua_createtable(lua, 0, 8);
+	int destinationIndex = lua_absindex(lua, -1);
+	lua_pushnil(lua);
+	while (lua_next(lua, sourceIndex) != 0)
+	{
+		if (!clone_checkpoint_value(lua, -2, depth + 1) || !clone_checkpoint_value(lua, -2, depth + 1))
+		{
+			lua_settop(lua, stackBase);
+			return false;
+		}
+		lua_rawset(lua, destinationIndex);
+		lua_pop(lua, 1);
+	}
+	return true;
+}
+
+static bool push_object_registry_table(lua_State* lua, const char* registryName, PangeaScriptObjectHandle handle, bool create)
+{
+	char key[48];
+	snprintf(key, sizeof(key), "%d:%u", handle.id, handle.generation);
+	lua_getfield(lua, LUA_REGISTRYINDEX, registryName);
+	if (!lua_istable(lua, -1))
+	{
+		lua_pop(lua, 1);
+		if (!create) return false;
+		lua_createtable(lua, 0, 32);
+		lua_pushvalue(lua, -1);
+		lua_setfield(lua, LUA_REGISTRYINDEX, registryName);
+	}
+	lua_getfield(lua, -1, key);
+	if (!lua_istable(lua, -1))
+	{
+		lua_pop(lua, 1);
+		if (!create)
+		{
+			lua_pop(lua, 1);
+			return false;
+		}
+		lua_createtable(lua, 0, 8);
+		lua_pushvalue(lua, -1);
+		lua_setfield(lua, -3, key);
+	}
+	lua_remove(lua, -2);
+	return true;
+}
+
+static void clear_object_registry_table(lua_State* lua, const char* registryName, PangeaScriptObjectHandle handle)
+{
+	char key[48];
+	snprintf(key, sizeof(key), "%d:%u", handle.id, handle.generation);
+	lua_getfield(lua, LUA_REGISTRYINDEX, registryName);
+	if (lua_istable(lua, -1))
+	{
+		lua_pushnil(lua);
+		lua_setfield(lua, -2, key);
+	}
+	lua_pop(lua, 1);
+}
+
 void PangeaScriptBackend_ClearObjectState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
 {
 	if (!backend || !backend->lua) return;
+	clear_object_registry_table(backend->lua, "PangeaObjectStates", handle);
+	clear_object_registry_table(backend->lua, "PangeaObjectCheckpointStates", handle);
+	PangeaScriptBackend_ClearObjectResources(backend, handle);
+}
+
+void PangeaScriptBackend_ClearObjectResources(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
+{
+	if (!backend || !backend->lua) return;
+	for (int i = 0; i < (int)(sizeof(backend->timers) / sizeof(backend->timers[0])); i++)
+	{
+		if (!backend->timers[i].active || !backend->timers[i].hasOwner ||
+			backend->timers[i].owner.id != handle.id || backend->timers[i].owner.generation != handle.generation)
+			continue;
+		luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->timers[i].callbackReference);
+		backend->timers[i].active = false;
+	}
+	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
+	{
+		if (!backend->tasks[i].active || !backend->tasks[i].hasOwner ||
+			backend->tasks[i].owner.id != handle.id || backend->tasks[i].owner.generation != handle.generation)
+			continue;
+		if (i != backend->runningTaskIndex)
+			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[i].threadReference);
+		backend->tasks[i].active = false;
+	}
+	for (int i = 0; i < (int)(sizeof(backend->subscriptions) / sizeof(backend->subscriptions[0])); i++)
+	{
+		if (!backend->subscriptions[i].active || !backend->subscriptions[i].hasOwner ||
+			backend->subscriptions[i].owner.id != handle.id || backend->subscriptions[i].owner.generation != handle.generation)
+			continue;
+		luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->subscriptions[i].callbackReference);
+		backend->subscriptions[i].active = false;
+	}
+}
+
+static void clear_lua_table(lua_State* lua, int index)
+{
+	int tableIndex = lua_absindex(lua, index);
+	lua_pushnil(lua);
+	while (lua_next(lua, tableIndex) != 0)
+	{
+		lua_pop(lua, 1);
+		lua_pushvalue(lua, -1);
+		lua_pushnil(lua);
+		lua_rawset(lua, tableIndex);
+	}
+}
+
+void PangeaScriptBackend_CaptureObjectCheckpointState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
+{
+	if (!backend || !backend->lua || !push_object_registry_table(backend->lua, "PangeaObjectStates", handle, false))
+		return;
+	int stateIndex = lua_absindex(backend->lua, -1);
+
+	/* Build the snapshot off to the side so unsupported values cannot publish
+	 * a partially copied or empty baseline. */
+	lua_getfield(backend->lua, LUA_REGISTRYINDEX, "PangeaObjectCheckpointStates");
+	if (!lua_istable(backend->lua, -1))
+	{
+		lua_pop(backend->lua, 1);
+		lua_createtable(backend->lua, 0, 32);
+		lua_pushvalue(backend->lua, -1);
+		lua_setfield(backend->lua, LUA_REGISTRYINDEX, "PangeaObjectCheckpointStates");
+	}
+	int checkpointRegistryIndex = lua_absindex(backend->lua, -1);
+	lua_createtable(backend->lua, 0, 8);
+	int snapshotIndex = lua_absindex(backend->lua, -1);
+	int stackBase = lua_gettop(backend->lua) - 3;
+	lua_pushnil(backend->lua);
+	while (lua_next(backend->lua, stateIndex) != 0)
+	{
+		if (!clone_checkpoint_value(backend->lua, -2, 0) || !clone_checkpoint_value(backend->lua, -2, 0))
+		{
+			lua_settop(backend->lua, stackBase);
+			return;
+		}
+		lua_rawset(backend->lua, snapshotIndex);
+		lua_pop(backend->lua, 1);
+	}
 	char key[48];
 	snprintf(key, sizeof(key), "%d:%u", handle.id, handle.generation);
-	lua_getfield(backend->lua, LUA_REGISTRYINDEX, "PangeaObjectStates");
-	if (lua_istable(backend->lua, -1))
+	lua_pushvalue(backend->lua, snapshotIndex);
+	lua_setfield(backend->lua, checkpointRegistryIndex, key);
+	lua_settop(backend->lua, stackBase);
+}
+
+bool PangeaScriptBackend_RestoreObjectCheckpointState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
+{
+	if (!backend || !backend->lua || !push_object_registry_table(backend->lua, "PangeaObjectCheckpointStates", handle, false))
+		return false;
+	int snapshotIndex = lua_absindex(backend->lua, -1);
+	if (!push_object_registry_table(backend->lua, "PangeaObjectStates", handle, true))
 	{
-		lua_pushnil(backend->lua);
-		lua_setfield(backend->lua, -2, key);
+		lua_pop(backend->lua, 1);
+		return false;
 	}
-	lua_pop(backend->lua, 1);
+	int stateIndex = lua_absindex(backend->lua, -1);
+	int stackBase = lua_gettop(backend->lua) - 2;
+	clear_lua_table(backend->lua, stateIndex);
+	lua_pushnil(backend->lua);
+	while (lua_next(backend->lua, snapshotIndex) != 0)
+	{
+		if (!clone_checkpoint_value(backend->lua, -2, 0) || !clone_checkpoint_value(backend->lua, -2, 0))
+		{
+			lua_settop(backend->lua, stackBase);
+			return false;
+		}
+		lua_rawset(backend->lua, stateIndex);
+		lua_pop(backend->lua, 1);
+	}
+	lua_settop(backend->lua, stackBase);
+	return true;
 }
 
 void PangeaScriptBackend_ResetObjectStates(PangeaScriptBackend* backend)
 {
 	if (!backend || !backend->lua) return;
+	for (int i = 0; i < (int)(sizeof(backend->timers) / sizeof(backend->timers[0])); i++)
+	{
+		if (backend->timers[i].active)
+			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->timers[i].callbackReference);
+		backend->timers[i].active = false;
+	}
+	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
+	{
+		if (backend->tasks[i].active && i != backend->runningTaskIndex)
+			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[i].threadReference);
+		backend->tasks[i].active = false;
+	}
+	for (int i = 0; i < (int)(sizeof(backend->subscriptions) / sizeof(backend->subscriptions[0])); i++)
+	{
+		if (backend->subscriptions[i].active)
+			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->subscriptions[i].callbackReference);
+		backend->subscriptions[i].active = false;
+	}
 	lua_pushnil(backend->lua);
 	lua_setfield(backend->lua, LUA_REGISTRYINDEX, "PangeaObjectStates");
+	lua_pushnil(backend->lua);
+	lua_setfield(backend->lua, LUA_REGISTRYINDEX, "PangeaObjectCheckpointStates");
 }
 
 static int lua_object_set_rotation(lua_State* lua)
@@ -514,7 +905,7 @@ static int lua_object_set_scale(lua_State* lua)
 {
 	PangeaScriptObjectHandle handle;
 	float scale = (float) luaL_checknumber(lua, 2);
-	if (!isfinite(scale) || scale <= 0.0f) return luaL_error(lua, "scale must be finite and greater than zero");
+	if (!isfinite(scale) || scale < 0.000001f || scale > 100.0f) return luaL_error(lua, "scale must be finite and between 0.000001 and 100");
 	lua_pushboolean(lua, read_handle(lua, 1, &handle) && PangeaScript_SetObjectScale(handle, scale)); return 1;
 }
 
@@ -541,6 +932,289 @@ static int lua_level_setting(lua_State* lua)
 static PangeaScriptBackend* current_backend(lua_State* lua)
 {
 	return lua_touserdata(lua, lua_upvalueindex(1));
+}
+
+static bool persistent_key(lua_State* lua, int index, char* outKey, size_t capacity)
+{
+	if (!outKey || capacity == 0 || lua_type(lua, index) != LUA_TSTRING)
+		return false;
+	size_t length = 0;
+	const char* value = lua_tolstring(lua, index, &length);
+	if (!value || length == 0 || length >= capacity || length > 63)
+		return false;
+	for (size_t i = 0; i < length; i++)
+	{
+		unsigned char character = (unsigned char)value[i];
+		bool valid = (character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '_' || character == '-' || character == '.';
+		if (!valid)
+			return false;
+	}
+	memcpy(outKey, value, length);
+	outKey[length] = '\0';
+	return true;
+}
+
+static bool persistent_version(lua_State* lua, int index, int* outVersion)
+{
+	if (!outVersion || !lua_isinteger(lua, index))
+		return false;
+	lua_Integer value = lua_tointeger(lua, index);
+	if (value < 0 || value > 65535)
+		return false;
+	*outVersion = (int)value;
+	return true;
+}
+
+static void write_persistent_u16(unsigned char* bytes, unsigned int value)
+{
+	bytes[0] = (unsigned char)(value & 0xffu);
+	bytes[1] = (unsigned char)((value >> 8) & 0xffu);
+}
+
+static unsigned int read_persistent_u16(const unsigned char* bytes)
+{
+	return (unsigned int)bytes[0] | ((unsigned int)bytes[1] << 8);
+}
+
+static void write_persistent_u32(unsigned char* bytes, uint32_t value)
+{
+	for (int index = 0; index < 4; index++)
+	{
+		bytes[index] = (unsigned char)(value & 0xffu);
+		value >>= 8;
+	}
+}
+
+static uint32_t read_persistent_u32(const unsigned char* bytes)
+{
+	uint32_t value = 0;
+	for (int index = 3; index >= 0; index--)
+		value = (value << 8) | bytes[index];
+	return value;
+}
+
+static bool encode_persistent_value(lua_State* lua, int index, int version, unsigned char* outBytes, int capacity, int* outSize)
+{
+	if (!outBytes || !outSize || capacity < 8 || version < 0 || version > 65535)
+		return false;
+	unsigned char valueType = 0;
+	const char* payload = NULL;
+	char numberBuffer[128];
+	int payloadSize = 0;
+	if (lua_type(lua, index) == LUA_TSTRING)
+	{
+		size_t length = 0;
+		payload = lua_tolstring(lua, index, &length);
+		if (!payload || length > PANGEA_LUA_PERSISTENCE_MAX_VALUE_BYTES - 8)
+			return false;
+		valueType = 1;
+		payloadSize = (int)length;
+	}
+	else if (lua_type(lua, index) == LUA_TBOOLEAN)
+	{
+		payload = lua_toboolean(lua, index) ? "1" : "0";
+		valueType = 2;
+		payloadSize = 1;
+	}
+	else if (lua_isinteger(lua, index))
+	{
+		int written = snprintf(numberBuffer, sizeof(numberBuffer), "%lld", (long long)lua_tointeger(lua, index));
+		if (written <= 0 || written >= (int)sizeof(numberBuffer))
+			return false;
+		payload = numberBuffer;
+		valueType = 3;
+		payloadSize = written;
+	}
+	else if (lua_isnumber(lua, index))
+	{
+		lua_Number number = lua_tonumber(lua, index);
+		if (!isfinite((double)number))
+			return false;
+		int written = snprintf(numberBuffer, sizeof(numberBuffer), "%.17g", (double)number);
+		if (written <= 0 || written >= (int)sizeof(numberBuffer))
+			return false;
+		payload = numberBuffer;
+		valueType = 4;
+		payloadSize = written;
+	}
+	else
+	{
+		return false;
+	}
+
+	if (payloadSize < 0 || payloadSize > capacity - 8 || payloadSize > PANGEA_LUA_PERSISTENCE_MAX_VALUE_BYTES - 8)
+		return false;
+	outBytes[0] = 1;
+	outBytes[1] = valueType;
+	write_persistent_u16(outBytes + 2, (unsigned int)version);
+	write_persistent_u32(outBytes + 4, (uint32_t)payloadSize);
+	if (payloadSize > 0)
+		memcpy(outBytes + 8, payload, (size_t)payloadSize);
+	*outSize = payloadSize + 8;
+	return true;
+}
+
+static int find_persistent_entry(PangeaScriptBackend* backend, const char* key)
+{
+	for (int index = 0; index < PANGEA_LUA_PERSISTENCE_MAX_ENTRIES; index++)
+		if (backend->persistence[index].active && strcmp(backend->persistence[index].key, key) == 0)
+			return index;
+	return -1;
+}
+
+static int find_free_persistent_entry(PangeaScriptBackend* backend)
+{
+	for (int index = 0; index < PANGEA_LUA_PERSISTENCE_MAX_ENTRIES; index++)
+		if (!backend->persistence[index].active)
+			return index;
+	return -1;
+}
+
+static bool decode_persistent_value(lua_State* lua, const unsigned char* bytes, int size, int version)
+{
+	if (!bytes || size < 8 || bytes[0] != 1 || read_persistent_u16(bytes + 2) != (unsigned int)version)
+		return false;
+	uint32_t payloadSize = read_persistent_u32(bytes + 4);
+	if (payloadSize > (uint32_t)(size - 8) || payloadSize > PANGEA_LUA_PERSISTENCE_MAX_VALUE_BYTES - 8)
+		return false;
+	const char* payload = (const char*)(bytes + 8);
+	if (bytes[1] == 1)
+	{
+		lua_pushlstring(lua, payload, payloadSize);
+		return true;
+	}
+	if (bytes[1] == 2 && payloadSize == 1 && (payload[0] == '0' || payload[0] == '1'))
+	{
+		lua_pushboolean(lua, payload[0] == '1');
+		return true;
+	}
+	if (bytes[1] == 3 || bytes[1] == 4)
+	{
+		char numberBuffer[128];
+		if (payloadSize == 0 || payloadSize >= sizeof(numberBuffer))
+			return false;
+		memcpy(numberBuffer, payload, payloadSize);
+		numberBuffer[payloadSize] = '\0';
+		char* end = NULL;
+		if (bytes[1] == 3)
+		{
+			long long value = strtoll(numberBuffer, &end, 10);
+			if (!end || *end != '\0') return false;
+			lua_pushinteger(lua, (lua_Integer)value);
+			return true;
+		}
+		double value = strtod(numberBuffer, &end);
+		if (!end || *end != '\0' || !isfinite(value)) return false;
+		lua_pushnumber(lua, (lua_Number)value);
+		return true;
+	}
+	return false;
+}
+
+static int lua_persistence_get(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	char key[PANGEA_LUA_PERSISTENCE_MAX_KEY_BYTES];
+	int version = 0;
+	if (!persistent_key(lua, 1, key, sizeof(key)) || !persistent_version(lua, 2, &version))
+	{
+		lua_pushnil(lua);
+		return 1;
+	}
+	if (!backend->gameInfo.loadPersistent)
+	{
+		lua_pushnil(lua);
+		return 1;
+	}
+	unsigned char bytes[PANGEA_LUA_PERSISTENCE_MAX_VALUE_BYTES];
+	int size = 0;
+	PangeaScriptStatus status = backend->gameInfo.loadPersistent(key, bytes, sizeof(bytes), &size);
+	if (status != PANGEA_SCRIPT_OK || size < 8 || size > (int)sizeof(bytes) || !decode_persistent_value(lua, bytes, size, version))
+	{
+		lua_pushnil(lua);
+		return 1;
+	}
+	int entryIndex = find_persistent_entry(backend, key);
+	if (entryIndex < 0) entryIndex = find_free_persistent_entry(backend);
+	if (entryIndex >= 0)
+	{
+		int previousSize = backend->persistence[entryIndex].active ? backend->persistence[entryIndex].encodedBytes : 0;
+		if (backend->persistentBytes - previousSize + size <= PANGEA_LUA_PERSISTENCE_MAX_TOTAL_BYTES)
+		{
+			if (!backend->persistence[entryIndex].active)
+			{
+				backend->persistence[entryIndex].active = true;
+				snprintf(backend->persistence[entryIndex].key, sizeof(backend->persistence[entryIndex].key), "%s", key);
+			}
+			backend->persistentBytes = backend->persistentBytes - previousSize + size;
+			backend->persistence[entryIndex].encodedBytes = size;
+		}
+	}
+	return 1;
+}
+
+static int lua_persistence_set(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	char key[PANGEA_LUA_PERSISTENCE_MAX_KEY_BYTES];
+	unsigned char bytes[PANGEA_LUA_PERSISTENCE_MAX_VALUE_BYTES];
+	int size = 0;
+	int version = 0;
+	if (!persistent_key(lua, 1, key, sizeof(key)) || !persistent_version(lua, 2, &version) || !encode_persistent_value(lua, 3, version, bytes, sizeof(bytes), &size) || !backend->gameInfo.savePersistent)
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	int entryIndex = find_persistent_entry(backend, key);
+	if (entryIndex < 0) entryIndex = find_free_persistent_entry(backend);
+	if (entryIndex < 0) { lua_pushboolean(lua, false); return 1; }
+	int previousSize = backend->persistence[entryIndex].active ? backend->persistence[entryIndex].encodedBytes : 0;
+	if (backend->persistentBytes - previousSize + size > PANGEA_LUA_PERSISTENCE_MAX_TOTAL_BYTES)
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (backend->gameInfo.savePersistent(key, bytes, size) != PANGEA_SCRIPT_OK)
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (!backend->persistence[entryIndex].active)
+	{
+		backend->persistence[entryIndex].active = true;
+		snprintf(backend->persistence[entryIndex].key, sizeof(backend->persistence[entryIndex].key), "%s", key);
+	}
+	backend->persistentBytes = backend->persistentBytes - previousSize + size;
+	backend->persistence[entryIndex].encodedBytes = size;
+	lua_pushboolean(lua, true);
+	return 1;
+}
+
+static int lua_persistence_delete(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	char key[PANGEA_LUA_PERSISTENCE_MAX_KEY_BYTES];
+	if (!persistent_key(lua, 1, key, sizeof(key)) || !backend->gameInfo.savePersistent)
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (backend->gameInfo.savePersistent(key, NULL, 0) != PANGEA_SCRIPT_OK)
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	int entryIndex = find_persistent_entry(backend, key);
+	if (entryIndex >= 0)
+	{
+		backend->persistentBytes -= backend->persistence[entryIndex].encodedBytes;
+		backend->persistence[entryIndex] = (PangeaScriptPersistenceEntry){0};
+	}
+	lua_pushboolean(lua, true);
+	return 1;
 }
 
 static int lua_player_count(lua_State* lua)
@@ -615,6 +1289,8 @@ static int schedule_timer(lua_State* lua, bool repeating)
 		backend->timers[i].dueTimeSeconds = backend->currentLevelTimeSeconds + delaySeconds;
 		backend->timers[i].intervalSeconds = delaySeconds;
 		backend->timers[i].repeating = repeating;
+		backend->timers[i].hasOwner = backend->hasCurrentObject;
+		backend->timers[i].owner = backend->currentObject;
 		lua_pushinteger(lua, backend->timers[i].id);
 		return 1;
 	}
@@ -675,14 +1351,27 @@ static PangeaScriptStatus resume_task(PangeaScriptBackend* backend, int taskInde
 {
 	lua_State* thread = backend->tasks[taskIndex].thread;
 	int resultCount = 0;
+	int previousRunningTaskIndex = backend->runningTaskIndex;
+	backend->runningTaskIndex = taskIndex;
 	lua_sethook(thread, instruction_budget_hook, LUA_MASKCOUNT, PANGEA_LUA_EVENT_BUDGET);
 	int status = lua_resume(thread, backend->lua, 0, &resultCount);
 	lua_sethook(thread, NULL, 0, 0);
+	backend->runningTaskIndex = previousRunningTaskIndex;
 	if (status == LUA_YIELD)
 	{
+		if (!backend->tasks[taskIndex].active)
+		{
+			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[taskIndex].threadReference);
+			backend->tasks[taskIndex].threadReference = LUA_NOREF;
+			lua_settop(thread, 0);
+			return PANGEA_SCRIPT_OK;
+		}
 		if (resultCount != 1 || !lua_isnumber(thread, -1) || !isfinite((double) lua_tonumber(thread, -1)) || lua_tonumber(thread, -1) < 0.0)
 		{
 			copy_error(error, errorCapacity, "pangea.task.wait must yield one finite, non-negative delay");
+			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[taskIndex].threadReference);
+			backend->tasks[taskIndex].threadReference = LUA_NOREF;
+			backend->tasks[taskIndex].active = false;
 			lua_settop(thread, 0);
 			return PANGEA_SCRIPT_RUNTIME_ERROR;
 		}
@@ -693,6 +1382,7 @@ static PangeaScriptStatus resume_task(PangeaScriptBackend* backend, int taskInde
 	if (status == LUA_OK)
 	{
 		luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[taskIndex].threadReference);
+		backend->tasks[taskIndex].threadReference = LUA_NOREF;
 		backend->tasks[taskIndex].active = false;
 		return PANGEA_SCRIPT_OK;
 	}
@@ -702,6 +1392,7 @@ static PangeaScriptStatus resume_task(PangeaScriptBackend* backend, int taskInde
 	lua_pop(backend->lua, 1);
 	lua_settop(thread, 0);
 	luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[taskIndex].threadReference);
+	backend->tasks[taskIndex].threadReference = LUA_NOREF;
 	backend->tasks[taskIndex].active = false;
 	if (status == LUA_ERRMEM) return PANGEA_SCRIPT_BUDGET_EXCEEDED;
 	return strstr(error ? error : "", "instruction budget") ? PANGEA_SCRIPT_BUDGET_EXCEEDED : PANGEA_SCRIPT_RUNTIME_ERROR;
@@ -724,6 +1415,8 @@ static int lua_task_start(lua_State* lua)
 		backend->tasks[i].id = backend->nextTaskId;
 		backend->tasks[i].threadReference = threadReference;
 		backend->tasks[i].thread = thread;
+		backend->tasks[i].hasOwner = backend->hasCurrentObject;
+		backend->tasks[i].owner = backend->currentObject;
 		char taskError[512] = {0};
 		PangeaScriptStatus taskStatus = resume_task(backend, i, taskError, sizeof(taskError));
 		if (taskStatus != PANGEA_SCRIPT_OK)
@@ -775,6 +1468,8 @@ static int subscribe_event(lua_State* lua, bool once)
 		backend->subscriptions[i].active = true;
 		backend->subscriptions[i].id = backend->nextSubscriptionId;
 		backend->subscriptions[i].once = once;
+		backend->subscriptions[i].hasOwner = backend->hasCurrentObject;
+		backend->subscriptions[i].owner = backend->currentObject;
 		snprintf(backend->subscriptions[i].eventName, sizeof(backend->subscriptions[i].eventName), "%s", eventName);
 		lua_pushvalue(lua, 2);
 		backend->subscriptions[i].callbackReference = luaL_ref(lua, LUA_REGISTRYINDEX);
@@ -823,7 +1518,13 @@ static int lua_events_emit(lua_State* lua)
 		}
 		if (lua_gettop(lua) >= 2) lua_pushvalue(lua, 2); else lua_pushnil(lua);
 		char eventError[512] = {0};
+		bool previousHasObject = backend->hasCurrentObject;
+		PangeaScriptObjectHandle previousObject = backend->currentObject;
+		backend->hasCurrentObject = backend->subscriptions[i].hasOwner;
+		backend->currentObject = backend->subscriptions[i].owner;
 		PangeaScriptStatus status = protected_call(lua, 1, 0, PANGEA_LUA_EVENT_BUDGET, eventError, sizeof(eventError));
+		backend->hasCurrentObject = previousHasObject;
+		backend->currentObject = previousObject;
 		if (status != PANGEA_SCRIPT_OK) return luaL_error(lua, "%s", eventError);
 		delivered++;
 	}
@@ -870,20 +1571,23 @@ static int lua_random_seed(lua_State* lua)
 static int lua_capabilities(lua_State* lua)
 {
 	PangeaScriptBackend* backend = current_backend(lua);
-	lua_createtable(lua, 0, 19);
+	lua_createtable(lua, 0, 22);
+	lua_pushinteger(lua, PANGEA_SCRIPT_CONTRACT_VERSION); lua_setfield(lua, -2, "contractVersion");
+	lua_pushinteger(lua, PANGEA_LUA_API_VERSION); lua_setfield(lua, -2, "apiVersion");
 	lua_pushboolean(lua, true); lua_setfield(lua, -2, "levelSettings");
 	lua_pushboolean(lua, true); lua_setfield(lua, -2, "objectMutation");
 	lua_pushboolean(lua, true); lua_setfield(lua, -2, "objectPosition");
 	lua_pushboolean(lua, backend->gameInfo.spawnNative != NULL); lua_setfield(lua, -2, "spawnNative");
-	lua_pushboolean(lua, true); lua_setfield(lua, -2, "spawnScripted");
+	lua_pushboolean(lua, backend->gameInfo.spawnScripted != NULL); lua_setfield(lua, -2, "spawnScripted");
 	lua_pushboolean(lua, true); lua_setfield(lua, -2, "objectQueries");
 	lua_pushboolean(lua, true); lua_setfield(lua, -2, "timers");
 	lua_pushboolean(lua, true); lua_setfield(lua, -2, "tasks");
 	lua_pushboolean(lua, true); lua_setfield(lua, -2, "events");
 	lua_pushboolean(lua, backend->gameInfo.getPlayerCount != NULL && backend->gameInfo.getPlayer != NULL); lua_setfield(lua, -2, "playerLookup");
-	lua_pushboolean(lua, strstr(backend->gameInfo.gameId, "MightyMike") == NULL); lua_setfield(lua, -2, "terrainItems");
-	lua_pushboolean(lua, strstr(backend->gameInfo.gameId, "Nanosaur-android") == NULL && strstr(backend->gameInfo.gameId, "CroMag") == NULL && strstr(backend->gameInfo.gameId, "MightyMike") == NULL); lua_setfield(lua, -2, "splineItems");
-	lua_pushboolean(lua, strstr(backend->gameInfo.gameId, "MightyMike") != NULL); lua_setfield(lua, -2, "mapItems");
+	lua_pushboolean(lua, backend->gameInfo.loadPersistent != NULL && backend->gameInfo.savePersistent != NULL); lua_setfield(lua, -2, "persistence");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.terrainItems); lua_setfield(lua, -2, "terrainItems");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.splineItems); lua_setfield(lua, -2, "splineItems");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.mapItems); lua_setfield(lua, -2, "mapItems");
 	lua_pushinteger(lua, PANGEA_LUA_MEMORY_LIMIT); lua_setfield(lua, -2, "memoryLimitBytes");
 	lua_pushinteger(lua, PANGEA_LUA_LOAD_BUDGET); lua_setfield(lua, -2, "loadInstructionBudget");
 	lua_pushinteger(lua, PANGEA_LUA_EVENT_BUDGET); lua_setfield(lua, -2, "eventInstructionBudget");
@@ -900,19 +1604,43 @@ static int lua_diagnostics(lua_State* lua)
 	int activeTimers = 0;
 	int activeTasks = 0;
 	int activeSubscriptions = 0;
+	int activePersistentEntries = 0;
 	for (int i = 0; i < (int)(sizeof(backend->timers) / sizeof(backend->timers[0])); i++)
 		if (backend->timers[i].active) activeTimers++;
 	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
 		if (backend->tasks[i].active) activeTasks++;
 	for (int i = 0; i < (int)(sizeof(backend->subscriptions) / sizeof(backend->subscriptions[0])); i++)
 		if (backend->subscriptions[i].active) activeSubscriptions++;
-	lua_createtable(lua, 0, 6);
+	for (int i = 0; i < PANGEA_LUA_PERSISTENCE_MAX_ENTRIES; i++)
+		if (backend->persistence[i].active) activePersistentEntries++;
+	lua_createtable(lua, 0, 12);
 	lua_pushinteger(lua, (lua_Integer) backend->allocatedBytes); lua_setfield(lua, -2, "memoryUsedBytes");
 	lua_pushinteger(lua, (lua_Integer) backend->memoryLimitBytes); lua_setfield(lua, -2, "memoryLimitBytes");
 	lua_pushinteger(lua, activeTimers); lua_setfield(lua, -2, "activeTimers");
 	lua_pushinteger(lua, activeTasks); lua_setfield(lua, -2, "activeTasks");
 	lua_pushinteger(lua, activeSubscriptions); lua_setfield(lua, -2, "activeSubscriptions");
 	lua_pushinteger(lua, (lua_Integer) backend->currentFrameNum); lua_setfield(lua, -2, "frameNum");
+	PangeaScriptCommandTrace trace;
+	PangeaScript_GetCommandTrace(&trace);
+	lua_pushinteger(lua, (lua_Integer) trace.commandCount); lua_setfield(lua, -2, "commandCount");
+	lua_pushinteger(lua, (lua_Integer) trace.hash); lua_setfield(lua, -2, "commandHash");
+	lua_pushboolean(lua, trace.overflow); lua_setfield(lua, -2, "commandTraceOverflow");
+	lua_createtable(lua, (int) trace.entryCount, 0);
+	for (int index = 0; index < (int) trace.entryCount; index++)
+	{
+		PangeaScriptCommandTraceEntry entry;
+		if (!PangeaScript_GetCommandTraceEntry(index, &entry))
+			continue;
+		lua_createtable(lua, 0, 4);
+		lua_pushstring(lua, entry.commandId); lua_setfield(lua, -2, "id");
+		lua_pushinteger(lua, entry.target.id); lua_setfield(lua, -2, "objectId");
+		lua_pushinteger(lua, (lua_Integer) entry.target.generation); lua_setfield(lua, -2, "generation");
+		lua_pushinteger(lua, entry.status); lua_setfield(lua, -2, "status");
+		lua_rawseti(lua, -2, index + 1);
+	}
+	lua_setfield(lua, -2, "commandTrace");
+	lua_pushinteger(lua, backend->persistentBytes); lua_setfield(lua, -2, "persistentBytes");
+	lua_pushinteger(lua, activePersistentEntries); lua_setfield(lua, -2, "persistentEntries");
 	return 1;
 }
 
@@ -953,14 +1681,22 @@ static void open_safe_libraries(lua_State* lua)
 
 static void push_supported_hooks(lua_State* lua, const char* gameId)
 {
-	static const char* levelHooks[] = {"onGameStart", "onGameShutdown", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "onTerrainItem", "onSplineItem", "onObjectFrame", "onPickupCollected", "onWeaponHit", "onTriggerEnter"};
-	static const char* raceHooks[] = {"onGameStart", "onGameShutdown", "onRaceLoad", "onRaceStart", "onRaceFrame", "onRaceComplete", "onRaceUnload", "onTerrainItem", "onObjectFrame", "onPickupCollected", "onWeaponHit", "onTriggerEnter"};
-	static const char* areaHooks[] = {"onGameStart", "onGameShutdown", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "onTerrainItem", "onSplineItem", "onObjectFrame", "onPickupCollected", "onWeaponHit", "onTriggerEnter"};
-	static const char* mapAreaHooks[] = {"onGameStart", "onGameShutdown", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "onMapItem", "onObjectFrame", "onPickupCollected", "onWeaponHit", "onTriggerEnter"};
-	static const char* nanosaurHooks[] = {"onGameStart", "onGameShutdown", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "onTerrainItem", "onObjectFrame", "onPickupCollected", "onWeaponHit", "onTriggerEnter"};
+	#define PANGEA_SCRIPT_HOOK_NAME(name) name,
+	static const char* levelHooks[] = {PANGEA_SCRIPT_LEVEL_HOOK_LIST(PANGEA_SCRIPT_HOOK_NAME)};
+	static const char* bugdom2Hooks[] = {PANGEA_SCRIPT_BUGDOM2_HOOK_LIST(PANGEA_SCRIPT_HOOK_NAME)};
+	static const char* raceHooks[] = {PANGEA_SCRIPT_RACE_HOOK_LIST(PANGEA_SCRIPT_HOOK_NAME)};
+	static const char* areaHooks[] = {PANGEA_SCRIPT_AREA_HOOK_LIST(PANGEA_SCRIPT_HOOK_NAME)};
+	static const char* mapAreaHooks[] = {PANGEA_SCRIPT_MAP_AREA_HOOK_LIST(PANGEA_SCRIPT_HOOK_NAME)};
+	static const char* nanosaurHooks[] = {PANGEA_SCRIPT_NANOSAUR_HOOK_LIST(PANGEA_SCRIPT_HOOK_NAME)};
+	#undef PANGEA_SCRIPT_HOOK_NAME
 	const char* const* hooks = levelHooks;
 	int count = (int)(sizeof(levelHooks) / sizeof(levelHooks[0]));
-	if (strstr(gameId, "CroMag"))
+	if (strcmp(gameId, "Bugdom2-Android") == 0)
+	{
+		hooks = bugdom2Hooks;
+		count = (int)(sizeof(bugdom2Hooks) / sizeof(bugdom2Hooks[0]));
+	}
+	else if (strstr(gameId, "CroMag"))
 	{
 		hooks = raceHooks;
 		count = (int)(sizeof(raceHooks) / sizeof(raceHooks[0]));
@@ -997,7 +1733,7 @@ static void install_pangea(PangeaScriptBackend* backend)
 	lua_setfield(lua, -2, "path");
 	lua_pop(lua, 1);
 	lua_createtable(lua, 0, 6);
-	lua_createtable(lua, 0, 5); lua_pushinteger(lua, PANGEA_LUA_API_VERSION); lua_setfield(lua, -2, "version"); lua_pushinteger(lua, PANGEA_LUA_MIN_API_VERSION); lua_setfield(lua, -2, "minimumVersion"); set_function(lua, "requireVersion", lua_api_require_version); set_backend_function(lua, "capabilities", lua_capabilities, backend); set_backend_function(lua, "diagnostics", lua_diagnostics, backend); lua_setfield(lua, -2, "api");
+	lua_createtable(lua, 0, 7); lua_pushinteger(lua, PANGEA_SCRIPT_CONTRACT_VERSION); lua_setfield(lua, -2, "contractVersion"); lua_pushinteger(lua, PANGEA_LUA_API_VERSION); lua_setfield(lua, -2, "apiVersion"); lua_pushinteger(lua, PANGEA_LUA_API_VERSION); lua_setfield(lua, -2, "version"); lua_pushinteger(lua, PANGEA_LUA_MIN_API_VERSION); lua_setfield(lua, -2, "minimumVersion"); set_function(lua, "requireVersion", lua_api_require_version); set_backend_function(lua, "capabilities", lua_capabilities, backend); set_backend_function(lua, "diagnostics", lua_diagnostics, backend); lua_setfield(lua, -2, "api");
 	lua_createtable(lua, 0, 3);
 	for (int level = PANGEA_LOG_INFO; level <= PANGEA_LOG_ERROR; level++)
 	{
@@ -1006,12 +1742,13 @@ static void install_pangea(PangeaScriptBackend* backend)
 	}
 	lua_setfield(lua, -2, "log");
 	lua_createtable(lua, 0, 3); set_function(lua, "native", lua_spawn_native); set_function(lua, "nativeResult", lua_spawn_native_result); set_function(lua, "scripted", lua_spawn_scripted); lua_setfield(lua, -2, "spawn");
-	lua_createtable(lua, 0, 15); set_function(lua, "exists", lua_object_exists); set_function(lua, "all", lua_object_all); set_function(lua, "findByTag", lua_object_find_by_tag); set_function(lua, "nearest", lua_object_nearest); set_function(lua, "position", lua_object_position); set_function(lua, "setPosition", lua_object_set_position); set_function(lua, "setVelocity", lua_object_set_velocity); set_function(lua, "setRotation", lua_object_set_rotation); set_function(lua, "setScale", lua_object_set_scale); set_function(lua, "setAnimation", lua_object_set_animation); set_function(lua, "tags", lua_object_tags); set_function(lua, "hasTag", lua_object_has_tag); set_function(lua, "state", lua_object_state); set_function(lua, "delete", lua_object_delete); lua_setfield(lua, -2, "object");
+	lua_createtable(lua, 0, 25); set_function(lua, "exists", lua_object_exists); set_function(lua, "all", lua_object_all); set_function(lua, "findByTag", lua_object_find_by_tag); set_function(lua, "nearest", lua_object_nearest); set_function(lua, "position", lua_object_position); set_function(lua, "source", lua_object_source); set_function(lua, "setPosition", lua_object_set_position); set_function(lua, "setPositionResult", lua_object_set_position_result); set_function(lua, "setVelocity", lua_object_set_velocity); set_function(lua, "setVelocityResult", lua_object_set_velocity_result); set_function(lua, "setRotation", lua_object_set_rotation); set_function(lua, "setRotationResult", lua_object_set_rotation_result); set_function(lua, "setScale", lua_object_set_scale); set_function(lua, "setScaleResult", lua_object_set_scale_result); set_function(lua, "setAnimation", lua_object_set_animation); set_function(lua, "setAnimationResult", lua_object_set_animation_result); set_function(lua, "setActive", lua_object_set_active); set_function(lua, "setActiveResult", lua_object_set_active_result); set_function(lua, "tags", lua_object_tags); set_function(lua, "hasTag", lua_object_has_tag); set_function(lua, "state", lua_object_state); set_function(lua, "delete", lua_object_delete); set_function(lua, "deleteResult", lua_object_delete_result); lua_setfield(lua, -2, "object");
 	lua_createtable(lua, 0, 2); set_function(lua, "setting", lua_level_setting); set_backend_function(lua, "current", lua_level_current, backend); lua_setfield(lua, -2, "level");
 	lua_createtable(lua, 0, 7); set_backend_function(lua, "frame", lua_time_frame, backend); set_backend_function(lua, "delta", lua_time_delta, backend); set_backend_function(lua, "level", lua_time_level, backend); set_backend_function(lua, "after", lua_time_after, backend); set_backend_function(lua, "every", lua_time_every, backend); set_backend_function(lua, "cancel", lua_time_cancel, backend); set_backend_function(lua, "isActive", lua_time_is_active, backend); lua_setfield(lua, -2, "time");
 	lua_createtable(lua, 0, 4); set_backend_function(lua, "start", lua_task_start, backend); set_function(lua, "wait", lua_task_wait); set_backend_function(lua, "cancel", lua_task_cancel, backend); set_backend_function(lua, "isActive", lua_task_is_active, backend); lua_setfield(lua, -2, "task");
 	lua_createtable(lua, 0, 4); set_backend_function(lua, "on", lua_events_on, backend); set_backend_function(lua, "once", lua_events_once, backend); set_backend_function(lua, "off", lua_events_off, backend); set_backend_function(lua, "emit", lua_events_emit, backend); lua_setfield(lua, -2, "events");
 	lua_createtable(lua, 0, 3); set_backend_function(lua, "number", lua_random_number, backend); set_backend_function(lua, "integer", lua_random_integer, backend); set_backend_function(lua, "seed", lua_random_seed, backend); lua_setfield(lua, -2, "random");
+	lua_createtable(lua, 0, 3); set_backend_function(lua, "get", lua_persistence_get, backend); set_backend_function(lua, "set", lua_persistence_set, backend); set_backend_function(lua, "delete", lua_persistence_delete, backend); lua_setfield(lua, -2, "persistence");
 	lua_createtable(lua, 0, 2); set_backend_function(lua, "count", lua_player_count, backend); set_backend_function(lua, "get", lua_player_get, backend); lua_setfield(lua, -2, "player");
 	lua_createtable(lua, 0, 4); lua_pushstring(lua, gameInfo->gameId); lua_setfield(lua, -2, "id"); lua_pushstring(lua, gameInfo->gameName); lua_setfield(lua, -2, "name"); push_supported_hooks(lua, gameInfo->gameId); lua_setfield(lua, -2, "supportedHooks"); lua_createtable(lua, 0, 0); lua_setfield(lua, -2, "tags"); lua_setfield(lua, -2, "game");
 	lua_pushvalue(lua, -1); lua_setglobal(lua, "pangea");
@@ -1050,12 +1787,17 @@ static bool reset_lua(PangeaScriptBackend* backend)
 	backend->currentFrameNum = 0;
 	backend->currentDeltaSeconds = 0.0f;
 	backend->currentLevelTimeSeconds = 0.0f;
+	backend->hasCurrentObject = false;
+	backend->currentObject = (PangeaScriptObjectHandle){0};
+	backend->runningTaskIndex = -1;
 	backend->nextTimerId = 0;
 	backend->nextTaskId = 0;
 	backend->nextSubscriptionId = 0;
+	backend->persistentBytes = 0;
 	memset(backend->timers, 0, sizeof(backend->timers));
 	memset(backend->tasks, 0, sizeof(backend->tasks));
 	memset(backend->subscriptions, 0, sizeof(backend->subscriptions));
+	memset(backend->persistence, 0, sizeof(backend->persistence));
 	backend->lua = lua_newstate(limited_allocator, backend);
 	backend->entryReference = LUA_NOREF;
 	if (!backend->lua)
@@ -1142,6 +1884,7 @@ void PangeaScriptBackend_Destroy(PangeaScriptBackend* backend) { if (backend) { 
 PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* source, char* error, int errorCapacity)
 {
 	if (!backend || !source) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	PangeaScript_ResetCommandTrace();
 	if (!reset_lua(backend))
 	{
 		copy_error(error, errorCapacity, "Unable to allocate the Lua state");
@@ -1156,10 +1899,9 @@ PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const 
 PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backend, PangeaScriptHook hook, const PangeaScriptLevelContext* context, char* error, int errorCapacity)
 {
 	if (!backend || !context) return PANGEA_SCRIPT_BAD_ARGUMENT;
-	if (hook == PANGEA_SCRIPT_HOOK_LEVEL_LOAD)
+	if (hook == PANGEA_SCRIPT_HOOK_LEVEL_LOAD || hook == PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD)
 	{
-		clear_timers(backend);
-		clear_tasks(backend);
+		PangeaScriptBackend_ResetObjectStates(backend);
 		backend->currentFrameNum = 0;
 		backend->currentDeltaSeconds = 0.0f;
 		backend->currentLevelTimeSeconds = 0.0f;
@@ -1183,7 +1925,13 @@ static PangeaScriptStatus call_due_timers(PangeaScriptBackend* backend, char* er
 		else backend->timers[i].active = false;
 		lua_rawgeti(backend->lua, LUA_REGISTRYINDEX, callbackReference);
 		if (!repeating) luaL_unref(backend->lua, LUA_REGISTRYINDEX, callbackReference);
+		bool previousHasObject = backend->hasCurrentObject;
+		PangeaScriptObjectHandle previousObject = backend->currentObject;
+		backend->hasCurrentObject = backend->timers[i].hasOwner;
+		backend->currentObject = backend->timers[i].owner;
 		PangeaScriptStatus status = protected_call(backend->lua, 0, 0, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
+		backend->hasCurrentObject = previousHasObject;
+		backend->currentObject = previousObject;
 		if (status != PANGEA_SCRIPT_OK)
 		{
 			if (repeating && backend->timers[i].active)
@@ -1202,7 +1950,13 @@ static PangeaScriptStatus call_due_tasks(PangeaScriptBackend* backend, char* err
 	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
 	{
 		if (!backend->tasks[i].active || backend->tasks[i].dueTimeSeconds > backend->currentLevelTimeSeconds) continue;
+		bool previousHasObject = backend->hasCurrentObject;
+		PangeaScriptObjectHandle previousObject = backend->currentObject;
+		backend->hasCurrentObject = backend->tasks[i].hasOwner;
+		backend->currentObject = backend->tasks[i].owner;
 		PangeaScriptStatus status = resume_task(backend, i, error, errorCapacity);
+		backend->hasCurrentObject = previousHasObject;
+		backend->currentObject = previousObject;
 		if (status != PANGEA_SCRIPT_OK) return status;
 	}
 	return PANGEA_SCRIPT_OK;
@@ -1309,6 +2063,11 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 	lua_setfield(backend->lua, -2, "objectType");
 	lua_pushstring(backend->lua, context->event ? context->event : "frame");
 	lua_setfield(backend->lua, -2, "event");
+	if (context->hasEventValue)
+	{
+		lua_pushinteger(backend->lua, context->eventValue);
+		lua_setfield(backend->lua, -2, "eventValue");
+	}
 	lua_createtable(backend->lua, context->tagCount, 0);
 	for (int i = 0; i < context->tagCount; i++)
 	{
@@ -1316,7 +2075,23 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 		lua_rawseti(backend->lua, -2, i + 1);
 	}
 	lua_setfield(backend->lua, -2, "tags");
-	PangeaScriptStatus status = protected_call(backend->lua, 1, 1, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity); if (status == PANGEA_SCRIPT_OK) status = validate_hook_result(backend->lua, "onObjectFrame", error, errorCapacity); if (status == PANGEA_SCRIPT_OK) status = validate_result_fields(backend->lua, "onObjectFrame", kObjectResultFields, 1, error, errorCapacity); if (status == PANGEA_SCRIPT_OK && lua_istable(backend->lua, -1)) { lua_getfield(backend->lua, -1, "positionOffset"); result->hasPositionOffset = read_vector(backend->lua, -1, &result->positionOffset); lua_pop(backend->lua, 1); } if (status == PANGEA_SCRIPT_OK) lua_pop(backend->lua, 1); return status;
+	bool previousHasObject = backend->hasCurrentObject;
+	PangeaScriptObjectHandle previousObject = backend->currentObject;
+	backend->hasCurrentObject = true;
+	backend->currentObject = context->object;
+	PangeaScriptStatus status = protected_call(backend->lua, 1, 1, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity);
+	backend->hasCurrentObject = previousHasObject;
+	backend->currentObject = previousObject;
+	if (status == PANGEA_SCRIPT_OK) status = validate_hook_result(backend->lua, "onObjectFrame", error, errorCapacity);
+	if (status == PANGEA_SCRIPT_OK) status = validate_result_fields(backend->lua, "onObjectFrame", kObjectResultFields, 1, error, errorCapacity);
+	if (status == PANGEA_SCRIPT_OK && lua_istable(backend->lua, -1))
+	{
+		lua_getfield(backend->lua, -1, "positionOffset");
+		result->hasPositionOffset = read_vector(backend->lua, -1, &result->positionOffset);
+		lua_pop(backend->lua, 1);
+	}
+	if (status == PANGEA_SCRIPT_OK) lua_pop(backend->lua, 1);
+	return status;
 }
 
 static bool read_optional_boolean(lua_State* lua, int tableIndex, const char* field, bool* value)
@@ -1419,6 +2194,92 @@ PangeaScriptStatus PangeaScriptBackend_CallWeaponHitHook(PangeaScriptBackend* ba
 		read_optional_boolean(backend->lua, -1, "destroyTarget", &result->destroyTarget);
 		lua_getfield(backend->lua, -1, "damage"); if (lua_isnumber(backend->lua, -1)) result->damage = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
 	}
+	if (status == PANGEA_SCRIPT_OK && (!isfinite(result->damage) || result->damage < 0.0f))
+	{
+		copy_error(error, errorCapacity, "onWeaponHit result field 'damage' must be finite and non-negative");
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	}
 	lua_pop(backend->lua, 1);
+	return status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallDamageHook(PangeaScriptBackend* backend, const PangeaScriptDamageContext* context, PangeaScriptDamageResult* result, char* error, int errorCapacity)
+{
+	if (!backend || !context || !result) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!push_hook(backend, "onDamage")) return PANGEA_SCRIPT_OK;
+	push_base_context(backend, context->levelNum);
+	lua_pushinteger(backend->lua, context->playerNum); lua_setfield(backend->lua, -2, "playerNum");
+	lua_pushinteger(backend->lua, context->cause); lua_setfield(backend->lua, -2, "cause");
+	lua_pushnumber(backend->lua, context->damage); lua_setfield(backend->lua, -2, "damage");
+	push_optional_handle(backend->lua, context->source); lua_setfield(backend->lua, -2, "source");
+	push_handle(backend->lua, context->target); lua_setfield(backend->lua, -2, "target");
+	push_vector(backend->lua, context->position.x, context->position.y, context->position.z); lua_setfield(backend->lua, -2, "position");
+	PangeaScriptStatus status = protected_call(backend->lua, 1, 1, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
+	if (status != PANGEA_SCRIPT_OK) return status;
+	status = validate_hook_result(backend->lua, "onDamage", error, errorCapacity);
+	if (status == PANGEA_SCRIPT_OK) status = validate_result_fields(backend->lua, "onDamage", kDamageResultFields, 3, error, errorCapacity);
+	if (status == PANGEA_SCRIPT_OK && lua_istable(backend->lua, -1))
+	{
+		read_optional_boolean(backend->lua, -1, "handled", &result->handled);
+		result->hasApplyDamage = read_optional_boolean(backend->lua, -1, "applyDamage", &result->applyDamage);
+		lua_getfield(backend->lua, -1, "damage");
+		if (lua_isnumber(backend->lua, -1))
+		{
+			result->hasDamage = true;
+			result->damage = (float)lua_tonumber(backend->lua, -1);
+		}
+		lua_pop(backend->lua, 1);
+	}
+	if (status == PANGEA_SCRIPT_OK && result->hasDamage && result->damage < 0.0f)
+	{
+		copy_error(error, errorCapacity, "onDamage result field 'damage' must be non-negative");
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	}
+	if (status == PANGEA_SCRIPT_OK || result->hasDamage) lua_pop(backend->lua, 1);
+	return status;
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallDamageAppliedHook(PangeaScriptBackend* backend, const PangeaScriptDamageContext* context, char* error, int errorCapacity)
+{
+	if (!backend || !context) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!push_hook(backend, "onDamageApplied")) return PANGEA_SCRIPT_OK;
+	push_base_context(backend, context->levelNum);
+	lua_pushinteger(backend->lua, context->playerNum); lua_setfield(backend->lua, -2, "playerNum");
+	lua_pushinteger(backend->lua, context->cause); lua_setfield(backend->lua, -2, "cause");
+	lua_pushnumber(backend->lua, context->damage); lua_setfield(backend->lua, -2, "damage");
+	push_optional_handle(backend->lua, context->source); lua_setfield(backend->lua, -2, "source");
+	push_handle(backend->lua, context->target); lua_setfield(backend->lua, -2, "target");
+	push_vector(backend->lua, context->position.x, context->position.y, context->position.z); lua_setfield(backend->lua, -2, "position");
+	return protected_call(backend->lua, 1, 0, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
+}
+
+static bool is_supported_player_event(const char* event)
+{
+	return event && (strcmp(event, "onDeath") == 0 || strcmp(event, "onPlayerSpawn") == 0 || strcmp(event, "onPlayerRespawn") == 0);
+}
+
+PangeaScriptStatus PangeaScriptBackend_CallPlayerEvent(PangeaScriptBackend* backend, const PangeaScriptPlayerEventContext* context, const char* event, char* error, int errorCapacity)
+{
+	if (!backend || !context || !is_supported_player_event(event)) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!push_hook(backend, event)) return PANGEA_SCRIPT_OK;
+	push_base_context(backend, context->levelNum);
+	lua_pushinteger(backend->lua, context->playerNum); lua_setfield(backend->lua, -2, "playerNum");
+	push_handle(backend->lua, context->player); lua_setfield(backend->lua, -2, "player");
+	if (strcmp(event, "onDeath") == 0)
+	{
+		lua_pushinteger(backend->lua, context->eventValue); lua_setfield(backend->lua, -2, "eventValue");
+	}
+	else
+	{
+		push_vector(backend->lua, context->position.x, context->position.y, context->position.z);
+		lua_setfield(backend->lua, -2, "position");
+	}
+	bool previousHasObject = backend->hasCurrentObject;
+	PangeaScriptObjectHandle previousObject = backend->currentObject;
+	backend->hasCurrentObject = context->player.id > 0 && context->player.generation > 0;
+	backend->currentObject = context->player;
+	PangeaScriptStatus status = protected_call(backend->lua, 1, 0, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
+	backend->hasCurrentObject = previousHasObject;
+	backend->currentObject = previousObject;
 	return status;
 }

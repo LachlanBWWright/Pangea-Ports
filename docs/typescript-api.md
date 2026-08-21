@@ -1,7 +1,13 @@
 # TypeScript API
 
-The type package lives at `shared/script-types` and exports the authoring API
-shape for game scripts.
+> Legacy compatibility note: production Pangea Ports scripts are authored in
+> Lua and use the generated declarations described in `lua-scripting.md`.
+> `shared/script-types` is retained only for historical TypeScript fixtures and
+> is not a runtime or editor authoring path.
+
+The package below documents the retained compatibility surface for old examples.
+New scripts should use Lua so their hooks and APIs are validated against the
+machine-readable editor/runtime contract.
 
 ```ts
 import { pangea, defineTerrainItem } from "@pangea-ports/script-types";

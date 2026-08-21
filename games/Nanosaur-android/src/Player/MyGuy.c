@@ -156,14 +156,17 @@ float	y;
 
 void ResetPlayer(void)
 {
-ObjNode	*theNode = gPlayerObj;
-
+	ObjNode	*theNode = gPlayerObj;
 	gNumLives--;
 	if (gNumLives < 0)
 	{
 		gGameOverFlag = true;
 		return;
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnCheckpointReset();
+#endif
 	
 
 	gPlayerGotKilledFlag = false;
@@ -202,9 +205,13 @@ ObjNode	*theNode = gPlayerObj;
 	
 	
 	
-			/* AND RESET WEAPONS INVENTORY */
+	/* AND RESET WEAPONS INVENTORY */
 			
 	InitWeaponManager();
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnPlayerRespawn(theNode);
+#endif
 }
 
 
@@ -1015,8 +1022,15 @@ void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean o
 	if (theNode->InvincibleTimer < INVINCIBILITY_DURATION_SHORT)
 		theNode->InvincibleTimer = INVINCIBILITY_DURATION_SHORT;	// make me invincible for a shorter while
 	
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!NanosaurScript_OnDamage(theNode, damage, 0, &damage))
+		return;
+	#endif
 	
 	gMyHealth -= damage;										// take damage
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnDamageApplied(damage, 0);
+	#endif
 	gInfobarUpdateBits |= UPDATE_HEALTH;						// tell system to update this at end of frame
 	if (gMyHealth <= 0)											// see if was killed
 		KillPlayer(theNode);
@@ -1033,6 +1047,9 @@ static void KillPlayer(ObjNode *theNode)
 		theNode->StatusBits &= ~STATUS_BIT_HIDDEN;				// un-hide me -- camera gets reset to third-person mode
 		MorphToSkeletonAnim(theNode->Skeleton,PLAYER_ANIM_DEATH,1.5);
 		gPlayerGotKilledFlag = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_OnDeath(0);
+#endif
 	}
 }
 
@@ -1099,8 +1116,3 @@ float	fps = gFramesPerSecondFrac;
 	
 	UpdateObjectTransforms(theNode);
 }
-
-
-
-
-

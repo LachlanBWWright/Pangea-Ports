@@ -32,8 +32,10 @@ function makeContext(
     deltaSeconds: 1 / 60,
     levelTimeSeconds,
     object: { id: 1, generation: 1 },
+    objectType: "test.object",
     position: { x: 0, y: 0, z: 0 },
     tags,
+    event: "update",
   };
 }
 

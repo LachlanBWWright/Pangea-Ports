@@ -1030,7 +1030,17 @@ OGLVector3D	splatVec;
 
 	if (player->Health > 0.0f)									// if not already dead
 	{
-		player->Health -= bullet->Damage;		
+		float damage = bullet->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!BillyScript_OnDamage(bullet, damage, 0, &damage))
+			return;
+#endif
+		player->Health -= damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_OnDamageApplied(player, damage, 0);
+		if (player->Health <= 0.0f)
+			BillyScript_OnDeath(player, 0);
+#endif
 	}
 
 				/*****************************/
@@ -1145,5 +1155,3 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
-

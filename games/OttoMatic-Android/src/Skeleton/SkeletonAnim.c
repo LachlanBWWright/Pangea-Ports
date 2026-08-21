@@ -238,7 +238,7 @@ float	fps;
 		eventType = skeletonDef->AnimEventsList[animNum][animEventIndex].type;
 		eventValue = skeletonDef->AnimEventsList[animNum][animEventIndex].value;
 #ifdef PANGEA_ENABLE_SCRIPTING
-		OttoScript_OnAnimationEvent(theNode);
+		OttoScript_OnAnimationEvent(theNode, eventValue);
 #endif
 
 		switch(eventType)
@@ -783,7 +783,6 @@ int	numJoints,i;
 		}
 	}
 }
-
 
 
 

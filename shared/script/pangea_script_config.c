@@ -1,4 +1,6 @@
 #include "pangea_script_config.h"
+#include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +32,12 @@ static bool match_char(Parser* p, char expected)
 
 static bool parse_string(Parser* p, char* outStr, int capacity)
 {
+	bool truncated = false;
+	if (!outStr || capacity <= 0)
+	{
+		snprintf(p->errorMsg, p->errorCapacity, "String output buffer is invalid");
+		return false;
+	}
 	skip_whitespace(p);
 	if (*p->cursor != '"')
 	{
@@ -69,6 +77,10 @@ static bool parse_string(Parser* p, char* outStr, int capacity)
 		{
 			outStr[len++] = c;
 		}
+		else
+		{
+			truncated = true;
+		}
 		p->cursor++;
 	}
 	if (*p->cursor != '"')
@@ -77,6 +89,11 @@ static bool parse_string(Parser* p, char* outStr, int capacity)
 		return false;
 	}
 	p->cursor++; // skip '"'
+	if (truncated)
+	{
+		snprintf(p->errorMsg, p->errorCapacity, "String exceeds the supported length of %d characters", capacity - 1);
+		return false;
+	}
 	outStr[len] = '\0';
 	return true;
 }
@@ -89,6 +106,11 @@ static bool parse_number(Parser* p, double* outNum)
 	if (endptr == p->cursor)
 	{
 		snprintf(p->errorMsg, p->errorCapacity, "Expected number");
+		return false;
+	}
+	if (!isfinite(val))
+	{
+		snprintf(p->errorMsg, p->errorCapacity, "Number must be finite");
 		return false;
 	}
 	p->cursor = endptr;
@@ -212,8 +234,21 @@ static bool skip_value(Parser* p)
 
 static bool is_integer_number(double value)
 {
-	int intValue = (int)value;
-	return (double)intValue == value;
+	return isfinite(value) && value >= (double)INT_MIN && value <= (double)INT_MAX && floor(value) == value;
+}
+
+static bool parse_integer(Parser* p, int* outValue)
+{
+	double value;
+	if (!parse_number(p, &value))
+		return false;
+	if (!is_integer_number(value))
+	{
+		snprintf(p->errorMsg, p->errorCapacity, "Expected a 32-bit integer");
+		return false;
+	}
+	*outValue = (int)value;
+	return true;
 }
 
 static bool parse_level_settings_object(Parser* p, PangeaConfigLevel* level)
@@ -463,21 +498,15 @@ static bool parse_item_overrides_array(Parser* p, PangeaConfigLevel* level, int 
 				return false;
 			}
 
-			double val;
-			if (!parse_number(p, &val))
-			{
-				snprintf(p->errorMsg, p->errorCapacity, "override values must be numbers");
-				return false;
-			}
-
 			if (strcmp(key, "from") == 0)
 			{
-				fromType = (int) val;
+				if (!parse_integer(p, &fromType)) return false;
 			}
 			else if (strcmp(key, "to") == 0)
 			{
-				toType = (int) val;
+				if (!parse_integer(p, &toType)) return false;
 			}
+			else if (!skip_value(p)) return false;
 
 			skip_whitespace(p);
 			if (match_char(p, ','))
@@ -571,9 +600,7 @@ static bool parse_custom_visual(Parser* p, PangeaScriptCustomObjectDefinition* d
 			}
 			else
 			{
-				double value;
-				if (!parse_number(p, &value)) return false;
-				definition->initialAnimation = (int)value;
+				if (!parse_integer(p, &definition->initialAnimation)) return false;
 			}
 		}
 		else if (strcmp(key, "animations") == 0)
@@ -583,14 +610,14 @@ static bool parse_custom_visual(Parser* p, PangeaScriptCustomObjectDefinition* d
 			{
 				if (match_char(p, '}')) break;
 				char animationName[64];
-				double animationIndex;
+				int animationIndex;
 				if (!parse_string(p, animationName, sizeof(animationName)) ||
-					!match_char(p, ':') || !parse_number(p, &animationIndex)) return false;
+					!match_char(p, ':') || !parse_integer(p, &animationIndex)) return false;
 				if (definition->animationCount < 16)
 				{
 					int index = definition->animationCount++;
 					snprintf(definition->animationNames[index], sizeof(definition->animationNames[index]), "%s", animationName);
-					definition->animationIndices[index] = (int) animationIndex;
+					definition->animationIndices[index] = animationIndex;
 				}
 				if (match_char(p, ',')) continue;
 				if (*p->cursor != '}') return false;
@@ -598,11 +625,13 @@ static bool parse_custom_visual(Parser* p, PangeaScriptCustomObjectDefinition* d
 		}
 		else if (strcmp(key, "modelObject") == 0 || strcmp(key, "skeletonType") == 0 || strcmp(key, "slot") == 0)
 		{
-			double value;
-			if (!parse_number(p, &value)) return false;
-			if (strcmp(key, "modelObject") == 0) definition->modelObject = (int)value;
-			else if (strcmp(key, "skeletonType") == 0) definition->skeletonType = (int)value;
-			else definition->slot = (int)value;
+			if (strcmp(key, "modelObject") == 0) {
+				if (!parse_integer(p, &definition->modelObject)) return false;
+			}
+			else if (strcmp(key, "skeletonType") == 0) {
+				if (!parse_integer(p, &definition->skeletonType)) return false;
+			}
+			else if (!parse_integer(p, &definition->slot)) return false;
 		}
 		else if (strcmp(key, "scale") == 0 || strcmp(key, "animationSpeed") == 0)
 		{
@@ -619,10 +648,22 @@ static bool parse_custom_visual(Parser* p, PangeaScriptCustomObjectDefinition* d
 
 static bool parse_custom_collision(Parser* p, PangeaScriptCustomObjectDefinition* definition)
 {
+	bool hasWidth = false;
+	bool hasHeight = false;
+	bool hasDepth = false;
 	if (!match_char(p, '{')) return false;
 	while (true)
 	{
-		if (match_char(p, '}')) return true;
+		if (match_char(p, '}'))
+		{
+			if ((hasWidth || hasHeight || hasDepth) && (!hasWidth || !hasHeight || !hasDepth))
+			{
+				snprintf(p->errorMsg, p->errorCapacity, "collision bounds require width, height, and depth");
+				return false;
+			}
+			definition->collisionBoundsSet = hasWidth && hasHeight && hasDepth;
+			return true;
+		}
 		char key[64];
 		if (!parse_string(p, key, sizeof(key)) || !match_char(p, ':')) return false;
 		if (strcmp(key, "preset") == 0)
@@ -630,6 +671,39 @@ static bool parse_custom_collision(Parser* p, PangeaScriptCustomObjectDefinition
 			char value[64];
 			if (!parse_string(p, value, sizeof(value))) return false;
 			definition->collisionPreset = parse_collision_preset(value);
+		}
+		else if (strcmp(key, "bounds") == 0)
+		{
+			if (!match_char(p, '{')) return false;
+			while (true)
+			{
+				if (match_char(p, '}')) break;
+				char boundsKey[32];
+				double value;
+				if (!parse_string(p, boundsKey, sizeof(boundsKey)) || !match_char(p, ':') || !parse_number(p, &value)) return false;
+				if (strcmp(boundsKey, "width") == 0)
+				{
+					definition->collisionWidth = (float)value;
+					hasWidth = true;
+				}
+				else if (strcmp(boundsKey, "height") == 0)
+				{
+					definition->collisionHeight = (float)value;
+					hasHeight = true;
+				}
+				else if (strcmp(boundsKey, "depth") == 0)
+				{
+					definition->collisionDepth = (float)value;
+					hasDepth = true;
+				}
+				else
+				{
+					snprintf(p->errorMsg, p->errorCapacity, "Unknown collision bounds field: %s", boundsKey);
+					return false;
+				}
+				if (match_char(p, ',')) continue;
+				if (*p->cursor != '}') return false;
+			}
 		}
 		else if (!skip_value(p)) return false;
 		if (match_char(p, ',')) continue;
@@ -639,7 +713,198 @@ static bool parse_custom_collision(Parser* p, PangeaScriptCustomObjectDefinition
 
 static bool has_safe_custom_asset_path(const char* path, const char* prefix)
 {
-	return path && strncmp(path, prefix, strlen(prefix)) == 0 && strstr(path, "..") == NULL && strchr(path, '\\') == NULL;
+	if (!path || !prefix)
+		return false;
+
+	size_t prefixLength = strlen(prefix);
+	if (strncmp(path, prefix, prefixLength) != 0 || path[prefixLength] == '\0')
+		return false;
+	if (strstr(path + prefixLength, "..") != NULL || strchr(path + prefixLength, '\\') != NULL)
+		return false;
+
+	const char* segmentStart = path + prefixLength;
+	size_t segmentLength = 0;
+	for (const char* cursor = segmentStart;; cursor++)
+	{
+		if (*cursor != '/' && *cursor != '\0')
+		{
+			segmentLength++;
+			continue;
+		}
+
+		if (segmentLength == 0 ||
+			(segmentLength == 1 && segmentStart[0] == '.') ||
+			(segmentLength == 2 && segmentStart[0] == '.' && segmentStart[1] == '.'))
+			return false;
+		if (*cursor == '\0')
+			break;
+		segmentStart = cursor + 1;
+		segmentLength = 0;
+	}
+	return true;
+}
+
+static bool has_custom_object_id(const PangeaConfigLevel* level, const char* id)
+{
+	for (int i = 0; i < level->customObjectCount; i++)
+	{
+		if (strcmp(level->customObjects[i].id, id) == 0)
+			return true;
+	}
+	return false;
+}
+
+static bool validate_custom_object(const PangeaConfigLevel* level, int index, char* errorMsg, int errorCapacity)
+{
+	const PangeaScriptCustomObjectDefinition* definition = &level->customObjects[index];
+	for (int previous = 0; previous < index; previous++)
+	{
+		if (strcmp(level->customObjects[previous].id, definition->id) == 0)
+		{
+			snprintf(errorMsg, errorCapacity, "Duplicate custom object id: %s", definition->id);
+			return false;
+		}
+	}
+
+	if (!isfinite(definition->scale) || definition->scale <= 0.0f || definition->scale > 100.0f)
+	{
+		snprintf(errorMsg, errorCapacity, "Custom object '%s' scale must be finite and between 0 and 100", definition->id);
+		return false;
+	}
+	if (!isfinite(definition->animationSpeed) || definition->animationSpeed < 0.0f)
+	{
+		snprintf(errorMsg, errorCapacity, "Custom object '%s' animationSpeed must be finite and non-negative", definition->id);
+		return false;
+	}
+	if (definition->collisionBoundsSet &&
+		(!isfinite(definition->collisionWidth) || definition->collisionWidth <= 0.0f || definition->collisionWidth > 1000.0f ||
+		 !isfinite(definition->collisionHeight) || definition->collisionHeight <= 0.0f || definition->collisionHeight > 1000.0f ||
+		 !isfinite(definition->collisionDepth) || definition->collisionDepth <= 0.0f || definition->collisionDepth > 1000.0f))
+	{
+		snprintf(errorMsg, errorCapacity, "Custom object '%s' collision bounds must be finite and between 0 and 1000", definition->id);
+		return false;
+	}
+
+	if (definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP)
+	{
+		if (!definition->modelPath[0] || definition->modelObject < 0)
+		{
+			snprintf(errorMsg, errorCapacity, "Custom object '%s' requires a non-negative modelObject and modelPath", definition->id);
+			return false;
+		}
+	}
+	if (definition->visualKind == PANGEA_SCRIPT_VISUAL_CUSTOM_SKELETON &&
+		(!definition->modelPath[0] || !definition->skeletonPath[0]))
+	{
+		snprintf(errorMsg, errorCapacity, "Custom object '%s' requires modelPath and skeletonPath", definition->id);
+		return false;
+	}
+
+	for (int animation = 0; animation < definition->animationCount; animation++)
+	{
+		if (!definition->animationNames[animation][0] || definition->animationIndices[animation] < 0)
+		{
+			snprintf(errorMsg, errorCapacity, "Custom object '%s' has an invalid animation declaration", definition->id);
+			return false;
+		}
+		for (int previous = 0; previous < animation; previous++)
+		{
+			if (strcmp(definition->animationNames[previous], definition->animationNames[animation]) == 0)
+			{
+				snprintf(errorMsg, errorCapacity, "Custom object '%s' declares animation '%s' more than once", definition->id, definition->animationNames[animation]);
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+static bool validate_replacement_references(const PangeaConfigLevel* level, char* errorMsg, int errorCapacity)
+{
+	for (int i = 0; i < level->terrainReplacementCount; i++)
+	{
+		const PangeaScriptTerrainReplacement* replacement = &level->terrainReplacements[i];
+		if (!isfinite(replacement->x) || !isfinite(replacement->z))
+		{
+			snprintf(errorMsg, errorCapacity, "Terrain replacement coordinates must be finite");
+			return false;
+		}
+		if (!has_custom_object_id(level, replacement->customObjectId))
+		{
+			snprintf(errorMsg, errorCapacity, "Terrain replacement references unknown custom object: %s", replacement->customObjectId);
+			return false;
+		}
+		for (int previous = 0; previous < i; previous++)
+		{
+			const PangeaScriptTerrainReplacement* prior = &level->terrainReplacements[previous];
+			if (prior->itemIndex == replacement->itemIndex && prior->nativeType == replacement->nativeType &&
+				fabsf(prior->x - replacement->x) < 0.5f && fabsf(prior->z - replacement->z) < 0.5f)
+			{
+				snprintf(errorMsg, errorCapacity, "Duplicate terrain replacement for item %d and native type %d", replacement->itemIndex, replacement->nativeType);
+				return false;
+			}
+		}
+	}
+	for (int i = 0; i < level->mapReplacementCount; i++)
+	{
+		const PangeaScriptMapReplacement* replacement = &level->mapReplacements[i];
+		if (!isfinite(replacement->x) || !isfinite(replacement->y))
+		{
+			snprintf(errorMsg, errorCapacity, "Map replacement coordinates must be finite");
+			return false;
+		}
+		if (!has_custom_object_id(level, replacement->customObjectId))
+		{
+			snprintf(errorMsg, errorCapacity, "Map replacement references unknown custom object: %s", replacement->customObjectId);
+			return false;
+		}
+		for (int previous = 0; previous < i; previous++)
+		{
+			const PangeaScriptMapReplacement* prior = &level->mapReplacements[previous];
+			if (prior->itemIndex == replacement->itemIndex && prior->nativeType == replacement->nativeType &&
+				fabsf(prior->x - replacement->x) < 0.5f && fabsf(prior->y - replacement->y) < 0.5f)
+			{
+				snprintf(errorMsg, errorCapacity, "Duplicate map replacement for item %d and native type %d", replacement->itemIndex, replacement->nativeType);
+				return false;
+			}
+		}
+	}
+	for (int i = 0; i < level->splineReplacementCount; i++)
+	{
+		const PangeaScriptSplineReplacement* replacement = &level->splineReplacements[i];
+		if (!isfinite(replacement->placement) || replacement->placement < 0.0f || replacement->placement > 1.0f)
+		{
+			snprintf(errorMsg, errorCapacity, "Spline replacement placement must be finite and between 0 and 1");
+			return false;
+		}
+		if (!has_custom_object_id(level, replacement->customObjectId))
+		{
+			snprintf(errorMsg, errorCapacity, "Spline replacement references unknown custom object: %s", replacement->customObjectId);
+			return false;
+		}
+		for (int previous = 0; previous < i; previous++)
+		{
+			const PangeaScriptSplineReplacement* prior = &level->splineReplacements[previous];
+			if (prior->splineNum == replacement->splineNum && prior->itemIndex == replacement->itemIndex &&
+				prior->nativeType == replacement->nativeType && fabsf(prior->placement - replacement->placement) < 0.0001f)
+			{
+				snprintf(errorMsg, errorCapacity, "Duplicate spline replacement for spline %d, item %d, and native type %d", replacement->splineNum, replacement->itemIndex, replacement->nativeType);
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+static bool validate_level_config(const PangeaConfigLevel* level, char* errorMsg, int errorCapacity)
+{
+	for (int i = 0; i < level->customObjectCount; i++)
+	{
+		if (!validate_custom_object(level, i, errorMsg, errorCapacity))
+			return false;
+	}
+	return validate_replacement_references(level, errorMsg, errorCapacity);
 }
 
 static bool parse_custom_objects_array(Parser* p, PangeaConfigLevel* level)
@@ -714,12 +979,19 @@ static bool parse_terrain_replacements_array(Parser* p, PangeaConfigLevel* level
 			else if (strcmp(key, "itemIndex") == 0 || strcmp(key, "nativeType") == 0 ||
 				strcmp(key, "x") == 0 || strcmp(key, "z") == 0)
 			{
-				double value;
-				if (!parse_number(p, &value)) return false;
-				if (strcmp(key, "itemIndex") == 0) replacement->itemIndex = (int)value;
-				else if (strcmp(key, "nativeType") == 0) replacement->nativeType = (int)value;
-				else if (strcmp(key, "x") == 0) replacement->x = (float)value;
-				else replacement->z = (float)value;
+				if (strcmp(key, "itemIndex") == 0) {
+					if (!parse_integer(p, &replacement->itemIndex)) return false;
+				}
+				else if (strcmp(key, "nativeType") == 0) {
+					if (!parse_integer(p, &replacement->nativeType)) return false;
+				}
+				else
+				{
+					double value;
+					if (!parse_number(p, &value)) return false;
+					if (strcmp(key, "x") == 0) replacement->x = (float)value;
+					else replacement->z = (float)value;
+				}
 			}
 			else if (!skip_value(p)) return false;
 			if (match_char(p, ',')) continue;
@@ -727,6 +999,59 @@ static bool parse_terrain_replacements_array(Parser* p, PangeaConfigLevel* level
 		}
 		if (replacement->itemIndex < 0 || replacement->nativeType < 0 || !replacement->customObjectId[0]) return false;
 		level->terrainReplacementCount++;
+		if (match_char(p, ',')) continue;
+		if (*p->cursor != ']') return false;
+	}
+}
+
+static bool parse_map_replacements_array(Parser* p, PangeaConfigLevel* level)
+{
+	if (!match_char(p, '[')) return false;
+	while (true)
+	{
+		if (match_char(p, ']')) return true;
+		if (level->mapReplacementCount >= PANGEA_CONFIG_MAX_MAP_REPLACEMENTS || !match_char(p, '{')) return false;
+		PangeaScriptMapReplacement* replacement = &level->mapReplacements[level->mapReplacementCount];
+		replacement->itemIndex = -1;
+		replacement->nativeType = -1;
+		while (true)
+		{
+			if (match_char(p, '}')) break;
+			char key[64];
+			if (!parse_string(p, key, sizeof(key)) || !match_char(p, ':')) return false;
+			if (strcmp(key, "customObjectId") == 0)
+			{
+				if (!parse_string(p, replacement->customObjectId, sizeof(replacement->customObjectId))) return false;
+			}
+			else if (strcmp(key, "strict") == 0)
+			{
+				if (!parse_bool(p, &replacement->strict)) return false;
+			}
+			else if (strcmp(key, "itemIndex") == 0 || strcmp(key, "nativeType") == 0 ||
+				strcmp(key, "x") == 0 || strcmp(key, "y") == 0)
+			{
+				if (strcmp(key, "itemIndex") == 0)
+				{
+					if (!parse_integer(p, &replacement->itemIndex)) return false;
+				}
+				else if (strcmp(key, "nativeType") == 0)
+				{
+					if (!parse_integer(p, &replacement->nativeType)) return false;
+				}
+				else
+				{
+					double value;
+					if (!parse_number(p, &value)) return false;
+					if (strcmp(key, "x") == 0) replacement->x = (float)value;
+					else replacement->y = (float)value;
+				}
+			}
+			else if (!skip_value(p)) return false;
+			if (match_char(p, ',')) continue;
+			if (*p->cursor != '}') return false;
+		}
+		if (replacement->itemIndex < 0 || replacement->nativeType < 0 || !replacement->customObjectId[0]) return false;
+		level->mapReplacementCount++;
 		if (match_char(p, ',')) continue;
 		if (*p->cursor != ']') return false;
 	}
@@ -759,12 +1084,21 @@ static bool parse_spline_replacements_array(Parser* p, PangeaConfigLevel* level)
 			else if (strcmp(key, "splineNum") == 0 || strcmp(key, "itemIndex") == 0 ||
 				strcmp(key, "nativeType") == 0 || strcmp(key, "placement") == 0)
 			{
-				double value;
-				if (!parse_number(p, &value)) return false;
-				if (strcmp(key, "splineNum") == 0) replacement->splineNum = (int)value;
-				else if (strcmp(key, "itemIndex") == 0) replacement->itemIndex = (int)value;
-				else if (strcmp(key, "nativeType") == 0) replacement->nativeType = (int)value;
-				else replacement->placement = (float)value;
+				if (strcmp(key, "splineNum") == 0) {
+					if (!parse_integer(p, &replacement->splineNum)) return false;
+				}
+				else if (strcmp(key, "itemIndex") == 0) {
+					if (!parse_integer(p, &replacement->itemIndex)) return false;
+				}
+				else if (strcmp(key, "nativeType") == 0) {
+					if (!parse_integer(p, &replacement->nativeType)) return false;
+				}
+				else
+				{
+					double value;
+					if (!parse_number(p, &value)) return false;
+					replacement->placement = (float)value;
+				}
 			}
 			else if (!skip_value(p)) return false;
 			if (match_char(p, ',')) continue;
@@ -830,6 +1164,11 @@ static bool parse_level_object(Parser* p, PangeaConfigLevel* level, int targetLe
 			if (!parse_terrain_replacements_array(p, level))
 				return false;
 		}
+		else if (strcmp(key, "mapReplacements") == 0)
+		{
+			if (!parse_map_replacements_array(p, level))
+				return false;
+		}
 		else if (strcmp(key, "splineReplacements") == 0)
 		{
 			if (!parse_spline_replacements_array(p, level))
@@ -893,13 +1232,11 @@ PangeaScriptStatus PangeaScript_ParseConfig(const char* json, int targetLevelNum
 
 		if (strcmp(key, "version") == 0)
 		{
-			double versionVal;
-			if (!parse_number(&p, &versionVal))
+			if (!parse_integer(&p, &outConfig->version))
 			{
 				snprintf(errorMsg, errorCapacity, "version must be a number");
 				return PANGEA_SCRIPT_CONFIG_ERROR;
 			}
-			outConfig->version = (int) versionVal;
 			if (outConfig->version != 1)
 			{
 				snprintf(errorMsg, errorCapacity, "Unknown schema version: %d", outConfig->version);
@@ -981,6 +1318,9 @@ PangeaScriptStatus PangeaScript_ParseConfig(const char* json, int targetLevelNum
 		snprintf(errorMsg, errorCapacity, "Missing required field: version");
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
+
+	if (!validate_level_config(&outConfig->level, errorMsg, errorCapacity))
+		return PANGEA_SCRIPT_CONFIG_ERROR;
 
 	return PANGEA_SCRIPT_OK;
 }

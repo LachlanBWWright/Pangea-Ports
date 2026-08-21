@@ -16,5 +16,11 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 PangeaScriptStatus PangeaScriptBackend_CallTriggerHook(PangeaScriptBackend* backend, const PangeaScriptTriggerContext* context, PangeaScriptTriggerResult* result, char* error, int errorCapacity);
 PangeaScriptStatus PangeaScriptBackend_CallPickupHook(PangeaScriptBackend* backend, const PangeaScriptPickupContext* context, PangeaScriptPickupResult* result, char* error, int errorCapacity);
 PangeaScriptStatus PangeaScriptBackend_CallWeaponHitHook(PangeaScriptBackend* backend, const PangeaScriptWeaponHitContext* context, PangeaScriptWeaponHitResult* result, char* error, int errorCapacity);
+PangeaScriptStatus PangeaScriptBackend_CallDamageHook(PangeaScriptBackend* backend, const PangeaScriptDamageContext* context, PangeaScriptDamageResult* result, char* error, int errorCapacity);
+PangeaScriptStatus PangeaScriptBackend_CallDamageAppliedHook(PangeaScriptBackend* backend, const PangeaScriptDamageContext* context, char* error, int errorCapacity);
+PangeaScriptStatus PangeaScriptBackend_CallPlayerEvent(PangeaScriptBackend* backend, const PangeaScriptPlayerEventContext* context, const char* event, char* error, int errorCapacity);
 void PangeaScriptBackend_ClearObjectState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle);
+void PangeaScriptBackend_ClearObjectResources(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle);
+void PangeaScriptBackend_CaptureObjectCheckpointState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle);
+bool PangeaScriptBackend_RestoreObjectCheckpointState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle);
 void PangeaScriptBackend_ResetObjectStates(PangeaScriptBackend* backend);

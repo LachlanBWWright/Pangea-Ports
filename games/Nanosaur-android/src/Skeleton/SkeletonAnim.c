@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -192,6 +195,9 @@ long	volume;
 		eventTime = skeletonDef->AnimEventsList[animNum][animEventIndex].time;
 		eventType = skeletonDef->AnimEventsList[animNum][animEventIndex].type;
 		eventValue = skeletonDef->AnimEventsList[animNum][animEventIndex].value;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_OnAnimationEvent(theNode, eventValue);
+	#endif
 		
 		switch(eventType)
 		{
@@ -638,9 +644,6 @@ long	i;
 	
 	return(gAccelerationCurve[i]);
 }
-
-
-
 
 
 

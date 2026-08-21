@@ -1,5 +1,8 @@
 # Script Examples
 
+> Legacy compatibility note: these are TypeScript examples only. Production scripts use Lua;
+> see `lua-scripting.md` for the supported authoring path.
+
 ## Bugdom 2 Level Log
 
 ```ts

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -213,6 +217,10 @@ int		i;
 
 	newObj->CType = CTYPE_PLAYER;
 	newObj->CBits = CBITS_ALLSOLID;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterPlayerObject(newObj);
+#endif
 
 	SetObjectCollisionBounds(newObj, newObj->BBox.max.y, gPlayerBottomOff = newObj->BBox.min.y, -40, 40, 40, -40);
 
@@ -3416,4 +3424,3 @@ static Boolean ShouldApplySlopesToPlayer(float newDistToFloor)
 
 	return true;
 }
-

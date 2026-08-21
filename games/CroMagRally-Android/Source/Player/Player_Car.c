@@ -282,7 +282,7 @@ static const float shadowScale[NUM_LAND_CAR_TYPES] =
 	AttachShadowToObject(newObj, SHADOW_TYPE_CAR_MAMMOTH + carType, shadowScale[carType], shadowScale[carType], true);
 
 	#ifdef PANGEA_ENABLE_SCRIPTING
-		CroMagScript_RegisterPlayerObject(newObj);
+		CroMagScript_RegisterPlayerObject(newObj, playerNum);
 	#endif
 
 
@@ -3657,7 +3657,6 @@ new_group:
 
 
 }
-
 
 
 

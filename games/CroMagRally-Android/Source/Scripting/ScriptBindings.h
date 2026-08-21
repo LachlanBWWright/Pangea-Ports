@@ -19,13 +19,17 @@ Boolean CroMagScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int trackNum, 
 // --- Live-object scripting extension ---
 typedef struct ObjNode ObjNode;
 void CroMagScript_ResetObjectRegistry(void);
-void CroMagScript_RegisterPlayerObject(ObjNode* playerObj);
+void CroMagScript_RegisterPlayerObject(ObjNode* playerObj, short playerNum);
 void CroMagScript_UnregisterPlayerObject(ObjNode* playerObj);
+Boolean CroMagScript_OnDamage(short playerNum, float damage, int cause, float* outDamage);
+void CroMagScript_OnDamageApplied(short playerNum, float damage, int cause);
+void CroMagScript_OnDeath(short playerNum, int eventValue);
 void CroMagScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category);
 void CroMagScript_UnregisterObject(ObjNode* obj);
 void CroMagScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void CroMagScript_ApplyObjectScripting(ObjNode* obj);
 void CroMagScript_RunObjectFrame(ObjNode* obj);
+void CroMagScript_OnAnimationEvent(ObjNode* obj, int eventValue);
 void CroMagScript_OnObjectDeleted(ObjNode* obj);
 Boolean CroMagScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
 Boolean CroMagScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);

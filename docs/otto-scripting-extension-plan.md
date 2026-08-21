@@ -1,5 +1,9 @@
 # Otto Matic Scripting Extension Plan
 
+> Historical TypeScript/JavaScript extension plan. It is retained as design
+> history only; the active implementation uses the shared Lua 5.4 runtime and
+> `SCRIPTING_ROADMAP.md` acceptance criteria.
+
 ## Goal
 
 Extend Otto Matic scripting from level/item-spawn hooks into a practical gameplay customization layer that can attach behavior to live objects, starting with humans as the first vertical slice.

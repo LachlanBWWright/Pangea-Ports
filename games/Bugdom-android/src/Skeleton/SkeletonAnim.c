@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -188,6 +191,9 @@ float	fps;
 		eventTime = skeletonDef->AnimEventsList[animNum][animEventIndex].time;
 		eventType = skeletonDef->AnimEventsList[animNum][animEventIndex].type;
 		eventValue = skeletonDef->AnimEventsList[animNum][animEventIndex].value;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_OnAnimationEvent(theNode, eventValue);
+	#endif
 		
 		switch(eventType)
 		{
@@ -597,9 +603,6 @@ long	i;
 
 	return(gAccelerationCurve[i]);
 }
-
-
-
 
 
 

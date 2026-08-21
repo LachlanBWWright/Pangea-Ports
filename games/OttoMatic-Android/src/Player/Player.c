@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -300,7 +304,16 @@ Boolean	killed = false;
 	if (gPlayerInfo.health < 0.0f)				// see if already dead
 		return(true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!OttoScript_OnDamage(nil, damage, deathType, &damage))
+		return(false);
+#endif
+
 	gPlayerInfo.health -= damage;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnDamageApplied(damage, deathType);
+#endif
 
 		/* SEE IF DEAD */
 
@@ -353,6 +366,9 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 	gPlayerIsDead = true;
 	gPlayerInfo.health = 0;					// make sure this is set correctly
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnDeath(deathType);
+#endif
 
 	switch(deathType)
 	{
@@ -462,6 +478,10 @@ void ResetPlayerAtBestCheckpoint(void)
 {
 ObjNode	*player = gPlayerInfo.objNode;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnCheckpointReset();
+#endif
+
 
 	gPlayerInfo.coord.x = player->Coord.x = gBestCheckpointCoord.x;
 	gPlayerInfo.coord.z = player->Coord.z = gBestCheckpointCoord.y;
@@ -509,6 +529,10 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 
 	PlayEffect_Parms(EFFECT_NEWLIFE, FULL_CHANNEL_VOLUME * 3, FULL_CHANNEL_VOLUME/3, NORMAL_CHANNEL_RATE / 1.5);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnPlayerRespawn(player);
+#endif
 }
 
 
@@ -1732,4 +1756,3 @@ float	y;
 	}
 
 }
-

@@ -205,7 +205,11 @@ static bool MikeScript_DeletePlayerObject(void* nativeObject)
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
 		return false;
 
-	if (obj->ScriptDefinitionID[0]) obj->ScriptDeleteRequested = true;
+	if (obj->ScriptDefinitionID[0])
+	{
+		MikeScript_UnregisterObject(obj);
+		obj->ScriptDeleteRequested = true;
+	}
 	else { MikeScript_UnregisterObject(obj); DeleteObject(obj); }
 	return true;
 }
@@ -265,6 +269,18 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 	SDL_Log("Mighty Mike scripting %s failed: %s", action, PangeaScript_GetLastError());
 }
 
+static bool CompleteScriptReplacement(PangeaScriptObjectHandle handle, const char* action)
+{
+	PangeaScriptStatus status = PangeaScript_ApplyObjectLifecycle(
+		handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_IN);
+	if (status == PANGEA_SCRIPT_OK && PangeaScript_ObjectExists(handle))
+		return true;
+	LogScriptStatus(action, status);
+	if (PangeaScript_ObjectExists(handle))
+		(void)PangeaScript_DeleteObject(handle);
+	return false;
+}
+
 void MikeScript_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 {
 	if (ctx)
@@ -273,6 +289,7 @@ void MikeScript_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 
 void MikeScript_ResetObjectRegistry(void)
 {
+	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
 	memset(gScriptItemOccupied, 0, sizeof(gScriptItemOccupied));
 	memset(gScriptItemReclaimable, 0, sizeof(gScriptItemReclaimable));
@@ -358,7 +375,14 @@ void MikeScript_RunObjectFrame(ObjNode* obj)
 	PangeaScriptObjectFrameResult result = {0};
 	PangeaScriptStatus status;
 
-	if (!obj || obj->ScriptObjectID == 0 || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || obj->CType == INVALID_NODE_FLAG)
+		return;
+	if (obj->ScriptDeleteRequested)
+	{
+		DeleteObject(obj);
+		return;
+	}
+	if (obj->ScriptObjectID == 0)
 		return;
 
 	handle = (PangeaScriptObjectHandle)
@@ -402,7 +426,10 @@ void MikeScript_OnObjectDeleted(ObjNode* obj)
 	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
-		(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "destroy");
+		PangeaScriptObjectLifecycle lifecycle = obj->ItemIndex
+			? PANGEA_SCRIPT_OBJECT_STREAM_OUT
+			: PANGEA_SCRIPT_OBJECT_DESTROY;
+		(void)PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, lifecycle);
 	}
 }
 
@@ -424,15 +451,26 @@ static int ResolveInitialAnimation(const PangeaScriptCustomObjectDefinition* def
 	return 0;
 }
 
-static void ApplyScriptedCollision(ObjNode* object, PangeaScriptCollisionPreset preset)
+static void ApplyScriptedCollision(ObjNode* object, const PangeaScriptCustomObjectDefinition* definition)
 {
 	const FrameHeader* frame;
+	PangeaScriptCollisionPreset preset = definition->collisionPreset;
 	if (preset == PANGEA_SCRIPT_COLLISION_NONE) return;
-	frame = GetFrameHeader(object->SpriteGroupNum, object->Type, object->CurrentFrame, NULL, NULL);
-	object->LeftOff = -frame->width / 2;
-	object->RightOff = object->LeftOff + frame->width;
-	object->TopOff = -frame->height / 2;
-	object->BottomOff = object->TopOff + frame->height;
+	if (definition->collisionBoundsSet)
+	{
+		object->LeftOff = (short)(-definition->collisionWidth * 0.5f);
+		object->RightOff = (short)(definition->collisionWidth * 0.5f);
+		object->TopOff = (short)(-definition->collisionHeight * 0.5f);
+		object->BottomOff = (short)(definition->collisionHeight * 0.5f);
+	}
+	else
+	{
+		frame = GetFrameHeader(object->SpriteGroupNum, object->Type, object->CurrentFrame, NULL, NULL);
+		object->LeftOff = -frame->width / 2;
+		object->RightOff = object->LeftOff + frame->width;
+		object->TopOff = -frame->height / 2;
+		object->BottomOff = object->TopOff + frame->height;
+	}
 	object->CBits = ALL_SOLID_SIDES;
 	if (preset == PANGEA_SCRIPT_COLLISION_ENEMY) object->CType = CTYPE_ENEMYA;
 	else if (preset == PANGEA_SCRIPT_COLLISION_PICKUP || preset == PANGEA_SCRIPT_COLLISION_TRIGGER_BOX)
@@ -465,13 +503,19 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 	if (group < 0 || definition->modelObject < 0 || definition->modelObject >= MAX_SHAPES_IN_FILE || !gSHAPE_HEADER_Ptrs[group][definition->modelObject]) return PANGEA_SCRIPT_RUNTIME_ERROR;
 	object = MakeNewShape(group, definition->modelObject, animation, (short)x, (short)y, (short)z, nil, PLAYFIELD_RELATIVE);
 	if (!object) return PANGEA_SCRIPT_RUNTIME_ERROR;
-	ApplyScriptedCollision(object, definition->collisionPreset);
+	ApplyScriptedCollision(object, definition);
 	snprintf(object->ScriptDefinitionID, sizeof(object->ScriptDefinitionID), "%s", definition->id);
 	MikeScript_RegisterObject(object, definition->id, "customObject");
 	if (!object->ScriptObjectID) { DeleteObject(object); return PANGEA_SCRIPT_RUNTIME_ERROR; }
 	if (outHandle) *outHandle = (PangeaScriptObjectHandle){(int)object->ScriptObjectID, object->ScriptObjectGeneration};
 	PangeaScriptObjectHandle handle = {(int)object->ScriptObjectID, object->ScriptObjectGeneration};
-	(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "spawn");
+	PangeaScriptStatus spawnStatus = PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "spawn");
+	if (spawnStatus != PANGEA_SCRIPT_OK || !PangeaScript_ObjectExists(handle))
+	{
+		(void)PangeaScript_DeleteObject(handle);
+		if (outHandle) *outHandle = (PangeaScriptObjectHandle){0};
+		return spawnStatus == PANGEA_SCRIPT_OK ? PANGEA_SCRIPT_RUNTIME_ERROR : spawnStatus;
+	}
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -494,6 +538,7 @@ void MikeScript_Init(void)
 		.spawnScripted = SpawnScriptedObject,
 		.getPlayerCount = GetScriptPlayerCount,
 		.getPlayer = GetScriptPlayer,
+		.capabilities = {.terrainItems = false, .splineItems = false, .mapItems = true},
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -567,6 +612,7 @@ void MikeScript_OnAreaComplete(int sceneNum, int areaNum)
 void MikeScript_OnAreaUnload(int sceneNum, int areaNum)
 {
 	CallAreaHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, sceneNum, areaNum, "onAreaUnload");
+	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	PangeaScript_ResetObjects();
 }
 
@@ -608,12 +654,32 @@ Boolean MikeScript_TryReplaceMapItem(ObjectEntryType* itemPtr, int itemIndex, in
 {
 	const float x = (float)itemPtr->x;
 	const float y = (float)itemPtr->y;
-	const PangeaScriptTerrainReplacement* replacement = PangeaScript_GetTerrainReplacement(itemIndex, nativeType, x, y);
+	const PangeaScriptMapReplacement* replacement = PangeaScript_GetMapReplacement(itemIndex, nativeType, x, y);
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptStatus status;
+	void* nativeObject = NULL;
+	const PangeaScriptObjectSource source = {
+		.kind = PANGEA_SCRIPT_SOURCE_MAP, .itemIndex = itemIndex, .nativeType = nativeType,
+		.x = x, .y = y, .z = 0.0f};
 	if (!replacement) return false;
+	if (PangeaScript_FindObjectBySource(&source, &handle))
+		return true;
 	status = SpawnScriptedObject(replacement->customObjectId, x, y, 100, &handle);
-	if (status == PANGEA_SCRIPT_OK) { itemPtr->type |= ITEM_IN_USE; return true; }
+	if (status == PANGEA_SCRIPT_OK && PangeaScript_GetObjectNativeObject(handle, &nativeObject))
+	{
+		((ObjNode*)nativeObject)->ItemIndex = itemPtr;
+		status = PangeaScript_AssociateObjectSource(handle, &source);
+		if (status != PANGEA_SCRIPT_OK)
+		{
+			LogScriptStatus("map replacement source association", status);
+			(void)PangeaScript_DeleteObject(handle);
+			return replacement->strict;
+		}
+		itemPtr->type |= ITEM_IN_USE;
+		if (!CompleteScriptReplacement(handle, "map replacement stream-in"))
+			return replacement->strict;
+		return true;
+	}
 	LogScriptStatus("map replacement", status);
 	return replacement->strict;
 }

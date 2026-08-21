@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -256,7 +260,16 @@ Boolean	killed = false;
 	if (gPlayerInfo[playerNum].health < 0.0f)				// see if already dead
 		return(true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!Nanosaur2Script_OnDamage(playerNum, nil, damage, deathType, &damage))
+		return(false);
+#endif
+
 	gPlayerInfo[playerNum].health -= damage;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnDamageApplied(playerNum, damage, deathType);
+#endif
 
 		/* SEE IF KILLED */
 
@@ -326,6 +339,9 @@ ObjNode	*player = gPlayerInfo[playerNum].objNode;
 
 	gPlayerIsDead[playerNum] = true;
 	gPlayerInfo[playerNum].health = 0;					// make sure this is set correctly
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnDeath(playerNum, deathType);
+#endif
 
 	switch(deathType)
 	{
@@ -473,6 +489,11 @@ ObjNode	*player = gPlayerInfo[playerNum].objNode;
 	}
 
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnCheckpointReset();
+#endif
+
+
 			/* RESET SPEEDS */
 
 	gTargetMaxSpeed[playerNum] = PLAYER_NORMAL_MAX_SPEED;
@@ -542,6 +563,10 @@ ObjNode	*player = gPlayerInfo[playerNum].objNode;
 
 
 	MakeFadeEvent(kFadeFlags_In | (kFadeFlags_P1 << playerNum), 3.0);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnPlayerRespawn(player);
+#endif
 
 }
 

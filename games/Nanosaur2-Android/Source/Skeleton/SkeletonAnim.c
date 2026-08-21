@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -230,6 +233,9 @@ float	fps;
 		eventTime = skeletonDef->AnimEventsList[animNum][animEventIndex].time;
 		eventType = skeletonDef->AnimEventsList[animNum][animEventIndex].type;
 		eventValue = skeletonDef->AnimEventsList[animNum][animEventIndex].value;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_OnAnimationEvent(theNode, eventValue);
+	#endif
 
 		switch(eventType)
 		{
@@ -753,9 +759,6 @@ int	numJoints,i;
 		}
 	}
 }
-
-
-
 
 
 

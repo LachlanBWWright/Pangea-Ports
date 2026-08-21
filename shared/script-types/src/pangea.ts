@@ -42,9 +42,24 @@ export interface FrameContext extends LevelContext {
 
 export interface ObjectFrameContext extends FrameContext {
   readonly object: ObjectHandle;
+  readonly objectType: string;
   readonly position: Vector3;
   readonly tags: readonly string[];
+  readonly event: ObjectEvent;
 }
+
+export type ObjectEvent =
+  | "spawn"
+  | "update"
+  | "triggerEnter"
+  | "animationEvent"
+  | "animationComplete"
+  | "activate"
+  | "deactivate"
+  | "streamIn"
+  | "streamOut"
+  | "checkpointReset"
+  | "destroy";
 
 export interface ObjectFrameResult {
   readonly positionOffset?: Vector3;
@@ -115,6 +130,14 @@ export interface NativeSpawnResult {
   readonly primary?: ObjectHandle;
 }
 
+export interface ObjectCommandResult {
+  readonly ok: boolean;
+  readonly code: number;
+  readonly reason: NativeSpawnResult["reason"];
+  readonly message: string;
+  readonly primary?: ObjectHandle;
+}
+
 export interface ScriptedSpawnOptions {
   readonly scale?: number;
   readonly animation?: string | number;
@@ -131,6 +154,7 @@ export interface PangeaCapabilities {
   readonly timers: boolean;
   readonly tasks: boolean;
   readonly events: boolean;
+  readonly persistence: boolean;
   readonly memoryLimitBytes: number;
   readonly loadInstructionBudget: number;
   readonly eventInstructionBudget: number;
@@ -152,6 +176,19 @@ export interface PangeaDiagnostics {
   readonly activeTasks: number;
   readonly activeSubscriptions: number;
   readonly frameNum: number;
+  readonly commandCount: number;
+  readonly commandHash: number;
+  readonly commandTraceOverflow: boolean;
+  readonly commandTrace: readonly PangeaCommandTraceEntry[];
+  readonly persistentBytes: number;
+  readonly persistentEntries: number;
+}
+
+export interface PangeaCommandTraceEntry {
+  readonly id: string;
+  readonly objectId: number;
+  readonly generation: number;
+  readonly status: number;
 }
 
 export interface PangeaApi {
@@ -165,6 +202,8 @@ export interface PangeaApi {
   readonly game: {
     readonly id: GameId;
     readonly name: string;
+    readonly supportedHooks: readonly string[];
+    readonly tags: readonly string[];
   };
   readonly log: {
     info(message: string): void;
@@ -178,19 +217,30 @@ export interface PangeaApi {
     exists(handle: ObjectHandle): boolean;
     position(handle: ObjectHandle): Vector3 | undefined;
     setPosition(handle: ObjectHandle, position: Vector3): boolean;
+    setPositionResult(handle: ObjectHandle, position: Vector3): ObjectCommandResult;
     setVelocity(handle: ObjectHandle, velocity: Vector3): boolean;
+    setVelocityResult(handle: ObjectHandle, velocity: Vector3): ObjectCommandResult;
     setRotation(handle: ObjectHandle, rotation: Vector3): boolean;
+    setRotationResult(handle: ObjectHandle, rotation: Vector3): ObjectCommandResult;
     setScale(handle: ObjectHandle, scale: number): boolean;
+    setScaleResult(handle: ObjectHandle, scale: number): ObjectCommandResult;
     setAnimation(
       handle: ObjectHandle,
       animation: string | number,
       speed?: number,
       blendSeconds?: number,
     ): boolean;
+    setAnimationResult(
+      handle: ObjectHandle,
+      animation: string | number,
+      speed?: number,
+      blendSeconds?: number,
+    ): ObjectCommandResult;
     tags(handle: ObjectHandle): readonly string[];
     hasTag(handle: ObjectHandle, tag: string): boolean;
     state(handle: ObjectHandle): Record<string, unknown> | undefined;
     delete(handle: ObjectHandle): boolean;
+    deleteResult(handle: ObjectHandle): ObjectCommandResult;
   };
   readonly spawn: {
     native(
@@ -246,6 +296,11 @@ export interface PangeaApi {
       position: Vector3;
       health?: number;
     }> | undefined;
+  };
+  readonly persistence: {
+    get(key: string, version: number): string | number | boolean | undefined;
+    set(key: string, version: number, value: string | number | boolean): boolean;
+    delete(key: string): boolean;
   };
 }
 

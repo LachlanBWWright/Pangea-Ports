@@ -11,6 +11,9 @@
 
 #include "game.h"
 #include "bones.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -230,6 +233,9 @@ float	fps;
 		eventTime = skeletonDef->AnimEventsList[animNum][animEventIndex].time;
 		eventType = skeletonDef->AnimEventsList[animNum][animEventIndex].type;
 		eventValue = skeletonDef->AnimEventsList[animNum][animEventIndex].value;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_OnAnimationEvent(theNode, eventValue);
+	#endif
 		
 		switch(eventType)
 		{
@@ -756,9 +762,6 @@ int	numJoints,i;
 		}	
 	}	
 }
-
-
-
 
 
 

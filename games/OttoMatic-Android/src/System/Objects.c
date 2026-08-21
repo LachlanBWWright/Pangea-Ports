@@ -13,6 +13,10 @@
 #include "game.h"
 #include "profiling.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -1220,6 +1224,11 @@ int		i;
 
 	if (theNode == nil)								// see if passed a bogus node
 		return;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnObjectDeleted(theNode);
+	OttoScript_UnregisterObjectNode(theNode);
+#endif
 
 	if (theNode->CType == INVALID_NODE_FLAG)		// see if already deleted
 	{

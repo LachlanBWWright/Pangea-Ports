@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -249,8 +253,19 @@ int		i;
 
 		if (ctype & CTYPE_HURTENEMY)
 		{
+			float hitDamage = hitObj->Damage;
+			Boolean destroyTarget = false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (!Bugdom2Script_OnWeaponHit(hitObj, theEnemy, hitDamage, &hitDamage, &destroyTarget))
+				continue;
+			if (destroyTarget)
+			{
+				DeleteEnemy(theEnemy);
+				return(true);
+			}
+#endif
 			if (theEnemy->HurtCallback != nil)							// if has a hurt callback
-				if (theEnemy->HurtCallback(theEnemy, hitObj->Damage))	// handle hit (returns true if was deleted)
+				if (theEnemy->HurtCallback(theEnemy, hitDamage))	// handle hit (returns true if was deleted)
 					return(true);
 		}
 
@@ -354,8 +369,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(chunk);
 }
-
-
 
 
 
