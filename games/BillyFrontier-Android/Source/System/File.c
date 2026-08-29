@@ -11,6 +11,10 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "pangea_script.h"
+static int gScriptLoadedSaveSlot;
+#endif
 #include 	"bones.h"
 #include 	"lzss.h"
 
@@ -1103,6 +1107,9 @@ Ptr						tempBuffer16 = nil;
 
 OSErr SaveGame(int fileSlot)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(0, fileSlot, false);
+#endif
 	char path[64];
 	SaveGameType saveData;
 
@@ -1144,6 +1151,9 @@ OSErr DeleteSavedGame(int fileSlot)
 
 OSErr LoadSavedGame(int fileSlot, SaveGameType* saveDataPtr)
 {
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	gScriptLoadedSaveSlot = fileSlot;
+	#endif
 	char path[64];
 	SDL_snprintf(path, sizeof(path), "%s%d", SAVE_FILE_NAME, fileSlot);
 
@@ -1161,6 +1171,10 @@ void UseSavedGame(const SaveGameType* saveData)
 
 	gDuelWonMask = saveData->duelWonMask;
 	gLevelWonMask = saveData->levelWonMask;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(0, gScriptLoadedSaveSlot, true);
+#endif
 }
 
 #pragma mark -

@@ -4,6 +4,11 @@
 
 #pragma once
 
+#include <setjmp.h>
+
+extern jmp_buf gPangeaScriptFatalJump;
+extern bool gPangeaScriptFatalBoundaryActive;
+
 void	DoAlert(const char* format, ...);
 POMME_NORETURN void DoFatalAlert(const char* format, ...);
 POMME_NORETURN void CleanQuit(void);

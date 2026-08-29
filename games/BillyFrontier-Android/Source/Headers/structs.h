@@ -329,6 +329,7 @@ struct ObjNode
 	uint32_t		ScriptObjectGeneration;
 	char			ScriptDefinitionID[96];
 	Boolean			ScriptDeleteRequested;
+	Boolean			ScriptStreamOutSent;
 	Boolean			ScriptAnimationCompletionSent;
 	
 	float			Health;				// health 0..1
@@ -412,6 +413,5 @@ enum
 };
 
 #endif
-
 
 

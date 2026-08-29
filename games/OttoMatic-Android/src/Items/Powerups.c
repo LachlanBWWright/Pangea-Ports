@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -1130,6 +1134,13 @@ float	r;
 
 	}
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"powerup"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.powerupPod", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 
 
 
@@ -1448,6 +1459,10 @@ float fps = gFramesPerSecondFrac;
 void AddPowerupToInventory(ObjNode *pow)
 {
 	DisableHelpType(HELP_MESSAGE_PICKUPPOW);					// dont need to show any help now that they've done it
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnPickupCollected(pow, gPlayerInfo.objNode, pow->POWType, pow->POWType == POW_TYPE_HEALTH ? .1f : 1.0f, "ottomatic.powerupPod");
+#endif
 
 	switch(pow->POWType)
 	{
@@ -1789,7 +1804,6 @@ float			speed;
 
 
 #pragma mark -
-
 
 
 

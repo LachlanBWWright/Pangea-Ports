@@ -12,6 +12,11 @@
 
 #include "game.h"
 
+#include <setjmp.h>
+
+extern jmp_buf gPangeaScriptFatalJump;
+extern bool gPangeaScriptFatalBoundaryActive;
+
 
 /****************************/
 /*    CONSTANTS             */
@@ -59,6 +64,8 @@ void DoAlert(const char* format, ...)
 
 void DoFatalAlert(const char* format, ...)
 {
+	if (gPangeaScriptFatalBoundaryActive)
+		longjmp(gPangeaScriptFatalJump, 1);
 	if (gSDLWindow)
 		SDL_SetWindowFullscreen(gSDLWindow, 0);
 

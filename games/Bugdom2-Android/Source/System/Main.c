@@ -121,6 +121,13 @@ OSErr CheckPrefsFolder(bool createIt)
 OSErr		iErr;
 long		createdDirID;
 
+#ifdef __EMSCRIPTEN__
+	gPrefsFolderVRefNum = 0;
+	gPrefsFolderDirID = 0;
+	if (!createIt)
+		return noErr;
+	return DirCreate(gPrefsFolderVRefNum, gPrefsFolderDirID, GAME_NAME, &createdDirID);
+#else
 	iErr = FindFolder(kOnSystemDisk,kPreferencesFolderType,kDontCreateFolder,			// locate the folder
 					&gPrefsFolderVRefNum,&gPrefsFolderDirID);
 
@@ -139,6 +146,7 @@ long		createdDirID;
 	}
 
 	return iErr;
+#endif
 }
 
 
@@ -332,6 +340,7 @@ static void PlayArea_Terrain(void)
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 #ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_ProcessCheckpointResetProbe();
 		Bugdom2Script_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gGameLevelTimer);
 #endif
 		MoveEverything();

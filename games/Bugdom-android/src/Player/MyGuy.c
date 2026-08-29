@@ -791,7 +791,19 @@ explode:
 	HandleCollisions(theNode, CTYPE_ENEMY);					// collide against enemies
 	if (gNumCollisions)
 	{
-		EnemyGotHurt(gCollisionList[0].objectPtr, 1.1);		// cause massive damage
+		float damage = 1.1f;
+		Boolean destroyTarget = false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (BugdomScript_OnWeaponHit(theNode, gCollisionList[0].objectPtr, damage, &damage, &destroyTarget))
+#endif
+		{
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (destroyTarget)
+				DeleteObject(gCollisionList[0].objectPtr);
+			else
+#endif
+				EnemyGotHurt(gCollisionList[0].objectPtr, damage);		// cause massive damage
+		}
 		goto explode;
 	}
 	
@@ -968,5 +980,3 @@ new_groupb:
 	}
 
 }
-
-

@@ -206,6 +206,7 @@ float			u,v;
 			gSkyUVs1[r][c].v = v + r * .8f;
 		}
 	}
+	CompatGL_InvalidateCachePtr(gSkyUVs1);
 
 
 			/*****************/
@@ -266,5 +267,4 @@ float			u,v;
 	gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_ALWAYSBLEND;			// make sure this is off
 	OGL_PopState();
 }
-
 

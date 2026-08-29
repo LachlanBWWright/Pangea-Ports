@@ -9,6 +9,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -38,6 +42,10 @@ short				gWorstHumanPlace;
 void NextLap(short p)
 {
 	gPlayerInfo[p].lapNum++;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_OnLapComplete(p, gPlayerInfo[p].lapNum);
+#endif
 
 	if (gPlayerInfo[p].lapNum >= gNumLapsThisRace)					// see if completed race
 		PlayerCompletedRace(p);
@@ -196,6 +204,9 @@ no_lap:;
 			}
 
 			gPlayerInfo[p].checkpointNum = newCheckpoint;								// update player's current ckpt #
+#ifdef PANGEA_ENABLE_SCRIPTING
+			CroMagScript_OnCheckpointReached(p, newCheckpoint);
+#endif
 			break;
 		}
 	}
@@ -347,10 +358,16 @@ next:
 
 void PlayerCompletedRace(short playerNum)
 {
+	if (gPlayerInfo[playerNum].raceComplete)
+		return;
 	gPlayerInfo[playerNum].raceComplete = true;
 
 
 	int rankInScoreboard = SaveRaceTime(playerNum);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_OnRaceFinish(playerNum, rankInScoreboard >= 0 ? rankInScoreboard : gPlayerInfo[playerNum].place);
+#endif
 
 
 			/* TELL WINNER IN MULTIPLAYER RACE */
@@ -392,9 +409,6 @@ void PlayerCompletedRace(short playerNum)
 		}
 	}
 }
-
-
-
 
 
 

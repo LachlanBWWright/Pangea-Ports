@@ -65,6 +65,9 @@ void DoAlert(const char* format, ...)
 
 void DoFatalAlert(const char* format, ...)
 {
+	if (gNanosaur2ScriptFatalBoundaryActive)
+		longjmp(gNanosaur2ScriptFatalJump, 1);
+
 	Enter2D();
 
 	char message[1024];

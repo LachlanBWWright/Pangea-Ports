@@ -11,6 +11,9 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "pangea_script.h"
+#endif
 
 
 /****************************/
@@ -620,6 +623,9 @@ static FSSpec MakeSaveGameFSSpec(int slot)
 
 void SaveGame(int slot)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gRealLevel, slot, false);
+#endif
 SaveGameType 	saveData;
 short			fRefNum;
 FSSpec			spec;
@@ -747,6 +753,10 @@ SaveGameType saveData;
 	gNumGoldClovers = saveData.numGoldClovers;
 
 	gRestoringSavedGame = true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gRealLevel, slot, true);
+#endif
 
 	return(noErr);
 }

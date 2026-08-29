@@ -317,8 +317,10 @@ if(EMSCRIPTEN)
 		-sASYNCIFY_STACK_SIZE=65536
 		"-sASYNCIFY_IMPORTS=['SDL_Delay','emscripten_sleep']"
 		-sDISABLE_EXCEPTION_CATCHING=0
-		"-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
-		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_Boot_SetDirectLevel','_Boot_SetCustomMapPath','_Cheat_SetFenceCollision','_Cheat_GetFenceCollision','_PangeaScript_IsEnabled','_PangeaScript_SetStartupScript','_PangeaScript_Reload','_PangeaScript_GetLastError','_PangeaScript_GetErrorCount','_PangeaScript_GetStatusEnabled','_PangeaScript_GetStatusConfigLoaded','_PangeaScript_GetStatusBundleLoaded','_PangeaScript_GetStatusActiveScriptPath','_PangeaScript_GetStatusLastError','_PangeaScript_GetStatusErrorCount','_PangeaScript_GetStatusBudgetExceededCount','_PangeaScript_GetStatusHooksCalledCount','_PangeaScript_GetStatusScriptsDisabled']>"
+		"-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
+		"-lidbfs.js"
+		"--pre-js=${CMAKE_SOURCE_DIR}/packaging/pangea_persistence.js"
+		"$<$<BOOL:${PANGEA_ENABLE_SCRIPTING}>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_Boot_SetDirectLevel','_Boot_SetCustomMapPath','_Cheat_SetFenceCollision','_Cheat_GetFenceCollision','_PangeaScript_IsEnabled','_PangeaScript_SetStartupScript','_PangeaScript_SetConfigPath','_PangeaScript_LoadLevelConfig','_PangeaScript_ProbeScriptedObjectJS','_PangeaScript_Reload','_PangeaScript_GetLastError','_PangeaScript_GetErrorCount','_PangeaScript_GetStatusEnabled','_PangeaScript_GetStatusConfigLoaded','_PangeaScript_GetStatusBundleLoaded','_PangeaScript_GetStatusActiveScriptPath','_PangeaScript_GetStatusLastError','_PangeaScript_GetStatusErrorCount','_PangeaScript_GetStatusBudgetExceededCount','_PangeaScript_GetStatusHooksCalledCount','_PangeaScript_GetStatusScriptsDisabled']>"
 		"$<$<NOT:$<BOOL:${PANGEA_ENABLE_SCRIPTING}>>:SHELL:-sEXPORTED_FUNCTIONS=['_main','_Boot_SetDirectLevel','_Boot_SetCustomMapPath','_Cheat_SetFenceCollision','_Cheat_GetFenceCollision']>"
 		"--embed-file=${GAME_DATADIR}@/Data"
 		-sWASM=1

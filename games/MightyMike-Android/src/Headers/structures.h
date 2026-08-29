@@ -138,6 +138,7 @@ struct ObjNode
 	uint32_t		ScriptObjectGeneration;
 	char			ScriptDefinitionID[96];
 	Boolean			ScriptDeleteRequested;
+	Boolean			ScriptStreamOutSent;
 	Boolean			ScriptAnimationCompletionSent;
 
 	long			Worth;				// "worth" of object / # coins to give

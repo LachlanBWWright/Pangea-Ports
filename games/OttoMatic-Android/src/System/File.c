@@ -7,6 +7,9 @@
 
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include <time.h>
 
 
@@ -1625,6 +1628,9 @@ static inline void Blit16(
 
 bool SaveGame(int saveSlot)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnSave(saveSlot);
+#endif
 SaveGameType	saveData;
 FSSpec			spec;
 OSErr			err;
@@ -1751,6 +1757,10 @@ SaveGameType	saveData;
 	gPlayerInfo.lives 	= saveData.numLives;
 	gPlayerInfo.health	= saveData.health;
 	gPlayerInfo.jumpJet	= saveData.jumpJet;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnLoad(saveSlot);
+#endif
 
 	return true;
 }

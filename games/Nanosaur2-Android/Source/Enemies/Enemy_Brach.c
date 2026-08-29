@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -462,11 +466,22 @@ static Boolean BrachHitByWeaponCallback(ObjNode *bullet, ObjNode *enemy, OGLPoin
 {
 #pragma unused (hitTriangleNormal, hitCoord)
 
-	enemy->Health -= bullet->Damage;
+	float hitDamage = bullet->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Boolean destroyTarget = false;
+	if (!Nanosaur2Script_OnWeaponHit(bullet, enemy, hitDamage, &hitDamage, &destroyTarget))
+		return(true);
+	if (destroyTarget)
+	{
+		KillBrach(enemy);
+		return(true);
+	}
+#endif
+	enemy->Health -= hitDamage;
 	if (enemy->Health <= 0.0f)
 		KillBrach(enemy);
 	else
-	if (bullet->Damage >= .1f)						// if hurt enough, make grunt
+	if (hitDamage >= .1f)						// if hurt enough, make grunt
 		PlayEffect_Parms3D(EFFECT_BRACHHURT, &enemy->Coord, NORMAL_CHANNEL_RATE, 1.2);
 
 	return(true);
@@ -492,6 +507,4 @@ static void KillBrach(ObjNode *enemy)
 	enemy->CType &= ~CTYPE_AUTOTARGETWEAPON;
 
 }
-
-
 

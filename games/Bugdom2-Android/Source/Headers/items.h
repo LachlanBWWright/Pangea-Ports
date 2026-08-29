@@ -208,7 +208,7 @@ void DefaultGotKickedCallback(ObjNode *player, ObjNode *kickedObj);
 void MoveDefaultPickup(ObjNode *theNode);
 void DefaultDropObject(ObjNode *player, ObjNode *held);
 
-ObjNode *MakeCheckpoint(OGLPoint3D *where);
+ObjNode *MakeCheckpoint(OGLPoint3D *where, int checkpointNum);
 void SetCheckpoint(ObjNode *checkpoint, ObjNode *player);
 Boolean CheckDropThruFence(ObjNode *player, ObjNode *held);
 

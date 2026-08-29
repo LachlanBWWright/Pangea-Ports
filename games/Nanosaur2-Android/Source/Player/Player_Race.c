@@ -4,6 +4,14 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 
 /***************/
 /* EXTERNALS   */
@@ -15,6 +23,29 @@
 /****************************/
 
 static void PlayerCompletedRace(short playerNum);
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE int Nanosaur2Script_ProbeRaceCompletionJS(void)
+{
+	ObjNode* player = gPlayerInfo[0].objNode;
+	if (player)
+	{
+		const PangeaScriptObjectHandle handle = {
+			.id = (int) player->ScriptObjectID,
+			.generation = player->ScriptObjectGeneration,
+		};
+		if (player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0 || !PangeaScript_ObjectExists(handle))
+		{
+			player->ScriptObjectID = 0;
+			player->ScriptObjectGeneration = 0;
+			Nanosaur2Script_RegisterPlayerObject(player);
+		}
+	}
+	gPlayerInfo[0].raceComplete = false;
+	PlayerCompletedRace(0);
+	return gLevelCompleted ? 1 : 0;
+}
+#endif
 
 
 
@@ -103,6 +134,10 @@ long		c;
 				{
 					gPlayerInfo[p].lapNum++;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+					Nanosaur2Script_OnLapComplete(p, gPlayerInfo[p].lapNum);
+#endif
+
 					if (gPlayerInfo[p].lapNum >= gNumLapsThisRace)					// see if completed race
 						PlayerCompletedRace(p);
 					else
@@ -171,6 +206,10 @@ long		c;
 			}
 			gPlayerInfo[p].lapNum++;												// yep, we lapped because all the checkpoints were tagged
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+			Nanosaur2Script_OnLapComplete(p, gPlayerInfo[p].lapNum);
+#endif
+
 				/* SEE IF COMPLETED THE RACE */
 
 			if (gPlayerInfo[p].lapNum >= gNumLapsThisRace)
@@ -186,6 +225,9 @@ no_lap:;
 		}
 
 		gPlayerInfo[p].raceCheckpointNum = newCheckpoint;								// update player's current ckpt #
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_OnCheckpointReached(p, newCheckpoint);
+#endif
 	}
 
 
@@ -327,7 +369,15 @@ static void PlayerCompletedRace(short playerNum)
 {
 short	i;
 
+	if (gPlayerInfo[playerNum].raceComplete)
+	{
+		return;
+	}
 	gPlayerInfo[playerNum].raceComplete = true;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnRaceFinish(playerNum, gPlayerInfo[playerNum].place);
+#endif
 
 
 	if (!gLevelCompleted)									// only if this is the 1st guy to win
@@ -345,10 +395,3 @@ short	i;
 		StartLevelCompletion(5.0f);
 	}
 }
-
-
-
-
-
-
-

@@ -11,6 +11,11 @@
 
 #include "game.h"
 
+#include <setjmp.h>
+
+extern jmp_buf gPangeaScriptFatalJump;
+extern bool gPangeaScriptFatalBoundaryActive;
+
 
 /****************************/
 /*    CONSTANTS             */
@@ -77,6 +82,8 @@ void DoAssert(const char* msg, const char* file, int line)
 
 void DoFatalAlert(const char* s)
 {
+	if (gPangeaScriptFatalBoundaryActive)
+		longjmp(gPangeaScriptFatalJump, 1);
 	SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Game Fatal Alert: %s", s);
 	Enter2D();
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME ": Fatal Alert", s, NULL);
@@ -213,7 +220,6 @@ void ApplyFrictionToDeltas(float f,TQ3Vector3D *d)
 			d->z = 0;
 	}
 }
-
 
 
 

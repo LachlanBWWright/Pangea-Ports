@@ -44,6 +44,8 @@ float	gDeathTimer[MAX_PLAYERS] = {0,0};
 
 Boolean	gPlayerIsDead[MAX_PLAYERS] = {false, false};
 
+static Boolean gBattleCollisionResolution = false;
+
 #define	TextureTransformU2	SpecialF[0]
 #define	TextureTransformV2	SpecialF[1]
 
@@ -364,10 +366,14 @@ ObjNode	*player = gPlayerInfo[playerNum].objNode;
 
 			/* SPECIAL STUFF FOR BATTLE MODE */
 
-	if (gVSMode == VS_MODE_BATTLE)
+	if (gVSMode == VS_MODE_BATTLE && !gBattleCollisionResolution)
 	{
 		if (gPlayerInfo[playerNum].numFreeLives <= 0)	// is this player out of lives?
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			Nanosaur2Script_OnObjectiveComplete(playerNum, 1);
+			Nanosaur2Script_OnObjectiveComplete(playerNum ^ 1, 0);
+		#endif
 			ShowWinLose(playerNum, 1);					// lost
 			ShowWinLose(playerNum^1, 0);				// win
 			StartLevelCompletion(5.0f);
@@ -916,11 +922,13 @@ short   p1,p2;
 	p1 = trigger->PlayerNum;
 	p2 = theNode->PlayerNum;
 
+	gBattleCollisionResolution = true;
 	p1Dead = PlayerLoseHealth(p1, damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
 	gPlayerInfo[p1].invincibilityTimer = .5f;
 
 	p2Dead = PlayerLoseHealth(p2, damage, PLAYER_DEATH_TYPE_DEATHDIVE, &gCoord, true);
 	gPlayerInfo[p2].invincibilityTimer = .5f;
+	gBattleCollisionResolution = false;
 
 	PlayRumbleEffect(EFFECT_BODYHIT, p1);
 	PlayRumbleEffect(EFFECT_BODYHIT, p2);
@@ -938,6 +946,10 @@ short   p1,p2;
 
 		if (p1Dead && p2Dead && (gPlayerInfo[0].numFreeLives <= 0) && (gPlayerInfo[1].numFreeLives <= 0))
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			Nanosaur2Script_OnObjectiveComplete(0, 2);
+			Nanosaur2Script_OnObjectiveComplete(1, 2);
+		#endif
 			ShowWinLose(0, 2);							// draw
 			ShowWinLose(1, 2);							// draw
 			StartLevelCompletion(5.0f);
@@ -946,6 +958,10 @@ short   p1,p2;
 		else
 		if (p1Dead && (gPlayerInfo[0].numFreeLives <= 0))
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			Nanosaur2Script_OnObjectiveComplete(0, 1);
+			Nanosaur2Script_OnObjectiveComplete(1, 0);
+		#endif
 			ShowWinLose(0, 1);							// lose
 			ShowWinLose(1, 0);							// win
 			StartLevelCompletion(5.0f);
@@ -954,6 +970,10 @@ short   p1,p2;
 		else
 		if (p2Dead && (gPlayerInfo[1].numFreeLives <= 0))
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			Nanosaur2Script_OnObjectiveComplete(1, 1);
+			Nanosaur2Script_OnObjectiveComplete(0, 0);
+		#endif
 			ShowWinLose(1, 1);							// lose
 			ShowWinLose(0, 0);							// win
 			StartLevelCompletion(5.0f);

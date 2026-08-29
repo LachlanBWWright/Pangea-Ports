@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -689,7 +693,18 @@ static Boolean RaptorHitByWeaponCallback(ObjNode *bullet, ObjNode *enemy, OGLPoi
 {
 #pragma unused (hitTriangleNormal, hitCoord)
 
-	enemy->Health -= bullet->Damage;
+	float hitDamage = bullet->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Boolean destroyTarget = false;
+	if (!Nanosaur2Script_OnWeaponHit(bullet, enemy, hitDamage, &hitDamage, &destroyTarget))
+		return(true);
+	if (destroyTarget)
+	{
+		KillRaptor(enemy);
+		return(true);
+	}
+#endif
+	enemy->Health -= hitDamage;
 
 			/* SEE IF KILLED */
 
@@ -875,8 +890,6 @@ Boolean			killed;
 
 	return(false);						// raptor not killed
 }
-
-
 
 
 

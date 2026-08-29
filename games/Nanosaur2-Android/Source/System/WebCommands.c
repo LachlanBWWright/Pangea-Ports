@@ -1233,6 +1233,7 @@ EMSCRIPTEN_KEEPALIVE int PangeaGame_DebugForcePlayerDeath(int playerIndex)
 	}
 	return 1;
 }
+
 static uint32_t gNS2LastRemoteExplosionTick[2] = {0u, 0u};
 
 static void NS2DebugLogEarlyNetPhase(const char* phase)

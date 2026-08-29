@@ -11,6 +11,9 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "pangea_script.h"
+#endif
 
 
 /****************************/
@@ -1204,6 +1207,9 @@ static void	ConvertTexture16To16(uint16_t *textureBuffer, int width, int height)
 
 Boolean SaveGame(int slot)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gLevelNum, slot, false);
+#endif
 SaveGameType	saveData;
 short			fRefNum;
 FSSpec			spec;
@@ -1327,6 +1333,10 @@ Boolean LoadSavedGame(int slot)
 	gPlayerInfo.lives = saveData.numLives;
 	gPlayerInfo.health = saveData.health;
 	gPlayerInfo.numGoldClovers = saveData.numGoldClovers;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gLevelNum, slot, true);
+#endif
 
 	return true;
 }

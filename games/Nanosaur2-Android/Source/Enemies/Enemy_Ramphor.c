@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -325,7 +329,18 @@ static Boolean RamphorHitByWeaponCallback(ObjNode *bullet, ObjNode *enemy, OGLPo
 {
 #pragma unused (hitTriangleNormal, hitCoord)
 
-	enemy->Health -= bullet->Damage;
+	float hitDamage = bullet->Damage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Boolean destroyTarget = false;
+	if (!Nanosaur2Script_OnWeaponHit(bullet, enemy, hitDamage, &hitDamage, &destroyTarget))
+		return(true);
+	if (destroyTarget)
+	{
+		KillRamphor(enemy);
+		return(true);
+	}
+#endif
+	enemy->Health -= hitDamage;
 
 			/* SEE IF KILLED */
 
@@ -553,4 +568,3 @@ Boolean			killed;
 
 	return(false);						//  not killed
 }
-

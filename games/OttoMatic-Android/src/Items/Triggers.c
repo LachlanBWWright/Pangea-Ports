@@ -849,6 +849,9 @@ static Boolean DoTrig_Checkpoint(ObjNode *theNode, ObjNode *whoNode, Byte sideBi
 		gBestCheckpointCoord.y = gPlayerInfo.coord.z;
 
 		gBestCheckpointAim = theNode->ReincarnationAim;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_OnCheckpointReached(theNode->CheckpointNum);
+	#endif
 	}
 
 
@@ -1751,6 +1754,5 @@ OGLPoint2D		origin,pt,p[12];
 
 	return(true);
 }
-
 
 

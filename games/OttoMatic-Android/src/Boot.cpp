@@ -16,6 +16,9 @@
 extern "C"
 {
 	#include "game.h"
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	#include "ScriptBindings.h"
+	#endif
 
 	SDL_Window* gSDLWindow = nullptr;
 	FSSpec gDataSpec;
@@ -131,11 +134,35 @@ EMSCRIPTEN_KEEPALIVE extern "C" float OttoMatic_GetPlayerHealth(void) { return g
 // Exported: get player remaining lives
 EMSCRIPTEN_KEEPALIVE extern "C" int OttoMatic_GetPlayerLives(void) { return gPlayerInfo.lives; }
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+EMSCRIPTEN_KEEPALIVE extern "C" int OttoScript_ProbeCheckpointResetJS(void)
+{
+	PangeaScriptObjectHandle handle = {0, 0};
+	PangeaScriptStatus status;
+	ObjNode* player = gPlayerInfo.objNode;
+
+	if (!player)
+		return 0;
+	status = PangeaScript_RegisterScriptedObject(
+		"browser-custom-object",
+		player->Coord.x,
+		player->Coord.y,
+		player->Coord.z,
+		&handle);
+	if (status != PANGEA_SCRIPT_OK)
+		return (int)status;
+	ResetPlayerAtBestCheckpoint();
+	if (!PangeaScript_DeleteObject(handle))
+		return (int)PANGEA_SCRIPT_RUNTIME_ERROR;
+	return 1;
+}
+#endif
+
 // Exported: skip to a specific level (triggers level completion then loads target)
 EMSCRIPTEN_KEEPALIVE extern "C" void OttoMatic_SkipToLevel(int level)
 {
-	if (level < 0 || level > 9) return;
-	gLevelNum = level - 1;	// PlayGame increments before loading
+	if (level < 0 || level >= NUM_LEVELS) return;
+	gLevelNum = level;
 	gLevelCompleted = true;
 	gLevelCompletedCoolDownTimer = 0;
 	SDL_Log("[LevelEditor] Skipping to level %d", level);

@@ -12,6 +12,10 @@
 
 #include <SDL3/SDL_time.h>
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "pangea_script.h"
+static int gScriptLoadedSaveSlot;
+#endif
 #include "stb_image.h"
 
 /****************************/
@@ -1219,6 +1223,9 @@ MOMaterialObject* LoadSuperTileTexture(Ptr textureBuffer, int texSize)
 
 Boolean SaveGame(int fileSlot)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gLevelNum, fileSlot, false);
+#endif
 	char path[256];
 	SDL_snprintf(path, sizeof(path), "File%c", 'A' + fileSlot);
 
@@ -1253,6 +1260,9 @@ Boolean SaveGame(int fileSlot)
 
 Boolean LoadSavedGame(int fileSlot, SaveGameType* outData)
 {
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	gScriptLoadedSaveSlot = fileSlot;
+	#endif
 	char path[256];
 	SDL_snprintf(path, sizeof(path), "File%c", 'A' + fileSlot);
 
@@ -1291,6 +1301,10 @@ void UseSaveGame(const SaveGameType* saveData)
 
 	for (int i = 0; i < NUM_WEAPON_TYPES; i++)
 		gPlayerInfo[0].weaponQuantity[i] = saveData->weaponQuantity[i];
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gLevelNum, gScriptLoadedSaveSlot, true);
+#endif
 }
 
 
@@ -1301,6 +1315,13 @@ OSErr InitPrefsFolder(Boolean createIt)
 {
 	long createdDirID;
 
+#ifdef __EMSCRIPTEN__
+	gPrefsFolderVRefNum = 0;
+	gPrefsFolderDirID = 0;
+	if (!createIt)
+		return noErr;
+	return DirCreate(gPrefsFolderVRefNum, gPrefsFolderDirID, PREFS_FOLDER_NAME, &createdDirID);
+#else
 	OSErr iErr = FindFolder(kOnSystemDisk, kPreferencesFolderType, kDontCreateFolder,			// locate the folder
 					  &gPrefsFolderVRefNum, &gPrefsFolderDirID);
 	if (iErr != noErr)
@@ -1312,6 +1333,7 @@ OSErr InitPrefsFolder(Boolean createIt)
 	}
 
 	return iErr;
+#endif
 }
 
 static OSErr MakeFSSpecForUserDataFile(const char* filename, FSSpec* spec)

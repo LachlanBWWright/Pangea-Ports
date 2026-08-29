@@ -146,6 +146,9 @@ export interface ScriptedSpawnOptions {
 }
 
 export interface PangeaCapabilities {
+  readonly contractVersion: number;
+  readonly apiVersion: number;
+  readonly runtimeFingerprint: number;
   readonly objectPosition: boolean;
   readonly objectMutation: boolean;
   readonly spawnNative: boolean;
@@ -167,6 +170,10 @@ export interface PangeaCapabilities {
   readonly terrainItems: boolean;
   readonly splineItems: boolean;
   readonly mapItems: boolean;
+  readonly pickupScoreEffects: boolean;
+  readonly objectCollision: boolean;
+  readonly playerCommands: boolean;
+  readonly playerInvulnerability: boolean;
 }
 
 export interface PangeaDiagnostics {

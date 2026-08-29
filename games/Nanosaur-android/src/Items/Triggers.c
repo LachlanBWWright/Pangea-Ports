@@ -341,6 +341,10 @@ static Boolean DoTrig_PowerUp(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	theNode->TerrainItemPtr = nil;							// it aint never comin' back
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_OnPickupCollected(theNode, whoNode, theNode->Kind, (float) theNode->PowerUpQuan, "nanosaur.powerup");
+#endif
+
 			/* HANDLE THE POW */
 
 	switch(theNode->Kind)
@@ -605,4 +609,3 @@ static Boolean DoTrig_StepStone(ObjNode *theNode, ObjNode *whoNode, Byte sideBit
 	}
 	return(true);
 }
-

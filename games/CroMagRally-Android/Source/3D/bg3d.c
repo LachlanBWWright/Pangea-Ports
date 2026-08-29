@@ -877,6 +877,17 @@ int					i;
 	gBG3DContainerList[groupNum] = nil;								// its gone
 }
 
+void AbortBG3DImport(int groupNum)
+{
+	if (groupNum < 0 || groupNum >= MAX_BG3D_GROUPS)
+		return;
+	if (gBG3DContainerList[groupNum] == nil && gBG3D_CurrentContainer != nil)
+		gBG3DContainerList[groupNum] = gBG3D_CurrentContainer;
+	DisposeBG3DContainer(groupNum);
+	gBG3D_CurrentContainer = nil;
+	gNumObjectsInBG3DGroupList[groupNum] = 0;
+}
+
 #pragma mark -
 
 
@@ -909,6 +920,5 @@ int					n,i;
 		mat->objectData.flags |= flags;					// set flags
 	}
 }
-
 
 

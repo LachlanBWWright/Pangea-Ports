@@ -435,6 +435,10 @@ ObjNode *nest;
 		return;
 #endif
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnPickupCollected(egg, gPlayerInfo[playerNum].objNode, egg->Kind, 1.0f, "nanosaur2.egg");
+#endif
+
 			/* LET NEST KNOW THE EGG IS GONE */
 
 	nest = egg->ChainHead;
@@ -721,6 +725,10 @@ Boolean	gotAllEggs = true;
 
 				if (gNumEggsSaved[1] >= gNumEggsToSave[1])			// did we get all of P2's eggs?
 				{
+				#ifdef PANGEA_ENABLE_SCRIPTING
+					Nanosaur2Script_OnObjectiveComplete(0, 0);
+					Nanosaur2Script_OnObjectiveComplete(1, 1);
+				#endif
 					ShowWinLose(0, 0);					// won!
 					ShowWinLose(1, 1);					// lost
 					StartLevelCompletion(5.0f);
@@ -730,6 +738,10 @@ Boolean	gotAllEggs = true;
 				else
 				if (gNumEggsSaved[0] >= gNumEggsToSave[0])			// did we get all of P1's eggs?
 				{
+				#ifdef PANGEA_ENABLE_SCRIPTING
+					Nanosaur2Script_OnObjectiveComplete(1, 0);
+					Nanosaur2Script_OnObjectiveComplete(0, 1);
+				#endif
 					ShowWinLose(1, 0);					// won!
 					ShowWinLose(0, 1);					// lost
 					StartLevelCompletion(5.0f);
@@ -844,8 +856,6 @@ void PangeaNet_ApplyEggNetworkState(int eggIndex, int state, int carrier, float 
 }
 
 #endif // __EMSCRIPTEN__
-
-
 
 
 

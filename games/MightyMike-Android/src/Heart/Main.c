@@ -811,6 +811,9 @@ delete:
 
 void SaveGame(short	gameNum, Boolean atNextFlag)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gSceneNum, gameNum, false);
+#endif
 OSErr		iErr;
 short		fRefNum;
 long		numBytes;
@@ -992,6 +995,10 @@ SaveGameFile	saveGame;
 
 	gStartingScene = gSceneNum;
 	gStartingArea = gAreaNum;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	(void) PangeaScript_CallNativeSaveHook(gSceneNum, gameNum, true);
+#endif
 }
 
 

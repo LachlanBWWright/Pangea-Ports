@@ -3537,6 +3537,76 @@ err:
 }
 
 
+/**************** UPDATE CAR ATTACHMENT TRANSFORMS ****************/
+
+void UpdateCarAttachmentTransforms(ObjNode *theCar)
+{
+	short playerNum = theCar->PlayerNum;
+	short carType = gPlayerInfo[playerNum].vehicleType;
+	ObjNode *wheels[4];
+	ObjNode *head;
+	OGLMatrix4x4 m1,m2,m3;
+	static const OGLPoint3D wheelOffsets[NUM_LAND_CAR_TYPES][4] =
+	{
+		[CAR_TYPE_MAMMOTH]     = { {-109,-19,-92},	{109,-19,-92},	{129,4,91},		{-129,4,91} },
+		[CAR_TYPE_BONEBUGGY]   = { {-76,-35,-101},	{76,-35,-101},	{84,-9,91},		{-84,-9,91} },
+		[CAR_TYPE_GEODE]       = { {-126,-27,-85},	{126,-27,-85},	{126,-27,82},	{-126,-27,82} },
+		[CAR_TYPE_LOG]         = { {-112,-49,-122},	{112,-49,-122},	{123,-27,37},	{-123,-27,37} },
+		[CAR_TYPE_TURTLE]      = { {-99,-31,-102},	{99,-31,-102},	{109,-23,73},	{-109,-23,73} },
+		[CAR_TYPE_ROCK]        = { {-70,-45,-84},	{70,-45,-84},	{96,-38,77},	{-96,-38,77} },
+		[CAR_TYPE_TROJANHORSE] = { {-103,-57,-64},	{103,-57,-64},	{103,-57,94},	{-103,-57,94} },
+		[CAR_TYPE_OBELISK]     = { {-111,-58,-89},	{111,-58,-89},	{112,-38,79},	{-112,-38,79} },
+		[CAR_TYPE_CATAPULT]    = { {-108,-38,-109},	{108,-38,-109},	{112,-10,105},	{-112,-10,105} },
+		[CAR_TYPE_CHARIOT]     = { {-122,-28,-80},	{122,-28,-80},	{122,-2,85},	{-122,-2,85} },
+	};
+	static const OGLPoint3D headOffsets[NUM_LAND_CAR_TYPES] =
+	{
+		[CAR_TYPE_MAMMOTH] = { 0, 58, -10 }, [CAR_TYPE_BONEBUGGY] = { 0, 65, -20 },
+		[CAR_TYPE_GEODE] = { 0, 70, 20 }, [CAR_TYPE_LOG] = { 0, 85, 0 },
+		[CAR_TYPE_TURTLE] = { 0, 70, 40 }, [CAR_TYPE_ROCK] = { 0, 50, 10 },
+		[CAR_TYPE_TROJANHORSE] = { 0, 140, 35 }, [CAR_TYPE_OBELISK] = { 0, 85, 22 },
+		[CAR_TYPE_CATAPULT] = { 0, 85, 10 }, [CAR_TYPE_CHARIOT] = { 0, 85, 10 },
+	};
+
+	if (playerNum < 0 || playerNum >= gNumTotalPlayers || carType >= NUM_LAND_CAR_TYPES)
+		return;
+
+	UpdateObjectTransforms(theCar);
+	wheels[0] = theCar->ChainNode;
+	if (!wheels[0]) return;
+	wheels[1] = wheels[0]->ChainNode;
+	if (!wheels[1]) return;
+	wheels[2] = wheels[1]->ChainNode;
+	if (!wheels[2]) return;
+	wheels[3] = wheels[2]->ChainNode;
+	if (!wheels[3]) return;
+	head = wheels[3]->ChainNode;
+	if (!head) return;
+
+	for (short i = 0; i < 4; i++)
+	{
+		OGLMatrix4x4_SetRotate_X(&m1, wheels[i]->WheelSpinRot);
+		if (i < 2)
+		{
+			wheels[i]->Rot.y = gPlayerInfo[playerNum].steering * -.6f;
+			OGLMatrix4x4_SetRotate_Y(&m2, wheels[i]->Rot.y);
+			OGLMatrix4x4_Multiply(&m1, &m2, &m3);
+			m1 = m3;
+		}
+		OGLMatrix4x4_SetTranslate(&m2, wheelOffsets[carType][i].x, wheelOffsets[carType][i].y, wheelOffsets[carType][i].z);
+		OGLMatrix4x4_Multiply(&m1, &m2, &m3);
+		OGLMatrix4x4_Multiply(&m3, &theCar->BaseTransformMatrix, &wheels[i]->BaseTransformMatrix);
+		SetObjectTransformMatrix(wheels[i]);
+	}
+
+	OGLMatrix4x4_SetScale(&m1, head->Scale.x, head->Scale.x, head->Scale.x);
+	OGLMatrix4x4_SetTranslate(&m2, headOffsets[carType].x, headOffsets[carType].y, headOffsets[carType].z);
+	OGLMatrix4x4_Multiply(&m1, &m2, &m3);
+	OGLMatrix4x4_Multiply(&m3, &theCar->BaseTransformMatrix, &head->BaseTransformMatrix);
+	SetObjectTransformMatrix(head);
+}
+
+
 
 /********************** SPEW DEBRIS FROM WHEEL ***********************/
 //
@@ -3657,8 +3727,6 @@ new_group:
 
 
 }
-
-
 
 
 

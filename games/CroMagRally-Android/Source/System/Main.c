@@ -1113,7 +1113,7 @@ static void PlayArea(void)
 
 		gGameFrameNum++;
 #ifdef PANGEA_ENABLE_SCRIPTING
-		if (!gNetGameInProgress)
+		if (PangeaScript_IsEnabled() && !PangeaScript_IsNetworkedMode())
 			CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, (float)gGameFrameNum * gFramesPerSecondFrac);
 #endif
 
@@ -2044,7 +2044,7 @@ void GameMain_RunFrame(void)
 	CalcFramesPerSecond();
 	gGameFrameNum++;
 #ifdef PANGEA_ENABLE_SCRIPTING
-	if (!gNetGameInProgress)
+	if (PangeaScript_IsEnabled() && !PangeaScript_IsNetworkedMode())
 		CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, (float)gGameFrameNum * gFramesPerSecondFrac);
 #endif
 	gDisableHiccupTimer = false;

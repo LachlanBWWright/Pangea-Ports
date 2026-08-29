@@ -779,8 +779,11 @@ static void BulletHitFreeLifePOW(ObjNode *bullet, ObjNode *pow, const OGLPoint3D
 
 static Boolean DoTrig_FreeLife(ObjNode *item, ObjNode *who, Byte sideBits)
 {
-	(void) who;
 	(void) sideBits;
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_OnPickupCollected(item, who, item->Type, 1.0f, "billy.freeLifePow");
+	#endif
 
 	BulletHitFreeLifePOW(nil, item, &item->Coord);
 
@@ -909,8 +912,11 @@ static void BulletHitPesoPOW(ObjNode *bullet, ObjNode *pow, const OGLPoint3D *im
 
 static Boolean DoTrig_Peso(ObjNode *item, ObjNode *who, Byte sideBits)
 {
-	(void) who;
 	(void) sideBits;
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_OnPickupCollected(item, who, item->Type, 1.0f, "billy.peso");
+	#endif
 
 	item->CType = 0;
 	item->MoveCall = MovePOW_Vanish;
@@ -1545,7 +1551,6 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
 
 
 

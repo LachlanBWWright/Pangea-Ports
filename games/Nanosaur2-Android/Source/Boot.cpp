@@ -127,6 +127,24 @@ static void ParseCommandLineArgs(int argc, char** argv)
 		if (gCmdLevelNum < 0 || gCmdLevelNum >= NUM_LEVELS)
 			gCmdLevelNum = -1;
 	}
+	char* terrainPath = (char*) EM_ASM_PTR({
+		try {
+			var value = new URLSearchParams(window.location.search).get('terrainFile');
+			if (!value) return 0;
+			var length = lengthBytesUTF8(value) + 1;
+			var pointer = _malloc(length);
+			stringToUTF8(value, pointer, length);
+			return pointer;
+		} catch (error) {
+			return 0;
+		}
+	});
+	if (terrainPath)
+	{
+		SDL_strlcpy(gCmdTerrainOverridePath, terrainPath, sizeof(gCmdTerrainOverridePath));
+		SDL_Log("Terrain override from URL: %s", gCmdTerrainOverridePath);
+		free(terrainPath);
+	}
 #endif
 }
 

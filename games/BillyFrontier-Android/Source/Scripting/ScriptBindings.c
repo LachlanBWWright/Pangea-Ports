@@ -7,7 +7,23 @@
 #include "splineitems.h"
 
 #include <stdio.h>
+#include <math.h>
+#include <stdint.h>
 #include <string.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
+
+extern bool PangeaScript_LoadCustomBG3D(FSSpec* spec, int group);
+extern bool PangeaScript_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
@@ -48,10 +64,30 @@ static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, floa
 
 static PangeaScriptFrameContext gScriptFrameContext;
 
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE int BillyScript_ProbeAreaCompletionJS(void)
+{
+	StartLevelCompletion(0.05f);
+	return 0;
+}
+#endif
+
 static bool CompleteScriptReplacement(PangeaScriptObjectHandle handle, const char* action)
 {
-	PangeaScriptStatus status = PangeaScript_ApplyObjectLifecycle(
+	PangeaScriptStatus status = PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "spawn");
+	if (status == PANGEA_SCRIPT_OK && !PangeaScript_ObjectExists(handle))
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (status != PANGEA_SCRIPT_OK)
+	{
+		LogScriptStatus(action, status);
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_DeleteObject(handle);
+		return false;
+	}
+	status = PangeaScript_ApplyObjectLifecycle(
 		handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_IN);
+	if (status == PANGEA_SCRIPT_OK && !PangeaScript_ObjectExists(handle))
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
 	if (status == PANGEA_SCRIPT_OK && PangeaScript_ObjectExists(handle))
 		return true;
 	LogScriptStatus(action, status);
@@ -107,7 +143,7 @@ static Boolean IsSafeCustomAsset(const FSSpec* spec)
 {
 	short refNum;
 	long size;
-	if (FSpOpenDF(spec, fsRdPerm, &refNum) != noErr) return false;
+	if (!spec || FSpOpenDF(spec, fsRdPerm, &refNum) != noErr) return false;
 	Boolean valid = GetEOF(refNum, &size) == noErr && size > 0 && size <= 16 * 1024 * 1024;
 	FSClose(refNum);
 	return valid;
@@ -117,6 +153,8 @@ static int GetCustomModelGroup(const char* modelPath)
 {
 	char dataPath[260];
 	FSSpec spec;
+	if (!modelPath || modelPath[0] == '\0')
+		return -1;
 	for (int i = 0; i < MODEL_GROUP_SCRIPT_CUSTOM_COUNT; i++)
 	{
 		int group = MODEL_GROUP_SCRIPT_CUSTOM_BASE + i;
@@ -129,8 +167,7 @@ static int GetCustomModelGroup(const char* modelPath)
 	{
 		int group = MODEL_GROUP_SCRIPT_CUSTOM_BASE + i;
 		if (gNumObjectsInBG3DGroupList[group] != 0) continue;
-		ImportBG3D(&spec, group);
-		if (!gBG3DContainerList[group] || gNumObjectsInBG3DGroupList[group] <= 0)
+		if (!PangeaScript_LoadCustomBG3D(&spec, group))
 		{
 			if (gBG3DContainerList[group])
 				DisposeBG3DContainer(group);
@@ -147,8 +184,8 @@ static int GetCustomSkeletonType(const PangeaScriptCustomObjectDefinition* defin
 {
 	char modelPath[260], skeletonPath[260];
 	FSSpec modelSpec, skeletonSpec;
-	short refNum;
-	long size;
+	if (!definition || definition->modelPath[0] == '\0' || definition->skeletonPath[0] == '\0')
+		return -1;
 	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
 	{
 		int type = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i;
@@ -157,14 +194,12 @@ static int GetCustomSkeletonType(const PangeaScriptCustomObjectDefinition* defin
 	}
 	if (!MakeDataAssetPath(definition->modelPath, modelPath, sizeof(modelPath)) || !MakeDataAssetPath(definition->skeletonPath, skeletonPath, sizeof(skeletonPath))) return -1;
 	if (FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, modelPath, &modelSpec) != noErr || FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, skeletonPath, &skeletonSpec) != noErr) return -1;
-	if (FSpOpenDF(&modelSpec, fsRdPerm, &refNum) != noErr) return -1;
-	if (GetEOF(refNum, &size) != noErr || size <= 0 || size > 16 * 1024 * 1024) { FSClose(refNum); return -1; }
-	FSClose(refNum);
+	if (!IsSafeCustomAsset(&modelSpec) || !IsSafeCustomAsset(&skeletonSpec)) return -1;
 	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
 	{
 		int type = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i;
 		if (IsSkeletonTypeLoaded(type)) continue;
-		if (!LoadCustomSkeleton(type, &skeletonSpec, &modelSpec)) return -1;
+		if (!PangeaScript_LoadCustomSkeleton(type, &skeletonSpec, &modelSpec)) return -1;
 		snprintf(gScriptSkeletonCache[i].modelPath, sizeof(gScriptSkeletonCache[i].modelPath), "%s", definition->modelPath);
 		snprintf(gScriptSkeletonCache[i].skeletonPath, sizeof(gScriptSkeletonCache[i].skeletonPath), "%s", definition->skeletonPath);
 		return type;
@@ -226,6 +261,15 @@ static bool BillyScript_SetObjectScale(void* nativeObject, float scale)
 	return true;
 }
 
+static bool BillyScript_SetObjectCollisionEnabled(void* nativeObject, bool enabled)
+{
+	ObjNode* obj = (ObjNode*)nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+	if (enabled) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
+	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
+	return true;
+}
+
 static int ResolveNamedAnimation(const ObjNode* obj, const char* animation)
 {
 	const PangeaScriptCustomObjectDefinition* definition;
@@ -262,7 +306,13 @@ static bool BillyScript_DeleteObject(void* nativeObject)
 
 	if (obj->ScriptDefinitionID[0])
 	{
-		BillyScript_UnregisterObject(obj);
+		if ((obj->TerrainItemPtr || obj->SplineItemPtr) && !obj->ScriptStreamOutSent)
+		{
+			PangeaScriptObjectHandle handle = {obj->ScriptObjectID, obj->ScriptObjectGeneration};
+			if (PangeaScript_ObjectExists(handle))
+				(void) PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_OUT);
+			obj->ScriptStreamOutSent = true;
+		}
 		obj->ScriptDeleteRequested = true;
 	}
 	else { BillyScript_UnregisterObject(obj); DeleteObject(obj); }
@@ -278,6 +328,7 @@ static const PangeaScriptObjectOps kBillyPlayerObjectOps =
 	.setScale = BillyScript_SetObjectScale,
 	.setAnimation = BillyScript_SetObjectAnimation,
 	.setAnimationNamed = BillyScript_SetObjectAnimationNamed,
+	.setCollisionEnabled = BillyScript_SetObjectCollisionEnabled,
 	.deleteObject = BillyScript_DeleteObject,
 };
 
@@ -351,7 +402,8 @@ void BillyScript_UnregisterObject(ObjNode* obj)
 		.id = (int) obj->ScriptObjectID,
 		.generation = obj->ScriptObjectGeneration,
 	};
-	(void) PangeaScript_UnregisterObject(handle);
+	if (PangeaScript_ObjectExists(handle))
+		(void) PangeaScript_UnregisterObject(handle);
 	obj->ScriptObjectID = 0;
 	obj->ScriptObjectGeneration = 0;
 	obj->ScriptVisualOffset = (OGLVector3D){0};
@@ -430,6 +482,47 @@ void BillyScript_OnDamageApplied(ObjNode* player, float damage, int cause)
 	LogScriptStatus("onDamageApplied", PangeaScript_CallDamageAppliedHook(&context));
 }
 
+void BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId)
+{
+	PangeaScriptPickupContext context;
+	PangeaScriptPickupResult result = {0};
+	PangeaScriptStatus status;
+	int64_t score;
+	if (!pickup || !player || pickup->ScriptObjectID <= 0 || pickup->ScriptObjectGeneration <= 0 ||
+		player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptPickupContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = 0,
+		.pickupType = pickupType,
+		.amount = amount,
+		.pickupId = pickupId,
+		.pickup = {pickup->ScriptObjectID, pickup->ScriptObjectGeneration},
+		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
+		.position = {pickup->Coord.x, pickup->Coord.y, pickup->Coord.z},
+	};
+	status = PangeaScript_CallPickupHook(&context, &result);
+	LogScriptStatus("onPickupCollected", status);
+	if (status != PANGEA_SCRIPT_OK)
+		return;
+	if (isfinite(result.healthDelta))
+	{
+		player->Health += result.healthDelta;
+		if (player->Health < 0.0f)
+			player->Health = 0.0f;
+		else if (player->Health > 1.0f)
+			player->Health = 1.0f;
+	}
+	score = (int64_t) gScore + (int64_t) result.scoreDelta;
+	if (score < 0)
+		gScore = 0;
+	else if (score > UINT32_MAX)
+		gScore = UINT32_MAX;
+	else
+		gScore = (uint32_t) score;
+}
+
 void BillyScript_OnDeath(ObjNode* player, int eventValue)
 {
 	PangeaScriptPlayerEventContext context;
@@ -461,8 +554,22 @@ void BillyScript_ApplyObjectScripting(ObjNode* obj)
 		.id = (int) obj->ScriptObjectID,
 		.generation = obj->ScriptObjectGeneration,
 	};
+	if (!PangeaScript_ObjectExists(handle))
+	{
+		obj->ScriptObjectID = 0;
+		obj->ScriptObjectGeneration = 0;
+		return;
+	}
 
 	status = PangeaScript_CallObjectFrame(handle, &gScriptFrameContext, &result);
+	if (!PangeaScript_ObjectExists(handle))
+	{
+		obj->ScriptObjectID = 0;
+		obj->ScriptObjectGeneration = 0;
+		obj->ScriptVisualOffset = (OGLVector3D){0};
+		PangeaScript_ClearLastError();
+		return;
+	}
 	LogScriptStatus("onObjectFrame", status);
 	if (status != PANGEA_SCRIPT_OK || obj->CType == INVALID_NODE_FLAG)
 	{
@@ -489,13 +596,15 @@ void BillyScript_ApplyObjectScripting(ObjNode* obj)
 
 void BillyScript_RunObjectFrame(ObjNode* obj)
 {
-	BillyScript_ApplyObjectScripting(obj);
+	if (!obj->ScriptDeleteRequested)
+		BillyScript_ApplyObjectScripting(obj);
 	if (obj->CType == INVALID_NODE_FLAG) return;
 	if (obj->ScriptDeleteRequested) { DeleteObject(obj); return; }
 	if (obj->Skeleton && obj->Skeleton->AnimHasStopped && !obj->ScriptAnimationCompletionSent)
 	{
 		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
-		(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "animationComplete");
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "animationComplete");
 		obj->ScriptAnimationCompletionSent = true;
 	}
 }
@@ -505,10 +614,15 @@ void BillyScript_OnObjectDeleted(ObjNode* obj)
 	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
-		PangeaScriptObjectLifecycle lifecycle = obj->TerrainItemPtr || obj->SplineItemPtr
-			? PANGEA_SCRIPT_OBJECT_STREAM_OUT
-			: PANGEA_SCRIPT_OBJECT_DESTROY;
-		(void)PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, lifecycle);
+		if (!PangeaScript_ObjectExists(handle))
+			return;
+		if ((obj->TerrainItemPtr || obj->SplineItemPtr) && !obj->ScriptStreamOutSent)
+		{
+			(void)PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_OUT);
+			obj->ScriptStreamOutSent = true;
+		}
+		else if (!obj->ScriptStreamOutSent)
+			(void)PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	}
 }
 
@@ -558,8 +672,12 @@ static Boolean ScriptedTriggerCallback(ObjNode* trigger, ObjNode* who, Byte side
 	{
 		PangeaScriptObjectHandle handle = {(int)trigger->ScriptObjectID, trigger->ScriptObjectGeneration};
 		PangeaScriptObjectHandle other = {0};
+		if (!PangeaScript_ObjectExists(handle))
+			return true;
 		if (who && who->ScriptObjectID)
 			other = (PangeaScriptObjectHandle){(int)who->ScriptObjectID, who->ScriptObjectGeneration};
+		if (other.id > 0 && !PangeaScript_ObjectExists(other))
+			other = (PangeaScriptObjectHandle){0};
 		return PangeaScript_CallObjectTriggerWithOther(handle, &gScriptFrameContext, sides, true, other);
 	}
 	return true;
@@ -570,7 +688,8 @@ void BillyScript_OnAnimationEvent(ObjNode* obj, int eventValue)
 	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID)
 	{
 		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
-		(void)PangeaScript_CallObjectEventWithValue(handle, &gScriptFrameContext, "animationEvent", eventValue);
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_CallObjectEventWithValue(handle, &gScriptFrameContext, "animationEvent", eventValue);
 	}
 }
 
@@ -606,14 +725,6 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 	BillyScript_RegisterObject(object, definition->id, "customObject");
 	if (!object->ScriptObjectID) { DeleteObject(object); return PANGEA_SCRIPT_RUNTIME_ERROR; }
 	if (outHandle) *outHandle = (PangeaScriptObjectHandle){(int)object->ScriptObjectID, object->ScriptObjectGeneration};
-	PangeaScriptObjectHandle handle = {(int)object->ScriptObjectID, object->ScriptObjectGeneration};
-	PangeaScriptStatus spawnStatus = PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "spawn");
-	if (spawnStatus != PANGEA_SCRIPT_OK || !PangeaScript_ObjectExists(handle))
-	{
-		(void)PangeaScript_DeleteObject(handle);
-		if (outHandle) *outHandle = (PangeaScriptObjectHandle){0};
-		return spawnStatus == PANGEA_SCRIPT_OK ? PANGEA_SCRIPT_RUNTIME_ERROR : spawnStatus;
-	}
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -660,8 +771,40 @@ static int GetScriptPlayerCount(void) { return gPlayerInfo.objNode ? 1 : 0; }
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerInfo.objNode) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .health = gPlayerInfo.objNode->Health, .hasHealth = true, .active = true};
 	return true;
+}
+
+static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScriptVector3* position)
+{
+	if (playerNum != 0 || !position || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.coord = (OGLPoint3D){position->x, position->y, position->z};
+	gPlayerInfo.objNode->Coord = gPlayerInfo.coord;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScriptVector3* velocity)
+{
+	if (playerNum != 0 || !velocity || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	return BillyScript_SetObjectVelocity(gPlayerInfo.objNode, velocity) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
+{
+	if (playerNum != 0 || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.objNode->Health = health;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerInvulnerable(int playerNum, float durationSeconds)
+{
+	if (playerNum != 0 || durationSeconds < 0.0f || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.invincibilityTimer = durationSeconds;
+	return PANGEA_SCRIPT_OK;
 }
 
 void BillyScript_Init(void)
@@ -674,7 +817,11 @@ void BillyScript_Init(void)
 		.spawnScripted = SpawnScriptedObject,
 		.getPlayerCount = GetScriptPlayerCount,
 		.getPlayer = GetScriptPlayer,
-		.capabilities = {.terrainItems = true, .splineItems = true, .mapItems = false},
+		.setPlayerPosition = SetScriptPlayerPosition,
+		.setPlayerVelocity = SetScriptPlayerVelocity,
+		.setPlayerHealth = SetScriptPlayerHealth,
+		.setPlayerInvulnerable = SetScriptPlayerInvulnerable,
+		.capabilities = PANGEA_SCRIPT_BILLY_FRONTIER_CAPABILITIES,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -703,12 +850,39 @@ void BillyScript_LoadAreaConfig(int areaNum)
 	LogScriptStatus("area config load", status);
 }
 
+static const char* BillyScript_AreaMode(int areaNum)
+{
+	switch (areaNum)
+	{
+		case AREA_TOWN_DUEL1:
+		case AREA_TOWN_DUEL2:
+		case AREA_TOWN_DUEL3:
+		case AREA_SWAMP_DUEL1:
+		case AREA_SWAMP_DUEL2:
+		case AREA_SWAMP_DUEL3:
+			return "duel";
+		case AREA_TOWN_SHOOTOUT:
+		case AREA_SWAMP_SHOOTOUT:
+			return "shootout";
+		case AREA_TOWN_STAMPEDE:
+		case AREA_SWAMP_STAMPEDE:
+			return "stampede";
+		case AREA_TARGETPRACTICE1:
+		case AREA_TARGETPRACTICE2:
+			return "targetPractice";
+		default:
+			return "duel";
+	}
+}
+
 static void CallAreaHook(PangeaScriptHook hook, int areaNum, const char* action)
 {
 	const PangeaScriptLevelContext context =
 	{
 		.levelNum = areaNum,
 		.levelName = NULL,
+		.mode = BillyScript_AreaMode(areaNum),
+		.networked = false,
 	};
 
 	PangeaScriptStatus status = PangeaScript_CallLevelHook(hook, &context);
@@ -733,8 +907,12 @@ void BillyScript_OnAreaFrame(int areaNum, unsigned int frameNum, float deltaSeco
 		.frameNum = frameNum,
 		.deltaSeconds = deltaSeconds,
 		.levelTimeSeconds = areaTimeSeconds,
+		.mode = BillyScript_AreaMode(areaNum),
+		.networked = false,
 	};
 	BillyScript_CacheFrameContext(&context);
+	PangeaScript_ExpireTriggerContacts(&context);
+	(void)PangeaScript_ApplyDeferredActions(&context);
 
 	PangeaScriptStatus status = PangeaScript_CallFrameHook(&context);
 	LogScriptStatus("onAreaFrame", status);
@@ -774,6 +952,8 @@ Boolean BillyScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int areaNum, in
 		.remappedItemType = remappedType,
 		.x = x,
 		.z = z,
+		.mode = BillyScript_AreaMode(areaNum),
+		.networked = false,
 		.flags = itemPtr->flags,
 		.params = params,
 		.paramCount = (int)(sizeof(params) / sizeof(params[0])),
@@ -802,6 +982,8 @@ Boolean BillyScript_OnSplineItem(SplineItemType* itemPtr, int areaNum, int splin
 		.itemType = itemPtr->type,
 		.splineNum = splineNum,
 		.placement = itemPtr->placement,
+		.mode = BillyScript_AreaMode(areaNum),
+		.networked = false,
 		.params = params,
 		.paramCount = (int)(sizeof(params) / sizeof(params[0])),
 		.handled = false,
@@ -837,15 +1019,49 @@ Boolean BillyScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int ite
 		{
 			LogScriptStatus("terrain replacement source association", status);
 			(void)PangeaScript_DeleteObject(handle);
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
 		}
 		itemPtr->flags |= ITEM_FLAGS_INUSE;
 		if (!CompleteScriptReplacement(handle, "terrain replacement stream-in"))
+		{
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
+		}
 		return true;
 	}
-	LogScriptStatus("terrain replacement", status);
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_DeleteObject(handle);
+	}
+	if (replacement->strict)
+		LogScriptStatus("terrain replacement", status);
+	else
+		PangeaScript_ClearLastError();
 	return replacement->strict;
+}
+
+int BillyScript_ProbeTerrainReplacementJS(int itemIndex, int nativeType, float x, float z)
+{
+	static TerrainItemEntryType probeItem;
+	PangeaScriptObjectHandle handle = {0};
+	const PangeaScriptObjectSource source = {
+		.kind = PANGEA_SCRIPT_SOURCE_TERRAIN, .itemIndex = itemIndex, .nativeType = nativeType,
+		.x = x, .y = GetTerrainY(x, z), .z = z};
+	memset(&probeItem, 0, sizeof(probeItem));
+	if (!PangeaScript_GetTerrainReplacement(itemIndex, nativeType, x, z))
+		return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (!BillyScript_TryReplaceTerrainItem(&probeItem, itemIndex, nativeType, x, z))
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (!PangeaScript_FindObjectBySource(&source, &handle) || handle.id <= 0 || handle.generation == 0)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (!PangeaScript_DeleteObject(handle))
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	return PANGEA_SCRIPT_OK;
 }
 
 Boolean BillyScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex)
@@ -880,14 +1096,40 @@ Boolean BillyScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum,
 		{
 			LogScriptStatus("spline replacement source association", status);
 			(void)PangeaScript_DeleteObject(handle);
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
 		}
 		if (!CompleteScriptReplacement(handle, "spline replacement stream-in"))
+		{
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
+		}
 		return true;
 	}
-	LogScriptStatus("spline replacement", status);
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_DeleteObject(handle);
+	}
+	if (replacement->strict)
+		LogScriptStatus("spline replacement", status);
+	else
+		PangeaScript_ClearLastError();
 	return replacement->strict;
+}
+
+EMSCRIPTEN_KEEPALIVE int BillyScript_ProbeSaveLoadJS(int saveSlot)
+{
+	SaveGameType saveData;
+	if (saveSlot < 0)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (SaveGame(saveSlot) != noErr || LoadSavedGame(saveSlot, &saveData) != noErr)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	UseSavedGame(&saveData);
+	return PANGEA_SCRIPT_OK;
 }
 
 #endif

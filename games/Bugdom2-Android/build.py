@@ -597,8 +597,7 @@ if __name__ == "__main__":
         common_gen_args += ["-A", args.A]
 
     project.gen_args += common_gen_args
-    if getattr(args, "emscripten", False):
-        project.gen_args.append("-DPANGEA_ENABLE_SCRIPTING=ON")
+    project.gen_args.append("-DPANGEA_ENABLE_SCRIPTING=ON")
 
     #----------------------------------------------------------------
     # Gather build steps

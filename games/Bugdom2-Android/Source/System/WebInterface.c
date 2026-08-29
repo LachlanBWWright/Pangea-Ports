@@ -29,6 +29,9 @@
 #ifdef __EMSCRIPTEN__
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include <emscripten.h>
 
 extern Boolean gDisableFenceCollision;
@@ -111,6 +114,35 @@ EMSCRIPTEN_KEEPALIVE void WinLevel(void)
 		return;
 	StartLevelCompletion(0.1f);
 	SDL_Log("Level completion triggered via web interface");
+}
+
+
+/************** PROBE CHECKPOINT RESET **************/
+//
+// Queues the same native checkpoint-reset path used after player death.
+//
+EMSCRIPTEN_KEEPALIVE int Bugdom2Script_ProbeCheckpointResetJS(void)
+{
+	if (!gInGameNow || !gPlayerInfo.objNode)
+		return 0;
+	Bugdom2Script_RequestCheckpointResetProbe();
+	return 1;
+}
+
+/************** PROBE DAMAGE SCRIPT HOOK **************/
+// Routes a deterministic damage request through the native player damage path.
+EMSCRIPTEN_KEEPALIVE int Bugdom2Script_ProbeDamageJS(float damage)
+{
+	float adjustedDamage = damage;
+	if (!gInGameNow || !gPlayerInfo.objNode)
+		return -1;
+	if (gPlayerInfo.objNode->ScriptObjectID <= 0)
+		Bugdom2Script_RegisterObject(gPlayerInfo.objNode, "bugdom2.player", "player");
+	PangeaScript_ClearLastError();
+	if (Bugdom2Script_OnDamage(nil, damage, 4, &adjustedDamage))
+		Bugdom2Script_OnDamageApplied(adjustedDamage, 4);
+	PangeaScript_ClearLastError();
+	return (int)(adjustedDamage * 1000.0f);
 }
 
 

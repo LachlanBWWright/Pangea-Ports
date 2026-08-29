@@ -4,6 +4,11 @@
 
 #pragma once
 
+#include <setjmp.h>
+
+extern jmp_buf gNanosaur2ScriptFatalJump;
+extern bool gNanosaur2ScriptFatalBoundaryActive;
+
 void	DoAlert(const char* format, ...);
 POMME_NORETURN void DoFatalAlert(const char* format, ...);
 POMME_NORETURN void CleanQuit(void);

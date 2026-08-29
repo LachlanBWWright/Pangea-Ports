@@ -107,6 +107,10 @@ void DoAlert(const char* s)
 
 void DoAssert(const char* msg, const char* file, int line)
 {
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (gMightyMikeScriptAssetBoundaryActive)
+		longjmp(gMightyMikeScriptAssetJump, 1);
+	#endif
 	SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Game Assertion failed: %s - %s:%d\n", msg, file, line);
 	static char alertbuf[1024];
 	SDL_snprintf(alertbuf, 1024, "%s\n%s:%d", msg, file, line);
@@ -119,6 +123,10 @@ void DoAssert(const char* msg, const char* file, int line)
 
 void DoFatalAlert(const char* s)
 {
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (gMightyMikeScriptAssetBoundaryActive)
+		longjmp(gMightyMikeScriptAssetJump, 1);
+	#endif
 	SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Game Fatal Alert: %s", s);
 
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, GAME_FULL_NAME, s, NULL);
@@ -752,12 +760,21 @@ void FillThermometer(short percent)
 short OpenMikeFile(const char* filename)
 {
 OSErr		iErr;
-FSSpec		spec;
-short		fRefNum = -1;
+	FSSpec		spec;
+	short		fRefNum = -1;
 
-	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, filename, &spec);
-
-	iErr = FSpOpenDF(&spec, fsRdPerm, &fRefNum);			// try to open
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (filename && strncmp(filename, ":Scripts:", 9) == 0)
+	{
+		fRefNum = MightyMikeScript_OpenDataFile(filename);
+		iErr = fRefNum < 0 ? fnfErr : noErr;
+	}
+	else
+#endif
+	{
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, filename, &spec);
+		iErr = FSpOpenDF(&spec, fsRdPerm, &fRefNum);			// try to open
+	}
 	if (iErr != noErr)
 	{
 		DoFatalAlert2("Cannot open data file", filename);
@@ -802,4 +819,3 @@ void SetMyRandomSeed(unsigned long seed)
 	seed1 = 0;
 	seed2 = 0;
 }
-

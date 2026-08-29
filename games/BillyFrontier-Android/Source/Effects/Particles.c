@@ -707,6 +707,8 @@ OGLBoundingBox	bbox;
 					/* DRAW IT */
 		
 				glBlendFunc(src, dst);											// set blending mode						
+				CompatGL_InvalidateCachePtr(geoData->points);
+				CompatGL_InvalidateCachePtr(geoData->colorsByte);
 				MO_DrawObject(gParticleGroups[g]->geometryObj);						// draw geometry
 			}
 		}
@@ -1856,7 +1858,6 @@ OGLPoint3D	verts[4];
 	
 	gGlobalColorFilter.r =gGlobalColorFilter.g = gGlobalColorFilter.b = 1;
 }
-
 
 
 

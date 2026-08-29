@@ -1,4 +1,9 @@
 //
+
+#include <setjmp.h>
+
+extern jmp_buf gPangeaScriptFatalJump;
+extern bool gPangeaScriptFatalBoundaryActive;
 // misc.h
 //
 

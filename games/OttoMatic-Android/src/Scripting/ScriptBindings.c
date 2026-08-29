@@ -5,7 +5,12 @@
 
 #include "splineitems.h"
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
+
+
+extern bool PangeaScript_LoadCustomBG3D(FSSpec* spec, int group);
+extern bool PangeaScript_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
 
 #define SCRIPT_TERRAIN_ITEM_CAPACITY 256
 static TerrainItemEntryType gScriptTerrainItems[SCRIPT_TERRAIN_ITEM_CAPACITY];
@@ -104,6 +109,13 @@ static void MoveScriptedSplineObject(ObjNode* object)
 	if (wasAttached == isAttached)
 		return;
 	handle = (PangeaScriptObjectHandle){object->ScriptObjectID, object->ScriptObjectGeneration};
+	if (!PangeaScript_ObjectExists(handle))
+	{
+		object->ScriptObjectID = 0;
+		object->ScriptObjectGeneration = 0;
+		PangeaScript_ClearLastError();
+		return;
+	}
 	(void) PangeaScript_ApplyObjectLifecycle(
 		handle,
 		&gCurrentFrameContext,
@@ -130,13 +142,23 @@ static ScriptSkeletonCacheEntry gScriptSkeletonCache[SKELETON_TYPE_SCRIPT_CUSTOM
 static void MoveScriptedCustomObject(ObjNode* theNode)
 {
 	GetObjectInfo(theNode);
-	OttoScript_RunObjectFrame(theNode, true);
+	if (!theNode->ScriptDeleteRequested)
+		OttoScript_RunObjectFrame(theNode, true);
 	if (theNode->ScriptDeleteRequested)
 	{
 		if (theNode->ScriptObjectID > 0)
 		{
 			PangeaScriptObjectHandle handle = { theNode->ScriptObjectID, theNode->ScriptObjectGeneration };
-			(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+			if (PangeaScript_ObjectExists(handle))
+			{
+				if ((theNode->TerrainItemPtr || theNode->SplineItemPtr) && !theNode->ScriptStreamOutSent)
+				{
+					(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_OUT);
+					theNode->ScriptStreamOutSent = true;
+				}
+				else if (!theNode->ScriptStreamOutSent)
+					(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+			}
 		}
 		OttoScript_UnregisterObjectNode(theNode);
 		DeleteObject(theNode);
@@ -145,7 +167,8 @@ static void MoveScriptedCustomObject(ObjNode* theNode)
 	if (theNode->Skeleton && theNode->Skeleton->AnimHasStopped && !theNode->ScriptAnimationCompletionSent)
 	{
 		PangeaScriptObjectHandle handle = { theNode->ScriptObjectID, theNode->ScriptObjectGeneration };
-		(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "animationComplete");
+		if (PangeaScript_ObjectExists(handle))
+			(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "animationComplete");
 		theNode->ScriptAnimationCompletionSent = true;
 	}
 	UpdateObject(theNode);
@@ -173,12 +196,24 @@ static bool MakeDataAssetPath(const char* source, char* destination, size_t capa
 	return true;
 }
 
+static bool IsSafeCustomAsset(const FSSpec* spec)
+{
+	short refNum;
+	long size;
+	if (!spec || FSpOpenDF(spec, fsRdPerm, &refNum) != noErr) return false;
+	Boolean valid = GetEOF(refNum, &size) == noErr && size > 0 && size <= 16 * 1024 * 1024;
+	FSClose(refNum);
+	return valid;
+}
+
 static int GetCustomModelGroup(const char* modelPath)
 {
 	char dataPath[260];
 	FSSpec spec;
 	short refNum;
 	long fileSize;
+	if (!modelPath || modelPath[0] == '\0')
+		return -1;
 
 	for (int i = 0; i < MODEL_GROUP_SCRIPT_CUSTOM_COUNT; i++)
 	{
@@ -208,8 +243,7 @@ static int GetCustomModelGroup(const char* modelPath)
 		if (gBG3DContainerList[group])
 			continue;
 
-		ImportBG3D(&spec, group);
-		if (!gBG3DContainerList[group] || gNumObjectsInBG3DGroupList[group] <= 0)
+		if (!PangeaScript_LoadCustomBG3D(&spec, group))
 		{
 			if (gBG3DContainerList[group])
 				DisposeBG3DContainer(group);
@@ -229,8 +263,8 @@ static int GetCustomSkeletonType(const PangeaScriptCustomObjectDefinition* defin
 	char skeletonDataPath[260];
 	FSSpec modelSpec;
 	FSSpec skeletonSpec;
-	short modelRefNum;
-	long modelFileSize;
+	if (!definition || definition->modelPath[0] == '\0' || definition->skeletonPath[0] == '\0')
+		return -1;
 
 	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
 	{
@@ -251,21 +285,15 @@ static int GetCustomSkeletonType(const PangeaScriptCustomObjectDefinition* defin
 	if (FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, modelDataPath, &modelSpec) != noErr ||
 		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, skeletonDataPath, &skeletonSpec) != noErr)
 		return -1;
-	if (FSpOpenDF(&modelSpec, fsRdPerm, &modelRefNum) != noErr)
+	if (!IsSafeCustomAsset(&modelSpec) || !IsSafeCustomAsset(&skeletonSpec))
 		return -1;
-	if (GetEOF(modelRefNum, &modelFileSize) != noErr || modelFileSize <= 0 || modelFileSize > 16 * 1024 * 1024)
-	{
-		FSClose(modelRefNum);
-		return -1;
-	}
-	FSClose(modelRefNum);
 
 	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
 	{
 		int skeletonType = SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i;
 		if (gBG3DContainerList[MODEL_GROUP_SKELETONBASE + skeletonType])
 			continue;
-		if (!LoadCustomSkeleton(skeletonType, &skeletonSpec, &modelSpec))
+		if (!PangeaScript_LoadCustomSkeleton(skeletonType, &skeletonSpec, &modelSpec))
 			return -1;
 		snprintf(gScriptSkeletonCache[i].modelPath, sizeof(gScriptSkeletonCache[i].modelPath), "%s", definition->modelPath);
 		snprintf(gScriptSkeletonCache[i].skeletonPath, sizeof(gScriptSkeletonCache[i].skeletonPath), "%s", definition->skeletonPath);
@@ -336,8 +364,12 @@ void OttoScript_OnCustomTrigger(ObjNode* triggerNode, ObjNode* whoNode, Byte sid
 	{
 		PangeaScriptObjectHandle handle = { triggerNode->ScriptObjectID, triggerNode->ScriptObjectGeneration };
 		PangeaScriptObjectHandle other = {0};
+		if (!PangeaScript_ObjectExists(handle))
+			return;
 		if (whoNode && whoNode->ScriptObjectID > 0)
 			other = (PangeaScriptObjectHandle){whoNode->ScriptObjectID, whoNode->ScriptObjectGeneration};
+		if (other.id > 0 && !PangeaScript_ObjectExists(other))
+			other = (PangeaScriptObjectHandle){0};
 		(void) PangeaScript_CallObjectTriggerWithOther(handle, &gCurrentFrameContext, sideBits, true, other);
 	}
 }
@@ -347,7 +379,8 @@ void OttoScript_OnAnimationEvent(ObjNode* node, int eventValue)
 	if (node && node->ScriptDefinitionID[0] && node->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = { node->ScriptObjectID, node->ScriptObjectGeneration };
-		(void) PangeaScript_CallObjectEventWithValue(handle, &gCurrentFrameContext, "animationEvent", eventValue);
+		if (PangeaScript_ObjectExists(handle))
+			(void) PangeaScript_CallObjectEventWithValue(handle, &gCurrentFrameContext, "animationEvent", eventValue);
 	}
 }
 
@@ -438,15 +471,6 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 		outHandle->id = object->ScriptObjectID;
 		outHandle->generation = object->ScriptObjectGeneration;
 	}
-	PangeaScriptObjectHandle handle = { object->ScriptObjectID, object->ScriptObjectGeneration };
-	PangeaScriptStatus spawnStatus = PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "spawn");
-	if (spawnStatus != PANGEA_SCRIPT_OK || !PangeaScript_ObjectExists(handle))
-	{
-		(void) PangeaScript_DeleteObject(handle);
-		if (outHandle) *outHandle = (PangeaScriptObjectHandle){0};
-		return spawnStatus == PANGEA_SCRIPT_OK ? PANGEA_SCRIPT_RUNTIME_ERROR : spawnStatus;
-	}
-
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -581,6 +605,15 @@ static bool OttoObjectSetScale(void* nativeObject, float scale)
 	return true;
 }
 
+static bool OttoObjectSetCollisionEnabled(void* nativeObject, bool enabled)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node) return false;
+	if (enabled) node->StatusBits &= ~STATUS_BIT_NOCOLLISION;
+	else node->StatusBits |= STATUS_BIT_NOCOLLISION;
+	return true;
+}
+
 static bool OttoObjectSetAnimation(void* nativeObject, int animation, float speed, float blendSeconds)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
@@ -617,9 +650,15 @@ static bool OttoObjectDelete(void* nativeObject)
 	ObjNode* node = (ObjNode*) nativeObject;
 	if (!node)
 		return false;
-	if (node == gCurrentScriptObject || (node->CType & CTYPE_TRIGGER))
+	if (node == gCurrentScriptObject || (node->CType & CTYPE_TRIGGER) || node->TerrainItemPtr || node->SplineItemPtr)
 	{
-		OttoScript_UnregisterObjectNode(node);
+		if ((node->TerrainItemPtr || node->SplineItemPtr) && !node->ScriptStreamOutSent)
+		{
+			PangeaScriptObjectHandle handle = { node->ScriptObjectID, node->ScriptObjectGeneration };
+			if (PangeaScript_ObjectExists(handle))
+				(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_OUT);
+			node->ScriptStreamOutSent = true;
+		}
 		node->ScriptDeleteRequested = true;
 		return true;
 	}
@@ -640,6 +679,7 @@ static const PangeaScriptObjectOps kOttoObjectNodeOps =
 	.setScale = OttoObjectSetScale,
 	.setAnimation = OttoObjectSetAnimation,
 	.setAnimationNamed = OttoObjectSetAnimationNamed,
+	.setCollisionEnabled = OttoObjectSetCollisionEnabled,
 	.deleteObject = OttoObjectDelete,
 };
 
@@ -669,8 +709,20 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 
 static bool CompleteScriptReplacement(PangeaScriptObjectHandle handle, const char* action)
 {
-	PangeaScriptStatus status = PangeaScript_ApplyObjectLifecycle(
+	PangeaScriptStatus status = PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "spawn");
+	if (status == PANGEA_SCRIPT_OK && !PangeaScript_ObjectExists(handle))
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (status != PANGEA_SCRIPT_OK)
+	{
+		LogScriptStatus(action, status);
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_DeleteObject(handle);
+		return false;
+	}
+	status = PangeaScript_ApplyObjectLifecycle(
 		handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_IN);
+	if (status == PANGEA_SCRIPT_OK && !PangeaScript_ObjectExists(handle))
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
 	if (status == PANGEA_SCRIPT_OK && PangeaScript_ObjectExists(handle))
 		return true;
 	LogScriptStatus(action, status);
@@ -684,8 +736,41 @@ static int GetScriptPlayerCount(void) { return gPlayerInfo.objNode ? 1 : 0; }
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerInfo.objNode) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .health = gPlayerInfo.health, .hasHealth = true, .active = true};
 	return true;
+}
+
+static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
+{
+	if (playerNum != 0 || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.health = health;
+	gPlayerInfo.objNode->Health = health;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerInvulnerable(int playerNum, float durationSeconds)
+{
+	if (playerNum != 0 || durationSeconds < 0.0f || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.invincibilityTimer = durationSeconds;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScriptVector3* position)
+{
+	if (playerNum != 0 || !position || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.coord = (OGLPoint3D){position->x, position->y, position->z};
+	gPlayerInfo.objNode->Coord = gPlayerInfo.coord;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScriptVector3* velocity)
+{
+	if (playerNum != 0 || !velocity || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	return OttoObjectSetVelocity(gPlayerInfo.objNode, velocity) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
 void OttoScript_Init(void)
@@ -698,7 +783,11 @@ void OttoScript_Init(void)
 		.spawnScripted = SpawnScriptedObject,
 		.getPlayerCount = GetScriptPlayerCount,
 		.getPlayer = GetScriptPlayer,
-		.capabilities = {.terrainItems = true, .splineItems = true, .mapItems = false},
+		.setPlayerHealth = SetScriptPlayerHealth,
+		.setPlayerInvulnerable = SetScriptPlayerInvulnerable,
+		.setPlayerPosition = SetScriptPlayerPosition,
+		.setPlayerVelocity = SetScriptPlayerVelocity,
+		.capabilities = PANGEA_SCRIPT_OTTO_MATIC_CAPABILITIES,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -733,16 +822,55 @@ void OttoScript_LoadLevelConfig(int levelNum)
 	LogScriptStatus("level config load", status);
 }
 
+static const char* OttoScript_LevelName(int levelNum)
+{
+	static const char* levelNames[] =
+	{
+		"farm", "blob", "blob-boss", "apocalypse", "cloud",
+		"jungle", "jungle-boss", "fire-ice", "saucer", "brain-boss",
+	};
+	if (levelNum < 0 || levelNum >= (int)(sizeof(levelNames) / sizeof(levelNames[0]))) return NULL;
+	return levelNames[levelNum];
+}
+
+static const char* OttoScript_PlayerMode(int levelNum)
+{
+	return levelNum == LEVEL_NUM_SAUCER ? "saucer" : "robot";
+}
+
 static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* action)
 {
 	const PangeaScriptLevelContext context =
 	{
 		.levelNum = levelNum,
-		.levelName = NULL,
+		.levelName = OttoScript_LevelName(levelNum),
+		.playerMode = OttoScript_PlayerMode(levelNum),
 	};
 
 	PangeaScriptStatus status = PangeaScript_CallLevelHook(hook, &context);
 	LogScriptStatus(action, status);
+}
+
+static void CallSaveLoadHook(PangeaScriptHook hook, int saveSlot, const char* action)
+{
+	char slotName[32];
+	snprintf(slotName, sizeof(slotName), "slot-%d", saveSlot);
+	const PangeaScriptLevelContext context =
+	{
+		.levelNum = gCurrentFrameContext.levelNum,
+		.levelName = slotName,
+	};
+	LogScriptStatus(action, PangeaScript_CallLevelHook(hook, &context));
+}
+
+void OttoScript_OnSave(int saveSlot)
+{
+	CallSaveLoadHook(PANGEA_SCRIPT_HOOK_SAVE, saveSlot, "onSave");
+}
+
+void OttoScript_OnLoad(int saveSlot)
+{
+	CallSaveLoadHook(PANGEA_SCRIPT_HOOK_LOAD, saveSlot, "onLoad");
 }
 
 void OttoScript_OnLevelLoad(int levelNum)
@@ -750,6 +878,8 @@ void OttoScript_OnLevelLoad(int levelNum)
 	gCurrentFrameContext = (PangeaScriptFrameContext)
 	{
 		.levelNum = levelNum,
+		.levelName = OttoScript_LevelName(levelNum),
+		.playerMode = OttoScript_PlayerMode(levelNum),
 	};
 	gCurrentScriptObject = NULL;
 	gCurrentScriptObjectUsesGlobals = false;
@@ -768,16 +898,37 @@ void OttoScript_OnCheckpointReset(void)
 		&gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_CHECKPOINT_RESET);
 }
 
+void OttoScript_OnCheckpointReached(int checkpointNum)
+{
+	PangeaScriptPlayerEventContext context;
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!player || player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptPlayerEventContext)
+	{
+		.levelNum = gCurrentFrameContext.levelNum,
+		.playerNum = 0,
+		.eventValue = checkpointNum,
+		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
+		.position = {player->Coord.x, player->Coord.y, player->Coord.z},
+	};
+	LogScriptStatus("onCheckpointReached", PangeaScript_CallPlayerEvent(&context, "onCheckpointReached"));
+}
+
 void OttoScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds)
 {
 	const PangeaScriptFrameContext context =
 	{
 		.levelNum = levelNum,
+		.levelName = OttoScript_LevelName(levelNum),
+		.playerMode = OttoScript_PlayerMode(levelNum),
 		.frameNum = frameNum,
 		.deltaSeconds = deltaSeconds,
 		.levelTimeSeconds = levelTimeSeconds,
 	};
 	gCurrentFrameContext = context;
+	PangeaScript_ExpireTriggerContacts(&context);
+	(void)PangeaScript_ApplyDeferredActions(&context);
 
 	PangeaScriptStatus status = PangeaScript_CallFrameHook(&context);
 	LogScriptStatus("onFrame", status);
@@ -828,15 +979,58 @@ Boolean OttoScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int item
 		{
 			LogScriptStatus("terrain replacement source association", status);
 			(void)PangeaScript_DeleteObject(handle);
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
 		}
 		if (!CompleteScriptReplacement(handle, "terrain replacement stream-in"))
+		{
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
+		}
 		return true;
 	}
 
-	LogScriptStatus("terrain replacement", status);
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_DeleteObject(handle);
+	}
+	if (replacement->strict)
+		LogScriptStatus("terrain replacement", status);
+	else
+		PangeaScript_ClearLastError();
 	return replacement->strict;
+}
+
+int OttoScript_ProbeTerrainReplacementJS(int itemIndex, int nativeType, float x, float z)
+{
+	static TerrainItemEntryType probeItem;
+	PangeaScriptObjectHandle handle = {0};
+	const PangeaScriptObjectSource source = {
+		.kind = PANGEA_SCRIPT_SOURCE_TERRAIN, .itemIndex = itemIndex, .nativeType = nativeType,
+		.x = x, .y = GetTerrainY(x, z), .z = z};
+	memset(&probeItem, 0, sizeof(probeItem));
+	if (!PangeaScript_GetTerrainReplacement(itemIndex, nativeType, x, z))
+		return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (!OttoScript_TryReplaceTerrainItem(&probeItem, itemIndex, nativeType, x, z))
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (!PangeaScript_FindObjectBySource(&source, &handle) || handle.id <= 0 || handle.generation == 0)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (!PangeaScript_DeleteObject(handle))
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	return PANGEA_SCRIPT_OK;
+}
+
+int OttoScript_ProbeSaveLoadJS(int saveSlot)
+{
+	if (saveSlot < 0 || saveSlot >= NUM_SAVE_SLOTS)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!SaveGame(saveSlot) || !LoadSavedGame(saveSlot))
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	return PANGEA_SCRIPT_OK;
 }
 
 Boolean OttoScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z)
@@ -929,14 +1123,56 @@ Boolean OttoScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, 
 		{
 			LogScriptStatus("spline replacement source association", status);
 			(void)PangeaScript_DeleteObject(handle);
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
 		}
 		if (!CompleteScriptReplacement(handle, "spline replacement stream-in"))
+		{
+			if (!replacement->strict)
+				PangeaScript_ClearLastError();
 			return replacement->strict;
+		}
 		return true;
 	}
-	LogScriptStatus("spline replacement", status);
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+		if (PangeaScript_ObjectExists(handle))
+			(void)PangeaScript_DeleteObject(handle);
+	}
+	if (replacement->strict)
+		LogScriptStatus("spline replacement", status);
+	else
+		PangeaScript_ClearLastError();
 	return replacement->strict;
+}
+
+int OttoScript_ProbeSplineReplacementJS(int splineNum, int itemIndex, int nativeType, float placement)
+{
+	static SplineItemType probeItem;
+	PangeaScriptObjectHandle handle = {0};
+	PangeaScriptObjectSource source;
+	float x;
+	float z;
+	memset(&probeItem, 0, sizeof(probeItem));
+	if (!gSplineList || splineNum < 0 || splineNum >= gNumSplines || placement < 0.0f || placement > 1.0f)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	probeItem.type = (Byte)nativeType;
+	probeItem.placement = placement;
+	if (!PangeaScript_GetSplineReplacement(splineNum, itemIndex, nativeType, placement))
+		return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (!OttoScript_TryReplaceSplineItem(&probeItem, splineNum, itemIndex))
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	GetCoordOnSpline(&(*gSplineList)[splineNum], placement, &x, &z);
+	source = (PangeaScriptObjectSource){
+		.kind = PANGEA_SCRIPT_SOURCE_SPLINE, .itemIndex = itemIndex, .nativeType = nativeType,
+		.splineNum = splineNum, .x = x, .y = GetTerrainY(x, z), .z = z, .placement = placement};
+	if (!PangeaScript_FindObjectBySource(&source, &handle) || handle.id <= 0 || handle.generation == 0)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	if (!PangeaScript_DeleteObject(handle))
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	return PANGEA_SCRIPT_OK;
 }
 
 void OttoScript_RegisterObjectNode(ObjNode* theNode, const char* objectType, PangeaScriptCapabilityLevel capabilityLevel, const char* const* tags, int tagCount)
@@ -989,7 +1225,8 @@ void OttoScript_UnregisterObjectNode(ObjNode* theNode)
 		.generation = theNode->ScriptObjectGeneration,
 	};
 
-	(void) PangeaScript_UnregisterObject(handle);
+	if (PangeaScript_ObjectExists(handle))
+		(void) PangeaScript_UnregisterObject(handle);
 	theNode->ScriptObjectID = 0;
 	theNode->ScriptObjectGeneration = 0;
 	theNode->ScriptVisualOffset.x = 0.0f;
@@ -1008,10 +1245,13 @@ void OttoScript_OnObjectDeleted(ObjNode* theNode)
 	if (theNode && theNode->ScriptDefinitionID[0] && theNode->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {theNode->ScriptObjectID, theNode->ScriptObjectGeneration};
-		PangeaScriptObjectLifecycle lifecycle = theNode->TerrainItemPtr || theNode->SplineItemPtr
-			? PANGEA_SCRIPT_OBJECT_STREAM_OUT
-			: PANGEA_SCRIPT_OBJECT_DESTROY;
-		(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, lifecycle);
+		if (PangeaScript_ObjectExists(handle) && (theNode->TerrainItemPtr || theNode->SplineItemPtr) && !theNode->ScriptStreamOutSent)
+		{
+			(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_OUT);
+			theNode->ScriptStreamOutSent = true;
+		}
+		else if (PangeaScript_ObjectExists(handle) && !theNode->ScriptStreamOutSent)
+			(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	}
 }
 
@@ -1036,6 +1276,24 @@ void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals)
 		.id = theNode->ScriptObjectID,
 		.generation = theNode->ScriptObjectGeneration,
 	};
+	if (!PangeaScript_ObjectExists(handle))
+	{
+		theNode->ScriptObjectID = 0;
+		theNode->ScriptObjectGeneration = 0;
+		if (theNode->Slot == HUMAN_SLOT)
+			OttoScript_RegisterHuman(theNode);
+		if (theNode->ScriptObjectID <= 0)
+		{
+			PangeaScript_ClearLastError();
+			return;
+		}
+		handle = (PangeaScriptObjectHandle)
+		{
+			.id = theNode->ScriptObjectID,
+			.generation = theNode->ScriptObjectGeneration,
+		};
+		PangeaScript_ClearLastError();
+	}
 
 	gCurrentScriptObject = theNode;
 	gCurrentScriptObjectUsesGlobals = usesGlobals;
@@ -1044,6 +1302,7 @@ void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals)
 	const char* error = PangeaScript_GetLastError();
 	if (status == PANGEA_SCRIPT_BAD_ARGUMENT && error && strstr(error, "stale object handle"))
 	{
+		bool recovered = false;
 		theNode->ScriptObjectID = 0;
 		theNode->ScriptObjectGeneration = 0;
 		if (theNode->Slot == HUMAN_SLOT)
@@ -1059,7 +1318,15 @@ void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals)
 				.generation = theNode->ScriptObjectGeneration,
 			};
 			status = PangeaScript_CallObjectFrame(handle, &gCurrentFrameContext, &result);
+			recovered = status == PANGEA_SCRIPT_OK;
 		}
+		else
+		{
+			status = PANGEA_SCRIPT_OK;
+			recovered = true;
+		}
+		if (recovered)
+			PangeaScript_ClearLastError();
 	}
 
 	gCurrentScriptObject = NULL;
@@ -1150,6 +1417,39 @@ Boolean OttoScript_OnDamage(ObjNode* source, float damage, int cause, float* out
 	if (result.hasDamage)
 		*outDamage = result.damage;
 	return result.hasApplyDamage ? result.applyDamage : true;
+}
+
+void OttoScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId)
+{
+	PangeaScriptPickupContext context;
+	PangeaScriptPickupResult result = {0};
+	PangeaScriptStatus status;
+
+	if (!pickup || !player || pickup->ScriptObjectID <= 0 || pickup->ScriptObjectGeneration <= 0 ||
+		player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptPickupContext)
+	{
+		.levelNum = gCurrentFrameContext.levelNum,
+		.playerNum = 0,
+		.pickupType = pickupType,
+		.amount = amount,
+		.pickupId = pickupId,
+		.pickup = {pickup->ScriptObjectID, pickup->ScriptObjectGeneration},
+		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
+		.position = {pickup->Coord.x, pickup->Coord.y, pickup->Coord.z},
+	};
+	status = PangeaScript_CallPickupHook(&context, &result);
+	LogScriptStatus("onPickupCollected", status);
+	if (status != PANGEA_SCRIPT_OK || !isfinite(result.healthDelta))
+		return;
+	gPlayerInfo.health += result.healthDelta;
+	if (gPlayerInfo.health < 0.0f)
+		gPlayerInfo.health = 0.0f;
+	else if (gPlayerInfo.health > 1.0f)
+		gPlayerInfo.health = 1.0f;
+	if (gPlayerInfo.objNode)
+		gPlayerInfo.objNode->Health = gPlayerInfo.health;
 }
 
 void OttoScript_OnPlayerSpawn(ObjNode* player)

@@ -18,14 +18,20 @@ int BugdomScript_RemapTerrainItemType(int levelNum, int itemType);
 Boolean BugdomScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
 Boolean BugdomScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splineNum);
 Boolean BugdomScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
+int BugdomScript_ProbeTerrainReplacementJS(int itemIndex, int nativeType, float x, float z);
+int BugdomScript_ProbeCheckpointResetJS(void);
+int BugdomScript_ProbeSaveLoadJS(int saveSlot);
 Boolean BugdomScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 
 // --- Live-object scripting extension ---
 typedef struct ObjNode ObjNode;
 Boolean BugdomScript_OnDamage(ObjNode* source, float damage, int cause, float* outDamage);
+void BugdomScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+Boolean BugdomScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);
 void BugdomScript_OnDamageApplied(float damage, int cause);
 void BugdomScript_OnPlayerSpawn(ObjNode* playerObj);
 void BugdomScript_OnPlayerRespawn(ObjNode* playerObj);
+void BugdomScript_OnCheckpointReached(int checkpointNum);
 void BugdomScript_OnDeath(int eventValue);
 void BugdomScript_ResetObjectRegistry(void);
 void BugdomScript_RegisterPlayerObject(ObjNode* playerObj);

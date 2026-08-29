@@ -132,6 +132,8 @@ static void GetLocalKeyStateForPlayer(short playerNum)
 {
 uint32_t	mask,old;
 short	i;
+	const short localInputPlayer =
+		(gNetGameInProgress && gNumLocalPlayers == 1) ? 0 : playerNum;
 
 	old = gPlayerInfo[playerNum].controlBits;						// remember old bits
 	gPlayerInfo[playerNum].controlBits = 0;							// initialize new bits
@@ -142,7 +144,7 @@ short	i;
 
 	for (i = 0; i < NUM_CONTROL_BITS; i++)
 	{
-		if (GetNeedState(i, playerNum))								// see if key is down
+		if (GetNeedState(i, localInputPlayer))								// see if key is down
 			gPlayerInfo[playerNum].controlBits |= mask;				// set bit in bitfield
 
 		mask <<= 1;													// shift bit to next position

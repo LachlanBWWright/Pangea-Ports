@@ -457,8 +457,22 @@
       requestAnimationFrame(stabilize);
     }
 
-    var Module = {
+    function mountPangeaPersistence(module) {
+      if (!module.FS || !module.FS.filesystems || !module.FS.filesystems.IDBFS) return;
+      try { module.FS.mkdir('/Data/Scripts/persistence'); } catch (error) { /* exists */ }
+      try {
+        module.FS.mount(module.FS.filesystems.IDBFS, { autoPersist: true }, '/Data/Scripts/persistence');
+        module.FS.syncfs(true, function(error) {
+          if (error) console.error('[Pangea] persistence sync failed', error);
+        });
+      } catch (error) {
+        console.error('[Pangea] persistence mount failed', error);
+      }
+    }
+
+    var Module = Object.assign(window.Module || {}, {
       canvas: document.getElementById('canvas'),
+      noInitialRun: false,
 
       // Request the high-performance (discrete/dedicated) GPU where available.
       // Without this, browsers may default to the integrated GPU, causing poor
@@ -546,9 +560,17 @@
         window.OttoMatic_GetPlayerHealth    = function()     { return window.PangeaGame.getPlayerHealth(); };
         window.OttoMatic_GetPlayerLives     = function()     { return window.PangeaGame.getPlayerLives(); };
         console.log('[OttoMatic] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
+        setTimeout(function () {
+          if (!Module.calledRun && Module.callMain) {
+            Module.callMain(Module.arguments || []);
+          }
+        }, 1000);
       },
 
-      preRun: [function() {
+      preRun: (window.Module && window.Module.preRun
+        ? (Array.isArray(window.Module.preRun) ? window.Module.preRun : [window.Module.preRun])
+        : []).concat([function() {
+        mountPangeaPersistence(Module);
         // Suppress the DirCreate error for the config directory
         // The browser's virtual filesystem doesn't need this directory for the game to work
         try {
@@ -564,7 +586,7 @@
         try {
           FS.mkdir('/home/web_user/.config/OttoMatic');
         } catch (e) { /* ignore if exists */ }
-      }],
+      }]),
 
       setStatus: function (text) {
         var el      = document.getElementById('status-text');
@@ -596,7 +618,7 @@
           bar.value = Math.max(0, 1 - (left * 0.02));
         }
       }
-    };
+    });
 
     // ── UI helpers ────────────────────────────────────────
 

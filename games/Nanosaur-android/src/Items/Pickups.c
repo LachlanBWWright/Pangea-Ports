@@ -119,10 +119,14 @@ short	species;
 		
 	
 	if (DoSimplePointCollision(&gCoord,CTYPE_PORTAL))
-	{		
+	{
 		ObjNode	*whoHasMe;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_OnPickupCollected(theNode, (ObjNode *)theNode->WhoHasPickUp, theNode->Kind, 1.0f, "nanosaur.egg");
+#endif
 		
-			/* EGG HAS BEEN RECOVERED */
+		/* EGG HAS BEEN RECOVERED */
 
 		whoHasMe = (ObjNode *)theNode->WhoHasPickUp;			// who has this?
 		DropItem(whoHasMe);							// if I'm carrying it, get rid of it
@@ -483,7 +487,6 @@ int	i;
 
 	SeeIfAllEggSpeciesRecovered();
 }
-
 
 
 

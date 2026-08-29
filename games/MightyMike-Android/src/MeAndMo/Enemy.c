@@ -25,6 +25,10 @@
 #include "io.h"
 #include "externs.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -147,8 +151,24 @@ int16_t offset;
 
 			if (gCollisionList[i].objectPtr->CType & CTYPE_MYBULLET)
 			{
-				WeaponHitEnemy(gCollisionList[i].objectPtr);				// tell weapon manager what happened
-				if (EnemyLoseHealth(gThisNodePtr,gCollisionList[i].objectPtr->WeaponPower))		// lose health & see if was killed
+				ObjNode* weapon = gCollisionList[i].objectPtr;
+				float hitDamage = weapon->WeaponPower;
+				Boolean destroyTarget = false;
+				WeaponHitEnemy(weapon);				// tell weapon manager what happened
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!MikeScript_OnWeaponHit(weapon, gThisNodePtr, hitDamage, &hitDamage, &destroyTarget))
+					continue;
+				if (destroyTarget)
+				{
+					KillEnemy(gThisNodePtr);
+					return(true);
+				}
+				if (hitDamage < 0.0f)
+					hitDamage = 0.0f;
+				if (hitDamage > 32767.0f)
+					hitDamage = 32767.0f;
+#endif
+				if (EnemyLoseHealth(gThisNodePtr, (short) hitDamage))		// lose health & see if was killed
 					return(true);
 			}
 			else
@@ -388,7 +408,6 @@ void MoveFrozenEnemy(void)
 
 	UpdateObject();
 }
-
 
 
 

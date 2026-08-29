@@ -1,4 +1,9 @@
 //
+
+#include <setjmp.h>
+
+extern jmp_buf gPangeaScriptFatalJump;
+extern bool gPangeaScriptFatalBoundaryActive;
 // misc.h
 //
 
@@ -64,4 +69,3 @@ char* CSVIterator(char** csvCursor, bool* eolOut);
 	#define GAME_DEBUGASSERT(...)
 	#define GAME_DEBUGASSERT_MESSAGE(...)
 #endif
-

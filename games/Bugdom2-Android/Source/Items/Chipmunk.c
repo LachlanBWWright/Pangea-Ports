@@ -157,7 +157,7 @@ int		anim;
 	switch(kind)
 	{
 		case	CHIPMUNK_KIND_CHECKPOINT:
-				pow = MakeCheckpoint(&newObj->Coord);
+				pow = MakeCheckpoint(&newObj->Coord, newObj->CheckPointNum);
 				if (pow)
 				{
 					pow->StatusBits |= STATUS_BIT_NOMOVE;				// chipmunk has control of it for now
@@ -510,7 +510,6 @@ const OGLPoint3D	zero = {0,0,0};
 
 
 }
-
 
 
 

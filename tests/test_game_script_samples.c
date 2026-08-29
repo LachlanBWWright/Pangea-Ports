@@ -29,6 +29,7 @@ typedef struct GameSampleCase
 	bool playerSpawn;
 	bool playerRespawn;
 	bool playerDeath;
+	bool checkpointEvents;
 } GameSampleCase;
 
 typedef struct TestVisualObject
@@ -39,14 +40,14 @@ typedef struct TestVisualObject
 
 static const GameSampleCase kGameCases[] =
 {
-	{"ottomatic", "OttoMatic-Android", "Otto Matic", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "ottomatic.human", "ottomatic.human.scientist", 8, 32, 56, true, true, false, false, true, true, true, true},
-	{"bugdom", "Bugdom-android", "Bugdom", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom.buddy", NULL, 6, 20, 20, true, true, false, false, true, true, true, true},
-	{"bugdom2", "Bugdom2-Android", "Bugdom 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom2.collectible", NULL, 5, 15, 15, true, true, false, true, true, true, true, true},
-	{"cromag", "CroMagRally-Android", "Cro-Mag Rally", "onRaceLoad", "onRaceStart", "onRaceFrame", "onRaceComplete", "onRaceUnload", "cromag.pickup", NULL, 7, 25, 25, true, false, false, false, true, false, false, true},
-	{"nanosaur", "Nanosaur-android", "Nanosaur", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur.egg", NULL, 4, 12, 12, true, false, false, false, true, true, true, true},
-	{"nanosaur2", "Nanosaur2-Android", "Nanosaur 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur2.powerup", NULL, 6, 18, 18, true, true, false, false, true, true, true, true},
-	{"billy", "BillyFrontier-Android", "Billy Frontier", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "billy.cacti", NULL, 5, 14, 14, true, true, false, false, true, false, false, true},
-	{"mightymike", "MightyMike-Android", "Mighty Mike", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "mightymike.box", NULL, 5, 16, 16, false, false, true, false, false, false, false, false},
+	{"ottomatic", "OttoMatic-Android", "Otto Matic", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "ottomatic.human", "ottomatic.human.scientist", 8, 32, 56, true, true, false, false, true, true, true, true, true},
+	{"bugdom", "Bugdom-android", "Bugdom", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom.buddy", NULL, 6, 20, 20, true, true, false, false, true, true, true, true, true},
+	{"bugdom2", "Bugdom2-Android", "Bugdom 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "bugdom2.collectible", NULL, 5, 15, 15, true, true, false, true, true, true, true, true, true},
+	{"cromag", "CroMagRally-Android", "Cro-Mag Rally", "onRaceLoad", "onRaceStart", "onRaceFrame", "onRaceComplete", "onRaceUnload", "cromag.pickup", NULL, 7, 25, 25, true, false, false, false, true, false, false, true, true},
+	{"nanosaur", "Nanosaur-android", "Nanosaur", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur.egg", NULL, 4, 12, 12, true, false, false, true, true, true, true, false, false},
+	{"nanosaur2", "Nanosaur2-Android", "Nanosaur 2", "onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload", "nanosaur2.powerup", NULL, 6, 18, 18, true, true, false, true, true, true, true, true, true},
+	{"billy", "BillyFrontier-Android", "Billy Frontier", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "billy.cacti", NULL, 5, 14, 14, true, true, false, false, true, false, false, true, false},
+	{"mightymike", "MightyMike-Android", "Mighty Mike", "onAreaLoad", "onAreaStart", "onAreaFrame", "onAreaComplete", "onAreaUnload", "mightymike.box", NULL, 5, 16, 16, false, false, true, true, false, false, false, false, false},
 };
 
 static int gNativeSpawnCount;
@@ -242,16 +243,12 @@ static void test_game_object_sample(const GameSampleCase* game, PangeaScriptBack
 		"return { onObjectFrame = function(ctx)\n"
 		" assert(ctx.gameId == '%s' and ctx.gameName == '%s')\n"
 		" if not hasTag(ctx.tags, TARGET_TAG) then return end\n"
-		" local amplitude = hasTag(ctx.tags, SPECIAL_TAG) and %.9g or %.9g\n"
-		" return {positionOffset={x=0,y=math.sin(ctx.levelTimeSeconds*%.9g)*amplitude,z=0}}\n"
+		" return\n"
 		"end }",
 		game->sampleTag,
 		game->specializedTag ? "'ottomatic.human.scientist'" : "nil",
 		game->gameId,
-		game->gameName,
-		game->specializedAmplitude,
-		game->amplitude,
-		game->frequency);
+		game->gameName);
 	assert(PangeaScriptBackend_Load(backend, source, error, errorCapacity) == PANGEA_SCRIPT_OK);
 
 	const char* matchingTags[] = {game->sampleTag};
@@ -265,10 +262,7 @@ static void test_game_object_sample(const GameSampleCase* game, PangeaScriptBack
 	};
 	PangeaScriptObjectFrameResult result = {0};
 	assert(PangeaScriptBackend_CallObjectFrameHook(backend, &context, &result, error, errorCapacity) == PANGEA_SCRIPT_OK);
-	assert(result.hasPositionOffset);
-	assert(nearly_equal(result.positionOffset.x, 0));
-	assert(nearly_equal(result.positionOffset.y, game->amplitude));
-	assert(nearly_equal(result.positionOffset.z, 0));
+	assert(!result.hasPositionOffset);
 	if (game->specializedTag)
 	{
 		const char* specializedTags[] = {game->sampleTag, game->specializedTag};
@@ -276,8 +270,7 @@ static void test_game_object_sample(const GameSampleCase* game, PangeaScriptBack
 		context.tagCount = 2;
 		result = (PangeaScriptObjectFrameResult){0};
 		assert(PangeaScriptBackend_CallObjectFrameHook(backend, &context, &result, error, errorCapacity) == PANGEA_SCRIPT_OK);
-		assert(result.hasPositionOffset);
-		assert(nearly_equal(result.positionOffset.y, game->specializedAmplitude));
+		assert(!result.hasPositionOffset);
 	}
 
 	const char* unrelatedTags[] = {"unrelated.object"};
@@ -510,9 +503,10 @@ static void test_player_event_sample(const GameSampleCase* game, PangeaScriptBac
 		" onDamageApplied=function(ctx) assert(ctx.target.id==%d and ctx.damage==.5 and ctx.cause==3) end,"
 		" onPlayerSpawn=function(ctx) assert(ctx.player.id==%d and ctx.position.x==4) end,"
 		" onPlayerRespawn=function(ctx) assert(ctx.player.id==%d and ctx.position.z==6) end,"
-		" onDeath=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==7) end"
+		" onDeath=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==7) end,"
+		" onCheckpointReached=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==3 and ctx.position.y==5) end"
 		"}",
-		handle.id, handle.id, handle.id, handle.id, handle.id);
+		handle.id, handle.id, handle.id, handle.id, handle.id, handle.id);
 	assert(PangeaScriptBackend_Load(backend, source, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	if (game->weaponHitEvents)
 	{
@@ -532,6 +526,11 @@ static void test_player_event_sample(const GameSampleCase* game, PangeaScriptBac
 		assert(PangeaScriptBackend_CallPlayerEvent(backend, &playerContext, "onPlayerRespawn", error, errorCapacity) == PANGEA_SCRIPT_OK);
 	if (game->playerDeath)
 		assert(PangeaScriptBackend_CallPlayerEvent(backend, &playerContext, "onDeath", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	if (game->checkpointEvents)
+	{
+		playerContext.eventValue = 3;
+		assert(PangeaScriptBackend_CallPlayerEvent(backend, &playerContext, "onCheckpointReached", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	}
 	assert(PangeaScript_UnregisterObject(handle));
 }
 

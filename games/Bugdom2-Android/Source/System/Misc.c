@@ -61,6 +61,9 @@ void DoAlert(const char* format, ...)
 
 void DoFatalAlert(const char* format, ...)
 {
+	if (gPangeaScriptFatalBoundaryActive)
+		longjmp(gPangeaScriptFatalJump, 1);
+
 	Enter2D();
 
 	char message[1024];

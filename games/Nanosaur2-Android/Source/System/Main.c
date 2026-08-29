@@ -1292,6 +1292,9 @@ void StartLevelCompletion(float coolDownTimer)
 	{
 		gLevelCompleted = true;
 		gLevelCompletedCoolDownTimer = coolDownTimer;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_OnLevelComplete(gLevelNum);
+#endif
 	}
 }
 
@@ -1544,11 +1547,28 @@ unsigned long	someLong;
 		}
 		gPlayingFromSavedGame = false;
 		gSkipLevelIntro = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_Init();
+#endif
 		InitPlayerInfo_Game();
 		PlaySong(gLevelSongs[gLevelNum], true);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_LoadLevelConfig(gLevelNum);
+#endif
 		InitLevel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_OnLevelLoad(gLevelNum);
+#endif
 		PlayLevel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (gLevelCompleted)
+			Nanosaur2Script_OnLevelComplete(gLevelNum);
+		Nanosaur2Script_OnLevelUnload(gLevelNum);
+#endif
 		CleanupLevel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Nanosaur2Script_Shutdown();
+#endif
 		return;
 	}
 

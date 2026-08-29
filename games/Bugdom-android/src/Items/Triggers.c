@@ -1220,8 +1220,11 @@ float	fps = gFramesPerSecondFrac;
 
 static Boolean DoTrig_Powerup(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 {
-	(void) whoNode;
 	(void) sideBits;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_OnPickupCollected(theNode, whoNode, theNode->NutContents, theNode->NutContents == NUT_CONTENTS_HEALTH ? .5f : 1.0f, "bugdom.nut");
+#endif
 
 	switch(theNode->NutContents)
 	{
@@ -1472,7 +1475,6 @@ ObjNode *handle;
 	
 	return(true);
 }
-
 
 
 

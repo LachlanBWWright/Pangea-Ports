@@ -253,6 +253,10 @@ short	weaponType, playerNum, quan;
 	quan 		= trigger->WeaponPOWQuantity;
 	playerNum 	= theNode->PlayerNum;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnPickupCollected(trigger, theNode, weaponType, (float) quan, "nanosaur2.weaponPow");
+#endif
+
 	gPlayerInfo[playerNum].weaponQuantity[weaponType] += quan;		// add in quantity
 	if (gPlayerInfo[playerNum].weaponQuantity[weaponType] > 999)	// max @ 999
 		gPlayerInfo[playerNum].weaponQuantity[weaponType] = 999;
@@ -348,6 +352,10 @@ static Boolean DoTrig_HealthPOW(ObjNode *trigger, ObjNode *theNode)
 short	playerNum;
 
 	playerNum 	= theNode->PlayerNum;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_OnPickupCollected(trigger, theNode, 21, 0.5f, "nanosaur2.healthPow");
+#endif
 
 	gPlayerInfo[playerNum].health += .5f;
 	if (gPlayerInfo[playerNum].health > 1.0f)
@@ -642,7 +650,6 @@ short	playerNum;
 
 	return(false);
 }
-
 
 
 

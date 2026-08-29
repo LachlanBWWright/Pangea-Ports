@@ -426,8 +426,11 @@ void MovePowerup(ObjNode *theNode)
 
 Boolean DoTrig_Powerup(ObjNode *pow, ObjNode *who, Byte sideBits)
 {
-	(void) who;
 	(void) sideBits;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnPickupCollected(pow, who, pow->POWKind, pow->POWKind == POW_KIND_HEALTH ? .15f : 1.0f, "bugdom2.powerup");
+#endif
 
 	switch(pow->POWKind)
 	{
@@ -606,7 +609,7 @@ OGLPoint3D	where;
 
 /************************* MAKE CHECKPOINT ***************************/
 
-ObjNode *MakeCheckpoint(OGLPoint3D *where)
+ObjNode *MakeCheckpoint(OGLPoint3D *where, int checkpointNum)
 {
 ObjNode	*newObj;
 
@@ -621,6 +624,7 @@ ObjNode	*newObj;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
 
 	newObj->What = WHAT_CHECKPOINT;
+	newObj->Special[0] = checkpointNum;
 
 			/* SET COLLISION STUFF */
 
@@ -651,6 +655,10 @@ void SetCheckpoint(ObjNode *checkpoint, ObjNode *player)
 	gBestCheckpointAim = player->Rot.y;
 	gBestCheckpointCoord.x = checkpoint->Coord.x;
 	gBestCheckpointCoord.y = checkpoint->Coord.z;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnCheckpointReached(checkpoint->Special[0]);
+#endif
 
 }
 
@@ -689,8 +697,6 @@ float	y;
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

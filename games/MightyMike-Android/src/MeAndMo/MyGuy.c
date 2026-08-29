@@ -27,9 +27,16 @@
 #include "collision.h"
 #include "input.h"
 #include "externs.h"
+#include <math.h>
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+#define MIKE_SCRIPT_INVULNERABLE() MikeScript_IsInvulnerable()
+#else
+#define MIKE_SCRIPT_INVULNERABLE() false
 #endif
 
 /****************************/
@@ -888,7 +895,7 @@ ignore_solid:
 			else
 			if (gCollisionList[i].objectPtr->CType & (CTYPE_ENEMYA|CTYPE_ENEMYB|CTYPE_ENEMYC))
 			{
-				if ((gMyBlinkieTimer+gShieldTimer) <= 0)		// check if I'm in blinkie invincible mode
+				if ((gMyBlinkieTimer+gShieldTimer) <= 0 && !MIKE_SCRIPT_INVULNERABLE())		// check if I'm in blinkie invincible mode
 				{												// 	or shield mode
 					MeHitEnemyObject(gCollisionList[i].objectPtr);
 					hurtFlag = true;
@@ -905,7 +912,7 @@ ignore_solid:
 
 		if (attrib & TILE_ATTRIB_DEATH)						// see if on death & Im vulnerable
 		{
-			if (!gMyBlinkieTimer)
+			if (!gMyBlinkieTimer && !MIKE_SCRIPT_INVULNERABLE())
 			{
 				if (gMeOnWaterFlag)
 					SwitchAnim(gMyNodePtr,MY_ANIMBASE_WATERDIE); // do water death animation
@@ -1227,6 +1234,9 @@ void MeHitBonusObject(ObjNode *targetNode)
 	else
 	if (targetNode->CType & CTYPE_HEALTH)
 	{
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_OnPickupCollected(targetNode, gMyNodePtr, targetNode->Type, 1.0f, "mightymike.healthPow");
+	#endif
 		if (gMyHealth < gMyMaxHealth)						// only get health if need it!
 		{
 			MakeMikeMessage(MESSAGE_NUM_FOOD);				// put message
@@ -1297,7 +1307,7 @@ Boolean	delFlag;
 		{
 			if (gMyMode != MY_MODE_FROG)				// if already frog, then just let witch hurt me
 			{
-				if (gMyBlinkieTimer <= 0)				// dont frog me while blinking
+				if (gMyBlinkieTimer <= 0 && !MIKE_SCRIPT_INVULNERABLE())				// dont frog me while blinking
 				{
 					TurnMeIntoFrog();
 					gMyBlinkieTimer = BLINKIE_DURATION;		// make me blink (don't hurt me 1st time)
@@ -1339,12 +1349,32 @@ Boolean	delFlag;
 
 void IGotHurt(void)
 {
-	if ((gMyBlinkieTimer+gShieldTimer) > 0)						// check if I'm in blinkie invincible mode
+	int heartDamage;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	float scriptedDamage = 1.0f;
+	#endif
+	if ((gMyBlinkieTimer+gShieldTimer) > 0 || MIKE_SCRIPT_INVULNERABLE())						// check if I'm in blinkie invincible mode
 		return;													// 	or shield mode
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!MikeScript_OnDamage(1.0f, &scriptedDamage))
+		return;
+	if (!isfinite(scriptedDamage) || scriptedDamage <= 0.0f)
+		return;
+	if (scriptedDamage > 32767.0f)
+		scriptedDamage = 32767.0f;
+	heartDamage = (int) scriptedDamage;
+	if ((float) heartDamage < scriptedDamage)
+		heartDamage++;
+	#else
+	heartDamage = 1;
+	#endif
 
 			/* DECREASE SHIELD LIFE */
 
-	gMyHealth--;											// lose health
+	gMyHealth -= heartDamage;											// lose health
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_OnDamageApplied((float) heartDamage);
+	#endif
 
 	DisposeFrog();											// undo frog if needed
 	DisposeSpaceShip();										// undo spaceship if needed
@@ -1364,6 +1394,9 @@ void IGotHurt(void)
 	else
 	{
 			/* IM DEAD */
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_OnDeath(gMyNodePtr, 0);
+	#endif
 
 		if (gMeOnWaterFlag)								// see which anim to use
 			SwitchAnim(gMyNodePtr,MY_ANIMBASE_WATERDIE);
@@ -1396,6 +1429,9 @@ void ReviveMe(void)
 	gMyHealth = gMyMaxHealth;						// restore health
 	ShowHealth();
 	ShowLives();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_OnPlayerRespawn(gMyNodePtr);
+#endif
 }
 
 
@@ -1570,8 +1606,3 @@ void MoveMyFlame(void)
 	gThisNodePtr->Z = gMyNodePtr->Z-1;
 	gThisNodePtr->YOffset = gMyNodePtr->YOffset;
 }
-
-
-
-
-

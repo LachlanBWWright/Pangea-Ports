@@ -402,6 +402,9 @@ unsigned long	someLong;
 
 	if (gDirectLaunchLevel >= 0)
 	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_Init();
+#endif
 		InitPlayerInfo_Game();
 		gCurrentArea = gDirectLaunchLevel;
 
@@ -438,6 +441,9 @@ unsigned long	someLong;
 				break;
 		}
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_Shutdown();
+#endif
 		return;
 	}
 

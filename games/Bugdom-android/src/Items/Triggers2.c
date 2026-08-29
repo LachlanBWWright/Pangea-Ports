@@ -15,6 +15,10 @@
 #include "ScriptBindings.h"
 #endif
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /*******************/
 /*   PROTOTYPES    */
@@ -200,6 +204,9 @@ TQ3Vector3D		delta;
 		gBestCheckPoint = num;
 		gMostRecentCheckPointCoord = theNode->Coord;	// remember where this checkpoint is
 		gCheckPointRot = theNode->PlayerRot;			// see what rot to restore player to				
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_OnCheckpointReached(num);
+	#endif
 	}		
 	
 			/******************/
@@ -844,7 +851,6 @@ Boolean DoTrig_Cage(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	
 	return(true);
 }
-
 
 
 

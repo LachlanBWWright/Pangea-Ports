@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -171,7 +175,18 @@ float	realSpeed;
 					
 			if (ctype & CTYPE_HURTENEMY)
 			{
-				if (EnemyGotHurt(theEnemy,hitObj->Damage))		// handle hit (returns true if was deleted)
+				float damage = hitObj->Damage;
+				Boolean destroyTarget = false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!BugdomScript_OnWeaponHit(hitObj, theEnemy, damage, &damage, &destroyTarget))
+					continue;
+				if (destroyTarget)
+				{
+					DeleteObject(theEnemy);
+					return(true);
+				}
+#endif
+				if (EnemyGotHurt(theEnemy,damage))		// handle hit (returns true if was deleted)
 					return(true);
 			}
 
@@ -379,8 +394,6 @@ Boolean DetachEnemyFromSpline(ObjNode *theNode, void (*moveCall)(ObjNode*))
 
 	return(true);
 }
-
-
 
 
 

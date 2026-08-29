@@ -295,6 +295,7 @@ ObjNode *InitPlayer_Car(int playerNum, OGLPoint3D *where, float rotY);
 void SetPhysicsForVehicleType(short playerNum);
 void CreateCarWheelsAndHead(ObjNode *theCar, short playerNum);
 void AlignWheelsAndHeadOnCar(ObjNode *theCar);
+void UpdateCarAttachmentTransforms(ObjNode *theCar);
 void BlastCars(short whoThrew, float x, float y, float z, float radius);
 void SetTractionPhysics(CarStatsType *carStats, float p);
 void SetSuspensionPhysics(CarStatsType *carStats, float n);
@@ -330,4 +331,3 @@ void UpdateSkidMarks(void);
 void StretchSkidMark(ObjNode *owner, short subID, float x, float z, float dx, float dz);
 void DetachOwnerFromSkid(ObjNode *owner);
 void MakeSkidSmoke(short p, OGLPoint3D *coord);
-

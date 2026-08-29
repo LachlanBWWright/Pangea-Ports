@@ -28,6 +28,38 @@
 static void DrawPFSprite(ObjNode *theNodePtr);
 static void ErasePFSprite(ObjNode *theNodePtr);
 
+static uint16_t ReadShapeTableU16(const uint8_t* data)
+{
+	return (uint16_t)(((uint16_t)data[0] << 8) | data[1]);
+}
+
+static int32_t ReadShapeTableI32(const uint8_t* data)
+{
+	return (int32_t)(((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) |
+		((uint32_t)data[2] << 8) | data[3]);
+}
+
+static bool IsShapeTableHeaderValid(Handle shapeTable)
+{
+	const uint8_t* data = (const uint8_t*)*shapeTable;
+	size_t size = (size_t)GetHandleSize(shapeTable);
+	int32_t colorOffset;
+	int32_t shapeListOffset;
+	uint16_t colorCount;
+	uint16_t shapeCount;
+
+	if (!data || size < 8) return false;
+	colorOffset = ReadShapeTableI32(data);
+	if (colorOffset < 0 || (size_t)colorOffset + 2 > size) return false;
+	colorCount = ReadShapeTableU16(data + colorOffset);
+	if (colorCount > 256 || (size_t)colorOffset + 2 + (size_t)colorCount * sizeof(RGBColor) > size) return false;
+	shapeListOffset = ReadShapeTableI32(data + SF_HEADER__SHAPE_LIST);
+	if (shapeListOffset < 0 || (size_t)shapeListOffset + 2 > size) return false;
+	shapeCount = ReadShapeTableU16(data + shapeListOffset);
+	return shapeCount <= MAX_SHAPES_IN_FILE &&
+		(size_t)shapeListOffset + 2 + (size_t)shapeCount * sizeof(int32_t) <= size;
+}
+
 /****************************/
 /*    CONSTANTS             */
 /****************************/
@@ -218,6 +250,7 @@ int32_t	offset;
 }
 
 
+
 /************************ LOAD SHAPE TABLE *****************/
 
 void LoadShapeTable(const char* fileName, long groupNum)
@@ -231,6 +264,15 @@ void LoadShapeTable(const char* fileName, long groupNum)
 	}
 
 	gShapeTableHandle[groupNum] = LoadPackedFile(fileName);
+	if (gShapeTableHandle[groupNum] == nil)
+		return;
+	if (!IsShapeTableHeaderValid(gShapeTableHandle[groupNum]))
+	{
+		DisposeHandle(gShapeTableHandle[groupNum]);
+		gShapeTableHandle[groupNum] = nil;
+		SDL_memset(gSHAPE_HEADER_Ptrs[groupNum], 0, sizeof(gSHAPE_HEADER_Ptrs[groupNum]));
+		return;
+	}
 
 	Ptr shapeTablePtr = *gShapeTableHandle[groupNum];						// get ptr to shape table
 
@@ -1016,4 +1058,3 @@ long	originalY;
 		}
 	}
 }
-

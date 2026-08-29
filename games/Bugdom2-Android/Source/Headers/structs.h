@@ -370,6 +370,7 @@ struct ObjNode
 	int			ScriptObjectGeneration;
 	char		ScriptDefinitionID[96];
 	Boolean		ScriptDeleteRequested;
+	Boolean		ScriptStreamOutSent;
 	Boolean		ScriptAnimationCompletionSent;
 	};
 typedef struct ObjNode ObjNode;

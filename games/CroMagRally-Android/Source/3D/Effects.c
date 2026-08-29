@@ -709,6 +709,8 @@ OGLBoundingBox	bbox;
 					/* DRAW IT */
 
 				glBlendFunc(gParticleGroups[g]->srcBlend, gParticleGroups[g]->dstBlend);		// set blending mode
+				CompatGL_InvalidateCachePtr(geoData->points);
+				CompatGL_InvalidateCachePtr(vertexColors);
 				MO_DrawObject(gParticleGroups[g]->geometryObj);									// draw geometry
 			}
 		}
@@ -1901,7 +1903,6 @@ float				x,y,z;
 		}
 	}
 }
-
 
 
 

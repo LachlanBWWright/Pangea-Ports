@@ -25,6 +25,7 @@ void BillyScript_OnDeath(ObjNode* player, int eventValue);
 void BillyScript_ResetObjectRegistry(void);
 void BillyScript_RegisterPlayerObject(ObjNode* playerObj);
 void BillyScript_UnregisterPlayerObject(ObjNode* playerObj);
+void BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
 void BillyScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category);
 void BillyScript_UnregisterObject(ObjNode* obj);
 void BillyScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
@@ -34,6 +35,8 @@ void BillyScript_RunObjectFrame(ObjNode* obj);
 void BillyScript_OnAnimationEvent(ObjNode* obj, int eventValue);
 void BillyScript_OnObjectDeleted(ObjNode* obj);
 Boolean BillyScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
+int BillyScript_ProbeTerrainReplacementJS(int itemIndex, int nativeType, float x, float z);
+int BillyScript_ProbeSaveLoadJS(int saveSlot);
 Boolean BillyScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 
 #endif

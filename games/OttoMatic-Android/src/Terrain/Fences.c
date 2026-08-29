@@ -397,7 +397,7 @@ float			cameraX, cameraZ;
 
 			/* SET GLOBAL MATERIAL FLAGS */
 
-	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V|BG3D_MATERIALFLAG_ALWAYSBLEND;
+	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_V;
 
 
 			/*******************/
@@ -479,6 +479,7 @@ float					dist,alpha;
 long					i,numNubs,j;
 FenceDefType			*fence;
 OGLPoint3D				*nubs;
+Boolean					overrideAlphaFunc = false;
 
 			/* GET FENCE INFO */
 
@@ -519,11 +520,25 @@ OGLPoint3D				*nubs;
 		else
 			alpha = 1.0f;
 
+		if (gAutoFadeStatusBits && dist >= gAutoFadeStartDist)
+			overrideAlphaFunc = true;
+
 		gFenceColors[f][j].a =
 		gFenceColors[f][j+1].a = 255.0f * alpha;
 	}
 
 	CompatGL_InvalidateCachePtr(gFenceTriMeshData[f].colorsByte);
+
+	uint32_t oldMaterialFlags = gGlobalMaterialFlags;
+	if (overrideAlphaFunc)
+	{
+		gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;
+		glAlphaFunc(GL_NOTEQUAL, 0);
+	}
+	else
+	{
+		glAlphaFunc(GL_EQUAL, 1);
+	}
 
 
 
@@ -532,6 +547,9 @@ OGLPoint3D				*nubs;
 		/*******************/
 
 	MO_DrawGeometry_VertexArray(&gFenceTriMeshData[f]);
+
+	glAlphaFunc(GL_NOTEQUAL, 0);
+	gGlobalMaterialFlags = oldMaterialFlags;
 }
 
 

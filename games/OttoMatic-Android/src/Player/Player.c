@@ -830,6 +830,7 @@ ObjNode			*rocket;
 
 	MOVertexArrayData* mesh = GenerateRocketFlameMesh();
 	OGLPoint3D_TransformArray(mesh->points, &m1, mesh->points, mesh->numPoints);
+	CompatGL_InvalidateCachePtr(mesh->points);
 
 		/* SET TEXTURE FOR CURRENT FRAME */
 

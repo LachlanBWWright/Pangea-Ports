@@ -1313,6 +1313,13 @@ PangeaScriptStatus PangeaScript_ParseConfig(const char* json, int targetLevelNum
 		}
 	}
 
+	skip_whitespace(&p);
+	if (*p.cursor != '\0')
+	{
+		snprintf(errorMsg, errorCapacity, "Unexpected trailing data after config object");
+		return PANGEA_SCRIPT_CONFIG_ERROR;
+	}
+
 	if (outConfig->version == -1)
 	{
 		snprintf(errorMsg, errorCapacity, "Missing required field: version");

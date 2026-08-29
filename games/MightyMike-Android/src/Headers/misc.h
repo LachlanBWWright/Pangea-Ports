@@ -4,6 +4,10 @@
 
 #pragma once
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include <setjmp.h>
+#endif
+
 #define gGlobFlag_MeDoneDead	gGlobalFlagList[0]		// flag set when I'm done with death anim
 
 #if _MSC_VER
@@ -34,6 +38,11 @@ void	VerifySystem(void);
 void	InitThermometer(void);
 void	FillThermometer(short);
 short	OpenMikeFile(const char* filename);
+#ifdef PANGEA_ENABLE_SCRIPTING
+short	MightyMikeScript_OpenDataFile(const char* filename);
+extern jmp_buf gMightyMikeScriptAssetJump;
+extern bool gMightyMikeScriptAssetBoundaryActive;
+#endif
 unsigned long	MyRandomLong(void);
 unsigned short	MyRandomShort(void);
 void	SetMyRandomSeed(unsigned long);

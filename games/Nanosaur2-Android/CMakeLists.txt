@@ -403,8 +403,17 @@ if(EMSCRIPTEN)
 	)
 	if(PANGEA_ENABLE_SCRIPTING)
 		list(APPEND WASM_EXPORTED_FUNCTIONS
+			"_Nanosaur2Script_ProbeRaceCompletionJS"
+			"_Nanosaur2Script_ProbeTerrainReplacementJS"
+			"_Nanosaur2Script_ProbeSplineReplacementJS"
+			"_Nanosaur2Script_ProbeCheckpointResetJS"
+			"_Nanosaur2Script_ProbeObjectiveCompletionJS"
+			"_Nanosaur2Script_ProbeSaveLoadJS"
 			"_PangeaScript_IsEnabled"
 			"_PangeaScript_SetStartupScript"
+			"_PangeaScript_SetConfigPath"
+			"_PangeaScript_LoadLevelConfig"
+			"_PangeaScript_ProbeScriptedObjectJS"
 			"_PangeaScript_Reload"
 			"_PangeaScript_GetLastError"
 			"_PangeaScript_GetErrorCount"
@@ -447,6 +456,7 @@ if(EMSCRIPTEN)
 		"SHELL:-s DISABLE_EXCEPTION_CATCHING=0"
 		# Export the C functions callable from JavaScript
 		"SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','FS']"
+		"SHELL:-lidbfs.js"
 		"SHELL:-s EXPORTED_FUNCTIONS=[${WASM_EXPORTED_FUNCTIONS_STR}]"
 		# Embed the game data (Data/ directory) into the wasm bundle
 		"SHELL:--preload-file ${GAME_DATADIR}@/Data"
