@@ -17,6 +17,9 @@
 **/.gradle/
 site/
 docs/bugdom_gameplay.png
+
+# Frontend-generated runtime bundles (large build outputs; not source)
+frontend/public/generated/
 games/BillyFrontier-Android/extern/SDL/
 **/extern/SDL3-*/
 **/extern/SDL3/

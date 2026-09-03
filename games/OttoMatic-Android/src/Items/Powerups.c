@@ -824,7 +824,7 @@ Boolean DoTrig_PowerupPod(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 static Boolean PowerupPodGotPunched(ObjNode *weapon, ObjNode *pod, OGLPoint3D *fistCoord, OGLVector3D *weaponDelta)
 {
-ObjNode	*newObj,*top,*bot;
+ObjNode	*newObj = nil,*top,*bot;
 float	r;
 
 #pragma unused(fistCoord,weapon,weaponDelta)
@@ -1135,6 +1135,7 @@ float	r;
 	}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+	if (newObj)
 	{
 		static const char* tags[] = {"powerup"};
 		OttoScript_RegisterObjectNode(newObj, "ottomatic.powerupPod", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
@@ -1804,7 +1805,6 @@ float			speed;
 
 
 #pragma mark -
-
 
 
 
