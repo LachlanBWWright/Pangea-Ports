@@ -209,6 +209,8 @@ TQ3ColorRGB		c2 = { 1, .9, .6 };
 
 	MakeShadowTexture();
 
+	LoadNanosaurMetadata();
+	gStartLevelNum = gNanosaurMetadataLevel;
 	LoadLevelArt(gStartLevelNum);
 
 	QD3D_InitShards();	

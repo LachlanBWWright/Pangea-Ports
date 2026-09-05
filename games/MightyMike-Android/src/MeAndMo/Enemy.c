@@ -154,10 +154,15 @@ int16_t offset;
 				ObjNode* weapon = gCollisionList[i].objectPtr;
 				float hitDamage = weapon->WeaponPower;
 				Boolean destroyTarget = false;
-				WeaponHitEnemy(weapon);				// tell weapon manager what happened
 #ifdef PANGEA_ENABLE_SCRIPTING
 				if (!MikeScript_OnWeaponHit(weapon, gThisNodePtr, hitDamage, &hitDamage, &destroyTarget))
+				{
+					if (weapon->CType != INVALID_NODE_FLAG)
+						WeaponHitEnemy(weapon);
 					continue;
+				}
+				if (weapon->CType != INVALID_NODE_FLAG)
+					WeaponHitEnemy(weapon);
 				if (destroyTarget)
 				{
 					KillEnemy(gThisNodePtr);
@@ -167,6 +172,8 @@ int16_t offset;
 					hitDamage = 0.0f;
 				if (hitDamage > 32767.0f)
 					hitDamage = 32767.0f;
+#else
+				WeaponHitEnemy(weapon);				// tell weapon manager what happened
 #endif
 				if (EnemyLoseHealth(gThisNodePtr, (short) hitDamage))		// lose health & see if was killed
 					return(true);
@@ -408,7 +415,6 @@ void MoveFrozenEnemy(void)
 
 	UpdateObject();
 }
-
 
 
 

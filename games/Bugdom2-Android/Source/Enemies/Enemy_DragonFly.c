@@ -122,7 +122,7 @@ float	s;
 				/* MAKE SKELETON ENEMY */
 				/***********************/
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.dragonfly", gLevelNum) == LEVEL_NUM_BALSA)
 		s = DRAGONFLY_SCALE;
 	else
 		s = DRAGONFLY_SCALE/2;
@@ -131,7 +131,7 @@ float	s;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_DRAGONFLY, animNum, x,z, s, 0, MoveDragonfly);
 
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.dragonfly", gLevelNum) == LEVEL_NUM_BALSA)
 		newObj->Coord.y = gDragonflyY;
 	else
 		newObj->Coord.y += DRAGONFLY_HOVER_HEIGHT;
@@ -150,7 +150,7 @@ float	s;
 
 				/* SET COLLISION INFO */
 
-	if (gLevelNum != LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.dragonfly", gLevelNum) != LEVEL_NUM_BALSA)
 	{
 		newObj->CType |= CTYPE_HURTME;
 		newObj->CBits = 0;
@@ -219,7 +219,7 @@ float		r,fps,y;
 			/* BALSA MOVE */
 			/**************/
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.dragonfly", gLevelNum) == LEVEL_NUM_BALSA)
 	{
 			/* AIM AT PLAYER */
 
@@ -433,7 +433,7 @@ static void UpdateDragonflySound(ObjNode *theNode, OGLPoint3D *p)
 {
 float	v;
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.dragonfly", gLevelNum) == LEVEL_NUM_BALSA)
 		v = .6f;
 	else
 		v = .3f;
@@ -563,7 +563,7 @@ float	r = player->Rot.y;
 
 static Boolean HurtDragonfly(ObjNode *enemy, float damage)
 {
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.dragonfly", gLevelNum) == LEVEL_NUM_BALSA)
 		PlayEffect3D(EFFECT_DRAGONFLYHIT, &enemy->Coord);
 
 			/* SEE IF REMOVE FROM SPLINE */
@@ -683,7 +683,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

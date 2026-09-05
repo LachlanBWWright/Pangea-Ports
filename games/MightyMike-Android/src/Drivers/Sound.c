@@ -558,7 +558,7 @@ void ZapAllSounds(void)
 
 void PlayAreaMusic(void)
 {
-	switch(gSceneNum)
+	switch(LevelMetadataScene("scene.sound", gSceneNum))
 	{
 		case	SCENE_JURASSIC:
 				PlaySong(SONG_ID_JURASSIC);
@@ -586,7 +586,7 @@ void PlayAreaMusic(void)
 
 void LoadAreaSound(void)
 {
-	switch(gSceneNum)
+	switch(LevelMetadataScene("scene.sound", gSceneNum))
 	{
 		case	SCENE_JURASSIC:
 				gSoundNum_UngaBunga		= AddEffect("Jurassic", "UngaBunga");
@@ -662,4 +662,3 @@ void PauseAllChannels(Boolean pause)
 		SndDoImmediate(gSndChannel[0], &cmd);
 	}
 }
-

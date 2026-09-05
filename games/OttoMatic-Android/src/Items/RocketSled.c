@@ -54,7 +54,7 @@ Boolean AddRocketSled(TerrainItemEntryType *itemPtr, long  x, long z)
 ObjNode	*newObj;
 
 	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
-	if (gLevelNum == LEVEL_NUM_CLOUD)
+	if (LevelMetadataProfileIs("level.transport", "rocket-sled", gLevelNum == LEVEL_NUM_CLOUD))
 		gNewObjectDefinition.type 	= CLOUD_ObjType_RocketSled;
 	else
 		gNewObjectDefinition.type	= FIREICE_ObjType_RocketSled;
@@ -250,7 +250,7 @@ uint16_t		effect;
 
 			/* UPDATE SOUND */
 
-	if (gLevelNum == LEVEL_NUM_CLOUD)
+	if (LevelMetadataProfileIs("level.transport", "rocket-sled", gLevelNum == LEVEL_NUM_CLOUD))
 		effect = EFFECT_ROCKETSLED;
 	else
 		effect = EFFECT_ROCKETSLED2;
@@ -505,7 +505,7 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 			/* BLOW UP THE SLED ON IMPACT */
 
-	if (gLevelNum == LEVEL_NUM_CLOUD)
+	if (LevelMetadataProfileIs("level.transport", "rocket-sled", gLevelNum == LEVEL_NUM_CLOUD))
 		PlayEffect3D(EFFECT_BUMPERPOLEBREAK, &gCoord);
 	else
 		PlayEffect3D(EFFECT_SLEDEXPLODE, &gCoord);
@@ -556,5 +556,4 @@ static const OGLPoint3D zero = {0,0,0};
 
 	player->Rot.y = gPlayerRocketSled->Rot.y;
 }
-
 

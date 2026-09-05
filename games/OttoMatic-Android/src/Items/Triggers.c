@@ -1099,7 +1099,7 @@ int		i;
 
 
 	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
-	if (gLevelNum == LEVEL_NUM_BLOBBOSS)
+	if (LevelMetadataProfileIs("level.blobPlatforms", "blob-boss", gLevelNum == LEVEL_NUM_BLOBBOSS))
 	{
 		type = 0;
 		gNewObjectDefinition.type 	= BLOBBOSS_ObjType_FallingSlimePlatform_Small;
@@ -1754,5 +1754,4 @@ OGLPoint2D		origin,pt,p[12];
 
 	return(true);
 }
-
 

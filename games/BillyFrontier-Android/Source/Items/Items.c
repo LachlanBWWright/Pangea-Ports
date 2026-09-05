@@ -83,12 +83,10 @@ void InitItemsManager(void)
 void CreateCyclorama(void)
 {
 
-	switch(gCurrentArea)
+	switch(GetBillyAreaMode())
 	{
-		case	AREA_SWAMP_STAMPEDE:
-		case	AREA_TOWN_STAMPEDE:
-		case	AREA_TARGETPRACTICE1:
-		case	AREA_TARGETPRACTICE2:
+		case	BILLY_AREA_MODE_STAMPEDE:
+		case	BILLY_AREA_MODE_TARGET_PRACTICE:
 				return;
 	}
 
@@ -1551,7 +1549,6 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
 
 
 

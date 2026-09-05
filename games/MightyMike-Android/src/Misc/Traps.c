@@ -96,7 +96,7 @@ ObjectEntryType	item;
 		item.y = gThisNodePtr->Y.Int;
 		item.parm[0] = 0;
 
-		switch(gSceneNum)
+		switch(LevelMetadataScene("area.traps", gSceneNum))
 		{
 			case	SCENE_JURASSIC:
 					if (AddEnemy_Caveman(&item))
@@ -659,8 +659,6 @@ void MoveHydrantWater(void)
 		UpdateObject();
 	}
 }
-
-
 
 
 

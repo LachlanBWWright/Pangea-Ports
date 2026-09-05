@@ -522,7 +522,7 @@ Boolean DoTrig_Door(void)
 		gMyKeys[gTriggerNode->KeyNeeded] = false;			// lose key
 		ShowKeys();											// update keys on screen
 
-		switch(gSceneNum)									// play door sound
+		switch(LevelMetadataScene("area.doors", gSceneNum))									// play door sound
 		{
 			case	SCENE_JURASSIC:
 			case	SCENE_CLOWN:
@@ -558,5 +558,3 @@ Boolean DoTrig_BargainDoor(void)
 
 	return(true);
 }
-
-

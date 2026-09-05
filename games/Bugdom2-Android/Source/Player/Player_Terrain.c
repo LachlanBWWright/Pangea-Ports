@@ -169,7 +169,7 @@ ObjNode	*newObj;
 
 		/* SPECIAL CASE BALSA FLYING */
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.terrain", gLevelNum) == LEVEL_NUM_BALSA)
 		PutPlayerInBalsaPlane(newObj);
 	else
 		AttachShadowToObject(newObj, 0, DEFAULT_PLAYER_SHADOW_SCALE,DEFAULT_PLAYER_SHADOW_SCALE * .8f, true);
@@ -1981,7 +1981,7 @@ int	markerNum;
 	if (!SeeIfCrossedLineMarker(player, &markerNum))
 		return;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.completion", gLevelNum))
 	{
 				/* HANDLE LINE MARKERS FOR GARDEN */
 
@@ -2024,9 +2024,6 @@ int	markerNum;
 				break;
 	}
 }
-
-
-
 
 
 

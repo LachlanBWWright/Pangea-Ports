@@ -461,7 +461,7 @@ long	spacing;
 	else
 		spacing = KEYS_SPACING;
 
-	switch(gSceneNum)
+	switch(LevelMetadataScene("scene.infobar", gSceneNum))
 	{
 		case	SCENE_JURASSIC:
 				group = GroupNum_JurassicKeys;
@@ -629,5 +629,4 @@ const int	quitY = gGamePrefs.pfSize == PFSIZE_SMALL ? 220 : ((VISIBLE_HEIGHT-64)
 
 	return(!selection);
 }
-
 

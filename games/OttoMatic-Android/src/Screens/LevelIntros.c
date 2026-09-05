@@ -83,19 +83,11 @@ void DoLevelIntro(void)
 {
 float	oldTime,maxTime = 11.0f;
 
-	if (gSkipFluff)
+	if (gSkipFluff || !GetLevelMetadataBool("level.introVisible", gLevelNum != LEVEL_NUM_BLOBBOSS && gLevelNum != LEVEL_NUM_JUNGLEBOSS))
 		return;
 
-	switch (gLevelNum)										// level special cases
-	{
-		case	LEVEL_NUM_BLOBBOSS:
-		case	LEVEL_NUM_JUNGLEBOSS:
-				return;										// these levels don't have an intro, so bail now.
-
-		case	LEVEL_NUM_BRAINBOSS:
-				maxTime = 5.0f;								// shorter intro time
-				break;
-	}
+	if (LevelMetadataProfileIs("level.introTiming", "short", gLevelNum == LEVEL_NUM_BRAINBOSS))
+		maxTime = 5.0f;								// shorter intro time
 
 
 	gIntroTimer = 0;
@@ -161,7 +153,7 @@ static void MoveLevelName(ObjNode* theNode)
 {
 	float alpha = theNode->ColorFilter.a;
 
-	if (gLevelNum == LEVEL_NUM_BRAINBOSS)							// comes in sooner on Brain Boss level
+	if (LevelMetadataProfileIs("level.introTiming", "short", gLevelNum == LEVEL_NUM_BRAINBOSS))							// comes in sooner on Brain Boss level
 	{
 		if (gIntroTimer > 1.0f)
 			alpha += gFramesPerSecondFrac *.6f;
@@ -369,7 +361,7 @@ const Byte	cloud[] =
 	gNewObjectDefinition.type 		= cloud[gLevelNum];
 	gNewObjectDefinition.flags 		= STATUS_BIT_ROTYZX | STATUS_BIT_DONTCULL | STATUS_BIT_UVTRANSFORM |
 									STATUS_BIT_KEEPBACKFACES|STATUS_BIT_NOZWRITES;
-	if (gLevelNum == LEVEL_NUM_APOCALYPSE)
+	if (GetLevelMetadataBool("level.introGlow", gLevelNum == LEVEL_NUM_APOCALYPSE))
 		gNewObjectDefinition.flags |= STATUS_BIT_GLOW;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= 0;
@@ -398,18 +390,16 @@ const Byte	cloud[] =
 			/* MAKE SHIPS */
 			/**************/
 
-	switch(gLevelNum)
+	if (LevelMetadataProfileIs("level.introShips", "none", gLevelNum == LEVEL_NUM_BRAINBOSS))
+		return;
+
+	if (LevelMetadataProfileIs("level.introShips", "saucer", gLevelNum == LEVEL_NUM_SAUCER))
 	{
-		case	LEVEL_NUM_SAUCER:								// show ice saucer
-				CreateIntroSaucer2();
-				break;
-
-		case	LEVEL_NUM_BRAINBOSS:							// no ships
-				break;
-
-		default:
-				CreateIntroSaucers();
-
+		CreateIntroSaucer2();
+	}
+	else if (!LevelMetadataProfileIs("level.introShips", "none", gLevelNum == LEVEL_NUM_BRAINBOSS))
+	{
+		CreateIntroSaucers();
 	}
 }
 
@@ -564,13 +554,6 @@ float	fps = gFramesPerSecondFrac;
 	theNode->ColorFilter.a = .3f + (sin(theNode->SpecialF[0]) + 1.0f) * .5f;
 
 }
-
-
-
-
-
-
-
 
 
 

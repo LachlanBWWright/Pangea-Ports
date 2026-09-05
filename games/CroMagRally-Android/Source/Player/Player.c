@@ -205,7 +205,7 @@ Boolean	taken[NUM_LAND_CAR_TYPES];
 
 			/* CREATE THE CAR MODEL */
 
-		if (gTrackNum == TRACK_NUM_ATLANTIS)
+		if (LevelMetadataProfileIs("track.vehicle", "submarine", gTrackNum == TRACK_NUM_ATLANTIS))
 			InitPlayer_Submarine(i, &gPlayerInfo[i].coord, gPlayerInfo[i].startRotY);
 		else
 			InitPlayer_Car(i, &gPlayerInfo[i].coord, gPlayerInfo[i].startRotY);
@@ -763,7 +763,6 @@ ObjNode *obj;
 		obj = obj->ChainNode;
 	}
 }
-
 
 
 

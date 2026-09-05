@@ -65,7 +65,7 @@ Boolean AddEnemy_Frog(TerrainItemEntryType *itemPtr, float x, float z)
 {
 ObjNode	*newObj;
 
-	if (gLevelNum == LEVEL_NUM_PARK)							// see if for park level
+	if (LevelMetadataCaseFor("level.frog", gLevelNum) == LEVEL_NUM_PARK)							// see if for park level
 		return(AddEnemy_Frog2(itemPtr,x,z));
 
 	if (gNumEnemies >= gMaxEnemies)								// keep from getting absurd
@@ -221,7 +221,7 @@ float	y;
 		theNode->JumpNow = false;
 		gDelta.y = FROG_JUMP_DY;
 
-		if (gLevelNum == LEVEL_NUM_BALSA)
+		if (LevelMetadataCaseFor("level.frog", gLevelNum) == LEVEL_NUM_BALSA)
 			PlayEffect3D(EFFECT_FROGJUMP, &gCoord);
 		else
 			PlayEffect3D(EFFECT_FROGJUMP2, &gCoord);
@@ -289,7 +289,7 @@ OGLPoint3D	tongueCoord;
 	FindCoordOfJoint(theNode, FROG_JOINT_TONGUE, &tongueCoord);						// get coord of tongue tip
 	if (OGLPoint3D_Distance(&tongueCoord, &gPlayerInfo.coord) < 400.0f)				// see if hit player
 	{
-		if (gLevelNum == LEVEL_NUM_BALSA)
+		if (LevelMetadataCaseFor("level.frog", gLevelNum) == LEVEL_NUM_BALSA)
 			PlayerGotHit(theNode, 0, 0);
 
 	}
@@ -344,7 +344,6 @@ static void UpdateFrog(ObjNode *theNode)
 	UpdateEnemy(theNode);
 
 }
-
 
 
 

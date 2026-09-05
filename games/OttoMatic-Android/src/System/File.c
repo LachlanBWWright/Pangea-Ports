@@ -10,6 +10,8 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 
@@ -23,6 +25,9 @@
 
 static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, FSSpec* modelSpec, int skeletonType);
 static void ReadDataFromPlayfieldFile(FSSpec *specPtr);
+static void ReadLevelMetadata(void);
+static Boolean ReadMetadataFloat(const char *json, const char *key, float *value);
+static char *gLevelMetadataJSON = NULL;
 static void	ConvertTexture16To16(uint16_t *textureBuffer, int width, int height);
 static inline void Blit16(
 		const char*			src,
@@ -706,7 +711,7 @@ levelSpriteFiles[NUM_LEVELS] =
 
 			/* LOAD LEVEL-SPECIFIC SKELETONS & APPLY REFLECTION MAPS */
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.assetIdentity", gLevelNum))
 	{
 		case	LEVEL_NUM_FARM:
 				LoadASkeleton(SKELETON_TYPE_ONION);
@@ -1032,6 +1037,7 @@ OSErr					iErr;
 	fRefNum = FSpOpenResFile(specPtr,fsRdPerm);
 	GAME_ASSERT_MESSAGE(fRefNum != -1, "FSpOpenResFile failed");
 	UseResFile(fRefNum);
+	ReadLevelMetadata();
 
 
 			/************************/
@@ -1533,7 +1539,7 @@ OSErr					iErr;
 											BG3D_MATERIALFLAG_CLAMP_V|
 											BG3D_MATERIALFLAG_TEXTURED;
 
-		if (gG4 && gLevelNum == LEVEL_NUM_BLOBBOSS)
+		if (gG4 && GetLevelMetadataBool("level.blobBossEnvMap", gLevelNum == LEVEL_NUM_BLOBBOSS))
 		{
 			matData.flags |= BG3D_MATERIALFLAG_MULTITEXTURE;
 			matData.envMapNum	= SPHEREMAP_SObjType_Red;
@@ -1556,6 +1562,161 @@ OSErr					iErr;
 	SafeDisposePtr(canvas);
 }
 
+static Boolean ReadMetadataFloat(const char *json, const char *key, float *value)
+{
+	char needle[64];
+	char *valueEnd;
+	const char *valueStart;
+	float parsed;
+
+	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
+	valueStart = strstr(json, needle);
+	if (!valueStart)
+		return false;
+
+	valueStart += strlen(needle);
+	parsed = strtof(valueStart, &valueEnd);
+	if (valueEnd == valueStart || *valueEnd != '\"')
+		return false;
+
+	*value = parsed;
+	return true;
+}
+
+Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
+{
+	char needle[64];
+	const char *valueStart;
+	const char *valueEnd;
+	size_t length;
+
+	if (!gLevelMetadataJSON || valueSize == 0)
+		return false;
+
+	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
+	valueStart = strstr(gLevelMetadataJSON, needle);
+	if (!valueStart)
+		return false;
+	valueStart += strlen(needle);
+	valueEnd = strchr(valueStart, '\"');
+	if (!valueEnd)
+		return false;
+
+	length = (size_t)(valueEnd - valueStart);
+	if (length >= valueSize)
+		return false;
+	SDL_memcpy(value, valueStart, length);
+	value[length] = '\0';
+	return true;
+}
+
+Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
+{
+	char value[8];
+	if (!GetLevelMetadataString(key, value, sizeof(value)))
+		return fallback;
+	if (!SDL_strcasecmp(value, "true"))
+		return true;
+	if (!SDL_strcasecmp(value, "false"))
+		return false;
+	return fallback;
+}
+
+Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default"))
+		return fallback;
+	if (!SDL_strcasecmp(key, "level.camera"))
+		if (SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "blob-boss")) return fallback;
+	if (!SDL_strcasecmp(key, "level.introTiming"))
+		if (SDL_strcasecmp(value, "normal") && SDL_strcasecmp(value, "short")) return fallback;
+	if (!SDL_strcasecmp(key, "level.jungleWeapons"))
+		if (SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "jungle")) return fallback;
+	if (!SDL_strcasecmp(key, "level.flytrapTargeting"))
+		if (SDL_strcasecmp(value, "enabled") && SDL_strcasecmp(value, "disabled")) return fallback;
+	if (!SDL_strcasecmp(key, "level.sky"))
+		if (SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "apocalypse")) return fallback;
+	if (!SDL_strcasecmp(key, "level.splineSurface"))
+		if (SDL_strcasecmp(value, "terrain-or-water") && SDL_strcasecmp(value, "flat")) return fallback;
+	if (!SDL_strcasecmp(key, "level.transport"))
+		if (SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "rocket-sled")) return fallback;
+	if (!SDL_strcasecmp(key, "level.zipLineStyle"))
+		if (SDL_strcasecmp(value, "fire-ice") && SDL_strcasecmp(value, "apocalypse")) return fallback;
+	if (!SDL_strcasecmp(key, "level.blobDeformation"))
+		if (SDL_strcasecmp(value, "none") && SDL_strcasecmp(value, "blob") && SDL_strcasecmp(value, "blob-boss")) return fallback;
+	if (!SDL_strcasecmp(key, "level.rocketExitTrigger"))
+		if (SDL_strcasecmp(value, "player-landed") && SDL_strcasecmp(value, "tractor-beam-active")) return fallback;
+	if (!SDL_strcasecmp(key, "level.rocketPersistence"))
+		if (SDL_strcasecmp(value, "jungle-boss") && SDL_strcasecmp(value, "saucer") && SDL_strcasecmp(value, "brain-boss")) return fallback;
+	if (!SDL_strcasecmp(key, "level.rocketFuel"))
+		if (SDL_strcasecmp(value, "required") && SDL_strcasecmp(value, "not-required")) return fallback;
+	return !SDL_strcasecmp(value, profile);
+}
+
+int LevelMetadataCaseFor(const char *key, int fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default"))
+		return fallback;
+	if (!SDL_strcasecmp(value, "standard") || !SDL_strcasecmp(value, "rocket-and-robot")) return -1;
+	if (!SDL_strcasecmp(value, "fog-only")) return LEVEL_NUM_BLOB;
+	if (!SDL_strcasecmp(value, "robot")) return LEVEL_NUM_BLOBBOSS;
+	if (!SDL_strcasecmp(value, "blob")) return LEVEL_NUM_BLOB;
+	if (!SDL_strcasecmp(value, "blob-boss")) return LEVEL_NUM_BLOBBOSS;
+	if (!SDL_strcasecmp(value, "apocalypse")) return LEVEL_NUM_APOCALYPSE;
+	if (!SDL_strcasecmp(value, "cloud")) return LEVEL_NUM_CLOUD;
+	if (!SDL_strcasecmp(value, "jungle")) return LEVEL_NUM_JUNGLE;
+	if (!SDL_strcasecmp(value, "jungle-boss")) return LEVEL_NUM_JUNGLEBOSS;
+	if (!SDL_strcasecmp(value, "fire-ice")) return LEVEL_NUM_FIREICE;
+	if (!SDL_strcasecmp(value, "saucer")) return LEVEL_NUM_SAUCER;
+	if (!SDL_strcasecmp(value, "brain-boss")) return LEVEL_NUM_BRAINBOSS;
+	return fallback;
+}
+
+static void ReadLevelMetadata(void)
+{
+	Handle hand;
+	Size size;
+	char *json;
+	float value;
+
+	gHasLevelGravityMetadata = false;
+	gHasLevelSlipperinessMetadata = false;
+	if (gLevelMetadataJSON)
+	{
+		SafeDisposePtr(gLevelMetadataJSON);
+		gLevelMetadataJSON = NULL;
+	}
+
+	hand = GetResource('Meta', 1000);
+	if (!hand)
+		return;
+
+	size = GetHandleSize(hand);
+	json = (char *)AllocPtrClear(size + 1);
+	if (!json)
+	{
+		ReleaseResource(hand);
+		return;
+	}
+	SDL_memcpy(json, *hand, (size_t)size);
+	gLevelMetadataJSON = json;
+
+	if (ReadMetadataFloat(json, "level.gravity", &value) && value >= 0.0f)
+	{
+		gLevelGravityMetadata = value;
+		gHasLevelGravityMetadata = true;
+	}
+	if (ReadMetadataFloat(json, "level.tileSlipperiness", &value) && value >= 0.0f && value <= 1.0f)
+	{
+		gLevelSlipperinessMetadata = value;
+		gHasLevelSlipperinessMetadata = true;
+	}
+
+	ReleaseResource(hand);
+}
+
 
 /*********************** CONVERT TEXTURE; 16 TO 16 ***********************************/
 //
@@ -1564,7 +1725,7 @@ OSErr					iErr;
 
 static void	ConvertTexture16To16(uint16_t *textureBuffer, int width, int height)
 {
-	bool blackOpaq = (gLevelNum != LEVEL_NUM_CLOUD);		// make black transparent on cloud
+	bool blackOpaq = !GetLevelMetadataBool("level.cloudTransparentBlack", gLevelNum == LEVEL_NUM_CLOUD);		// make black transparent on cloud
 
 	for (int p = 0; p < width*height; p++)
 	{

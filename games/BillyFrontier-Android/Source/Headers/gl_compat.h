@@ -52,4 +52,8 @@
 // GL_FOG_HINT calls are guarded with #ifndef __EMSCRIPTEN__ in the source code
 // instead of a macro, to avoid conflicting with the GLES2/gl2.h declaration.
 
+#else
+
+void CompatGL_InvalidateCachePtr(const void *ptr);
+
 #endif // __EMSCRIPTEN__ || __ANDROID__

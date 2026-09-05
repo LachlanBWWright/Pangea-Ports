@@ -153,7 +153,7 @@ void ShowLevelIntroScreen(void)
 		
 		/* DO LEVEL CUSTOM */
 				
-	switch(gRealLevel)
+	 switch(LevelMetadataCaseFor("presentation.levelIntro", gRealLevel))
 	{
 		case	LEVEL_NUM_TRAINING:					
 				DoLawn1Intro();
@@ -266,7 +266,7 @@ TQ3Vector3D				fillDirection2 = { -.7, -.2, -.9 };			// fill
 	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:LevelIntro.3dmf", &spec);
 	LoadGrouped3DMF(&spec,MODEL_GROUP_LEVELINTRO);	
 
-	switch(gRealLevel)
+	switch(LevelMetadataCaseFor("presentation.levelIntro", gRealLevel))
 	{
 		case	LEVEL_NUM_TRAINING:
 				LoadASkeleton(SKELETON_TYPE_ANT);
@@ -302,7 +302,7 @@ TQ3Vector3D				fillDirection2 = { -.7, -.2, -.9 };			// fill
 			/* MAKE BACKGROUND */
 			/*******************/
 			
-	if (gRealLevel != LEVEL_NUM_FLIGHT)
+	if (!LevelMetadataProfileIs("presentation.levelIntro", "flight", gRealLevel == LEVEL_NUM_FLIGHT))
 	{
 				/* LOG */
 
@@ -1517,6 +1517,4 @@ float		fps = gFramesPerSecondFrac;
 	
 	QD3D_UpdateCameraFromTo(gGameViewInfoPtr, &from, &to);	
 }
-
-
 

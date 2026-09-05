@@ -65,6 +65,10 @@ Boolean				gIsInGame = false;
 Boolean				gSkipFluff = false;
 
 float				gGravity = NORMAL_GRAVITY;
+Boolean				gHasLevelGravityMetadata = false;
+float				gLevelGravityMetadata = NORMAL_GRAVITY;
+Boolean				gHasLevelSlipperinessMetadata = false;
+float				gLevelSlipperinessMetadata = 0.0f;
 
 Byte				gDebugMode = 0;				// 0 == none, 1 = fps, 2 = all
 
@@ -484,14 +488,14 @@ float	fps = gFramesPerSecondFrac;
 
 	/* LEVEL SPECIFIC UPDATES */
 
-	switch(gLevelNum)
+	if (GetLevelMetadataBool("level.blobEffects", gLevelNum == LEVEL_NUM_BLOB))
 	{
-		case	LEVEL_NUM_BLOB:
 				MO_Object_OffsetUVs(gBG3DGroupList[MODEL_GROUP_LEVELSPECIFIC][SLIME_ObjType_BumperBubble], fps * .3, 0);	// scroll bumper bubble
 				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, SLIME_ObjType_BlobArrow, 0, fps * -.4, 0);	// scroll arrow texture
-				break;
+	}
 
-		case	LEVEL_NUM_BLOBBOSS:
+	if (GetLevelMetadataBool("level.blobBossEffects", gLevelNum == LEVEL_NUM_BLOBBOSS))
+	{
 				gSpinningPlatformRot += SPINNING_PLATFORM_SPINSPEED * fps;
 				if (gSpinningPlatformRot > PI2)																			// wrap back rather than getting bigger and bigger
 					gSpinningPlatformRot -= PI2;
@@ -503,12 +507,11 @@ float	fps = gFramesPerSecondFrac;
 				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_Tube_Straight2,1, 0, -fps);
 
 				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_TubeSegment,1, 0, -fps);
-				break;
+	}
 
-		case	LEVEL_NUM_CLOUD:
+	if (GetLevelMetadataBool("level.cloudEffects", gLevelNum == LEVEL_NUM_CLOUD))
+	{
 				UpdateZigZagSlats();
-				break;
-
 	}
 
 }
@@ -553,7 +556,7 @@ DeformationType		defData;
 	viewDef.camera.fov 				= GAME_FOV;
 
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.environment", gLevelNum))
 	{
 		case	LEVEL_NUM_BLOB:
 				viewDef.camera.yon				*= .6f;								// bring in the yon
@@ -661,11 +664,11 @@ DeformationType		defData;
 				gDrawLensFlare = true;
 	}
 
-		/**************/
-		/* SET LIGHTS */
-		/**************/
+	/**************/
+	/* SET LIGHTS */
+	/**************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.lighting", gLevelNum))
 	{
 		case	LEVEL_NUM_BLOBBOSS:
 				gWorldSunDirection.x 	= .5;
@@ -806,11 +809,11 @@ DeformationType		defData;
 	OGL_SetupWindow(&viewDef);
 
 
-			/**********************/
-			/* SET AUTO-FADE INFO */
-			/**********************/
+	/**********************/
+	/* SET AUTO-FADE INFO */
+	/**********************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.autoFade", gLevelNum))
 	{
 		case	LEVEL_NUM_BLOB:
 				gAutoFadeStartDist = 0;						// no auto fade here - we gots fog
@@ -887,14 +890,11 @@ DeformationType		defData;
 			/* INIT SPECIAL */
 			/****************/
 
-	gGravity = NORMAL_GRAVITY;					// assume normal gravity
-	gTileSlipperyFactor = 0.0f;					// assume normal slippery
+	gGravity = gLevelNum == LEVEL_NUM_BLOBBOSS ? NORMAL_GRAVITY * 3 / 4 : NORMAL_GRAVITY;
+	gTileSlipperyFactor = gLevelNum == LEVEL_NUM_BLOB ? .1f : 0.0f;
 
-	switch(gLevelNum)
+	if (LevelMetadataProfileIs("level.blobDeformation", "blob", gLevelNum == LEVEL_NUM_BLOB))
 	{
-		case	LEVEL_NUM_BLOB:
-
-				gTileSlipperyFactor = .1f;
 
 				/* INIT DEFORMATIONS */
 
@@ -918,16 +918,12 @@ DeformationType		defData;
 					defData.oneOverWaveLength 	= 1.0f / 200.0f;
 					NewSuperTileDeformation(&defData);
 				}
-				break;
+	}
 
-		case	LEVEL_NUM_BLOBBOSS:
+	else if (LevelMetadataProfileIs("level.blobDeformation", "blob-boss", gLevelNum == LEVEL_NUM_BLOBBOSS))
+	{
 
-				gGravity = NORMAL_GRAVITY*3/4;						// low gravity
-
-					/* MAKE THE BLOB BOSS MACHINE */
-
-				MakeBlobBossMachine();
-
+				/* MAKE THE BLOB BOSS MACHINE */
 
 				if (gG4)										// only do this on a G4 since we need the horsepower
 				{
@@ -951,31 +947,27 @@ DeformationType		defData;
 					defData.oneOverWaveLength 	= 1.0f / 400.0f;
 					NewSuperTileDeformation(&defData);
 				}
-				break;
-
-		case	LEVEL_NUM_APOCALYPSE:
-				InitZipLines();
-				InitTeleporters();
-				InitSpacePods();
-				break;
-
-		case	LEVEL_NUM_CLOUD:
-				InitBumperCars();
-				break;
-
-		case	LEVEL_NUM_JUNGLEBOSS:
-				InitJungleBossStuff();
-				break;
-
-		case	LEVEL_NUM_FIREICE:
-				InitZipLines();
-				break;
-
-		case	LEVEL_NUM_BRAINBOSS:
-				InitBrainBoss();
-				break;
-
 	}
+
+	if (GetLevelMetadataBool("level.blobBossMachine", gLevelNum == LEVEL_NUM_BLOBBOSS))
+		MakeBlobBossMachine();
+	if (GetLevelMetadataBool("level.teleporters", gLevelNum == LEVEL_NUM_APOCALYPSE))
+		InitTeleporters();
+	if (GetLevelMetadataBool("level.spacePods", gLevelNum == LEVEL_NUM_APOCALYPSE))
+		InitSpacePods();
+	if (GetLevelMetadataBool("level.bumperCars", gLevelNum == LEVEL_NUM_CLOUD))
+		InitBumperCars();
+	if (GetLevelMetadataBool("level.jungleBoss", gLevelNum == LEVEL_NUM_JUNGLEBOSS))
+		InitJungleBossStuff();
+	if (GetLevelMetadataBool("level.zipLines", gLevelNum == LEVEL_NUM_APOCALYPSE || gLevelNum == LEVEL_NUM_FIREICE))
+		InitZipLines();
+	if (GetLevelMetadataBool("level.brainBoss", gLevelNum == LEVEL_NUM_BRAINBOSS))
+		InitBrainBoss();
+
+	if (gHasLevelGravityMetadata)
+		gGravity = gLevelGravityMetadata;
+	if (gHasLevelSlipperinessMetadata)
+		gTileSlipperyFactor = gLevelSlipperinessMetadata;
 
 		/* INIT THE PLAYER & RELATED STUFF */
 

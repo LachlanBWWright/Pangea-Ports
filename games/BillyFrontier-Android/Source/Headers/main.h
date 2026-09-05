@@ -38,6 +38,17 @@ enum
 
 };
 
+enum
+{
+	BILLY_AREA_MODE_DUEL,
+	BILLY_AREA_MODE_SHOOTOUT,
+	BILLY_AREA_MODE_STAMPEDE,
+	BILLY_AREA_MODE_TARGET_PRACTICE
+};
+
+int GetBillyAreaMode(void);
+Boolean IsBillySwampArea(void);
+
 
 
 #define	DuelerNum	Special[4]

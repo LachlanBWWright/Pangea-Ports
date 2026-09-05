@@ -62,5 +62,7 @@ extern	void LoadTerrainTileset(FSSpec *fsSpec);
 extern	void LoadTerrain(FSSpec *fsSpec);
 
 extern	void LoadLevelArt(short levelNum);
+extern	Boolean LoadNanosaurMetadata(void);
+extern	short gNanosaurMetadataLevel;
 
 void FSMakeCustomSpec(const char* hostPath, FSSpec* outSpec);

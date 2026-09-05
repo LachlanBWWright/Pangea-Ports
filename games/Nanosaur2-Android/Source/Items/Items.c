@@ -210,17 +210,13 @@ Boolean AddRock(TerrainItemEntryType *itemPtr, float  x, float z)
 short	base;
 long	rot = itemPtr->parm[1];
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.items", GetDefaultBiomeForLevel(gLevelNum)))
 	{
-		case	LEVEL_NUM_ADVENTURE1:
-		case	LEVEL_NUM_FLAG2:
-		case	LEVEL_NUM_BATTLE1:
+		case	BIOME_FOREST:
 				base = 	LEVEL1_ObjType_Rock1;
 				break;
 
-		case	LEVEL_NUM_ADVENTURE2:
-		case	LEVEL_NUM_RACE2:
-		case	LEVEL_NUM_BATTLE2:
+		case	BIOME_DESERT:
 				base = 	LEVEL2_ObjType_Rock_Small1;
 				break;
 
@@ -511,8 +507,6 @@ Boolean AddAsteroid(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	return(true);													// item was added
 }
-
-
 
 
 

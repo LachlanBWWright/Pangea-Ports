@@ -54,11 +54,9 @@ long	h = itemPtr->parm[0];
 			h = 0;
 	}
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.items", GetDefaultBiomeForLevel(gLevelNum)))
 	{
-		case	LEVEL_NUM_ADVENTURE1:
-		case	LEVEL_NUM_FLAG2:
-		case	LEVEL_NUM_BATTLE1:
+		case	BIOME_FOREST:
 				typeB = LEVEL1_ObjType_AirMine_Base;
 				typeM = LEVEL1_ObjType_AirMine_Mine;
 				typeC = LEVEL1_ObjType_AirMine_Chain;
@@ -68,7 +66,7 @@ long	h = itemPtr->parm[0];
 					chainOff = h * (800.0f/10.0f);
 				break;
 
-		case	LEVEL_NUM_ADVENTURE2:
+		case	BIOME_DESERT:
 				typeB = LEVEL2_ObjType_AirMine_Base;
 				typeM = LEVEL2_ObjType_AirMine_Mine;
 				typeC = LEVEL2_ObjType_AirMine_Chain;
@@ -78,9 +76,7 @@ long	h = itemPtr->parm[0];
 					chainOff = h * (2300.0f/10.0f);
 				break;
 
-		case	LEVEL_NUM_ADVENTURE3:
-		case	LEVEL_NUM_RACE1:
-		case	LEVEL_NUM_FLAG1:
+		case	BIOME_SWAMP:
 				typeB = LEVEL3_ObjType_AirMine_Base;
 				typeM = LEVEL3_ObjType_AirMine_Mine;
 				typeC = LEVEL3_ObjType_AirMine_Chain;
@@ -236,11 +232,9 @@ const OGLPoint3D	lightOff2 = {0,2100,0};
 
 	mine->Rot.x = chain->Rot.x;													// match x rot
 
-	switch(gLevelNum)
+	switch(LevelMetadataProfileIs("level.minePlacement", "forest", GetDefaultBiomeForLevel(gLevelNum) == BIOME_FOREST) ? BIOME_FOREST : BIOME_DESERT)
 	{
-		case	LEVEL_NUM_ADVENTURE1:
-		case	LEVEL_NUM_FLAG2:
-		case	LEVEL_NUM_BATTLE1:
+		case	BIOME_FOREST:
 				OGLPoint3D_Transform(&mineOff, &chain->BaseTransformMatrix, &mine->Coord);	// calc coord of mine @ end of chain
 				break;
 
@@ -259,11 +253,9 @@ const OGLPoint3D	lightOff2 = {0,2100,0};
 
 		/* CALC COORD OF LIGHT */
 
-	switch(gLevelNum)
+	switch(LevelMetadataProfileIs("level.minePlacement", "forest", GetDefaultBiomeForLevel(gLevelNum) == BIOME_FOREST) ? BIOME_FOREST : BIOME_DESERT)
 	{
-		case	LEVEL_NUM_ADVENTURE1:
-		case	LEVEL_NUM_FLAG2:
-		case	LEVEL_NUM_BATTLE1:
+		case	BIOME_FOREST:
 				OGLPoint3D_Transform(&lightOff, &chain->BaseTransformMatrix, &origin);
 				break;
 
@@ -604,9 +596,6 @@ short	i;
 
 
 }
-
-
-
 
 
 

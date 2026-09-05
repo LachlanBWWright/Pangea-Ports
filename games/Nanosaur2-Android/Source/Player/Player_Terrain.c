@@ -787,21 +787,13 @@ short	playerNum = theNode->PlayerNum;
 			/* SEE IF CROSSED ANY LINE MARKERS */
 			/***********************************/
 
-	switch(gLevelNum)
+	if (LevelMetadataProfileIs("level.raceMarkers", "race", gLevelNum == LEVEL_NUM_RACE1 || gLevelNum == LEVEL_NUM_RACE2))
 	{
-		case	LEVEL_NUM_RACE1:								// call special line marker function for race modes
-		case	LEVEL_NUM_RACE2:
-				if (gVSMode == VS_MODE_RACE)
-				{
-					UpdatePlayerRaceMarkers(theNode);
-				}
-				else
-				{
-					HandlePlayerLineMarkerCrossing(theNode);
-				}
-				break;
-
-		default:
+		if (gVSMode == VS_MODE_RACE) UpdatePlayerRaceMarkers(theNode);
+		else HandlePlayerLineMarkerCrossing(theNode);
+	}
+	else
+	{
 				HandlePlayerLineMarkerCrossing(theNode);
 	}
 
@@ -2121,8 +2113,6 @@ float	x,z;
 
 	gBestCheckpointAim[playerNum] = player->Rot.y;
 }
-
-
 
 
 

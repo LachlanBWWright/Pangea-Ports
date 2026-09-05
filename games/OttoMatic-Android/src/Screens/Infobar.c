@@ -330,7 +330,7 @@ void DrawInfobar(void)
 	Infobar_DrawFuel();
 	Infobar_DrawHumans();
 
-	if (gLevelNum != LEVEL_NUM_SAUCER)
+	if (!GetLevelMetadataBool("level.saucerMode", gLevelNum == LEVEL_NUM_SAUCER))
 	{
 		Infobar_DrawWeaponInventory();
 		Infobar_DrawJumpJet();

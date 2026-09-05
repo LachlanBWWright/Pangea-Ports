@@ -22,6 +22,9 @@
 
 static void ReadDataFromSkeletonResourceFork(SkeletonDefType *skeleton, FSSpec *bg3dSpec, int skeletonType);
 static void ReadDataFromPlayfieldFile(FSSpec *specPtr);
+static void ReadLevelMetadata(void);
+static Boolean IsValidLevelMetadataJSON(const char *json, Size size);
+static char *gLevelMetadataJSON = nil;
 static void	ConvertTexture16To16(uint16_t *textureBuffer, int width, int height);
 
 static Ptr TileImage(Ptr imageBank, int col, int row);
@@ -574,6 +577,158 @@ long				count;
 
 /******************* LOAD PLAYFIELD *******************/
 
+#pragma mark - LEVEL METADATA
+
+Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
+{
+	char needle[96];
+	const char *valueStart;
+	const char *valueEnd;
+	size_t length;
+
+	if (!gLevelMetadataJSON || !key || !value || valueSize == 0)
+		return false;
+	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
+	valueStart = SDL_strstr(gLevelMetadataJSON, needle);
+	if (!valueStart)
+		return false;
+	valueStart += SDL_strlen(needle);
+	valueEnd = SDL_strchr(valueStart, '\"');
+	if (!valueEnd)
+		return false;
+	length = (size_t)(valueEnd - valueStart);
+	if (length >= valueSize)
+		return false;
+	SDL_memcpy(value, valueStart, length);
+	value[length] = '\0';
+	return true;
+}
+
+Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
+{
+	char value[8];
+	if (!GetLevelMetadataString(key, value, sizeof(value)))
+		return fallback;
+	if (!SDL_strcasecmp(value, "true"))
+		return true;
+	if (!SDL_strcasecmp(value, "false"))
+		return false;
+	return fallback;
+}
+
+Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default"))
+		return fallback;
+	return !SDL_strcasecmp(value, profile);
+}
+
+int LevelMetadataCaseFor(const char *key, int fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default"))
+		return fallback;
+	if (!SDL_strcasecmp(value, "gnome-garden")) return LEVEL_NUM_GNOMEGARDEN;
+	if (!SDL_strcasecmp(value, "sidewalk")) return LEVEL_NUM_SIDEWALK;
+	if (!SDL_strcasecmp(value, "fido")) return LEVEL_NUM_FIDO;
+	if (!SDL_strcasecmp(value, "plumbing")) return LEVEL_NUM_PLUMBING;
+	if (!SDL_strcasecmp(value, "playroom")) return LEVEL_NUM_PLAYROOM;
+	if (!SDL_strcasecmp(value, "closet")) return LEVEL_NUM_CLOSET;
+	if (!SDL_strcasecmp(value, "gutter")) return LEVEL_NUM_GUTTER;
+	if (!SDL_strcasecmp(value, "garbage")) return LEVEL_NUM_GARBAGE;
+	if (!SDL_strcasecmp(value, "balsa")) return LEVEL_NUM_BALSA;
+	if (!SDL_strcasecmp(value, "park")) return LEVEL_NUM_PARK;
+	return fallback;
+}
+
+static Boolean IsValidLevelMetadataJSON(const char *json, Size size)
+{
+	int braceDepth = 0;
+	int bracketDepth = 0;
+	Boolean inString = false;
+	Boolean escaped = false;
+
+	if (!json || size < 2 || json[0] != '{' || json[size - 1] != '}')
+		return false;
+
+	for (Size i = 0; i < size; i++)
+	{
+		unsigned char c = (unsigned char)json[i];
+
+		if (inString)
+		{
+			if (escaped)
+			{
+				escaped = false;
+				continue;
+			}
+			if (c == '\\')
+			{
+				escaped = true;
+				continue;
+			}
+			if (c == '"')
+				inString = false;
+			else if (c < 0x20)
+				return false;
+			continue;
+		}
+
+		if (c == '"')
+			inString = true;
+		else if (c == '{')
+			braceDepth++;
+		else if (c == '}')
+		{
+			braceDepth--;
+			if (braceDepth < 0)
+				return false;
+		}
+		else if (c == '[')
+			bracketDepth++;
+		else if (c == ']')
+		{
+			bracketDepth--;
+			if (bracketDepth < 0)
+				return false;
+		}
+	}
+
+	return !inString && !escaped && braceDepth == 0 && bracketDepth == 0;
+}
+
+static void ReadLevelMetadata(void)
+{
+	Handle hand;
+	Size size;
+	char *json;
+
+	if (gLevelMetadataJSON)
+	{
+		SafeDisposePtr(gLevelMetadataJSON);
+		gLevelMetadataJSON = nil;
+	}
+	hand = GetResource('Meta', 1000);
+	if (!hand)
+		return;
+	size = GetHandleSize(hand);
+	json = (char *)AllocPtrClear(size + 1);
+	if (json)
+	{
+		SDL_memcpy(json, *hand, (size_t)size);
+		if (IsValidLevelMetadataJSON(json, size) &&
+			SDL_strstr(json, "\"schemaVersion\":1") &&
+			SDL_strstr(json, "\"game\":\"bugdom2\"") &&
+			SDL_strstr(json, "\"identity\":\"") &&
+			SDL_strstr(json, "\"properties\":{"))
+			gLevelMetadataJSON = json;
+		else
+			SafeDisposePtr(json);
+	}
+	ReleaseResource(hand);
+}
+
 void LoadPlayfield(FSSpec *specPtr)
 {
 
@@ -625,6 +780,7 @@ OSErr					iErr;
 	fRefNum = FSpOpenResFile(specPtr, fsRdPerm);
 	GAME_ASSERT(fRefNum != -1);
 	UseResFile(fRefNum);
+	ReadLevelMetadata();
 
 
 			/************************/
@@ -696,7 +852,7 @@ OSErr					iErr;
 
 	yScale = gTerrainPolygonSize / g3DTileSize;											// need to scale original geometry units to game units
 
-	if (gLevelNum == LEVEL_NUM_PARK)			// modify y scale for this level since we need more range
+	if (LevelMetadataCaseFor("level.fileScale", gLevelNum) == LEVEL_NUM_PARK)			// modify y scale for this level since we need more range
 		yScale *= 2.0f;
 
 	Alloc_2d_array(float, gMapYCoords, gTerrainTileDepth+1, gTerrainTileWidth+1);			// alloc 2D array for map

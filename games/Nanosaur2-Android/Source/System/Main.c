@@ -452,11 +452,9 @@ OGLSetupInputType	viewDef;
 	viewDef.view.clearBackBuffer	= false;	//true;
 	viewDef.camera.yon 				= (gSuperTileActiveRange * SUPERTILE_SIZE * gTerrainPolygonSize) * .95f;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.rendering", GetDefaultBiomeForLevel(gLevelNum)))
 	{
-		case	LEVEL_NUM_ADVENTURE2:
-		case	LEVEL_NUM_RACE2:
-		case	LEVEL_NUM_BATTLE2:
+		case	BIOME_DESERT:
 				viewDef.view.clearColor.r 		= .968;
 				viewDef.view.clearColor.g 		= .537;
 				viewDef.view.clearColor.b		= .278;
@@ -475,9 +473,7 @@ OGLSetupInputType	viewDef;
 				gDrawLensFlare = true;
 				break;
 
-		case	LEVEL_NUM_ADVENTURE3:
-		case	LEVEL_NUM_RACE1:
-		case	LEVEL_NUM_FLAG1:
+		case	BIOME_SWAMP:
 				viewDef.view.clearColor.r 		= .568;
 				viewDef.view.clearColor.g 		= .243;
 				viewDef.view.clearColor.b		= .125;
@@ -1513,6 +1509,7 @@ unsigned long	someLong;
 	if (gCmdLevelNum >= 0)
 	{
 		gLevelNum = (short) gCmdLevelNum;
+		LoadLevelMetadata();
 
 #if __EMSCRIPTEN__
 		if (PangeaNet_IsEnabled())

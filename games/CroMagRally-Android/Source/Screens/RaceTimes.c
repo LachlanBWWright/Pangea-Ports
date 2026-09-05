@@ -28,16 +28,20 @@ static void LayOutScoreboardForTrack(void);
 
 Boolean IsRaceMode(void)
 {
+	Boolean sourceRace;
 	switch (gGameMode)
 	{
 	case GAME_MODE_PRACTICE:
 	case GAME_MODE_TOURNAMENT:
 	case GAME_MODE_MULTIPLAYERRACE:
-		return true;
+		sourceRace = true;
+		break;
 
 	default:
-		return false;
+		sourceRace = false;
+		break;
 	}
+	return LevelMetadataProfileIs("track.mode", "race", sourceRace);
 }
 
 char* FormatRaceTime(float t)

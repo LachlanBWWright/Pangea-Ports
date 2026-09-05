@@ -601,7 +601,8 @@ static float		waveX = 0, waveY = 1.0;
 int GetLevelSpecificMenuLayoutFlags(const MenuItem* mi)
 {
 	int id = mi->id;
-	if ((gLevelNum == 1 && id == 'lvl1') || (gLevelNum == 2 && id == 'lvl2'))
+	if ((LevelMetadataProfileIs("level.intro", "level1", gLevelNum == 1) && id == 'lvl1') ||
+		(LevelMetadataProfileIs("level.intro", "level2", gLevelNum == 2) && id == 'lvl2'))
 	{
 		return 0;
 	}

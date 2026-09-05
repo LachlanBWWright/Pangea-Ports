@@ -259,7 +259,7 @@ static void PlayGame(void)
 
 		/* DO END-LEVEL BONUS SCREEN */
 
-		if (gLevelNum == LEVEL_NUM_PARK)				// if just won game then do win screen first!
+		if (LevelMetadataCaseFor("level.bugdom2Area", gLevelNum) == LEVEL_NUM_PARK)				// if just won game then do win screen first!
 			DoWinScreen();
 		DoBonusScreen();
 
@@ -288,7 +288,7 @@ static void PlayArea(void)
 	/* PLAY BASED ON THE TYPE OF LEVEL WE'RE DOING */
 	/***********************************************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.bugdom2Area", gLevelNum))
 	{
 			/* PLAY TUNNEL LEVELS */
 
@@ -460,7 +460,7 @@ void MoveEverything(void)
 
 	/* LEVEL SPECIFIC UPDATES */
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.areaUpdate", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				UpdateSprinklerHeads();
@@ -540,7 +540,7 @@ static void InitArea(void)
 	/* INIT BASED ON THE TYPE OF LEVEL WE'RE DOING */
 	/***********************************************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.tunnel", gLevelNum))
 	{
 			/* INIT TUNNEL LEVELS */
 
@@ -596,7 +596,7 @@ OGLSetupInputType	viewDef;
 
 
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.rendering", gLevelNum))
 	{
 		case	LEVEL_NUM_SIDEWALK:
 #if APPSTORE
@@ -750,7 +750,7 @@ OGLSetupInputType	viewDef;
 		/* SET LIGHTS */
 		/**************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.lighting", gLevelNum))
 	{
 		case	LEVEL_NUM_FIDO:
 				viewDef.lights.numFillLights 		= 2;
@@ -906,7 +906,7 @@ OGLSetupInputType	viewDef;
 			/* SET AUTO-FADE INFO */
 			/**********************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.autoFade", gLevelNum))
 	{
 		case	LEVEL_NUM_FIDO:
 		case	LEVEL_NUM_BALSA:
@@ -962,7 +962,7 @@ OGLSetupInputType	viewDef;
 
 	gGravity = NORMAL_GRAVITY;					// assume normal gravity
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.levelInit", gLevelNum))
 	{
 		case	LEVEL_NUM_SIDEWALK:
 				InitSnakeStuff();

@@ -54,23 +54,17 @@ Boolean AddGrass(TerrainItemEntryType *itemPtr, float  x, float z)
 	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, 1.0);
 
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.items", GetDefaultBiomeForLevel(gLevelNum)))
 	{
-		case	LEVEL_NUM_ADVENTURE1:
-		case	LEVEL_NUM_FLAG2:
-		case	LEVEL_NUM_BATTLE1:
+		case	BIOME_FOREST:
 				def.type 		= LEVEL1_ObjType_Grass + itemPtr->parm[0];
 				break;
 
-		case	LEVEL_NUM_ADVENTURE2:
-		case	LEVEL_NUM_RACE2:
-		case	LEVEL_NUM_BATTLE2:
+		case	BIOME_DESERT:
 				def.type 		= LEVEL2_ObjType_Grass + itemPtr->parm[0];
 				break;
 
-		case	LEVEL_NUM_ADVENTURE3:
-		case	LEVEL_NUM_RACE1:
-		case	LEVEL_NUM_FLAG1:
+		case	BIOME_SWAMP:
 				def.type 		= LEVEL3_ObjType_Grass_Single + itemPtr->parm[0];
 				break;
 
@@ -506,7 +500,6 @@ short   color = itemPtr->parm[1];
 
 	return(true);													// item was added
 }
-
 
 
 

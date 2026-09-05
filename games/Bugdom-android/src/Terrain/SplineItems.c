@@ -459,7 +459,7 @@ void DrawSplines(void)
 		}
 
 		float flatY = 0;
-		Boolean flat = gRealLevel == 5 && FindLiquidY(points[halfway].x, points[halfway].z, &flatY);
+	Boolean flat = LevelMetadataProfileIs("level.splineItems", "hive", gRealLevel == 5) && FindLiquidY(points[halfway].x, points[halfway].z, &flatY);
 		flatY += 150;
 
 		glBegin(GL_LINE_STRIP);

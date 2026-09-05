@@ -54,29 +54,23 @@ Boolean AddTowerTurret(TerrainItemEntryType *itemPtr, float  x, float z)
 ObjNode	*base, *turret, *wheel, *gun, *lens;
 short	typeB, typeT, typeW, typeG;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.items", GetDefaultBiomeForLevel(gLevelNum)))
 	{
-		case	LEVEL_NUM_ADVENTURE1:
-		case	LEVEL_NUM_FLAG2:
-		case	LEVEL_NUM_BATTLE1:
+		case	BIOME_FOREST:
 				typeB = LEVEL1_ObjType_TowerTurret_Base;
 				typeT = LEVEL1_ObjType_TowerTurret_Turret;
 				typeW = LEVEL1_ObjType_TowerTurret_Wheel;
 				typeG = LEVEL1_ObjType_TowerTurret_Gun;
 				break;
 
-		case	LEVEL_NUM_ADVENTURE2:
-		case	LEVEL_NUM_BATTLE2:
-		case	LEVEL_NUM_RACE2:
+		case	BIOME_DESERT:
 				typeB = LEVEL2_ObjType_TowerTurret_Base;
 				typeT = LEVEL2_ObjType_TowerTurret_Turret;
 				typeW = LEVEL2_ObjType_TowerTurret_Wheel;
 				typeG = LEVEL2_ObjType_TowerTurret_Gun;
 				break;
 
-		case	LEVEL_NUM_ADVENTURE3:
-		case	LEVEL_NUM_RACE1:
-		case	LEVEL_NUM_FLAG1:
+		case	BIOME_SWAMP:
 				typeB = LEVEL3_ObjType_TowerTurret_Base;
 				typeT = LEVEL3_ObjType_TowerTurret_Turret;
 				typeW = LEVEL3_ObjType_TowerTurret_Wheel;
@@ -231,7 +225,7 @@ static const OGLPoint3D gunOff = {0, 283.141, 0};
 
 	dist = CalcDistanceToClosestPlayer(&turret->Coord, &playerNum);									// calc dist to player
 
-	if (gLevelNum == LEVEL_NUM_ADVENTURE1)					// make this easier on level 1
+	if (LevelMetadataProfileIs("level.turretRange", "adventure1", gLevelNum == LEVEL_NUM_ADVENTURE1))					// make this easier on level 1
 		turretShootDist = TURRET_SHOOT_DIST * 2/3;
 	else
 		turretShootDist = TURRET_SHOOT_DIST;
@@ -796,10 +790,6 @@ OGLVector3D				delta,v;
 
 	PlayEffect3D(EFFECT_IMPACTSIZZLE, &gCoord);
 }
-
-
-
-
 
 
 

@@ -593,7 +593,7 @@ void DrawSplines(void)
 		Boolean flat = false;
 		float flatY = 0;
 
-		if (gLevelNum == 2)
+		if (LevelMetadataProfileIs("level.splineSurface", "flat", gLevelNum == LEVEL_NUM_BLOBBOSS))
 		{
 			flat = true;
 			flatY = 500;

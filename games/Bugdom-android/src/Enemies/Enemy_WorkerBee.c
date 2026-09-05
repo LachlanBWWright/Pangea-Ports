@@ -98,7 +98,7 @@ ObjNode	*newObj;
 
 		/* SEE IF KEYED ENEMY ON HIVE */
 		
-	if (gRealLevel == LEVEL_NUM_HIVE)
+	if (LevelMetadataProfileIs("level.workerBeeSetup", "hive", gRealLevel == LEVEL_NUM_HIVE))
 	{
 		if (itemPtr->parm[3] & 1)										// see if we care
 		{
@@ -621,7 +621,7 @@ Boolean KillWorkerBee(ObjNode *theNode)
 
 			/* DEACTIVATE */
 			
-	if (gRealLevel != LEVEL_NUM_QUEENBEE)			// always come back on queen level
+	if (!LevelMetadataProfileIs("level.queenBeeRegeneration", "queen-bee", gRealLevel == LEVEL_NUM_QUEENBEE))			// always come back on queen level
 		theNode->TerrainItemPtr = nil;				// dont ever come back 
 	theNode->CType = CTYPE_MISC;
 	
@@ -796,9 +796,6 @@ adios:
 
 	UpdateObject(theNode);
 }
-
-
-
 
 
 

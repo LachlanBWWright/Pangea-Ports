@@ -941,18 +941,15 @@ int	i;
 
 			/* SPEW ATOMS */
 
-	switch(gLevelNum)
+	if (GetLevelMetadataBool("level.brainAlien", gLevelNum == LEVEL_NUM_BRAINBOSS))
 	{
-		case	LEVEL_NUM_BRAINBOSS:
-				if (MyRandomLong()&0x7)
-					SpewAtoms(&where, 0,0, 2, false);
-				else
-					SpewAtoms(&where, 1,0, 1, false);
-				break;
-
-		default:
-				SpewAtoms(&where, 0,1, 2, false);
+		if (MyRandomLong()&0x7)
+			SpewAtoms(&where, 0,0, 2, false);
+		else
+			SpewAtoms(&where, 1,0, 1, false);
 	}
+	else
+		SpewAtoms(&where, 0,1, 2, false);
 }
 
 
@@ -1305,7 +1302,6 @@ float		r,fps,c,a;
 
 	UpdateBrainAlien(theNode);
 }
-
 
 
 

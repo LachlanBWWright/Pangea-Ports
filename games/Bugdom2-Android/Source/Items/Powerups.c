@@ -166,7 +166,7 @@ static const OGLPoint3D off[2] =
 
 			/* DO WOBBLES */
 
-	if (gLevelNum == LEVEL_NUM_BALSA)									// special for Balsa level
+	if (LevelMetadataCaseFor("level.powerups", gLevelNum) == LEVEL_NUM_BALSA)									// special for Balsa level
 	{
 		gCoord.y = gDragonflyY;
 	}
@@ -250,7 +250,7 @@ ObjNode	*pow;
 	}
 
 
-	if (gLevelNum == LEVEL_NUM_BALSA)									// instantly get powerup on Balsa level
+	if (LevelMetadataCaseFor("level.powerups", gLevelNum) == LEVEL_NUM_BALSA)									// instantly get powerup on Balsa level
 	{
 		PlayEffect(EFFECT_BUTTERFLYBOOM);								// need to play loud on balsa level
 		DoTrig_Powerup(pow, nil, 0);
@@ -310,7 +310,7 @@ static	short	powToModel[] =
 				/********************/
 				/* MAKE GENERAL POW */
 				/********************/
-	if ((gLevelNum == LEVEL_NUM_CLOSET) && (powKind == POW_KIND_MAP))		// use special paper map on Closet level
+	if ((LevelMetadataCaseFor("level.mapPowerup", gLevelNum) == LEVEL_NUM_CLOSET) && (powKind == POW_KIND_MAP))		// use special paper map on Closet level
 	{
 		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
 		gNewObjectDefinition.type 		= CLOSET_ObjType_PaperMap;
@@ -535,7 +535,7 @@ void StartPowerupVanish(ObjNode *pow)
 		pow->ChainHead = nil;
 	}
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.powerups", gLevelNum) == LEVEL_NUM_BALSA)
 		PlayEffect(EFFECT_GETPOW);
 	else
 		PlayEffect3D(EFFECT_GETPOW, &pow->Coord);
@@ -697,9 +697,6 @@ float	y;
 
 	UpdateObject(theNode);
 }
-
-
-
 
 
 

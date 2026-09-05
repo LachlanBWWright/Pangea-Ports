@@ -288,7 +288,7 @@ Boolean			canBlow;
 	
 	newObj->NutContents 	= contents;						// remember what's in this nut
 	
-	if (gRealLevel == LEVEL_NUM_BEACH)			// **hack to fix problem with Level 4 map which has all regenerating nuts
+	if (LevelMetadataProfileIs("level.beachNutRegeneration", "beach", gRealLevel == LEVEL_NUM_BEACH))			// **hack to fix problem with Level 4 map which has all regenerating nuts
 		newObj->RegenerateNut = false;
 	else
 		newObj->RegenerateNut 	= itemPtr->parm[3] & 1;		// see if regenerate this
@@ -1475,8 +1475,6 @@ ObjNode *handle;
 	
 	return(true);
 }
-
-
 
 
 

@@ -340,13 +340,13 @@ TQ3Matrix4x4	m;
 
 			/* SEE IF MAKE BAT ATTACK */
 			
-	if (gRealLevel == LEVEL_NUM_BEACH)	
+	if (LevelMetadataProfileIs("level.dragonflyRide", "beach", gRealLevel == LEVEL_NUM_BEACH))
 	{
 		if (gCoord.y > MAX_DRAGONFLY_FLIGHT_HEIGHT)				// see if reached max height
 			MakeBat(gCoord.x, gCoord.y + 100.0f, gCoord.z);		// create a bat to nab me
 	}
 	else
-	if (gRealLevel == LEVEL_NUM_FLIGHT)	
+	if (LevelMetadataProfileIs("level.dragonflyRide", "flight", gRealLevel == LEVEL_NUM_FLIGHT))
 	{
 		if ((gCoord.y-GetTerrainHeightAtCoord(gCoord.x,gCoord.z,FLOOR)) > MAX_DRAGONFLY_FLIGHT_HEIGHT2)						// see if reached max height
 			MakeBat(gCoord.x, gCoord.y + 100.0f, gCoord.z);		// create a bat to nab me
@@ -638,8 +638,6 @@ TQ3Vector3D		delta;
 
 	DeleteObject(theNode);
 }
-
-
 
 
 

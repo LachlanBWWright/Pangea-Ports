@@ -263,7 +263,7 @@ short		i;
 			gNumBunnies++;
 	}
 
-	gBunnyCounts[gSceneNum][gAreaNum] = gNumBunnies;	// remember count for each level
+	gBunnyCounts[LevelMetadataScene("scene.bunnyCounts", gSceneNum)][gAreaNum] = gNumBunnies;	// remember count for each level
 }
 
 
@@ -357,7 +357,7 @@ Boolean AddHealthPOW(ObjectEntryType *itemPtr)
 ObjNode		*newObj;
 Byte	group,type;
 
-	switch(gSceneNum)
+	switch(LevelMetadataScene("scene.bonus", gSceneNum))
 	{
 
 		case	SCENE_JURASSIC:
@@ -426,7 +426,7 @@ short	group,type;
 	if (gDifficultySetting == DIFFICULTY_EASY)			// no doors/keys in easy mode
 		return(false);
 
-	switch(gSceneNum)
+	switch(LevelMetadataScene("scene.bonus", gSceneNum))
 	{
 		case	SCENE_CLOWN:
 				group = GroupNum_ClownKeys;
@@ -527,7 +527,7 @@ static ObjectEntryType	item;
 			do
 			{
 				item.parm[0] = RandomRange(0,14);
-			} while (gBonusWeaponStartScenes[item.parm[0]] > gSceneNum);	// make sure this weapon can appear during this scene
+			} while (gBonusWeaponStartScenes[item.parm[0]] > LevelMetadataScene("scene.weaponUnlocks", gSceneNum));	// make sure this weapon can appear during this scene
 
 			item.x = x;
 			item.y = y;
@@ -852,4 +852,3 @@ ObjNode		*newObj;
 
 	return(true);									// was added
 }
-

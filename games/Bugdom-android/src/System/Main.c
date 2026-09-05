@@ -69,6 +69,8 @@ u_short		gRealLevel = 0;
 u_short		gLevelType = 0;
 u_short		gAreaNum = 0;
 u_short		gLevelTypeMask = 0;
+u_short		gResourceLevelType = 0;
+u_short		gResourceAreaNum = 0;
 
 
 int			gDebugMode = DEBUG_MODE_OFF;
@@ -302,6 +304,11 @@ static void PlayGame(void)
 
 		gLevelType = gLevelTable[gRealLevel].levelType;
 		gAreaNum = gLevelTable[gRealLevel].areaNum;
+		gResourceLevelType = gLevelType;
+		gResourceAreaNum = gAreaNum;
+		PrepareLevelMetadata();
+		gLevelType = (u_short)LevelMetadataCaseFor("level.terrainFamily", gResourceLevelType);
+		gAreaNum = (u_short)LevelMetadataCaseFor("level.area", gResourceAreaNum);
 #ifdef PANGEA_ENABLE_SCRIPTING
 		BugdomScript_LoadLevelConfig(gRealLevel);
 #endif

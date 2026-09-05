@@ -195,7 +195,7 @@ ObjNode	*newObj;
 
 
 	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
-	if (gLevelNum == LEVEL_NUM_APOCALYPSE)
+	if (LevelMetadataProfileIs("level.zipLineStyle", "apocalypse", gLevelNum == LEVEL_NUM_APOCALYPSE))
 		gNewObjectDefinition.type 	= APOCALYPSE_ObjType_ZipLinePost;
 	else
 		gNewObjectDefinition.type 	= FIREICE_ObjType_ZipLinePost;
@@ -420,7 +420,7 @@ static const OGLVector3D	up = {0,1,0};
 			/* INIT MESH BASICS */
 
 	mesh->numMaterials = 1;										// 1 material
-	if (gLevelNum == LEVEL_NUM_APOCALYPSE)
+	if (LevelMetadataProfileIs("level.zipLineStyle", "apocalypse", gLevelNum == LEVEL_NUM_APOCALYPSE))
 		mesh->materials[0] = gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][APOCALYPSE_SObjType_Rope].materialObject;	// set ILLEGAL ref to this texture
 	else
 		mesh->materials[0] = gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][FIREICE_SObjType_Rope].materialObject;
@@ -562,7 +562,7 @@ static void AttachPullyToZip(short zipNum)
 ObjNode	*newObj;
 
 	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
-	if (gLevelNum == LEVEL_NUM_APOCALYPSE)
+	if (LevelMetadataProfileIs("level.zipLineStyle", "apocalypse", gLevelNum == LEVEL_NUM_APOCALYPSE))
 		gNewObjectDefinition.type 		= APOCALYPSE_ObjType_ZipLinePully;
 	else
 		gNewObjectDefinition.type 		= FIREICE_ObjType_ZipLinePully;
@@ -689,7 +689,6 @@ static void MoveZipPully_Completed(ObjNode *theNode)
 		theNode->MoveCall = MoveZipPully_Waiting;
 	}
 }
-
 
 
 

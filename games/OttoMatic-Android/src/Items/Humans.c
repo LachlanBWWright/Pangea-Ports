@@ -100,7 +100,7 @@ void InitHumans(void)
 		gNumHumansRescuedOfType[i] = 0;
 
 
-	if (gLevelNum == LEVEL_NUM_SAUCER)
+	if (GetLevelMetadataBool("level.saucerMode", gLevelNum == LEVEL_NUM_SAUCER))
 		gHumanScaleRatio = .5f;
 	else
 		gHumanScaleRatio = 1.0f;
@@ -549,7 +549,7 @@ void UpdateHuman(ObjNode *theNode)
 
 			/* CHECK SAUCER SHADOW FADING */
 
-	if (gLevelNum == LEVEL_NUM_SAUCER)
+	if (GetLevelMetadataBool("level.saucerMode", gLevelNum == LEVEL_NUM_SAUCER))
 	{
 		SeeIfUnderPlayerSaucerShadow(theNode);
 	}
@@ -562,7 +562,7 @@ void CheckHumanHelp(ObjNode *theNode)
 {
 			/* SPECIAL CASE FOR SAUCER LEVEL */
 
-	if (gLevelNum == LEVEL_NUM_SAUCER)
+	if (GetLevelMetadataBool("level.saucerMode", gLevelNum == LEVEL_NUM_SAUCER))
 	{
 		if (CalcQuickDistance(theNode->Coord.x, theNode->Coord.z, gPlayerInfo.coord.x, gPlayerInfo.coord.z) < 600.0f)
 		{
@@ -692,7 +692,7 @@ static	void(*myMoveTable[])(ObjNode *) =
 					MoveHuman_Teleport,
 				};
 
-	if (gLevelNum != LEVEL_NUM_SAUCER)
+	if (!GetLevelMetadataBool("level.saucerMode", gLevelNum == LEVEL_NUM_SAUCER))
 	{
 		if (TrackTerrainItem(theNode))						// just check to see if it's gone
 		{
@@ -1106,7 +1106,7 @@ static void AbductHuman(ObjNode *theNode)
 
 	theNode->TerrainItemPtr = nil;		// dont come back
 
-	if (gLevelNum == LEVEL_NUM_SAUCER)	// if abducted by player saucer then change move call
+	if (GetLevelMetadataBool("level.saucerMode", gLevelNum == LEVEL_NUM_SAUCER))	// if abducted by player saucer then change move call
 		theNode->MoveCall = MoveHuman_ToPlayerSaucer;
 	else
 		theNode->MoveCall = nil;
@@ -1236,4 +1236,3 @@ Boolean PrimeHumanScientist(long splineNum, SplineItemType* itemPtr)
 	itemPtr->parm[0] = HUMAN_TYPE_SCIENTIST;
 	return PrimeHuman(splineNum, itemPtr);
 }
-

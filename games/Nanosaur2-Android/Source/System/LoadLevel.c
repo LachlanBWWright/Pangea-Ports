@@ -59,6 +59,35 @@ static const char*	kBiomeNames[NUM_BIOMES] =
 	[BIOME_SWAMP]			= "swamp",
 };
 
+void LoadLevelMetadata(void)
+{
+	FSSpec spec;
+	char path[256];
+	short metadataRef;
+
+	Boot_UpdateTerrainOverrideSpec();
+	if (gCmdTerrainOverrideSpec.vRefNum != 0)
+	{
+		spec = gCmdTerrainOverrideSpec;
+	}
+	else
+	{
+		SDL_snprintf(path, sizeof(path), ":Terrain:%s.ter", kLevelNames[gLevelNum]);
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, path, &spec);
+	}
+	metadataRef = FSpOpenResFile(&spec, fsRdPerm);
+	if (metadataRef != -1)
+	{
+		UseResFile(metadataRef);
+		ReadLevelMetadata();
+		FSClose(metadataRef);
+	}
+	else
+	{
+		ReadLevelMetadata();
+	}
+}
+
 
 /************************** LOAD LEVEL ART ***************************/
 
@@ -67,7 +96,9 @@ void LoadLevelArt(void)
 FSSpec	spec;
 char	path[256];
 
-	const int currentBiome = kLevelBiomes[gLevelNum];
+	int currentBiome = kLevelBiomes[gLevelNum];
+	LoadLevelMetadata();
+	currentBiome = LevelMetadataCaseFor("level.biome", currentBiome);
 
 	UnsignedWide timeStartLoad;
 	Microseconds(&timeStartLoad);
@@ -190,6 +221,7 @@ char	path[256];
 			FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, path, &spec);
 		}
 		LoadPlayfield(&spec);
+		currentBiome = LevelMetadataCaseFor("level.biome", kLevelBiomes[gLevelNum]);
 	}
 
 
@@ -230,12 +262,6 @@ char	path[256];
 
 	SDL_Log("%s: %d ms", __func__, (timeEndLoad.lo - timeStartLoad.lo) / 1000);
 }
-
-
-
-
-
-
 
 
 

@@ -658,7 +658,7 @@ float				speed;
 
 		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
 
-		if (gLevelNum == LEVEL_NUM_GNOMEGARDEN)
+		if (LevelMetadataCaseFor("level.enemyPlant", gLevelNum) == LEVEL_NUM_GNOMEGARDEN)
 			gNewObjectDefinition.type 	= GARDEN_ObjType_PollenSpore;
 		else
 			gNewObjectDefinition.type 	= SIDEWALK_ObjType_PollenSpore;
@@ -760,7 +760,6 @@ boom:
 
 	UpdateObject(spore);
 }
-
 
 
 

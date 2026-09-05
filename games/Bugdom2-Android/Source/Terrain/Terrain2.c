@@ -577,7 +577,7 @@ int					row,col;
 Byte				**shadowFlags;
 float				shadeFactor;
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.terrain", gLevelNum) == LEVEL_NUM_BALSA)
 		shadeFactor = .9;
 	else
 		shadeFactor = .7;

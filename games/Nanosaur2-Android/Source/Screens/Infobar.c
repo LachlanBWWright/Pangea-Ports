@@ -969,7 +969,7 @@ double				leftEdge, topEdge;
 	leftEdge = gPlayerInfo[gCurrentSplitScreenPane].coord.x * gMapToUnitValueFrac;		// convert world-coord to texture-pixel-coord
 	topEdge = gPlayerInfo[gCurrentSplitScreenPane].coord.z * gMapToUnitValueFrac;
 
-	switch(gLevelNum)
+	switch(LevelMetadataMapViewFor("level.mapView", gLevelNum))
 	{
 		case	LEVEL_NUM_ADVENTURE1:
 				visibleRange = .18f;
@@ -2001,5 +2001,4 @@ float		scale;
 
 
 }
-
 

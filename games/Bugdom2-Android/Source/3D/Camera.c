@@ -397,7 +397,7 @@ void UpdateCamera(void)
 	/* UPDATE BASED ON THE TYPE OF LEVEL WE'RE DOING */
 	/*************************************************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.camera", gLevelNum))
 	{
 			/* TUNNEL LEVELS */
 
@@ -816,7 +816,7 @@ ObjNode	*playerObj = gPlayerInfo.objNode;
 			i = 0.0;
 
 		CalcTunnelCoordFromIndex(i, &gGameView.cameraPlacement.cameraLocation);
-		if (gLevelNum == LEVEL_NUM_GUTTER)
+		if (LevelMetadataCaseFor("level.camera", gLevelNum) == LEVEL_NUM_GUTTER)
 			gGameView.cameraPlacement.cameraLocation.y += 5.0f;
 		else
 			gGameView.cameraPlacement.cameraLocation.y -= 12.0f;
@@ -947,7 +947,6 @@ const	OGLVector3D up = {0,1,0};
 
 
 }
-
 
 
 

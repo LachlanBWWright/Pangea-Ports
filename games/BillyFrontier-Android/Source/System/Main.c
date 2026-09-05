@@ -78,6 +78,41 @@ int					gDirectLaunchLevel = -1;	// -1 = normal startup, >=0 = jump straight to 
 char				gDirectTerrainPath[512] = {0};	// optional override terrain file path
 
 
+int GetBillyAreaMode(void)
+{
+	int fallback;
+
+	switch (gCurrentArea)
+	{
+		case AREA_TOWN_SHOOTOUT:
+		case AREA_SWAMP_SHOOTOUT:
+			fallback = BILLY_AREA_MODE_SHOOTOUT;
+			break;
+		case AREA_TOWN_STAMPEDE:
+		case AREA_SWAMP_STAMPEDE:
+			fallback = BILLY_AREA_MODE_STAMPEDE;
+			break;
+		case AREA_TARGETPRACTICE1:
+		case AREA_TARGETPRACTICE2:
+			fallback = BILLY_AREA_MODE_TARGET_PRACTICE;
+			break;
+		default:
+			fallback = BILLY_AREA_MODE_DUEL;
+			break;
+	}
+
+	if (LevelMetadataProfileIs("area.mode", "shootout", false)) return BILLY_AREA_MODE_SHOOTOUT;
+	if (LevelMetadataProfileIs("area.mode", "stampede", false)) return BILLY_AREA_MODE_STAMPEDE;
+	if (LevelMetadataProfileIs("area.mode", "target-practice", false)) return BILLY_AREA_MODE_TARGET_PRACTICE;
+	if (LevelMetadataProfileIs("area.mode", "duel", false)) return BILLY_AREA_MODE_DUEL;
+	return fallback;
+}
+
+Boolean IsBillySwampArea(void)
+{
+	return gCurrentArea >= AREA_SWAMP_DUEL1 && gCurrentArea <= AREA_TARGETPRACTICE2;
+}
+
 //======================================================================================
 //======================================================================================
 //======================================================================================
@@ -192,6 +227,7 @@ uint32_t	oldScore;
 
 		}
 		gCurrentArea++;
+		LoadCurrentAreaMetadata();
 
 			/**************************/
 			/* NOW PLAY THE MINI-GAME */
@@ -199,28 +235,31 @@ uint32_t	oldScore;
 
 		oldScore = gScore;					// remember score in case we get killed and have to revert it
 
-		switch(gCurrentArea)
+		switch(GetBillyAreaMode())
 		{
+			case	BILLY_AREA_MODE_DUEL:
+					PlayDuel(gCurrentArea / 2);
+					if (!gPlayerIsDead)
+						MarkLevelWon(gCurrentArea / 2);
+					break;
+
 			        /* PLAY SHOOTOUT */
 			        
-			case	AREA_TOWN_SHOOTOUT:
-			case	AREA_SWAMP_SHOOTOUT:
+			case	BILLY_AREA_MODE_SHOOTOUT:
 					PlayShootout();
 					break;
 
 
 			        /* PLAY STAMPEDE */
 			        
-			case	AREA_TOWN_STAMPEDE:
-			case	AREA_SWAMP_STAMPEDE:
+			case	BILLY_AREA_MODE_STAMPEDE:
 					PlayStampede();
 					break;
 					
 					
 					/* TARGET PRACTICE */
 					
-			case	AREA_TARGETPRACTICE1:
-			case	AREA_TARGETPRACTICE2:
+			case	BILLY_AREA_MODE_TARGET_PRACTICE:
 					PlayTargetPractice();
 					break;
 		}				
@@ -407,33 +446,26 @@ unsigned long	someLong;
 #endif
 		InitPlayerInfo_Game();
 		gCurrentArea = gDirectLaunchLevel;
+		LoadCurrentAreaMetadata();
 
-		switch(gCurrentArea)
+		switch(GetBillyAreaMode())
 		{
-			case AREA_TOWN_DUEL1:
-			case AREA_TOWN_DUEL2:
-			case AREA_TOWN_DUEL3:
-			case AREA_SWAMP_DUEL1:
-			case AREA_SWAMP_DUEL2:
-			case AREA_SWAMP_DUEL3:
+			case BILLY_AREA_MODE_DUEL:
 				// PlayDuel takes a difficulty index equal to half the area number.
 				// Duel areas are defined at even offsets (0, 2, 4, 6, 8, 10) in the
 				// area enum, so dividing by 2 gives the difficulty/duel index.
 				PlayDuel(gCurrentArea / 2);
 				break;
 
-			case AREA_TOWN_SHOOTOUT:
-			case AREA_SWAMP_SHOOTOUT:
+			case BILLY_AREA_MODE_SHOOTOUT:
 				PlayShootout();
 				break;
 
-			case AREA_TOWN_STAMPEDE:
-			case AREA_SWAMP_STAMPEDE:
+			case BILLY_AREA_MODE_STAMPEDE:
 				PlayStampede();
 				break;
 
-			case AREA_TARGETPRACTICE1:
-			case AREA_TARGETPRACTICE2:
+			case BILLY_AREA_MODE_TARGET_PRACTICE:
 				PlayTargetPractice();
 				break;
 

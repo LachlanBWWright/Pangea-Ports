@@ -22,6 +22,14 @@
 
 static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, const FSSpec* fsSpec3DMF);
 static void ReadDataFromPlayfieldFile(void);
+static void ReadLevelMetadata(void);
+static void ClearLevelMetadata(void);
+static Boolean MetadataJSONIsValid(const char *json, Size size);
+static Boolean MetadataParseValue(const char **cursor, const char *end, int depth);
+static Boolean MetadataParseString(const char **cursor, const char *end);
+static void MetadataSkipWhitespace(const char **cursor, const char *end);
+static Boolean MetadataProfileValueIsValid(const char *key, const char *value);
+static char *gLevelMetadataJSON = NULL;
 
 
 /****************************/
@@ -772,6 +780,300 @@ OSErr DeleteSavedGame(int slot)
 
 #pragma mark -
 
+/************************** LEVEL METADATA ***************************/
+
+Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
+{
+	char needle[96];
+	const char *valueStart;
+	const char *valueEnd;
+	size_t length;
+
+	if (!gLevelMetadataJSON || valueSize == 0) return false;
+	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
+	valueStart = strstr(gLevelMetadataJSON, needle);
+	if (!valueStart) return false;
+	valueStart += strlen(needle);
+	valueEnd = strchr(valueStart, '\"');
+	if (!valueEnd) return false;
+	length = (size_t)(valueEnd - valueStart);
+	if (length >= valueSize) return false;
+	SDL_memcpy(value, valueStart, length);
+	value[length] = '\0';
+	return true;
+}
+
+Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
+{
+	char value[8];
+	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (!SDL_strcasecmp(value, "true")) return true;
+	if (!SDL_strcasecmp(value, "false")) return false;
+	return fallback;
+}
+
+Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default")) return fallback;
+	if (!MetadataProfileValueIsValid(key, value)) return fallback;
+	return !SDL_strcasecmp(value, profile);
+}
+
+static Boolean MetadataProfileValueIsValid(const char *key, const char *value)
+{
+	if (!SDL_strcasecmp(key, "level.flyingBeeSetup") || !SDL_strcasecmp(key, "level.workerBeeSetup") || !SDL_strcasecmp(key, "level.splineItems"))
+		return !SDL_strcasecmp(value, "hive");
+	if (!SDL_strcasecmp(key, "level.beeFlightRegeneration"))
+		return !SDL_strcasecmp(value, "flight");
+	if (!SDL_strcasecmp(key, "level.queenBeeRegeneration"))
+		return !SDL_strcasecmp(value, "queen-bee");
+	if (!SDL_strcasecmp(key, "level.antKing"))
+		return !SDL_strcasecmp(value, "ant-king");
+	if (!SDL_strcasecmp(key, "level.beachNutRegeneration"))
+		return !SDL_strcasecmp(value, "beach");
+	if (!SDL_strcasecmp(key, "level.dragonflyRide"))
+		return !SDL_strcasecmp(value, "beach") || !SDL_strcasecmp(value, "flight");
+	if (!SDL_strcasecmp(key, "presentation.levelIntro"))
+		return !SDL_strcasecmp(value, "flight");
+	if (!SDL_strcasecmp(key, "presentation.infobar"))
+		return !SDL_strcasecmp(value, "flight") || !SDL_strcasecmp(value, "queen-bee") ||
+			!SDL_strcasecmp(value, "ant-king");
+	return false;
+}
+
+int LevelMetadataCaseFor(const char *key, int fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default")) return fallback;
+	if (!SDL_strcasecmp(key, "level.terrainFamily"))
+	{
+		if (!SDL_strcasecmp(value, "lawn")) return LEVEL_TYPE_LAWN;
+		if (!SDL_strcasecmp(value, "pond")) return LEVEL_TYPE_POND;
+		if (!SDL_strcasecmp(value, "forest")) return LEVEL_TYPE_FOREST;
+		if (!SDL_strcasecmp(value, "hive")) return LEVEL_TYPE_HIVE;
+		if (!SDL_strcasecmp(value, "night")) return LEVEL_TYPE_NIGHT;
+		if (!SDL_strcasecmp(value, "anthill")) return LEVEL_TYPE_ANTHILL;
+	}
+	if (!SDL_strcasecmp(key, "level.area"))
+	{
+		if (!SDL_strcasecmp(value, "training") || !SDL_strcasecmp(value, "beach") || !SDL_strcasecmp(value, "hive-area") || !SDL_strcasecmp(value, "ant-hill")) return 0;
+		if (!SDL_strcasecmp(value, "lawn-area") || !SDL_strcasecmp(value, "flight") || !SDL_strcasecmp(value, "queen-bee") || !SDL_strcasecmp(value, "ant-king")) return 1;
+	}
+	if (!SDL_strcasecmp(key, "presentation.levelIntro"))
+	{
+		if (!SDL_strcasecmp(value, "flight")) return LEVEL_NUM_FLIGHT;
+	}
+	if (!SDL_strcasecmp(key, "presentation.infobar"))
+	{
+		if (!SDL_strcasecmp(value, "flight")) return LEVEL_NUM_FLIGHT;
+		if (!SDL_strcasecmp(value, "queen-bee")) return LEVEL_NUM_QUEENBEE;
+		if (!SDL_strcasecmp(value, "ant-king")) return LEVEL_NUM_ANTKING;
+	}
+	return fallback;
+}
+
+void PrepareLevelMetadata(void)
+{
+	FSSpec spec;
+	short fRefNum;
+	ClearLevelMetadata();
+
+	if (gLevelTerrainOverride[0] != '\0')
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, gLevelTerrainOverride, &spec);
+	else switch (gResourceLevelType)
+	{
+		case LEVEL_TYPE_LAWN:
+			FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, gResourceAreaNum == 0 ? ":Terrain:Training.ter" : ":Terrain:Lawn.ter", &spec);
+			break;
+		case LEVEL_TYPE_POND:
+			FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Pond.ter", &spec);
+			break;
+		case LEVEL_TYPE_FOREST:
+			FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, gResourceAreaNum == 0 ? ":Terrain:Beach.ter" : ":Terrain:Flight.ter", &spec);
+			break;
+		case LEVEL_TYPE_HIVE:
+			FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, gResourceAreaNum == 0 ? ":Terrain:BeeHive.ter" : ":Terrain:QueenBee.ter", &spec);
+			break;
+		case LEVEL_TYPE_NIGHT:
+			FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Night.ter", &spec);
+			break;
+		case LEVEL_TYPE_ANTHILL:
+			FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, gResourceAreaNum == 0 ? ":Terrain:AntHill.ter" : ":Terrain:AntKing.ter", &spec);
+			break;
+		default:
+			return;
+	}
+	fRefNum = FSpOpenResFile(&spec, fsRdPerm);
+	if (fRefNum == -1) return;
+	UseResFile(fRefNum);
+	ReadLevelMetadata();
+	CloseResFile(fRefNum);
+}
+
+static void ReadLevelMetadata(void)
+{
+	Handle hand;
+	Size size;
+	char *json;
+
+	ClearLevelMetadata();
+	hand = GetResource('Meta', 1000);
+	if (!hand) return;
+	size = GetHandleSize(hand);
+	json = (char *)AllocPtr(size + 1);
+	if (!json)
+	{
+		ReleaseResource(hand);
+		return;
+	}
+	SDL_memcpy(json, *hand, (size_t)size);
+	json[size] = '\0';
+	if (!MetadataJSONIsValid(json, size) || !strstr(json, "\"schemaVersion\":1") || !strstr(json, "\"game\":\"bugdom1\"") ||
+		!strstr(json, "\"identity\":\"") || !strstr(json, "\"properties\":{"))
+		DisposePtr((Ptr)json);
+	else
+		gLevelMetadataJSON = json;
+	ReleaseResource(hand);
+}
+
+static void ClearLevelMetadata(void)
+{
+	if (gLevelMetadataJSON)
+	{
+		DisposePtr((Ptr)gLevelMetadataJSON);
+		gLevelMetadataJSON = NULL;
+	}
+}
+
+static Boolean MetadataJSONIsValid(const char *json, Size size)
+{
+	const char *cursor = json;
+	const char *end = json + size;
+	if (!MetadataParseValue(&cursor, end, 0)) return false;
+	MetadataSkipWhitespace(&cursor, end);
+	return cursor == end;
+}
+
+static void MetadataSkipWhitespace(const char **cursor, const char *end)
+{
+	while (*cursor < end && (**cursor == ' ' || **cursor == '\t' || **cursor == '\r' || **cursor == '\n'))
+		(*cursor)++;
+}
+
+static Boolean MetadataParseString(const char **cursor, const char *end)
+{
+	if (*cursor >= end || **cursor != '\"') return false;
+	(*cursor)++;
+	while (*cursor < end)
+	{
+		unsigned char c = (unsigned char)**cursor;
+		if (c == '\"')
+		{
+			(*cursor)++;
+			return true;
+		}
+		if (c < 0x20) return false;
+		if (c == '\\')
+		{
+			(*cursor)++;
+			if (*cursor >= end) return false;
+			c = (unsigned char)**cursor;
+			if (c == 'u')
+			{
+				int i;
+				for (i = 0; i < 4; i++)
+				{
+					(*cursor)++;
+					if (*cursor >= end || !( (**cursor >= '0' && **cursor <= '9') || (**cursor >= 'a' && **cursor <= 'f') || (**cursor >= 'A' && **cursor <= 'F') )) return false;
+				}
+			}
+			else if (c != '\"' && c != '\\' && c != '/' && c != 'b' && c != 'f' && c != 'n' && c != 'r' && c != 't')
+				return false;
+		}
+		(*cursor)++;
+	}
+	return false;
+}
+
+static Boolean MetadataParseValue(const char **cursor, const char *end, int depth)
+{
+	MetadataSkipWhitespace(cursor, end);
+	if (*cursor >= end || depth > 32) return false;
+	if (**cursor == '\"') return MetadataParseString(cursor, end);
+	if (**cursor == '{')
+	{
+		(*cursor)++;
+		MetadataSkipWhitespace(cursor, end);
+		if (*cursor < end && **cursor == '}') { (*cursor)++; return true; }
+		while (*cursor < end)
+		{
+			if (!MetadataParseString(cursor, end)) return false;
+			MetadataSkipWhitespace(cursor, end);
+			if (*cursor >= end || **cursor != ':') return false;
+			(*cursor)++;
+			if (!MetadataParseValue(cursor, end, depth + 1)) return false;
+			MetadataSkipWhitespace(cursor, end);
+			if (*cursor >= end) return false;
+			if (**cursor == '}') { (*cursor)++; return true; }
+			if (**cursor != ',') return false;
+			(*cursor)++;
+			MetadataSkipWhitespace(cursor, end);
+		}
+		return false;
+	}
+	if (**cursor == '[')
+	{
+		(*cursor)++;
+		MetadataSkipWhitespace(cursor, end);
+		if (*cursor < end && **cursor == ']') { (*cursor)++; return true; }
+		while (*cursor < end)
+		{
+			if (!MetadataParseValue(cursor, end, depth + 1)) return false;
+			MetadataSkipWhitespace(cursor, end);
+			if (*cursor >= end) return false;
+			if (**cursor == ']') { (*cursor)++; return true; }
+			if (**cursor != ',') return false;
+			(*cursor)++;
+			MetadataSkipWhitespace(cursor, end);
+		}
+		return false;
+	}
+	if ((end - *cursor >= 4 && !SDL_memcmp(*cursor, "true", 4)) ||
+		(end - *cursor >= 5 && !SDL_memcmp(*cursor, "false", 5)) ||
+		(end - *cursor >= 4 && !SDL_memcmp(*cursor, "null", 4)))
+	{
+		if (**cursor == 'f') *cursor += 5; else *cursor += 4;
+		return true;
+	}
+	if (**cursor == '-' || (**cursor >= '0' && **cursor <= '9'))
+	{
+		if (**cursor == '-') (*cursor)++;
+		if (*cursor >= end) return false;
+		if (**cursor == '0') (*cursor)++;
+		else
+		{
+			if (**cursor < '1' || **cursor > '9') return false;
+			while (*cursor < end && **cursor >= '0' && **cursor <= '9') (*cursor)++;
+		}
+		if (*cursor < end && **cursor == '.')
+		{
+			(*cursor)++;
+			if (*cursor >= end || **cursor < '0' || **cursor > '9') return false;
+			while (*cursor < end && **cursor >= '0' && **cursor <= '9') (*cursor)++;
+		}
+		if (*cursor < end && (**cursor == 'e' || **cursor == 'E'))
+		{
+			(*cursor)++;
+			if (*cursor < end && (**cursor == '+' || **cursor == '-')) (*cursor)++;
+			if (*cursor >= end || **cursor < '0' || **cursor > '9') return false;
+			while (*cursor < end && **cursor >= '0' && **cursor <= '9') (*cursor)++;
+		}
+		return true;
+	}
+	return false;
+}
+
 /******************* LOAD PLAYFIELD *******************/
 
 void LoadPlayfield(FSSpec *specPtr)
@@ -784,11 +1086,14 @@ short	fRefNum;
 	fRefNum = FSpOpenResFile(specPtr,fsRdPerm);
 	GAME_ASSERT(fRefNum != -1);
 	UseResFile(fRefNum);
+	ReadLevelMetadata();
 	
 	
 			/* READ PLAYFIELD RESOURCES */
 
 	ReadDataFromPlayfieldFile();
+	gLevelType = (u_short)LevelMetadataCaseFor("level.terrainFamily", gResourceLevelType);
+	gAreaNum = (u_short)LevelMetadataCaseFor("level.area", gResourceAreaNum);
 
 	
 			/* CLOSE REZ FILE */
@@ -1231,7 +1536,7 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 		gLevelTerrainOverride[0] = '\0';	// consume override: terrainSpec is already set from it
 	}
 		
-	switch(gLevelType)
+	switch(gResourceLevelType)
 	{
 				/***********************/
 				/* LEVEL 1: THE GARDEN */
@@ -1240,7 +1545,7 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 		case	LEVEL_TYPE_LAWN:
 				if (!hasTerrainOverride)
 				{
-					if (gAreaNum == 0)
+					if (gResourceAreaNum == 0)
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Training.ter", &terrainSpec);
 					else
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Lawn.ter", &terrainSpec);
@@ -1305,7 +1610,7 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 		case	LEVEL_TYPE_FOREST:
 				if (!hasTerrainOverride)
 				{
-					if (gAreaNum == 0)
+					if (gResourceAreaNum == 0)
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Beach.ter", &terrainSpec);
 					else
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Flight.ter", &terrainSpec);
@@ -1343,7 +1648,7 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 			
 				if (!hasTerrainOverride)
 				{
-					if (gAreaNum == 0)
+					if (gResourceAreaNum == 0)
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:BeeHive.ter", &terrainSpec);
 					else
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:QueenBee.ter", &terrainSpec);
@@ -1409,7 +1714,7 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 		case	LEVEL_TYPE_ANTHILL:
 				if (!hasTerrainOverride)
 				{
-					if (gAreaNum == 0)
+					if (gResourceAreaNum == 0)
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:AntHill.ter", &terrainSpec);
 					else
 						FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:AntKing.ter", &terrainSpec);
@@ -1424,7 +1729,7 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 				
 				/* LOAD SKELETON FILES */
 				
-				if (gRealLevel == LEVEL_NUM_ANTKING)
+				if (LevelMetadataProfileIs("level.antKing", "ant-king", gRealLevel == LEVEL_NUM_ANTKING))
 					LoadASkeleton(SKELETON_TYPE_KINGANT);			
 					
 				LoadASkeleton(SKELETON_TYPE_SLUG);			

@@ -237,7 +237,7 @@ float					y,centerX,centerZ;
 
 			y =  GetTerrainY(gWaterList[f].hotSpotX, gWaterList[f].hotSpotZ);
 
-			switch(gLevelNum)
+			switch(LevelMetadataCaseFor("level.water", gLevelNum))
 			{
 				case	LEVEL_NUM_GARBAGE:					// water starts shallow for flooding
 						y += 10.0f;
@@ -297,7 +297,7 @@ float					y,centerX,centerZ;
 		.flags 		= STATUS_BIT_NOLIGHTING | STATUS_BIT_DONTCULL,
 	};
 
-	if (gLevelNum == LEVEL_NUM_PARK)						// in park, need to do water *after* particles so that bubbles are seen
+	if (LevelMetadataCaseFor("level.water", gLevelNum) == LEVEL_NUM_PARK)						// in park, need to do water *after* particles so that bubbles are seen
 		def.slot = WATERPARK_SLOT;
 
 	MakeNewObject(&def);

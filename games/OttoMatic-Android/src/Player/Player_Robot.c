@@ -182,7 +182,7 @@ int		i;
 
 	y = FindHighestCollisionAtXZ(where->x,where->z, CTYPE_MISC|CTYPE_TERRAIN);
 
-	if (gLevelNum == LEVEL_NUM_BLOBBOSS)
+	if (GetLevelMetadataBool("level.robotStartHeight", gLevelNum == LEVEL_NUM_BLOBBOSS))
 		y += 5000.0f;				// blob boss, player falls from above
 	else
 		y += -gObjectGroupBBoxList[MODEL_GROUP_SKELETONBASE+SKELETON_TYPE_OTTO][0].min.y * PLAYER_DEFAULT_SCALE + 5.0f;	// offset y so foot is on ground
@@ -1079,7 +1079,7 @@ Byte	aimMode;
 
 						/* MAKE DEFORMATION WAVE */
 
-				if (gLevelNum == LEVEL_NUM_BLOB)
+				if (GetLevelMetadataBool("level.blobLandingDeformation", gLevelNum == LEVEL_NUM_BLOB))
 				{
 					if (gPlayerInfo.distToFloor < 10.0f)						// if on terrain, then deform
 					{
@@ -1226,7 +1226,7 @@ static void MovePlayerRobot_Drilled(ObjNode *theNode)
 
 static void MovePlayerRobot_Zapped(ObjNode *theNode)
 {
-	if (gLevelNum == LEVEL_NUM_BLOBBOSS)				// if blob boss then must have fallen into water/ground to bob
+	if (GetLevelMetadataBool("level.robotBlobBounce", gLevelNum == LEVEL_NUM_BLOBBOSS))				// if blob boss then must have fallen into water/ground to bob
 		gCoord.y = GetTerrainY(gCoord.x, gCoord.z);
 
 	theNode->ZappedTimer -= gFramesPerSecondFrac;					// dec timer
@@ -1609,7 +1609,7 @@ float fps = gFramesPerSecondFrac;
 
 			/* VERIFY BOTTOMLESS PIT */
 
-	if (gLevelNum == LEVEL_NUM_CLOUD)
+	if (GetLevelMetadataBool("level.cloudPits", gLevelNum == LEVEL_NUM_CLOUD))
 	{
 		if ((gCoord.y + theNode->BBox.min.y) < (GetTerrainY2(gCoord.x, gCoord.z) - 30.0f))		// if player is below terrain's real height
 		{
@@ -2690,15 +2690,15 @@ Boolean		killed = false;
 		theNode->StatusBits |= STATUS_BIT_ONGROUND;
 		gPlayerSlipperyFactor = gTileSlipperyFactor;				// use this slippery factor
 
-		switch(gLevelNum)
+		if (GetLevelMetadataBool("level.robotBlobBounce", gLevelNum == LEVEL_NUM_BLOBBOSS))
 		{
-			case	LEVEL_NUM_BLOBBOSS:								// if touch blob boss ground, then hurt player and bounce back up
 					PlayerLoseHealth(.25, PLAYER_DEATH_TYPE_EXPLODE);
 					gDelta.y = 2500.0f;
 					PlayEffect3D(EFFECT_SLIMEBOUNCE, &gCoord);
-					break;
+		}
 
-			case	LEVEL_NUM_CLOUD:								// see if touch electric floor
+		else if (GetLevelMetadataBool("level.robotElectricFloor", gLevelNum == LEVEL_NUM_CLOUD))
+		{
 					if (gTileAttribFlags & (TILE_ATTRIB_ELECTROCUTE_AREA0|TILE_ATTRIB_ELECTROCUTE_AREA1))
 					{
 						if (gTileAttribFlags & TILE_ATTRIB_ELECTROCUTE_AREA0)	// check area #0
@@ -2712,7 +2712,6 @@ Boolean		killed = false;
 								PlayerTouchedElectricFloor(theNode);
 						}
 					}
-					break;
 		}
 	}
 
@@ -2869,7 +2868,7 @@ static void CheckPlayerActionControls(ObjNode *theNode)
 	{
 		/* SEE IF ENTER CANNON ON CLOUD LEVEL */
 
-		if (gLevelNum == LEVEL_NUM_CLOUD)
+		if (GetLevelMetadataBool("level.cloudCannon", gLevelNum == LEVEL_NUM_CLOUD))
 		{
 			float	cannonTipX, cannonTipZ;
 			gCannon = IsPlayerInPositionToEnterCannon(&cannonTipX, &cannonTipZ);		// see if in position for cannon

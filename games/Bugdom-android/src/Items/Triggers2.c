@@ -456,7 +456,7 @@ Boolean AddKingWaterPipe(TerrainItemEntryType *itemPtr, long  x, long z)
 {
 ObjNode	*newObj;
 	
-	if (gRealLevel != LEVEL_NUM_ANTKING)
+	if (!LevelMetadataProfileIs("level.antKing", "ant-king", gRealLevel == LEVEL_NUM_ANTKING))
 		DoFatalAlert("AddKingWaterPipe: not on this level!");
 	
 			
@@ -851,7 +851,6 @@ Boolean DoTrig_Cage(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	
 	return(true);
 }
-
 
 
 

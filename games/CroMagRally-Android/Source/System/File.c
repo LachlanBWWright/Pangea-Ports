@@ -21,6 +21,11 @@
 static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *bg3dSpec, int skeletonType);
 static void ReadDataFromPlayfieldFile(FSSpec *specPtr);
 static void LoadTerrainSuperTileTextures(short fRefNum);
+static void ReadLevelMetadata(void);
+static Boolean IsValidLevelMetadataJSON(const char *json);
+static Boolean HasMetadataValue(const char *json, const char *key, const char *value, Boolean quoted);
+
+static char *gLevelMetadataJSON = nil;
 
 
 /****************************/
@@ -36,6 +41,156 @@ static void LoadTerrainSuperTileTextures(short fRefNum);
 #define	SAVE_PLAYER_VERSION	0x0100		// 1.0
 
 
+
+
+Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
+{
+	char needle[96];
+	const char *valueStart;
+	const char *valueEnd;
+	size_t length;
+
+	if (!gLevelMetadataJSON || valueSize == 0) return false;
+	SDL_snprintf(needle, sizeof(needle), "\"%s\":", key);
+	valueStart = strstr(gLevelMetadataJSON, needle);
+	if (!valueStart) return false;
+	valueStart += strlen(needle);
+	while (*valueStart == ' ' || *valueStart == '\t' || *valueStart == '\r' || *valueStart == '\n')
+		valueStart++;
+	if (*valueStart != '"') return false;
+	valueStart++;
+	valueEnd = strchr(valueStart, '\"');
+	if (!valueEnd) return false;
+	length = (size_t)(valueEnd - valueStart);
+	if (length >= valueSize) return false;
+	SDL_memcpy(value, valueStart, length);
+	value[length] = '\0';
+	return true;
+}
+
+static Boolean IsValidLevelMetadataJSON(const char *json)
+{
+	int braceDepth = 0;
+	int bracketDepth = 0;
+	Boolean inString = false;
+	Boolean escaped = false;
+	const unsigned char *cursor = (const unsigned char *)json;
+	const unsigned char *lastSignificant = nil;
+
+	if (!json || *json != '{') return false;
+	while (*cursor)
+	{
+		if (inString)
+		{
+			if (escaped) escaped = false;
+			else if (*cursor == '\\') escaped = true;
+			else if (*cursor == '"') inString = false;
+			else if (*cursor < 0x20) return false;
+		}
+		else
+		{
+			switch (*cursor)
+			{
+				case '"': inString = true; break;
+				case '{': braceDepth++; break;
+				case '}': if (--braceDepth < 0) return false; break;
+				case '[': bracketDepth++; break;
+				case ']': if (--bracketDepth < 0) return false; break;
+				default: break;
+			}
+		}
+		if (*cursor > 0x20) lastSignificant = cursor;
+		cursor++;
+	}
+	return !inString && !escaped && braceDepth == 0 && bracketDepth == 0 && lastSignificant && *lastSignificant == '}';
+}
+
+static Boolean HasMetadataValue(const char *json, const char *key, const char *value, Boolean quoted)
+{
+	char needle[96];
+	const char *cursor;
+	const char *valueStart;
+	size_t valueLength = strlen(value);
+
+	SDL_snprintf(needle, sizeof(needle), "\"%s\"", key);
+	cursor = strstr(json, needle);
+	if (!cursor) return false;
+	cursor += strlen(needle);
+	while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n') cursor++;
+	if (*cursor != ':') return false;
+	cursor++;
+	while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n') cursor++;
+	if (quoted)
+	{
+		if (*cursor != '\"') return false;
+		cursor++;
+	}
+	valueStart = cursor;
+	if (SDL_strncmp(valueStart, value, valueLength)) return false;
+	if (quoted) return valueStart[valueLength] == '\"';
+	return valueStart[valueLength] == ',' || valueStart[valueLength] == '}' ||
+		valueStart[valueLength] == ' ' || valueStart[valueLength] == '\t' ||
+		valueStart[valueLength] == '\r' || valueStart[valueLength] == '\n';
+}
+
+Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
+{
+	char value[8];
+	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (!SDL_strcasecmp(value, "true")) return true;
+	if (!SDL_strcasecmp(value, "false")) return false;
+	return fallback;
+}
+
+Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default")) return fallback;
+	if (!SDL_strcasecmp(value, "race") || !SDL_strcasecmp(value, "battle") ||
+		!SDL_strcasecmp(value, "car") || !SDL_strcasecmp(value, "submarine") ||
+		!SDL_strcasecmp(value, "none") || !SDL_strcasecmp(value, "snow") ||
+		!SDL_strcasecmp(value, "scroll-both") || !SDL_strcasecmp(value, "scroll-v") ||
+		!SDL_strcasecmp(value, "desert") || !SDL_strcasecmp(value, "jungle") ||
+		!SDL_strcasecmp(value, "atlantis") || !SDL_strcasecmp(value, "china") ||
+		!SDL_strcasecmp(value, "crete") || !SDL_strcasecmp(value, "egypt") ||
+		!SDL_strcasecmp(value, "europe") || !SDL_strcasecmp(value, "viking") ||
+		!SDL_strcasecmp(value, "ice") || !SDL_strcasecmp(value, "scandinavia") ||
+		!SDL_strcasecmp(value, "aztec") || !SDL_strcasecmp(value, "coliseum") ||
+		!SDL_strcasecmp(value, "tar") || !SDL_strcasecmp(value, "water") ||
+		!SDL_strcasecmp(value, "standard"))
+		return !SDL_strcasecmp(value, profile);
+	return fallback;
+}
+
+static void ReadLevelMetadata(void)
+{
+	Handle hand;
+	Size size;
+	char *json;
+
+	if (gLevelMetadataJSON)
+	{
+		SafeDisposePtr(gLevelMetadataJSON);
+		gLevelMetadataJSON = nil;
+	}
+	hand = GetResource('Meta', 1000);
+	if (!hand) return;
+	size = GetHandleSize(hand);
+	json = (char *)AllocPtrClear(size + 1);
+	if (!json)
+	{
+		ReleaseResource(hand);
+		return;
+	}
+	SDL_memcpy(json, *hand, (size_t)size);
+	if (!IsValidLevelMetadataJSON(json) || !HasMetadataValue(json, "schemaVersion", "1", false) ||
+		!HasMetadataValue(json, "game", "cromag", true) || !HasMetadataValue(json, "identity", "", true) ||
+		!HasMetadataValue(json, "properties", "{", false))
+		SafeDisposePtr(json);
+	else
+		gLevelMetadataJSON = json;
+	ReleaseResource(hand);
+}
 
 		/* PLAYFIELD HEADER */
 
@@ -989,6 +1144,7 @@ Ptr						tempBuffer16 = nil;
 	if (fRefNum == -1)
 		DoFatalAlert("LoadPlayfield: FSpOpenResFile failed");
 	UseResFile(fRefNum);
+	ReadLevelMetadata();
 
 
 			/************************/

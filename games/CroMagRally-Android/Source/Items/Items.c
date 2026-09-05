@@ -17,6 +17,7 @@
 
 static void MoveTorchPot(ObjNode *theNode);
 static void MoveAtlantisStartline(ObjNode *theNode);
+static void ApplyStartLineMovement(ObjNode *newObj);
 static void MoveVolcano(ObjNode *theNode);
 static void MovePolarBear(ObjNode *theNode);
 static void MoveViking(ObjNode *theNode);
@@ -145,15 +146,14 @@ static const float diameter[] =
 		return(false);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	ApplyStartLineMovement(newObj);
 
 
-	switch(gTrackNum)
+	if (LevelMetadataProfileIs("track.startLineCollision", "crete", gTrackNum == TRACK_NUM_CRETE))
 	{
 				/*********/
 				/* CRETE */
 				/*********/
-
-		case	TRACK_NUM_CRETE:
 
 				newObj->CType 			= CTYPE_MISC;
 				newObj->CBits			= CBITS_ALLSOLID;
@@ -193,26 +193,17 @@ static const float diameter[] =
 				KeepOldCollisionBoxes(newObj);
 
 
-				break;
-
-				/************/
-				/* ATLANTIS */
-				/************/
-
-		case	TRACK_NUM_ATLANTIS:
-				newObj->MoveCall = MoveAtlantisStartline;
-				break;
-
-
+					}
 				/************/
 				/* JUNGLE   */
 				/************/
 
-		case	TRACK_NUM_JUNGLE:
+		else if (LevelMetadataProfileIs("track.startLineCollision", "jungle", gTrackNum == TRACK_NUM_JUNGLE))
+		{
 				newObj->CType 			= CTYPE_MISC | CTYPE_AVOID;
 				newObj->CBits			= CBITS_ALLSOLID;
 				CreateCollisionBoxFromBoundingBox(newObj, 1.0, 1.0);
-				break;
+					}
 
 
 
@@ -220,7 +211,8 @@ static const float diameter[] =
 				/* BRIDGE COLLISION */
 				/********************/
 
-		default:
+		else if (!LevelMetadataProfileIs("track.startLineCollision", "none", gTrackNum == TRACK_NUM_ATLANTIS))
+		{
 
 						/* SET COLLISION STUFF */
 
@@ -266,6 +258,13 @@ static const float diameter[] =
 
 
 	return(true);													// item was added
+}
+
+/* Keep Atlantis movement independent from the collision profile. */
+static void ApplyStartLineMovement(ObjNode *newObj)
+{
+	if (LevelMetadataProfileIs("track.startLineMovement", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS))
+		newObj->MoveCall = MoveAtlantisStartline;
 }
 
 /********** MOVE ATLANTIS START LINE ********************/
@@ -678,7 +677,7 @@ Boolean	collision = true;
 	}
 
 
-	if (gTrackNum == TRACK_NUM_ATLANTIS)			// blue tint for atlantis
+	if (LevelMetadataProfileIs("track.objectTint", "underwater", gTrackNum == TRACK_NUM_ATLANTIS))			// blue tint for atlantis
 	{
 		newObj->ColorFilter.r = .7;
 		newObj->ColorFilter.g = .8;
@@ -2011,4 +2010,3 @@ Boolean isVisible;
 		UpdateShadow(theNode);
 	}
 }
-

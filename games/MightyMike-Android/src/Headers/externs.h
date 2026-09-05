@@ -83,6 +83,10 @@ extern	Boolean					gFinishedArea;
 extern	Boolean					gScreenScrollFlag;
 extern	Boolean					gIsInGame;
 
+void					LoadLevelMetadata(const char* mapPath);
+int					LevelMetadataScene(const char* key, int fallback);
+Boolean					LevelMetadataProfileIs(const char* key, const char* profile, Boolean fallback);
+
 #pragma mark - Main.cpp
 
 extern	struct SDL_Window		*gSDLWindow;

@@ -48,7 +48,7 @@ Boolean	gResetRideBall = false;
 Boolean AddRideBall(TerrainItemEntryType *itemPtr, float  x, float z)
 {
 ObjNode	*ball;
-Boolean	playroom = (gLevelNum == LEVEL_NUM_PLAYROOM);
+Boolean	playroom = (LevelMetadataCaseFor("level.rideBall", gLevelNum) == LEVEL_NUM_PLAYROOM);
 
 	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
 	if (playroom)
@@ -129,7 +129,7 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 	if (gPlayerInfo.ridingBall == ball)
 	{
-		if (gLevelNum != LEVEL_NUM_SIDEWALK)							// can only ride on sidewalk level
+		if (LevelMetadataCaseFor("level.rideBall", gLevelNum) != LEVEL_NUM_SIDEWALK)							// can only ride on sidewalk level
 		{
 			rot = RandomFloat2() * PI;									// pick some angle
 			goto jump_off;
@@ -340,7 +340,6 @@ ObjNode	*ball = gPlayerInfo.ridingBall;
 	UpdateObject(player);
 	HandlePlayerLineMarkerCrossing(player);
 }
-
 
 
 

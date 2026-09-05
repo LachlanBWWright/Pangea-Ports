@@ -79,7 +79,7 @@ Boolean AddEnemy_FlyingBee(TerrainItemEntryType *itemPtr, long x, long z)
 {
 ObjNode	*newObj;
 
-	if (gRealLevel == LEVEL_NUM_HIVE)
+	if (LevelMetadataProfileIs("level.flyingBeeSetup", "hive", gRealLevel == LEVEL_NUM_HIVE))
 	{
 		if (gNumEnemyOfKind[ENEMY_KIND_FLYINGBEE] >= MAX_FLYINGBEE)						// keep from getting absurd
 			return(false);
@@ -92,7 +92,7 @@ ObjNode	*newObj;
 
 		/* SEE IF KEYED ENEMY ON HIVE */
 		
-	if (gRealLevel == LEVEL_NUM_HIVE)
+	if (LevelMetadataProfileIs("level.flyingBeeSetup", "hive", gRealLevel == LEVEL_NUM_HIVE))
 	{
 		if (itemPtr->parm[3] & 1)										// see if we care
 		{
@@ -108,7 +108,7 @@ ObjNode	*newObj;
 		return(false);
 	newObj->TerrainItemPtr = itemPtr;
 
-	if (gLevelType == LEVEL_TYPE_HIVE)
+	if (LevelMetadataProfileIs("level.flyingBeeSetup", "hive", gLevelType == LEVEL_TYPE_HIVE))
 	{
 			newObj->Coord.y += 200.0f;			// raise off ground	
 	}
@@ -528,7 +528,7 @@ TQ3Vector3D		delta;
 	
 			/* DEACTIVATE */
 			
-	if (gRealLevel != LEVEL_NUM_FLIGHT)				// always regenerate bees on flight attack level
+	if (!LevelMetadataProfileIs("level.beeFlightRegeneration", "flight", gRealLevel == LEVEL_NUM_FLIGHT))				// always regenerate bees on flight attack level
 		theNode->TerrainItemPtr = nil;				// dont ever come back
 	
 	MorphToSkeletonAnim(theNode->Skeleton, FLYINGBEE_ANIM_FALL, 5);
@@ -595,11 +595,6 @@ Boolean BallHitFlyingBee(ObjNode *me, ObjNode *enemy)
 	
 	return(false);
 }
-
-
-
-
-
 
 
 

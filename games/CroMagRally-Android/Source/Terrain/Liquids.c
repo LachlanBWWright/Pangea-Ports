@@ -193,23 +193,23 @@ MetaObjectPtr	waterObj;
 
 			/* SEE IF DO ANIM ON THIS TRACK */
 
-	switch(gTrackNum)
+	if (LevelMetadataProfileIs("track.waterAnimation", "scroll-both", false))
 	{
-		case	TRACK_NUM_JUNGLE:
-		case	TRACK_NUM_CRETE:
-				du = gFramesPerSecondFrac * .05f;
-				dv = gFramesPerSecondFrac * .1f;
-				break;
-
-		case	TRACK_NUM_EGYPT:
-				du = 0;
-				dv = gFramesPerSecondFrac * .1f;
-				break;
-
-		default:
-				return;
+		du = gFramesPerSecondFrac * .05f;
+		dv = gFramesPerSecondFrac * .1f;
 	}
-
+	else if (LevelMetadataProfileIs("track.waterAnimation", "scroll-v", false))
+	{
+		du = 0;
+		dv = gFramesPerSecondFrac * .1f;
+	}
+	else
+	{
+		Boolean sourceAnimated = gTrackNum == TRACK_NUM_JUNGLE || gTrackNum == TRACK_NUM_CRETE || gTrackNum == TRACK_NUM_EGYPT;
+		if (!sourceAnimated || !LevelMetadataProfileIs("track.waterAnimation", "source-default", true)) return;
+		du = gTrackNum == TRACK_NUM_EGYPT ? 0 : gFramesPerSecondFrac * .05f;
+		dv = gFramesPerSecondFrac * .1f;
+	}
 		/* DO IT */
 
 	waterObj = gBG3DGroupList[MODEL_GROUP_GLOBAL][GLOBAL_ObjType_WaterPatch];
@@ -372,8 +372,6 @@ float				y;
 
 	return(true);													// item was added
 }
-
-
 
 
 

@@ -178,6 +178,10 @@ extern uint32_t					gAutoFadeStatusBits;
 extern uint32_t					gGlobalMaterialFlags;
 extern uint32_t					gInfobarUpdateBits;
 
+extern Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize);
+extern Boolean GetLevelMetadataBool(const char *key, Boolean fallback);
+extern Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback);
+
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 // WebGL/GLES2 compatibility layer — must come LAST (after all game type definitions).
 // gl_compat.h already includes SDL_opengl.h for constants; the #ifdef block

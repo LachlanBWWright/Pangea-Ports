@@ -312,7 +312,7 @@ Boolean	IsBottomlessPitInFrontOfEnemy(float r)
 {
 float	x,z;
 
-	if (gLevelNum != LEVEL_NUM_CLOUD)				// only on cloud level
+	if (!GetLevelMetadataBool("level.cloudPits", gLevelNum == LEVEL_NUM_CLOUD))				// only on cloud level
 		return(false);
 
 	x = gCoord.x - sin(r) * 200.0f;
@@ -354,8 +354,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(chunk);
 }
-
-
 
 
 

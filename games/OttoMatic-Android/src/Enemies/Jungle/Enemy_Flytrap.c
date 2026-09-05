@@ -115,7 +115,7 @@ ObjNode	*newObj;
 	newObj->HitByWeaponHandler[WEAPON_TYPE_FREEZE] 		= FlyTrapHitByFreeze;
 	newObj->HitByWeaponHandler[WEAPON_TYPE_FLAME] 		= FlyTrapHitByFire;
 
-	if (gLevelNum == LEVEL_NUM_JUNGLEBOSS)				// dont auto target these on boss level since cant be killed
+	if (LevelMetadataProfileIs("level.flytrapTargeting", "disabled", gLevelNum == LEVEL_NUM_JUNGLEBOSS))				// dont auto target these on boss level since cant be killed
 		newObj->CType &= ~CTYPE_AUTOTARGETWEAPON;
 
 
@@ -379,7 +379,6 @@ float		scale;
 
 	FindCoordOnJoint(enemy, FLYTRAP_JOINT_HEAD, &gJawOff, &gPlayerInfo.objNode->Coord);			// get coord of mouth
 }
-
 
 
 

@@ -17,6 +17,28 @@
 
 static void MakeTerrainSpec(FSSpec *spec, const char *defaultRelPath);
 
+static void MakeCurrentAreaTerrainSpec(FSSpec *spec)
+{
+	static const char *const kAreaTerrainPaths[] =
+	{
+		":Terrain:town_duel.ter",
+		":Terrain:town_shootout.ter",
+		":Terrain:town_duel.ter",
+		":Terrain:town_stampede.ter",
+		":Terrain:town_duel.ter",
+		":Terrain:town_duel.ter",
+		":Terrain:swamp_duel.ter",
+		":Terrain:swamp_shootout.ter",
+		":Terrain:swamp_duel.ter",
+		":Terrain:swamp_stampede.ter",
+		":Terrain:swamp_duel.ter",
+		":Terrain:swamp_duel.ter"
+	};
+
+	if (gCurrentArea >= 0 && gCurrentArea < (int) SDL_arraysize(kAreaTerrainPaths))
+		MakeTerrainSpec(spec, kAreaTerrainPaths[gCurrentArea]);
+}
+
 
 /****************************/
 /*    CONSTANTS             */
@@ -73,24 +95,18 @@ FSSpec	spec;
 
 			/* LOAD LEVEL BG3D */
 			
-	switch(gCurrentArea)
+	if (!IsBillySwampArea())
 	{
-		case	AREA_TOWN_DUEL1:
-		case	AREA_TOWN_DUEL2:
-		case	AREA_TOWN_DUEL3:
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:town.bg3d", &spec);
 				ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
 
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:buildings.bg3d", &spec);
 				ImportBG3D(&spec, MODEL_GROUP_BUILDINGS);
-				break;
-				
-		case	AREA_SWAMP_DUEL1:
-		case	AREA_SWAMP_DUEL2:
-		case	AREA_SWAMP_DUEL3:
+	}
+	else
+	{
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:swamp.bg3d", &spec);
 				ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
-				
 	}
 
 
@@ -118,20 +134,7 @@ FSSpec	spec;
 			// must do this after creating the view!
 			//
 			
-	switch(gCurrentArea)
-	{
-		case	AREA_TOWN_DUEL1:
-		case	AREA_TOWN_DUEL2:
-		case	AREA_TOWN_DUEL3:
-				MakeTerrainSpec(&spec, ":Terrain:town_duel.ter");
-				break;
-				
-		case	AREA_SWAMP_DUEL1:
-		case	AREA_SWAMP_DUEL2:
-		case	AREA_SWAMP_DUEL3:
-				MakeTerrainSpec(&spec, ":Terrain:swamp_duel.ter");
-				break;
-	}
+	MakeCurrentAreaTerrainSpec(&spec);
 	
 	LoadPlayfield(&spec);
 
@@ -157,20 +160,18 @@ FSSpec	spec;
 	ImportBG3D(&spec, MODEL_GROUP_GLOBAL);
 
 
-	switch(gCurrentArea)
+	if (!IsBillySwampArea())
 	{
-		case	AREA_TOWN_SHOOTOUT:
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:town.bg3d", &spec);
 				ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
 
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:buildings.bg3d", &spec);
 				ImportBG3D(&spec, MODEL_GROUP_BUILDINGS);
-				break;
-				
-		case	AREA_SWAMP_SHOOTOUT:
+	}
+	else
+	{
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:swamp.bg3d", &spec);
 				ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
-				break;
 	}
 
 
@@ -187,24 +188,21 @@ FSSpec	spec;
 			
 	LoadASkeleton(SKELETON_TYPE_BILLY);
 
-	switch(gCurrentArea)
+	if (!IsBillySwampArea())
 	{
-		case	AREA_TOWN_SHOOTOUT:
-				LoadASkeleton(SKELETON_TYPE_BANDITO);
+			LoadASkeleton(SKELETON_TYPE_BANDITO);
 				LoadASkeleton(SKELETON_TYPE_SHORTY);
 				LoadASkeleton(SKELETON_TYPE_WALKER);
 				LoadASkeleton(SKELETON_TYPE_KANGACOW);
-				break;
-			
-		case	AREA_SWAMP_SHOOTOUT:
+	}
+	else
+	{
 				LoadASkeleton(SKELETON_TYPE_KANGAREX);
 				LoadASkeleton(SKELETON_TYPE_TREMORALIEN);
 				LoadASkeleton(SKELETON_TYPE_TREMORGHOST);
 				LoadASkeleton(SKELETON_TYPE_FROGMAN);
 				LoadASkeleton(SKELETON_TYPE_BANDITO);
 				LoadASkeleton(SKELETON_TYPE_SHORTY);
-				break;
-				
 	}
 
 
@@ -214,16 +212,7 @@ FSSpec	spec;
 			// must do this after creating the view!
 			//
 			
-	switch(gCurrentArea)
-	{
-		case	AREA_TOWN_SHOOTOUT:
-				MakeTerrainSpec(&spec, ":Terrain:town_shootout.ter");
-				break;
-
-		case	AREA_SWAMP_SHOOTOUT:
-				MakeTerrainSpec(&spec, ":Terrain:swamp_shootout.ter");
-				break;
-	}
+	MakeCurrentAreaTerrainSpec(&spec);
 
 	LoadPlayfield(&spec);
 	
@@ -248,15 +237,13 @@ FSSpec	spec;
 
 			/* LOAD LEVEL BG3D */
 			
-	switch(gCurrentArea)
+	if (!IsBillySwampArea())
 	{
-		case	AREA_TOWN_STAMPEDE:
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:town.bg3d", &spec);
-				break;			
-
-		case	AREA_SWAMP_STAMPEDE:
+	}
+	else
+	{
 				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:swamp.bg3d", &spec);
-				break;			
 	}
 	ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
 
@@ -283,15 +270,13 @@ FSSpec	spec;
 						
 	LoadASkeleton(SKELETON_TYPE_BILLY);
 	
-	switch(gCurrentArea)
+	if (!IsBillySwampArea())
 	{
-		case	AREA_TOWN_STAMPEDE:
 				LoadASkeleton(SKELETON_TYPE_KANGACOW);
-				break;			
-
-		case	AREA_SWAMP_STAMPEDE:
+	}
+	else
+	{
 				LoadASkeleton(SKELETON_TYPE_KANGAREX);
-				break;			
 	}
 	
 
@@ -303,16 +288,7 @@ FSSpec	spec;
 			// must do this after creating the view!
 			//
 			
-	switch(gCurrentArea)
-	{
-		case	AREA_TOWN_STAMPEDE:
-				MakeTerrainSpec(&spec, ":Terrain:town_stampede.ter");
-				break;
-				
-		case	AREA_SWAMP_STAMPEDE:
-				MakeTerrainSpec(&spec, ":Terrain:swamp_stampede.ter");
-				break;
-	}
+	MakeCurrentAreaTerrainSpec(&spec);
 
 	LoadPlayfield(&spec);
 
@@ -385,6 +361,5 @@ FSSpec	spec;
 	BG3D_SphereMapGeomteryMaterial(MODEL_GROUP_LEVELSPECIFIC, PRACTICE_ObjType_DeathSkull,
 								0, MULTI_TEXTURE_COMBINE_ADD, SPHEREMAP_SObjType_Satin);
 }
-
 
 

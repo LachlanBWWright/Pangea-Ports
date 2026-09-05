@@ -779,7 +779,7 @@ static void KillTick(ObjNode *enemy)
 
 			/* SEE IF TALK ON FIDO LEVEL */
 
-	if (gLevelNum == LEVEL_NUM_FIDO)
+	if (LevelMetadataCaseFor("level.fido", gLevelNum) == LEVEL_NUM_FIDO)
 	{
 		if (gNumKilledTicks >= gTotalTicks)
 		{
@@ -918,7 +918,6 @@ OGLVector3D	aim;
 
 	UpdateObject(theNode);
 }
-
 
 
 

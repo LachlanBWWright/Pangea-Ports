@@ -82,13 +82,9 @@ Boolean CallAlienSaucer(ObjNode *who)
 {
 	float maxCallDistance = 4000.0f;
 
-	switch(gLevelNum)									// no saucers on some levels
-	{
-		case	LEVEL_NUM_BLOBBOSS:
-		case	LEVEL_NUM_SAUCER:
-		case	LEVEL_NUM_BRAINBOSS:
-				return(false);
-	}
+	if (!GetLevelMetadataBool("level.saucers", gLevelNum != LEVEL_NUM_BLOBBOSS
+		&& gLevelNum != LEVEL_NUM_SAUCER && gLevelNum != LEVEL_NUM_BRAINBOSS))
+		return(false);
 
 	if (!gPlayerHasLanded)								// no saucers until player is ready
 		return(false);
@@ -879,7 +875,6 @@ static void SaucerReachedTarget(ObjNode *saucer)
 	}
 
 }
-
 
 
 

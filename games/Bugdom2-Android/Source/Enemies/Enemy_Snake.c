@@ -630,7 +630,7 @@ static void SnakeAtePlayer(int snakeNum, ObjNode *head, ObjNode *player)
 
 void MovePlayer_EatenBySnake(ObjNode *player)
 {
-	if (gLevelNum == LEVEL_NUM_PARK)						// see if actually eaten by fish
+	if (LevelMetadataCaseFor("level.snake", gLevelNum) == LEVEL_NUM_PARK)						// see if actually eaten by fish
 	{
 		MovePlayer_EatenByFish(player);
 
@@ -661,7 +661,6 @@ void MovePlayer_EatenBySnake(ObjNode *player)
 		}
 	}
 }
-
 
 
 

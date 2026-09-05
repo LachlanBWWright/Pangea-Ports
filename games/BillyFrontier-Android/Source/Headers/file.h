@@ -103,6 +103,10 @@ void SavePrefs(void);
 
 void LoadPlayfield(FSSpec *specPtr);
 
+Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize);
+Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback);
+void LoadCurrentAreaMetadata(void);
+
 OSErr SaveGame(int fileSlot);
 OSErr DeleteSavedGame(int fileSlot);
 OSErr LoadSavedGame(int fileSlot, SaveGameType* saveDataPtr);
@@ -119,4 +123,3 @@ Ptr LoadDataFile(const char* path, long* outLength);
 char* LoadTextFile(const char* path, long* outLength);
 
 char* CSVIterator(char** csvCursor, bool* eolOut);
-

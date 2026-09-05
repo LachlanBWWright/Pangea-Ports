@@ -1073,7 +1073,7 @@ ObjNode	*newObj;
 	NewObjectDefinitionType def =
 	{
 		.group		= MODEL_GROUP_LEVELSPECIFIC,
-		.type		= gTrackNum == TRACK_NUM_ICE ? ICE_ObjType_CampFire : SCANDINAVIA_ObjType_Campfire,
+		.type		= LevelMetadataProfileIs("track.campfire", "ice", gTrackNum == TRACK_NUM_ICE) ? ICE_ObjType_CampFire : SCANDINAVIA_ObjType_Campfire,
 		.coord.x	= x,
 		.coord.z	= z,
 		.coord.y	= GetTerrainY(x,z),
@@ -2074,7 +2074,6 @@ short	p;
 
 	return(true);
 }
-
 
 
 

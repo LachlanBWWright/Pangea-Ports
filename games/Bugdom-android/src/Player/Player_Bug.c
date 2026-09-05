@@ -1196,7 +1196,7 @@ int			i;
 							switch(kickedObj->Type)
 							{
 								case	ANTHILL_MObjType_KingPipe:
-										if (gRealLevel == LEVEL_NUM_ANTKING)
+										if (LevelMetadataProfileIs("level.antKing", "ant-king", gRealLevel == LEVEL_NUM_ANTKING))
 										{
 											KickKingWaterPipe(kickedObj);										
 										}
@@ -1523,7 +1523,6 @@ new_pgroup:
 		}
 	}
 }
-
 
 
 

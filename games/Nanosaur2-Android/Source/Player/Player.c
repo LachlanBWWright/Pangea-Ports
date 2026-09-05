@@ -1226,17 +1226,12 @@ float CalcPlayerMaxAltitude(float x, float z)
 {
 float	maxAlt;
 
-	switch(gLevelNum)
+	if (LevelMetadataProfileIs("level.flightHeight", "adventure1", gLevelNum == LEVEL_NUM_ADVENTURE1))
 	{
-		case	LEVEL_NUM_ADVENTURE1:
-				maxAlt = GetTerrainY(x, z) + MAX_ALTITUDE_DIFF;
-				if (maxAlt > MAX_ALTITUDE)
-					maxAlt = MAX_ALTITUDE;
-				break;
-
-		default:
-				maxAlt = MAX_ALTITUDE;
+		maxAlt = GetTerrainY(x, z) + MAX_ALTITUDE_DIFF;
+		if (maxAlt > MAX_ALTITUDE) maxAlt = MAX_ALTITUDE;
 	}
+	else maxAlt = MAX_ALTITUDE;
 
 
 	return(maxAlt);

@@ -170,12 +170,12 @@ void DoLevelIntro(void)
 			[LEVEL_NUM_PARK]		= 5.5f,
 		};
 		ObjNode* subtitle = MakeNewDriverObject(INFOBAR_SLOT, DrawLevelIntroSubtitle, 0);
-		subtitle->Timer = -timers[gLevelNum];
+		subtitle->Timer = -timers[LevelMetadataCaseFor("level.intro", gLevelNum)];
 	}
 
 			/* DO INTRO SCENE */
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.intro", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				DoLevelIntroScreen_FrontYard();

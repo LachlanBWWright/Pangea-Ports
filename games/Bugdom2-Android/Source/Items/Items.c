@@ -80,7 +80,7 @@ void InitItemsManager(void)
 
 void CreateCyclorama(void)
 {
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.cyclorama", gLevelNum))
 	{
 		case	LEVEL_NUM_FIDO:
 		case	LEVEL_NUM_PLUMBING:
@@ -368,7 +368,7 @@ int		doorColor = itemPtr->parm[1];
 
 	gNewObjectDefinition.scale 		= 1.8f;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.specialItems", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				gNewObjectDefinition.type 		= GARDEN_ObjType_RedDoor + doorColor;
@@ -512,7 +512,7 @@ Boolean AddBrick(TerrainItemEntryType *itemPtr, float  x, float z)
 {
 ObjNode	*newObj;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.specialItems", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				gNewObjectDefinition.type 		= GARDEN_ObjType_Brick;
@@ -560,7 +560,7 @@ int	type = itemPtr->parm[0];
 
 	gNewObjectDefinition.scale 		= 1.5f;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.itemObjects", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				gNewObjectDefinition.type 		= GARDEN_ObjType_Post_Brick + type;
@@ -620,7 +620,7 @@ Boolean AddPebble(TerrainItemEntryType *itemPtr, float  x, float z)
 {
 ObjNode	*newObj;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.itemObjects", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				gNewObjectDefinition.type 		= GARDEN_ObjType_LargeStone + itemPtr->parm[0];
@@ -968,7 +968,7 @@ Boolean AddBeachBall(TerrainItemEntryType *itemPtr, float  x, float z)
 {
 ObjNode	*newObj;
 
-	if (gLevelNum == LEVEL_NUM_SIDEWALK)
+	if (LevelMetadataCaseFor("level.specialItems", gLevelNum) == LEVEL_NUM_SIDEWALK)
 	{
 		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
 		gNewObjectDefinition.type 		= SIDEWALK_ObjType_BeachBall;
@@ -1008,7 +1008,7 @@ ObjNode	*newObj;
 
 				/* MAKE SHADOW */
 
-	if (gLevelNum == LEVEL_NUM_PLAYROOM)
+	if (LevelMetadataCaseFor("level.specialItems", gLevelNum) == LEVEL_NUM_PLAYROOM)
 	{
 		AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 25,25, false);
 	}
@@ -1243,7 +1243,7 @@ Boolean AddGlassBottle(TerrainItemEntryType *itemPtr, float  x, float z)
 {
 ObjNode	*newObj;
 
-	if (gLevelNum == LEVEL_NUM_SIDEWALK)
+	if (LevelMetadataCaseFor("level.specialItems", gLevelNum) == LEVEL_NUM_SIDEWALK)
 		gNewObjectDefinition.type 		= SIDEWALK_ObjType_Bottle;
 	else
 		gNewObjectDefinition.type 		= PARK_ObjType_Bottle;
@@ -1318,10 +1318,6 @@ static Boolean HurtGlassBottle(ObjNode *bottle, float damage)
 	PlayEffect3D(EFFECT_BOTTLECRACK, &bottle->Coord);
 	return(false);
 }
-
-
-
-
 
 
 

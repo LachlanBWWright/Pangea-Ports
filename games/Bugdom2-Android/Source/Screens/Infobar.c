@@ -297,7 +297,7 @@ void DrawInfobar(ObjNode* theNode)
 	Infobar_DrawMap();
 	Infobar_DrawClovers();
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.infobar", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 		case	LEVEL_NUM_SIDEWALK:
@@ -693,7 +693,7 @@ float	x,y;
 	if (!gPlayerInfo.hasMap)
 		return;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.infobar", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				gGlobalTransparency = .90f;
@@ -995,4 +995,3 @@ int		i;
 
 	gGlobalTransparency = 1.0f;
 }
-

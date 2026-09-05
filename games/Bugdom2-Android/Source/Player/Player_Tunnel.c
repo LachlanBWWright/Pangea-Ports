@@ -82,7 +82,8 @@ static OGLPoint3D	gPreviousSprayCoord;
 
 Boolean IsTunnelLevel(void)
 {
-	return gLevelNum == LEVEL_NUM_PLUMBING || gLevelNum == LEVEL_NUM_GUTTER;
+	int area = LevelMetadataCaseFor("level.tunnel", gLevelNum);
+	return area == LEVEL_NUM_PLUMBING || area == LEVEL_NUM_GUTTER;
 }
 
 
@@ -116,7 +117,7 @@ OGLSetupInputType	viewDef;
 
 			/* PLUMBING */
 
-	if (gLevelNum == LEVEL_NUM_PLUMBING)
+	if (LevelMetadataCaseFor("level.tunnel", gLevelNum) == LEVEL_NUM_PLUMBING)
 	{
 		const OGLColorRGBA	fogColor = {.6,.7,.2,1};
 
@@ -203,7 +204,7 @@ OGLSetupInputType	viewDef;
 			/* INIT SPECIAL */
 			/****************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.tunnel", gLevelNum))
 	{
 
 		case	LEVEL_NUM_PLUMBING:
@@ -462,7 +463,7 @@ void PlayArea_Tunnel(void)
 
 void DrawTunnel(void)
 {
-	const Boolean isGutterLevel = gLevelNum == LEVEL_NUM_GUTTER;
+	const Boolean isGutterLevel = LevelMetadataCaseFor("level.tunnel", gLevelNum) == LEVEL_NUM_GUTTER;
 
 	OGL_PushState();
 	glEnable(GL_CULL_FACE);
@@ -735,7 +736,7 @@ int		anim;
 				/* DO OBJECT COLLISION */
 				/***********************/
 
-	if (gLevelNum == LEVEL_NUM_PLUMBING)
+	if (LevelMetadataCaseFor("level.tunnel", gLevelNum) == LEVEL_NUM_PLUMBING)
 		DoTunnelObjectCollision_Sewer(player);
 	else
 		DoTunnelObjectCollision_Gutter(player);
@@ -862,7 +863,7 @@ OGLPoint3D	wallOff;
 		/* SEE IF FLY OFF EDGE OF GUTTER */
 		/*********************************/
 
-	if (gLevelNum == LEVEL_NUM_GUTTER)
+	if (LevelMetadataCaseFor("level.tunnel", gLevelNum) == LEVEL_NUM_GUTTER)
 	{
 		if (tunnelAngle > 1.65f)			// see if off left edge
 		{
@@ -1073,7 +1074,7 @@ static const OGLPoint3D footOff = {0,0,0};
 	for (i = 0; i < numSegments; i++)
 	{
 		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
-		if (gLevelNum == LEVEL_NUM_PLUMBING)
+		if (LevelMetadataCaseFor("level.tunnel", gLevelNum) == LEVEL_NUM_PLUMBING)
 			gNewObjectDefinition.type 		= PLUMBING_ObjType_Spray;
 		else
 			gNewObjectDefinition.type 		= GUTTER_ObjType_Spray;
@@ -1545,8 +1546,6 @@ float	fps = gFramesPerSecondFrac;
 	gPlayerTunnelIndex += gPlayerInfo.tunnelSpeed * fps;
 
 }
-
-
 
 
 

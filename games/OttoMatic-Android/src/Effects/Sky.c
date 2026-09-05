@@ -75,11 +75,15 @@ const SkyStyle kSkyTable[NUM_LEVELS] =
 void InitSky(void)
 {
 int					r,c;
+int					skyLevel;
 float				cornerX,cornerZ,dist,alpha;
 MOTriangleIndecies	*triPtr;
 ObjNode				*obj;
 
-	const SkyStyle* mySky = &kSkyTable[gLevelNum];
+	skyLevel = LevelMetadataCaseFor("level.sky", gLevelNum);
+	if (skyLevel < 0 || skyLevel >= NUM_LEVELS)
+		skyLevel = gLevelNum;
+	const SkyStyle* mySky = &kSkyTable[skyLevel];
 
 	gSkyAltitudeY = mySky->altitude;
 
@@ -182,9 +186,15 @@ static void DrawSky(ObjNode *theNode)
 
 OGLMatrix4x4	m;
 int					r,c;
+int					skyLevel;
 float			u,v;
 
-	if (!kSkyTable->hasSky)
+	skyLevel = LevelMetadataCaseFor("level.sky", gLevelNum);
+	if (skyLevel < 0 || skyLevel >= NUM_LEVELS)
+		skyLevel = gLevelNum;
+	const SkyStyle* mySky = &kSkyTable[skyLevel];
+
+	if (!mySky->hasSky)
 		return;
 
 
@@ -218,7 +228,7 @@ float			u,v;
 	glEnable(GL_TEXTURE_2D);											// enable textures
 	glDisableClientState(GL_NORMAL_ARRAY);								// disable normal arrays
 
-	if (gLevelNum == LEVEL_NUM_APOCALYPSE)					// see if glow
+	if (LevelMetadataProfileIs("level.sky", "apocalypse", gLevelNum == LEVEL_NUM_APOCALYPSE))					// see if glow
 	{
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE);								// make glow
 		gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;
@@ -238,7 +248,7 @@ float			u,v;
 
 			/* SETUP VERTEX COLORS */
 
-	if (kSkyTable[gLevelNum].fadeEdges)
+	if (mySky->fadeEdges)
 	{
 		glColorPointer(4, GL_FLOAT, 0, &gSkyColors[0][0].r);
 		glEnableClientState(GL_COLOR_ARRAY);								// enable color arrays
@@ -250,7 +260,7 @@ float			u,v;
 			/* SET TRANSLATION TRANSFORM */
 
 	OGLMatrix4x4_SetTranslate(&m, gPlayerInfo.camera.cameraLocation.x,
-								kSkyTable[gLevelNum].altitude,
+								mySky->altitude,
 								gPlayerInfo.camera.cameraLocation.z);
 	glMultMatrixf(m.value);
 
@@ -267,4 +277,3 @@ float			u,v;
 	gGlobalMaterialFlags &= ~BG3D_MATERIALFLAG_ALWAYSBLEND;			// make sure this is off
 	OGL_PopState();
 }
-

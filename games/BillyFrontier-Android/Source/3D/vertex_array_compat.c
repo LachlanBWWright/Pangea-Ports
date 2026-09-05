@@ -821,4 +821,11 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
     gBufferUploadBytesThisFrame += uploadBytes;
 }
 
+#else
+
+void CompatGL_InvalidateCachePtr(const void *ptr)
+{
+	(void) ptr;
+}
+
 #endif // __EMSCRIPTEN__ || __ANDROID__

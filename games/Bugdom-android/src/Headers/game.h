@@ -219,8 +219,15 @@ extern	u_short						gAreaNum;
 extern	u_short						gLevelType;
 extern	u_short						gLevelTypeMask;
 extern	u_short						gRealLevel;
+extern	u_short						gResourceLevelType;
+extern	u_short						gResourceAreaNum;
 extern	unsigned long 				gScore;
 extern	char						gLevelTerrainOverride[512];
+extern	Boolean					GetLevelMetadataString(const char *key, char *value, size_t valueSize);
+extern	Boolean					GetLevelMetadataBool(const char *key, Boolean fallback);
+extern	Boolean					LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback);
+extern	int						LevelMetadataCaseFor(const char *key, int fallback);
+extern	void					PrepareLevelMetadata(void);
 
 #ifdef __cplusplus
 };

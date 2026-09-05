@@ -914,7 +914,7 @@ float	volume;
 	pt.x = x;
 	pt.z = z;
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.particles", gLevelNum) == LEVEL_NUM_BALSA)
 		volume = 7.0;
 	else
 		volume = 1.5;
@@ -1509,7 +1509,6 @@ float	x,y,z;
 		}
 	}
 }
-
 
 
 

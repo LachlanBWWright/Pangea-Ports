@@ -390,7 +390,7 @@ ObjNode	*newObj;
 		.rot		= 0,
 	};
 
-	if (gLevelNum == LEVEL_NUM_JUNGLE || gLevelNum == LEVEL_NUM_JUNGLEBOSS)
+	if (LevelMetadataProfileIs("level.jungleWeapons", "jungle", gLevelNum == LEVEL_NUM_JUNGLE || gLevelNum == LEVEL_NUM_JUNGLEBOSS))
 	{
 		// We do have a better model of the vial for those levels
 		def.group = MODEL_GROUP_LEVELSPECIFIC;
@@ -2617,7 +2617,6 @@ static void ExplodeDart(ObjNode *theNode)
 
 	DeleteObject(theNode);
 }
-
 
 
 

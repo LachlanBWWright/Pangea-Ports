@@ -33,6 +33,159 @@ static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *target);
 /**********************/
 
 Ptr		gTileFilePtr = nil;
+short	gNanosaurMetadataLevel = LEVEL_NUM_0;
+
+static Uint32 ReadMetadataBE32(const Byte* data)
+{
+	return ((Uint32)data[0] << 24) | ((Uint32)data[1] << 16) |
+		((Uint32)data[2] << 8) | (Uint32)data[3];
+}
+
+static Uint32 ReadMetadataBE24(const Byte* data)
+{
+	return ((Uint32)data[0] << 16) | ((Uint32)data[1] << 8) | (Uint32)data[2];
+}
+
+static Boolean MetadataRangeIsValid(Uint32 offset, Uint32 length, Uint32 fileSize)
+{
+	return offset <= fileSize && length <= fileSize - offset;
+}
+
+static Boolean ParseNanosaurMetadataJSON(const Byte* data, Uint32 length)
+{
+	char* json = (char*) SDL_malloc(length + 1);
+	if (!json)
+		return false;
+
+	SDL_memcpy(json, data, length);
+	json[length] = 0;
+
+	Boolean valid = SDL_strstr(json, "\"schemaVersion\":1") != nil &&
+		SDL_strstr(json, "\"game\":\"Nanosaur\"") != nil &&
+		SDL_strstr(json, "\"identity\":\"") != nil &&
+		SDL_strstr(json, "\"properties\":{") != nil;
+	char* properties = SDL_strstr(json, "\"properties\":{");
+	char* levelID = SDL_strstr(json, "\"level.id\":\"");
+	if (valid && properties && properties[SDL_strlen("\"properties\":{")] != '}')
+		valid = levelID != nil;
+	if (valid && levelID)
+	{
+		levelID += SDL_strlen("\"level.id\":\"");
+		valid = levelID[0] == '0' && levelID[1] == '"';
+		if (valid)
+			gNanosaurMetadataLevel = LEVEL_NUM_0;
+	}
+
+	SDL_free(json);
+	return valid;
+}
+
+Boolean LoadNanosaurMetadata(void)
+{
+	FSSpec spec;
+	short refNum;
+	long fileSize;
+	Byte* fileData;
+	OSErr error;
+	Uint32 dataOffset;
+	Uint32 mapOffset;
+	Uint32 dataLength;
+	Uint32 mapLength;
+	Uint32 typeListOffset;
+	Uint16 typeCount;
+	Byte* typeList;
+
+	gNanosaurMetadataLevel = gStartLevelNum;
+	SDL_memset(&spec, 0, sizeof(spec));
+	error = FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Level1.Meta.rsrc", &spec);
+	if (error != noErr || FSpOpenDF(&spec, fsRdPerm, &refNum) != noErr)
+		return false;
+	if (GetEOF(refNum, &fileSize) != noErr || fileSize < 16)
+	{
+		FSClose(refNum);
+		return false;
+	}
+
+	fileData = (Byte*) SDL_malloc((size_t) fileSize);
+	if (!fileData)
+	{
+		FSClose(refNum);
+		return false;
+	}
+	long readSize = fileSize;
+	error = FSRead(refNum, &readSize, (Ptr) fileData);
+	FSClose(refNum);
+	if (error != noErr || readSize != fileSize)
+	{
+		SDL_free(fileData);
+		return false;
+	}
+
+	dataOffset = ReadMetadataBE32(fileData);
+	mapOffset = ReadMetadataBE32(fileData + 4);
+	dataLength = ReadMetadataBE32(fileData + 8);
+	mapLength = ReadMetadataBE32(fileData + 12);
+	if (!MetadataRangeIsValid(dataOffset, dataLength, (Uint32)fileSize) ||
+		!MetadataRangeIsValid(mapOffset, mapLength, (Uint32)fileSize) ||
+		mapLength < 28)
+	{
+		SDL_free(fileData);
+		return false;
+	}
+
+	typeListOffset = UnpackU16BE(fileData + mapOffset + 24);
+	if (typeListOffset > mapLength - 2)
+	{
+		SDL_free(fileData);
+		return false;
+	}
+	typeList = fileData + mapOffset + typeListOffset;
+	typeCount = UnpackU16BE(typeList) + 1;
+	if ((Uint32)typeCount > (mapLength - typeListOffset - 2) / 8)
+	{
+		SDL_free(fileData);
+		return false;
+	}
+
+	for (Uint16 typeIndex = 0; typeIndex < typeCount; typeIndex++)
+	{
+		Byte* typeEntry = typeList + 2 + typeIndex * 8;
+		Uint16 resourceCount = UnpackU16BE(typeEntry + 4) + 1;
+		Uint16 referenceOffset = UnpackU16BE(typeEntry + 6);
+		Byte* references;
+		if (referenceOffset > mapLength - typeListOffset ||
+			(Uint32)resourceCount > (mapLength - typeListOffset - referenceOffset) / 12)
+			continue;
+		if (SDL_memcmp(typeEntry, "Meta", 4) != 0)
+			continue;
+
+		references = typeList + referenceOffset;
+		for (Uint16 resourceIndex = 0; resourceIndex < resourceCount; resourceIndex++)
+		{
+			Byte* resource = references + resourceIndex * 12;
+			Uint16 resourceID = UnpackU16BE(resource);
+			Uint32 resourceDataOffset = ReadMetadataBE24(resource + 5);
+			Uint32 resourceOffset;
+			Uint32 resourceLength;
+			if (resourceID != 1000 || dataOffset > (Uint32)fileSize ||
+				resourceDataOffset > (Uint32)fileSize - dataOffset)
+				continue;
+			resourceOffset = dataOffset + resourceDataOffset;
+			if (!MetadataRangeIsValid(resourceOffset, 4, (Uint32)fileSize))
+				continue;
+			resourceLength = ReadMetadataBE32(fileData + resourceOffset);
+			if (MetadataRangeIsValid(resourceOffset + 4, resourceLength, (Uint32)fileSize) &&
+				ParseNanosaurMetadataJSON(fileData + resourceOffset + 4, resourceLength))
+			{
+				SDL_free(fileData);
+				return true;
+			}
+		}
+	}
+
+	SDL_free(fileData);
+	return false;
+}
 
 
 /******************* LOAD SKELETON *******************/

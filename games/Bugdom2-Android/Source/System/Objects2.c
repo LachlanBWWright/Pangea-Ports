@@ -545,14 +545,14 @@ Boolean	onBlocker = false;
 			/* SHADOW IS ON TERRAIN */
 			/************************/
 
-	if (gLevelNum == LEVEL_NUM_BALSA)
+	if (LevelMetadataCaseFor("level.objects", gLevelNum) == LEVEL_NUM_BALSA)
 		RotateOnTerrain(shadowNode, 15, nil);
 	else
 		RotateOnTerrain(shadowNode, SHADOW_Y_OFF, nil);							// set transform matrix
 
 			/* CALC SCALE OF SHADOW */
 
-	if (gLevelNum == LEVEL_NUM_BALSA)											// special for balsa plane level
+	if (LevelMetadataCaseFor("level.objects", gLevelNum) == LEVEL_NUM_BALSA)											// special for balsa plane level
 	{
 		dist = (bottom - shadowNode->Coord.y) * (1.0f/6000.0f);					// as we go higher, shadow gets smaller
 		if (dist < 0.0f)
@@ -942,7 +942,6 @@ float	x,z;
 		theNode->Speed2D = 0;
 	}
 }
-
 
 
 

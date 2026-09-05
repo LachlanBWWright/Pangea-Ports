@@ -130,7 +130,7 @@ void InitPlayersAtStartOfLevel(void)
 
 	gExitRocket = nil;
 
-	if (gLevelNum == LEVEL_NUM_SAUCER)							// scale down rocket for saucer level
+	if (LevelMetadataProfileIs("level.rocketScale", "small", gLevelNum == LEVEL_NUM_SAUCER))							// scale down rocket for saucer level
 		gRocketScaleAdjust = .4f;
 	else
 		gRocketScaleAdjust = 1.0f;
@@ -151,8 +151,7 @@ void InitPlayersAtStartOfLevel(void)
 
 	gPlayerInfo.invincibilityTimer = 0;
 
-	if ((gLevelNum == LEVEL_NUM_BLOBBOSS) ||				// player still has full fuel on Blob Boss from prev level
-		(gLevelNum == LEVEL_NUM_JUNGLEBOSS))
+	if (LevelMetadataProfileIs("level.startingFuel", "full", gLevelNum == LEVEL_NUM_BLOBBOSS || gLevelNum == LEVEL_NUM_JUNGLEBOSS))
 		gPlayerInfo.fuel = 1;
 	else
 		gPlayerInfo.fuel = 0;
@@ -176,7 +175,7 @@ void InitPlayersAtStartOfLevel(void)
 	gFreezeCameraFromXZ		= false;
 
 	gPlayerHasLanded = true;							// assume true, will get overridden by rocket init code if not true
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.player", gLevelNum))
 	{
 		case	LEVEL_NUM_BLOBBOSS:
 				InitPlayer_Robot(&gPlayerInfo.coord, gPlayerInfo.startRotY);
@@ -501,7 +500,7 @@ ObjNode	*player = gPlayerInfo.objNode;
 	gExplodePlayerAfterElectrocute 	= false;
 
 
-	if (gLevelNum != LEVEL_NUM_SAUCER)									// dont do some of this on saucer level
+	if (!GetLevelMetadataBool("level.saucerMode", gLevelNum == LEVEL_NUM_SAUCER))									// dont do some of this on saucer level
 	{
 		ObjNode	*leftHand = gPlayerInfo.leftHandObj;
 		ObjNode	*rightHand = gPlayerInfo.rightHandObj;
@@ -905,14 +904,9 @@ static void MoveRocketShip(ObjNode *rocket)
 	/* SEE IF DISPLAY HELP */
 
 
-	switch(gLevelNum)
+	if (GetLevelMetadataBool("level.exitHelp", gLevelNum != LEVEL_NUM_BRAINBOSS
+		&& gLevelNum != LEVEL_NUM_JUNGLEBOSS && gLevelNum != LEVEL_NUM_SAUCER))
 	{
-		case	LEVEL_NUM_BRAINBOSS:				// no help on these levels
-		case	LEVEL_NUM_JUNGLEBOSS:
-		case	LEVEL_NUM_SAUCER:
-				break;
-
-		default:
 				if (rocket->Kind == ROCKET_KIND_EXIT)
 				{
 					if (!gHelpMessageDisabled[HELP_MESSAGE_ENTERSHIP])
@@ -1215,25 +1209,23 @@ ObjNode	*door = rocket->ChainNode;
 		}
 		else
 		{
-			if (gLevelNum == LEVEL_NUM_JUNGLEBOSS)	// the rocket becomes the exit rocket on the Jungle Boss level
+			Boolean rocketExitConditionMet = false;
+			if (GetLevelMetadataBool("level.rocketExit", gLevelNum == LEVEL_NUM_JUNGLEBOSS || gLevelNum == LEVEL_NUM_BRAINBOSS))
 			{
-				if (gTractorBeamObj)				// if tractor beam still active, then just wait
-				{
-					rocket->Kind = ROCKET_KIND_EXIT;
-					rocket->Mode = ROCKET_MODE_WAITING;
-				}
+				if (LevelMetadataProfileIs("level.rocketExitTrigger", "tractor-beam-active", gLevelNum == LEVEL_NUM_JUNGLEBOSS))
+					rocketExitConditionMet = gTractorBeamObj != nil;
 				else
-					goto leave;
+				if (LevelMetadataProfileIs("level.rocketExitTrigger", "player-landed", gLevelNum != LEVEL_NUM_JUNGLEBOSS))
+					rocketExitConditionMet = gPlayerHasLanded;
 			}
-			else
-			if ((gLevelNum == LEVEL_NUM_BRAINBOSS) && gPlayerHasLanded)	//  the rocket becomes the exit rocket on the Brain Boss level
+
+			if (rocketExitConditionMet)
 			{
 				rocket->Kind = ROCKET_KIND_EXIT;
 				rocket->Mode = ROCKET_MODE_WAITING;
 			}
 			else
 			{
-leave:
 				if (rocket->Kind == ROCKET_KIND_EXIT)
 					HidePlayer(gPlayerInfo.objNode);												// hide otto so gun doesnt poke thru hull
 				rocket->Mode = ROCKET_MODE_LEAVE;
@@ -1428,14 +1420,9 @@ ObjNode	*door = rocket->ChainNode;
 
 			/* SEE IF OUT OF RANGE */
 
-	switch(gLevelNum)									// keep the rocket here on the Jungle Boss level, et.al.
+	if (!GetLevelMetadataBool("level.rocketPersistence", gLevelNum == LEVEL_NUM_JUNGLEBOSS
+		|| gLevelNum == LEVEL_NUM_SAUCER || gLevelNum == LEVEL_NUM_BRAINBOSS))
 	{
-		case	LEVEL_NUM_JUNGLEBOSS:
-		case	LEVEL_NUM_SAUCER:
-		case	LEVEL_NUM_BRAINBOSS:
-				break;
-
-		default:
 				if (TrackTerrainItem(rocket))
 				{
 					DeleteObject(rocket);
@@ -1451,7 +1438,7 @@ ObjNode	*door = rocket->ChainNode;
 
 		/* SEE IF SHOULD OPEN DOOR */
 
-	if (gLevelNum == LEVEL_NUM_JUNGLEBOSS)			// on this level, the door can't open until the tractor beam is gone
+	if (GetLevelMetadataBool("level.rocketTractorBeamGate", gLevelNum == LEVEL_NUM_JUNGLEBOSS))			// on this level, the door can't open until the tractor beam is gone
 	{
 		if (gTractorBeamObj)
 			goto update;
@@ -1459,7 +1446,7 @@ ObjNode	*door = rocket->ChainNode;
 
 	if (CalcQuickDistance(rocket->Coord.x, rocket->Coord.z, gPlayerInfo.coord.x, gPlayerInfo.coord.z) < 900.0f)	// see if close enough
 	{
-		if (gLevelNum == LEVEL_NUM_BRAINBOSS)						// don't do anything until boss is dead
+		if (GetLevelMetadataBool("level.rocketBossGate", gLevelNum == LEVEL_NUM_BRAINBOSS))						// don't do anything until boss is dead
 		{
 			if (!gBrainBossDead)
 				goto update;
@@ -1467,10 +1454,7 @@ ObjNode	*door = rocket->ChainNode;
 
 		if (gPlayerInfo.fuel < 1.0f)								// see if have enough fuel to leave
 		{
-			if (gLevelNum == LEVEL_NUM_JUNGLEBOSS)					// don't need fuel on Jungle Boss
-				goto open_door;
-
-			if (gLevelNum == LEVEL_NUM_SAUCER)						// or Saucer
+			if (!GetLevelMetadataBool("level.rocketFuel", gLevelNum != LEVEL_NUM_JUNGLEBOSS && gLevelNum != LEVEL_NUM_SAUCER))					// don't need fuel on selected levels
 				goto open_door;
 
 			DisplayHelpMessage(HELP_MESSAGE_NOTENOUGHFUELTOLEAVE, 1.0, true);
@@ -1506,14 +1490,9 @@ ObjNode	*door = rocket->ChainNode;
 
 			/* SEE IF OUT OF RANGE */
 
-	switch(gLevelNum)									// keep the rocket here on the Jungle Boss level, et.al.
+	if (!GetLevelMetadataBool("level.rocketPersistence", gLevelNum == LEVEL_NUM_JUNGLEBOSS
+		|| gLevelNum == LEVEL_NUM_SAUCER || gLevelNum == LEVEL_NUM_BRAINBOSS))
 	{
-		case	LEVEL_NUM_JUNGLEBOSS:
-		case	LEVEL_NUM_SAUCER:
-		case	LEVEL_NUM_BRAINBOSS:
-				break;
-
-		default:
 				if (TrackTerrainItem(rocket))
 				{
 					DeleteObject(rocket);
@@ -1533,7 +1512,7 @@ ObjNode	*door = rocket->ChainNode;
 
 	if (CalcQuickDistance(rocket->Coord.x, rocket->Coord.z, gPlayerInfo.coord.x, gPlayerInfo.coord.z) > 1200.0f)
 	{
-		if (gLevelNum != LEVEL_NUM_SAUCER)					// keep door open on this level
+		if (!GetLevelMetadataBool("level.rocketDoorStaysOpen", gLevelNum == LEVEL_NUM_SAUCER))					// keep door open on this level
 		{
 			rocket->Mode = ROCKET_MODE_CLOSEDOOR;
 			PlayEffect3D(EFFECT_HATCH, &door->Coord);
@@ -1548,7 +1527,7 @@ ObjNode	*door = rocket->ChainNode;
 	else
 	if (player->StatusBits & STATUS_BIT_ONGROUND)
 	{
-		if (gLevelNum == LEVEL_NUM_BLOB)										// do special check for blob world
+		if (GetLevelMetadataBool("level.blobLandingWell", gLevelNum == LEVEL_NUM_BLOB))										// do special check for Blob World
 		{
 			CheckIfPlayerSuckedIntoBlobWell(player, rocket);
 		}

@@ -224,7 +224,7 @@ int	deathType = PLAYER_DEATH_TYPE_FALLOVER;
 	if (player->Skeleton->AnimNum == PLAYER_ANIM_DRIVESLOTCAR)			// cant get hurt if driving
 		return;
 
-	if (gLevelNum == LEVEL_NUM_BALSA)									// special for balsa level
+	if (LevelMetadataCaseFor("level.player", gLevelNum) == LEVEL_NUM_BALSA)									// special for balsa level
 	{
 		HurtPlayerOnBalsaPlane();
 		deathType = PLAYER_DEATH_TYPE_BALSA;
@@ -477,7 +477,7 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 			/* SET PLAYER ANIM & CAMERA */
 
-	if (gLevelNum == LEVEL_NUM_BALSA)								// special for balsa level
+	if (LevelMetadataCaseFor("level.player", gLevelNum) == LEVEL_NUM_BALSA)								// special for balsa level
 	{
 		ResetPlayerOnBalsaPlane(player);
 	}
@@ -489,7 +489,7 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 			/* RESET RISING WATER ON GARBAGE LEVEL */
 
-	if (gLevelNum == LEVEL_NUM_GARBAGE)
+	if (LevelMetadataCaseFor("level.player", gLevelNum) == LEVEL_NUM_GARBAGE)
 	{
 		ResetRisingWater();
 
@@ -1302,8 +1302,6 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 	UpdateObjectTransforms(theNode);
 }
-
-
 
 
 

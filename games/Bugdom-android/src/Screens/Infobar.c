@@ -1197,7 +1197,7 @@ int		w,x;
 
 		/* DETERMINE HEALTH */
 		
-	switch(gRealLevel)
+	switch(LevelMetadataCaseFor("presentation.infobar", gRealLevel))
 	{
 		case	LEVEL_NUM_FLIGHT:
 				if (gHiveObj == nil)

@@ -249,6 +249,7 @@ void LoadAreaArt(void)
 
 	GAME_ASSERT(gAreaNum < 3);
 	SDL_snprintf(path, sizeof(path), ":Maps:%s.map-%d", sceneName, gAreaNum + 1);
+	LoadLevelMetadata(gCustomMapPath[0] != '\0' ? gCustomMapPath : path);
 	LoadPlayfield(path);
 	FillThermometer(80);
 }

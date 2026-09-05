@@ -18,12 +18,183 @@ static int gScriptLoadedSaveSlot;
 #endif
 #include "stb_image.h"
 
+static char *gLevelMetadataJSON;
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
 
 static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, int skeletonType);
 static void ReadDataFromPlayfieldFile(FSSpec *specPtr);
+void ReadLevelMetadata(void);
+
+static Boolean IsMetadataJSONWellFormed(const char *json)
+{
+	int depth = 0;
+	Boolean inString = false;
+	Boolean escaped = false;
+	Boolean rootClosed = false;
+	const char *cursor;
+	if (!json) return false;
+	for (cursor = json; *cursor; cursor++)
+	{
+		if (rootClosed)
+		{
+			if (*cursor != ' ' && *cursor != '\t' && *cursor != '\r' && *cursor != '\n') return false;
+			continue;
+		}
+		if (escaped)
+		{
+			escaped = false;
+			continue;
+		}
+		if (*cursor == '\\' && inString)
+		{
+			escaped = true;
+			continue;
+		}
+		if (*cursor == '\"') inString = !inString;
+		if (inString) continue;
+		if (*cursor == '{') depth++;
+		if (*cursor == '}' && --depth < 0) return false;
+		if (depth == 0 && *cursor == '}') rootClosed = true;
+	}
+	return !inString && !escaped && depth == 0 && rootClosed;
+}
+
+Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
+{
+	char needle[96];
+	const char *start;
+	const char *end;
+	size_t length;
+	if (!gLevelMetadataJSON || !key || !value || valueSize == 0) return false;
+	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
+	start = strstr(gLevelMetadataJSON, needle);
+	if (!start) return false;
+	start += strlen(needle);
+	end = strchr(start, '\"');
+	if (!end) return false;
+	length = (size_t)(end - start);
+	if (length >= valueSize) return false;
+	SDL_memcpy(value, start, length);
+	value[length] = '\0';
+	return true;
+}
+
+Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
+{
+	char value[8];
+	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (!SDL_strcasecmp(value, "true")) return true;
+	if (!SDL_strcasecmp(value, "false")) return false;
+	return fallback;
+}
+
+Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (!SDL_strcasecmp(key, "level.items") &&
+		SDL_strcasecmp(value, "forest") && SDL_strcasecmp(value, "desert") && SDL_strcasecmp(value, "swamp")) return fallback;
+	if (!SDL_strcasecmp(key, "level.minePlacement") &&
+		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "forest")) return fallback;
+	if (!SDL_strcasecmp(key, "level.turretRange") &&
+		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "adventure1")) return fallback;
+	if (!SDL_strcasecmp(key, "level.doorMotion") &&
+		SDL_strcasecmp(value, "limited") && SDL_strcasecmp(value, "continuous")) return fallback;
+	if (!SDL_strcasecmp(key, "level.flightHeight") &&
+		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "adventure1")) return fallback;
+	if (!SDL_strcasecmp(key, "level.raceMarkers") &&
+		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "race")) return fallback;
+	if (!SDL_strcasecmp(key, "level.player") &&
+		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "adventure1") && SDL_strcasecmp(value, "race")) return fallback;
+	if (!SDL_strcasecmp(key, "level.intro") &&
+		SDL_strcasecmp(value, "none") && SDL_strcasecmp(value, "level1") && SDL_strcasecmp(value, "level2")) return fallback;
+	return !SDL_strcasecmp(value, profile);
+}
+
+int LevelMetadataCaseFor(const char *key, int fallback)
+{
+	char value[64];
+	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (!SDL_strcasecmp(value, "source-default")) return fallback;
+	if (!SDL_strcasecmp(value, "forest")) return BIOME_FOREST;
+	if (!SDL_strcasecmp(value, "desert")) return BIOME_DESERT;
+	if (!SDL_strcasecmp(value, "swamp")) return BIOME_SWAMP;
+	if (!SDL_strcasecmp(value, "adventure")) return VS_MODE_NONE;
+	if (!SDL_strcasecmp(value, "race")) return VS_MODE_RACE;
+	if (!SDL_strcasecmp(value, "battle")) return VS_MODE_BATTLE;
+	if (!SDL_strcasecmp(value, "capture-the-flag")) return VS_MODE_CAPTURETHEFLAG;
+	return fallback;
+}
+
+int LevelMetadataMapViewFor(const char *key, int fallback)
+{
+	char value[32];
+	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (!SDL_strcasecmp(value, "level1")) return LEVEL_NUM_ADVENTURE1;
+	if (!SDL_strcasecmp(value, "level2")) return LEVEL_NUM_ADVENTURE2;
+	if (!SDL_strcasecmp(value, "level3")) return LEVEL_NUM_ADVENTURE3;
+	if (!SDL_strcasecmp(value, "race1")) return LEVEL_NUM_RACE1;
+	if (!SDL_strcasecmp(value, "race2")) return LEVEL_NUM_RACE2;
+	if (!SDL_strcasecmp(value, "flag1")) return LEVEL_NUM_FLAG1;
+	if (!SDL_strcasecmp(value, "flag2")) return LEVEL_NUM_FLAG2;
+	if (!SDL_strcasecmp(value, "battle1")) return LEVEL_NUM_BATTLE1;
+	if (!SDL_strcasecmp(value, "battle2")) return LEVEL_NUM_BATTLE2;
+	return fallback;
+}
+
+int GetDefaultBiomeForLevel(short levelNum)
+{
+	switch (levelNum)
+	{
+		case LEVEL_NUM_ADVENTURE1:
+		case LEVEL_NUM_BATTLE1:
+		case LEVEL_NUM_FLAG2: return BIOME_FOREST;
+		case LEVEL_NUM_ADVENTURE2:
+		case LEVEL_NUM_RACE2:
+		case LEVEL_NUM_BATTLE2: return BIOME_DESERT;
+		default: return BIOME_SWAMP;
+	}
+}
+
+void ReadLevelMetadata(void)
+{
+	Handle hand = GetResource('Meta', 1000);
+	Size size;
+	char *json;
+	if (gLevelMetadataJSON)
+	{
+		SafeDisposePtr(gLevelMetadataJSON);
+		gLevelMetadataJSON = NULL;
+	}
+	if (!hand) return;
+	size = GetHandleSize(hand);
+	if (size <= 0 || size > 64 * 1024)
+	{
+		ReleaseResource(hand);
+		return;
+	}
+	json = (char *) AllocPtrClear(size + 1);
+	if (!json)
+	{
+		ReleaseResource(hand);
+		return;
+	}
+	SDL_memcpy(json, *hand, (size_t) size);
+	if (!IsMetadataJSONWellFormed(json) || json[0] != '{' ||
+		!strstr(json, "\"schemaVersion\":1,\"game\":\"nanosaur2\"") ||
+		!strstr(json, "\"properties\":{"))
+	{
+		SafeDisposePtr(json);
+		ReleaseResource(hand);
+		return;
+	}
+	gLevelMetadataJSON = json;
+	gVSMode = (short) LevelMetadataCaseFor("level.mode", GetVSModeForLevel(gLevelNum));
+	ReleaseResource(hand);
+}
 
 /****************************/
 /*    CONSTANTS             */

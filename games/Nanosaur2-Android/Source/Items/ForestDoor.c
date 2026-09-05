@@ -61,19 +61,17 @@ Byte				keyID = itemPtr->parm[0];
 float				rot = (float)itemPtr->parm[1] * (PI/2);
 short			type;
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.items", GetDefaultBiomeForLevel(gLevelNum)))
 	{
-		case	LEVEL_NUM_ADVENTURE1:
+		case	BIOME_FOREST:
 				type = LEVEL1_ObjType_ForestDoor_Wall;
 				break;
 
-		case	LEVEL_NUM_ADVENTURE2:
+		case	BIOME_DESERT:
 				type = LEVEL2_ObjType_ForestDoor_Wall;
 				break;
 
-		case	LEVEL_NUM_ADVENTURE3:
-		case	LEVEL_NUM_RACE1:
-		case	LEVEL_NUM_FLAG1:
+		case	BIOME_SWAMP:
 				type = LEVEL3_ObjType_ForestDoor_Wall;
 				break;
 
@@ -185,7 +183,7 @@ ObjNode	*ring = door->ChainNode;
 
 		door->Rot.z -= fps;
 
-		if (gLevelNum != LEVEL_NUM_ADVENTURE3)			// on level 3 we'll keep the door spinning
+		if (!LevelMetadataProfileIs("level.doorMotion", "continuous", gLevelNum == LEVEL_NUM_ADVENTURE3))			// on level 3 we'll keep the door spinning
 		{
 			if (door->Rot.z < -PI)
 				door->Rot.z = -PI;
@@ -460,11 +458,6 @@ OGLVector3D	v, delta;
 
 	keyHolder->ChainNode = nil;
 }
-
-
-
-
-
 
 
 

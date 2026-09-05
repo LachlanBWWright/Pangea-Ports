@@ -1281,7 +1281,7 @@ void MeHitBonusObject(ObjNode *targetNode)
 
 					/* SEE IF HIT SPACESHIP */
 	else
-	if ((gSceneNum == SCENE_BARGAIN) && (targetNode->Type == ObjType_SpaceShip) &&
+	if ((LevelMetadataScene("area.character", gSceneNum) == SCENE_BARGAIN) && (targetNode->Type == ObjType_SpaceShip) &&
 		(gSpaceShipFlag != true))
 	{
 		TurnMeIntoShip(targetNode);
@@ -1301,7 +1301,7 @@ Boolean	delFlag;
 
 			/* SPECIAL CHECK FOR WITCH-FROG */
 
-	if (gSceneNum == SCENE_FAIRY)
+	if (LevelMetadataScene("area.character", gSceneNum) == SCENE_FAIRY)
 	{
 		if ((targetNode->Type == ObjType_Witch) && (targetNode->SpriteGroupNum == GroupNum_Witch))
 		{
@@ -1321,7 +1321,7 @@ Boolean	delFlag;
 	if (targetNode->CType & CTYPE_ENEMYB)
 	{
 		delFlag = true;								// assume will delete the bullet
-		switch(gSceneNum)							// see if do something special with the bullet
+		switch(LevelMetadataScene("area.projectiles", gSceneNum))							// see if do something special with the bullet
 		{
 			case	SCENE_CLOWN:
 					delFlag = false;

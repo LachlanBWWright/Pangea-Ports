@@ -402,7 +402,7 @@ void DoSceneScreen(void)
 	PlaySong(SONG_ID_WORLD_INTRO);
 
 	const char* imagePath = nil;
-	switch (gSceneNum)
+	switch (LevelMetadataScene("scene.cinema", gSceneNum))
 	{
 		case SCENE_JURASSIC:		imagePath = ":Images:dinoscene.tga";		break;
 		case SCENE_CANDY:			imagePath = ":Images:candyscene.tga";		break;
@@ -1157,7 +1157,7 @@ short	counter,i;
 
 					/* PLAY INTRO MELODY */
 
-	switch(gSceneNum)
+	switch(LevelMetadataScene("scene.cinema", gSceneNum))
 	{
 		case	SCENE_JURASSIC:		PlaySong(SONG_ID_JURASSIC_INTRO);		break;
 		case	SCENE_CANDY:		PlaySong(SONG_ID_CANDY_INTRO);			break;
@@ -1182,8 +1182,9 @@ short	counter,i;
 
 					/* GET FROM / TO COORDS */
 
-	destX = toCoord[gSceneNum][gAreaNum].h+OFFSCREEN_BORDER_WIDTHX;
-	destY = toCoord[gSceneNum][gAreaNum].v+OFFSCREEN_BORDER_WIDTHY;
+	int cinemaScene = LevelMetadataScene("scene.cinema", gSceneNum);
+	destX = toCoord[cinemaScene][gAreaNum].h+OFFSCREEN_BORDER_WIDTHX;
+	destY = toCoord[cinemaScene][gAreaNum].v+OFFSCREEN_BORDER_WIDTHY;
 
 	if ((gSceneNum == 0) && (gAreaNum == 0))									// special case start
 	{
@@ -1199,8 +1200,8 @@ short	counter,i;
 		}
 		else
 		{
-			fromX = toCoord[gSceneNum][gAreaNum-1].h+OFFSCREEN_BORDER_WIDTHX;
-			fromY = toCoord[gSceneNum][gAreaNum-1].v+OFFSCREEN_BORDER_WIDTHY;
+			fromX = toCoord[cinemaScene][gAreaNum-1].h+OFFSCREEN_BORDER_WIDTHX;
+			fromY = toCoord[cinemaScene][gAreaNum-1].v+OFFSCREEN_BORDER_WIDTHY;
 		}
 	}
 
@@ -1218,7 +1219,7 @@ short	counter,i;
 				200,nil,SCREEN_RELATIVE);
 
 	for (i=0; i < gAreaNum; i++)
-			MakeNewShape(GroupNum_OverheadIcons,ObjType_OverheadIcons,3,toCoord[gSceneNum][i].h,toCoord[gSceneNum][i].v,
+			MakeNewShape(GroupNum_OverheadIcons,ObjType_OverheadIcons,3,toCoord[cinemaScene][i].h,toCoord[cinemaScene][i].v,
 						200,nil,SCREEN_RELATIVE);
 
 						/* PLAYER SIGNAL */
@@ -1646,7 +1647,7 @@ short	selection;
 				/* SHOW BUNNY BONUS */
 
 	bonus = 0;
-	for (i=0; i < gBunnyCounts[gSceneNum][gAreaNum]; i++)
+	for (i=0; i < gBunnyCounts[LevelMetadataScene("scene.bunnyCounts", gSceneNum)][gAreaNum]; i++)
 	{
 		htab = 80;
 		vtab = 130;
@@ -1715,12 +1716,12 @@ short	selection;
 //						goto bye;
 //					break;
 			case	DIFFICULTY_EASY:
-					if (gSceneNum == 2)
+					if (LevelMetadataScene("scene.progression", gSceneNum) == 2)
 						goto bye;
 					break;
 			case	DIFFICULTY_NORMAL:
 			case	DIFFICULTY_HARD:
-					if (gSceneNum == 4)
+					if (LevelMetadataScene("scene.progression", gSceneNum) == 4)
 						goto bye;
 					break;
 		}
@@ -1835,6 +1836,3 @@ register short	i,digit;
 		num = num/10;
 	}
 }
-
-
-

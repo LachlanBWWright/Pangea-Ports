@@ -42,6 +42,9 @@ static Boolean PlayGame_Tag(void);
 static Boolean PlayGame_Survival(void);
 static Boolean PlayGame_CaptureTheFlag(void);
 static void UpdateGameModeSpecifics(void);
+static void PlayTrackMusic(void);
+static void SetTrackLighting(OGLSetupInputType* viewDef);
+static void SetTrackSkyColor(OGLSetupInputType* viewDef);
 
 static void TallyTokens(void);
 
@@ -1180,14 +1183,100 @@ void MoveEverything(void)
 
 			/* DO TRACK SPECIFICS */
 
-	switch(gTrackNum)
-	{
-		case	TRACK_NUM_ICE:
-		case	TRACK_NUM_RAMPS:
-				MakeSnow();
-				break;
+	if (LevelMetadataProfileIs("track.surfaceEffects", "snow", gTrackNum == TRACK_NUM_ICE || gTrackNum == TRACK_NUM_RAMPS))
+		MakeSnow();
+}
 
+
+static void PlayTrackMusic(void)
+{
+	if (LevelMetadataProfileIs("track.music", "desert", gTrackNum == TRACK_NUM_DESERT))
+		PlaySong(SONG_DESERT, true);
+	else if (LevelMetadataProfileIs("track.music", "jungle", gTrackNum == TRACK_NUM_JUNGLE || gTrackNum == TRACK_NUM_AZTEC))
+		PlaySong(SONG_JUNGLE, true);
+	else if (LevelMetadataProfileIs("track.music", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS || gTrackNum == TRACK_NUM_TARPITS))
+		PlaySong(SONG_ATLANTIS, true);
+	else if (LevelMetadataProfileIs("track.music", "china", gTrackNum == TRACK_NUM_CHINA || gTrackNum == TRACK_NUM_SPIRAL))
+		PlaySong(SONG_CHINA, true);
+	else if (LevelMetadataProfileIs("track.music", "egypt", gTrackNum == TRACK_NUM_EGYPT))
+		PlaySong(SONG_EGYPT, true);
+	else if (LevelMetadataProfileIs("track.music", "crete", gTrackNum == TRACK_NUM_CRETE || gTrackNum == TRACK_NUM_CELTIC || gTrackNum == TRACK_NUM_COLISEUM))
+		PlaySong(SONG_CRETE, true);
+	else if (LevelMetadataProfileIs("track.music", "ice", gTrackNum == TRACK_NUM_ICE || gTrackNum == TRACK_NUM_RAMPS))
+		PlaySong(SONG_ICE, true);
+	else if (LevelMetadataProfileIs("track.music", "europe", gTrackNum == TRACK_NUM_EUROPE || gTrackNum == TRACK_NUM_STONEHENGE))
+		PlaySong(SONG_EUROPE, true);
+	else if (LevelMetadataProfileIs("track.music", "viking", gTrackNum == TRACK_NUM_SCANDINAVIA))
+		PlaySong(SONG_VIKING, true);
+	else
+		PlaySong(SONG_DESERT, true);
+}
+
+
+static void SetTrackLighting(OGLSetupInputType* viewDef)
+{
+	if (LevelMetadataProfileIs("track.lighting", "ice", gTrackNum == TRACK_NUM_ICE))
+	{
+		viewDef->lights.numFillLights = 1;
+		viewDef->lights.ambientColor.r = .7;
+		viewDef->lights.ambientColor.g = .7;
+		viewDef->lights.ambientColor.b = .7;
+		viewDef->lights.fillDirection[0] = (OGLVector3D){1.0, -.1, 1.0};
+		viewDef->lights.fillColor[0] = (OGLColorRGBA){1.0, 1.0, 1.0, 1.0};
 	}
+	else if (LevelMetadataProfileIs("track.lighting", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS))
+	{
+		viewDef->lights.numFillLights = 1;
+		viewDef->lights.ambientColor.r = .5;
+		viewDef->lights.ambientColor.g = .5;
+		viewDef->lights.ambientColor.b = .7;
+		viewDef->lights.fillDirection[0] = (OGLVector3D){0, -1.0, 0};
+		viewDef->lights.fillColor[0] = (OGLColorRGBA){.9, .9, 1.0, 1.0};
+	}
+	else
+	{
+		viewDef->lights.numFillLights = 1;
+		OGLVector3D_Normalize(&gWorldSunDirection, &gWorldSunDirection);
+		viewDef->lights.ambientColor.r = .6;
+		viewDef->lights.ambientColor.g = .6;
+		viewDef->lights.ambientColor.b = .6;
+		viewDef->lights.fillDirection[0] = gWorldSunDirection;
+		viewDef->lights.fillColor[0] = gFillColor1;
+		viewDef->lights.fillDirection[1] = (OGLVector3D){-gWorldSunDirection.x, gWorldSunDirection.y, -gWorldSunDirection.z};
+		viewDef->lights.fillColor[1] = gFillColor2;
+	}
+}
+
+
+static void SetTrackSkyColor(OGLSetupInputType* viewDef)
+{
+	const Boolean ice = gTrackNum == TRACK_NUM_ICE || gTrackNum == TRACK_NUM_RAMPS;
+	const Boolean blueJungle = gTrackNum == TRACK_NUM_JUNGLE || gTrackNum == TRACK_NUM_AZTEC;
+	const Boolean crete = gTrackNum == TRACK_NUM_SPIRAL || gTrackNum == TRACK_NUM_CRETE || gTrackNum == TRACK_NUM_CELTIC || gTrackNum == TRACK_NUM_MAZE;
+	const Boolean egypt = gTrackNum == TRACK_NUM_EGYPT || gTrackNum == TRACK_NUM_TARPITS;
+	const Boolean scandinavia = gTrackNum == TRACK_NUM_SCANDINAVIA || gTrackNum == TRACK_NUM_STONEHENGE;
+	if (LevelMetadataProfileIs("track.sky", "desert", gTrackNum == TRACK_NUM_DESERT))
+		viewDef->view.clearColor = (OGLColorRGBA){153.0/255.0, 171.0/255.0, 237.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "jungle", blueJungle))
+		viewDef->view.clearColor = (OGLColorRGBA){82.0/255.0, 148.0/255.0, 198.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "ice", ice))
+		viewDef->view.clearColor = (OGLColorRGBA){115.0/255.0, 198.0/255.0, 255.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "crete", crete))
+		viewDef->view.clearColor = (OGLColorRGBA){44.0/255.0, 73.0/255.0, 195.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "china", gTrackNum == TRACK_NUM_CHINA))
+		viewDef->view.clearColor = (OGLColorRGBA){179.0/255.0, 153.0/255.0, 91.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "egypt", egypt))
+		viewDef->view.clearColor = (OGLColorRGBA){222.0/255.0, 181.0/255.0, 99.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "europe", gTrackNum == TRACK_NUM_EUROPE))
+		viewDef->view.clearColor = (OGLColorRGBA){16.0/255.0, 16.0/255.0, 74.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "scandinavia", scandinavia))
+		viewDef->view.clearColor = (OGLColorRGBA){74.0/255.0, 90.0/255.0, 148.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS))
+		viewDef->view.clearColor = (OGLColorRGBA){5.0/255.0, 160.0/255.0, 190.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "aztec", gTrackNum == TRACK_NUM_AZTEC))
+		viewDef->view.clearColor = (OGLColorRGBA){82.0/255.0, 148.0/255.0, 198.0/255.0, 1};
+	else if (LevelMetadataProfileIs("track.sky", "coliseum", gTrackNum == TRACK_NUM_COLISEUM))
+		viewDef->view.clearColor = (OGLColorRGBA){61.0/255.0, 87.0/255.0, 198.0/255.0, 1};
 }
 
 
@@ -1207,54 +1296,7 @@ short				numPanes;
 #endif
 
 
-	switch(gTrackNum)
-	{
-		case	TRACK_NUM_DESERT:
-				PlaySong(SONG_DESERT, true);
-				break;
-
-		case	TRACK_NUM_JUNGLE:
-		case	TRACK_NUM_AZTEC:
-				PlaySong(SONG_JUNGLE, true);
-				break;
-
-		case	TRACK_NUM_ATLANTIS:
-		case	TRACK_NUM_TARPITS:
-				PlaySong(SONG_ATLANTIS, true);
-				break;
-
-		case	TRACK_NUM_CHINA:
-		case	TRACK_NUM_SPIRAL:
-				PlaySong(SONG_CHINA, true);
-				break;
-
-		case	TRACK_NUM_EGYPT:
-				PlaySong(SONG_EGYPT, true);
-				break;
-
-		case	TRACK_NUM_CRETE:
-		case	TRACK_NUM_CELTIC:
-		case	TRACK_NUM_COLISEUM:
-				PlaySong(SONG_CRETE, true);
-				break;
-
-		case	TRACK_NUM_ICE:
-		case	TRACK_NUM_RAMPS:
-				PlaySong(SONG_ICE, true);
-				break;
-
-		case	TRACK_NUM_EUROPE:
-		case	TRACK_NUM_STONEHENGE:
-				PlaySong(SONG_EUROPE, true);
-				break;
-
-		case	TRACK_NUM_SCANDINAVIA:
-				PlaySong(SONG_VIKING, true);
-				break;
-
-		default:
-				PlaySong(SONG_DESERT, true);
-	}
+	PlayTrackMusic();
 
 
 
@@ -1309,133 +1351,14 @@ short				numPanes;
 
 			/* SET LIGHTS */
 
-	switch(gTrackNum)
-	{
-		case	TRACK_NUM_ICE:
-				viewDef.lights.numFillLights 	= 1;
-
-				viewDef.lights.ambientColor.r 		= .7;
-				viewDef.lights.ambientColor.g 		= .7;
-				viewDef.lights.ambientColor.b 		= .7;
-				viewDef.lights.fillDirection[0].x 	= 1.0;
-				viewDef.lights.fillDirection[0].y 	= -.1;
-				viewDef.lights.fillDirection[0].z 	= 1.0;
-				viewDef.lights.fillColor[0].r 		= 1.0;
-				viewDef.lights.fillColor[0].g 		= 1.0;
-				viewDef.lights.fillColor[0].b 		= 1.0;
-				break;
-
-		case	TRACK_NUM_ATLANTIS:
-				viewDef.lights.numFillLights 		= 1;
-
-				viewDef.lights.ambientColor.r 		= .5;
-				viewDef.lights.ambientColor.g 		= .5;
-				viewDef.lights.ambientColor.b 		= .7;
-				viewDef.lights.fillDirection[0].x 	= 0;
-				viewDef.lights.fillDirection[0].y 	= -1.0;
-				viewDef.lights.fillDirection[0].z 	= 0;
-				viewDef.lights.fillColor[0].r 		= .9;
-				viewDef.lights.fillColor[0].g 		= .9;
-				viewDef.lights.fillColor[0].b 		= 1.0;
-				break;
-
-		default:
-				viewDef.lights.numFillLights 		= 1;
-				OGLVector3D_Normalize(&gWorldSunDirection,&gWorldSunDirection);
-
-				viewDef.lights.ambientColor.r 		= .6;
-				viewDef.lights.ambientColor.g 		= .6;
-				viewDef.lights.ambientColor.b 		= .6;
-				viewDef.lights.fillDirection[0] 	= gWorldSunDirection;
-				viewDef.lights.fillColor[0] 		= gFillColor1;
-				viewDef.lights.fillDirection[1].x 	= -gWorldSunDirection.x;
-				viewDef.lights.fillDirection[1].y 	= gWorldSunDirection.y;
-				viewDef.lights.fillDirection[1].z 	= -gWorldSunDirection.z;
-				viewDef.lights.fillColor[1]			= gFillColor2;
-	}
+	SetTrackLighting(&viewDef);
 
 			/* SET CLEAR COLOR */
 			//
 			// Our crappy sky dome is a cylinder with a big hole, so pick a color to kinda blend it in
 			//
 
-	switch(gTrackNum)
-	{
-
-		case		TRACK_NUM_DESERT:
-					viewDef.view.clearColor.r = 153.0/255.0;
-					viewDef.view.clearColor.g = 171.0/255.0;
-					viewDef.view.clearColor.b = 237.0/255.0;
-					break;
-
-		case		TRACK_NUM_JUNGLE:
-					viewDef.view.clearColor.r = 82.0/255.0;
-					viewDef.view.clearColor.g = 148.0/255.0;
-					viewDef.view.clearColor.b = 198.0/255.0;
-					break;
-
-		case		TRACK_NUM_ICE:
-		case		TRACK_NUM_RAMPS:
-					viewDef.view.clearColor.r = 115.0/255.0;
-					viewDef.view.clearColor.g = 198.0/255.0;
-					viewDef.view.clearColor.b = 255.0/255.0;
-					break;
-
-		case		TRACK_NUM_SPIRAL:
-		case		TRACK_NUM_CRETE:
-		case		TRACK_NUM_CELTIC:
-		case		TRACK_NUM_MAZE:
-					viewDef.view.clearColor.r = 44.0/255.0;
-					viewDef.view.clearColor.g = 73.0/255.0;
-					viewDef.view.clearColor.b = 195.0/255.0;
-					break;
-
-		case		TRACK_NUM_CHINA:
-					viewDef.view.clearColor.r = 179.0/255.0;
-					viewDef.view.clearColor.g = 153.0/255.0;
-					viewDef.view.clearColor.b = 91.0/255.0;
-					break;
-
-		case		TRACK_NUM_EGYPT:
-		case		TRACK_NUM_TARPITS:
-					viewDef.view.clearColor.r = 222.0/255.0;
-					viewDef.view.clearColor.g = 181.0/255.0;
-					viewDef.view.clearColor.b = 99.0/255.0;
-					break;
-
-		case		TRACK_NUM_EUROPE:
-					viewDef.view.clearColor.r = 16.0/255.0;
-					viewDef.view.clearColor.g = 16.0/255.0;
-					viewDef.view.clearColor.b = 74.0/255.0;
-					break;
-
-		case		TRACK_NUM_SCANDINAVIA:
-		case		TRACK_NUM_STONEHENGE:
-					viewDef.view.clearColor.r = 74.0/255.0;
-					viewDef.view.clearColor.g = 90.0/255.0;
-					viewDef.view.clearColor.b = 148.0/255.0;
-					break;
-
-		case		TRACK_NUM_ATLANTIS:
-					viewDef.view.clearColor.r = 5.0/255.0;
-					viewDef.view.clearColor.g = 160.0/255.0;
-					viewDef.view.clearColor.b = 190.0/255.0;
-					break;
-
-
-		case		TRACK_NUM_AZTEC:
-					viewDef.view.clearColor.r = 82.0/255.0;
-					viewDef.view.clearColor.g = 148.0/255.0;
-					viewDef.view.clearColor.b = 198.0/255.0;
-					break;
-
-		case		TRACK_NUM_COLISEUM:
-					viewDef.view.clearColor.r = 61.0/255.0;
-					viewDef.view.clearColor.g = 87.0/255.0;
-					viewDef.view.clearColor.b = 198.0/255.0;
-					break;
-
-	}
+	SetTrackSkyColor(&viewDef);
 
 
 	OGL_SetupGameView(&viewDef);

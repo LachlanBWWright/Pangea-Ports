@@ -3149,7 +3149,7 @@ void ClientApplyPendingSnapshot(void)
 				gPlayerInfo[i].objNode->Rot.x = s->rotX;
 				gPlayerInfo[i].objNode->Rot.y = s->rotY;
 				gPlayerInfo[i].objNode->Rot.z = s->rotZ;
-				if (gTrackNum != TRACK_NUM_ATLANTIS)
+				if (!LevelMetadataProfileIs("track.vehicle", "submarine", gTrackNum == TRACK_NUM_ATLANTIS))
 					UpdateCarAttachmentTransforms(gPlayerInfo[i].objNode);
 			}
 			PangeaNet_ReapplyUnackedLocalInput(s->lastProcessedInputSequence, i);
@@ -3225,7 +3225,7 @@ void ClientApplyPendingSnapshot(void)
 		gPlayerInfo[i].objNode->Rot.y = interp->toState.rotY;
 		gPlayerInfo[i].objNode->Rot.z = interp->toState.rotZ;
 		gPlayerInfo[i].objNode->DeltaRot = interp->toState.deltaRot;
-		if (gTrackNum != TRACK_NUM_ATLANTIS)
+		if (!LevelMetadataProfileIs("track.vehicle", "submarine", gTrackNum == TRACK_NUM_ATLANTIS))
 			UpdateCarAttachmentTransforms(gPlayerInfo[i].objNode);
 	}
 

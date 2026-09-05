@@ -76,14 +76,9 @@ void CreateCyclorama(void)
 {
 ObjNode	*newObj;
 
-	switch(gLevelNum)
+	if (GetLevelMetadataBool("level.cyclorama", gLevelNum != LEVEL_NUM_BLOB
+		&& gLevelNum != LEVEL_NUM_SAUCER && gLevelNum != LEVEL_NUM_BRAINBOSS))
 	{
-		case	LEVEL_NUM_BLOB:
-		case	LEVEL_NUM_SAUCER:
-		case	LEVEL_NUM_BRAINBOSS:
-				break;
-
-		default:
 				gNewObjectDefinition.group	= MODEL_GROUP_LEVELSPECIFIC;
 				gNewObjectDefinition.type 	= 0;						// cyc is always 1st model in level bg3d files
 				gNewObjectDefinition.coord.x = 0;
@@ -97,7 +92,6 @@ ObjNode	*newObj;
 				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
 				newObj->CustomDrawFunction = DrawCyclorama;
-				break;
 	}
 }
 
@@ -2140,7 +2134,6 @@ static void RadiateGrave(ObjNode *theNode)
 {
 	GrowMutant(theNode->Coord.x, theNode->Coord.z);
 }
-
 
 
 

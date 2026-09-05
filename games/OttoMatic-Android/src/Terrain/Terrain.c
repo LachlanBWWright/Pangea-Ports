@@ -165,7 +165,7 @@ ObjNode	*obj;
 	gNewObjectDefinition.slot 		= TERRAIN_SLOT;
 	gNewObjectDefinition.moveCall 	= nil;
 
-	if (gLevelNum == LEVEL_NUM_CLOUD)
+	if (GetLevelMetadataBool("level.cloudTwoSidedTerrain", gLevelNum == LEVEL_NUM_CLOUD))
 		gNewObjectDefinition.flags 		= STATUS_BIT_KEEPBACKFACES;		// show both sides of scaffolding
 	else
 		gNewObjectDefinition.flags 		= 0;
@@ -1328,7 +1328,7 @@ float				xi,zi;
 	if ((row < 0) || (row >= gTerrainTileDepth))
 		return(0);
 
-	if (gLevelNum == LEVEL_NUM_CLOUD)									// special check on cloud level
+	if (GetLevelMetadataBool("level.cloudBlankTiles", gLevelNum == LEVEL_NUM_CLOUD))									// special check on cloud level
 	{
 		uint16_t	 flags = GetTileAttribsAtRowCol(row, col);
 		if (flags & TILE_ATTRIB_BLANK)									// see if on blank tile
@@ -1982,9 +1982,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
-
-
 
 
 

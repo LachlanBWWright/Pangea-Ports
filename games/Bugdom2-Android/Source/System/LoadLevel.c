@@ -241,7 +241,7 @@ const int levelSpriteCount[NUM_LEVELS] =
 			/* DO LEVEL-SPECIFIC LOADING */
 			/*****************************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.bugdom2Area", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				LoadLevelArt_Garden();
@@ -738,7 +738,7 @@ FSSpec	spec;
 
 			/* LOAD SPRITES */
 
-	if (gLevelNum == LEVEL_NUM_PLUMBING)
+	if (LevelMetadataCaseFor("level.tunnel", gLevelNum) == LEVEL_NUM_PLUMBING)
 	{
 		LoadSpriteGroupFromSeries(SPRITE_GROUP_LEVELSPECIFIC, PLUMBING_SObjType_COUNT, "Level4_Plumbing");
 	}
@@ -771,7 +771,7 @@ FSSpec	spec;
 
 					/* PLUMBING */
 
-	if (gLevelNum == LEVEL_NUM_PLUMBING)
+	if (LevelMetadataCaseFor("level.tunnel", gLevelNum) == LEVEL_NUM_PLUMBING)
 	{
 		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:Level4_Plumbing.bg3d", &spec);
 		ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
@@ -796,6 +796,4 @@ FSSpec	spec;
 //		SetSphereMapInfoOnMaterialObject(gTunnelTextureObj,	MULTI_TEXTURE_COMBINE_ADD, SPHEREMAP_SObjType_DarkYosemite);
 	}
 }
-
-
 

@@ -309,7 +309,7 @@ void SetPhysicsForVehicleType(short playerNum)
 
 				/* SPEED  */
 
-	if (gTrackNum == TRACK_NUM_ATLANTIS)				// rigged speed in subs
+	if (LevelMetadataProfileIs("track.vehicle", "submarine", gTrackNum == TRACK_NUM_ATLANTIS))				// rigged speed in subs
 		info->maxSpeed = MAX_SUBMARINE_SPEED + RandomFloat()*200.0f;
 	else
 		info->maxSpeed = 3000.0f + speed * 3000.0f;
@@ -3291,7 +3291,7 @@ ObjNode	*obj;
 
 				/* SEE IF SUBMARINES */
 
-			if (gTrackNum == TRACK_NUM_ATLANTIS)
+			if (LevelMetadataProfileIs("track.vehicle", "submarine", gTrackNum == TRACK_NUM_ATLANTIS))
 			{
 				gPlayerInfo[i].submarineImmobilized = 2.0f;					// immobilize the sub for a few seconds
 			}
@@ -3634,7 +3634,7 @@ short			textureNum;
 
 	if (gPlayerInfo[p].onWater)										// if on water, then move water spray up a little
 	{
-		if (gTrackNum == TRACK_NUM_TARPITS)							// water is tar, so don't splash
+		if (LevelMetadataProfileIs("track.liquidMaterial", "tar", gTrackNum == TRACK_NUM_TARPITS))							// water is tar, so don't splash
 			return;
 
 		coord.y += 50.0f;
@@ -3727,6 +3727,4 @@ new_group:
 
 
 }
-
-
 

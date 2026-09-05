@@ -1045,7 +1045,7 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.checkpointNum = gPlayerInfo[playerNum].raceCheckpointNum,
 		.placement = gPlayerInfo[playerNum].place,
 		.raceComplete = gPlayerInfo[playerNum].raceComplete,
-		.hasRaceState = gLevelNum >= LEVEL_NUM_RACE1,
+		.hasRaceState = gVSMode == VS_MODE_RACE,
 		.active = true,
 	};
 	return true;
@@ -1129,9 +1129,7 @@ void Nanosaur2Script_LoadLevelConfig(int levelNum)
 
 static const char* Nanosaur2Script_ModeName(int levelNum)
 {
-	if (levelNum >= LEVEL_NUM_RACE1 && levelNum <= LEVEL_NUM_RACE2) return "race";
-	if (levelNum >= LEVEL_NUM_BATTLE1 && levelNum <= LEVEL_NUM_BATTLE2) return "battle";
-	if (levelNum >= LEVEL_NUM_FLAG1 && levelNum <= LEVEL_NUM_FLAG2) return "capture";
+	(void) levelNum;
 	switch (gVSMode)
 	{
 		case VS_MODE_RACE: return "race";

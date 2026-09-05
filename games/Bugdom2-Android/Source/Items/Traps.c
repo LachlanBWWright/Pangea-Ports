@@ -94,7 +94,7 @@ int	headType;
 			/* MAKE BASE */
 			/*************/
 
-	switch(gLevelNum)
+	switch(LevelMetadataCaseFor("level.traps", gLevelNum))
 	{
 		case	LEVEL_NUM_GNOMEGARDEN:
 				gNewObjectDefinition.type 	= GARDEN_ObjType_SprinklerBase;
@@ -188,7 +188,7 @@ ObjNode	*spray = head->ChainNode;
 
 		if (spray == nil)
 		{
-			switch(gLevelNum)
+			switch(LevelMetadataCaseFor("level.traps", gLevelNum))
 			{
 				case	LEVEL_NUM_GNOMEGARDEN:
 						gNewObjectDefinition.type 	= GARDEN_ObjType_SprinklerSpray;
@@ -627,7 +627,7 @@ float				dist;
 
 	dist = OGLPoint3D_Distance(&theNode->Coord, &gPlayerInfo.coord);		// calc dist from firecracker to player
 
-	if (gLevelNum == LEVEL_NUM_SIDEWALK)									// range on this level is wide
+	if (LevelMetadataCaseFor("level.trapRanges", gLevelNum) == LEVEL_NUM_SIDEWALK)									// range on this level is wide
 		dist -= 300.0f;
 	else
 		dist -= 200.0f;
@@ -1401,7 +1401,6 @@ float	x,z,r;
 	gPlayerInfo.suckSpeed = 50;
 
 }
-
 
 
 

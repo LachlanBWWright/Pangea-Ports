@@ -128,18 +128,16 @@ static float	dotAlpha = 1.0f;
 
 				/* DRAW TEXT */
 		
-	switch (gCurrentArea)
+	switch (GetBillyAreaMode())
 	{
-		case AREA_TOWN_SHOOTOUT:
-		case AREA_SWAMP_SHOOTOUT:
+		case BILLY_AREA_MODE_SHOOTOUT:
 //			DrawFontString("SHOOTOUT", 320, 370, 30, true);
 			DrawFontString("DUCK with Ctrl or Right Click", 320, 400, 20, true);
 			DrawFontString("TURN with Arrows or A/D", 320, 420, 20, true);
 //			DrawFontString("hold Shift to turn FASTER", 320, 440, 20, true);
 			break;
 
-		case AREA_TOWN_STAMPEDE:
-		case AREA_SWAMP_STAMPEDE:
+		case BILLY_AREA_MODE_STAMPEDE:
 //			DrawFontString("STAMPEDE", 320, 370, 30, true);
 //			DrawFontString("get to the finish line before the kangacows!", 320, 400, 20, true);
 			DrawFontString("TURN with Arrows or A/D", 320, 420, 20, true);

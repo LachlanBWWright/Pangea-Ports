@@ -667,7 +667,7 @@ float	y;
 			/* ATTACH SPARKLES */
 			/*******************/
 
-	if ((gLevelNum == LEVEL_NUM_BRAINBOSS) || (!gG4))					// conserve sparkles on BB level
+	if ((GetLevelMetadataBool("level.reducedPowerupSparkles", gLevelNum == LEVEL_NUM_BRAINBOSS)) || (!gG4))					// conserve sparkles on BB level
 		n = 4;
 	else
 		n = 8;
@@ -1065,7 +1065,7 @@ float	r;
 
 		case	POW_TYPE_GROWTH:
 
-				if (gLevelNum != LEVEL_NUM_JUNGLE)
+				if (!GetLevelMetadataBool("level.growthPowerups", gLevelNum == LEVEL_NUM_JUNGLE))
 					DoFatalAlert("PowerupPodGotPunched: growth POW only on jungle!");
 
 					/* PUT DOWN THE POWERUP */
@@ -1645,7 +1645,7 @@ static Boolean MakePowerupBalloon(TerrainItemEntryType *itemPtr, float x, float 
 ObjNode	*string, *balloon;
 int		i;
 
-	if (gLevelNum != LEVEL_NUM_CLOUD)
+	if (!GetLevelMetadataBool("level.cloudBalloonPowerups", gLevelNum == LEVEL_NUM_CLOUD))
 		DoFatalAlert("MakePowerupBalloon: not cloud level");
 
 
@@ -1805,8 +1805,6 @@ float			speed;
 
 
 #pragma mark -
-
-
 
 
 

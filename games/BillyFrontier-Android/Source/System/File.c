@@ -28,6 +28,9 @@ static int gScriptLoadedSaveSlot;
 
 static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, int skeletonType);
 static void ReadDataFromPlayfieldFile(FSSpec *specPtr);
+static void ReadLevelMetadata(void);
+static void ClearLevelMetadata(void);
+static char *gLevelMetadataJSON;
 
 #define BYTESWAP_HANDLE(format, type, n, handle)                                  \
 {                                                                                 \
@@ -629,6 +632,128 @@ void LoadPlayfield(FSSpec *specPtr)
 	DoItemShadowCasting();
 }
 
+static void ClearLevelMetadata(void)
+{
+	if (gLevelMetadataJSON)
+	{
+		SafeDisposePtr(gLevelMetadataJSON);
+		gLevelMetadataJSON = nil;
+	}
+}
+
+static void ReadLevelMetadata(void)
+{
+	Handle hand;
+	Size size;
+	char *json;
+
+	ClearLevelMetadata();
+
+	hand = GetResource('Meta', 1000);
+	if (!hand)
+		return;
+
+	size = GetHandleSize(hand);
+	if (size <= 0)
+	{
+		ReleaseResource(hand);
+		return;
+	}
+
+	json = (char *) AllocPtrClear(size + 1);
+	if (!json)
+	{
+		ReleaseResource(hand);
+		return;
+	}
+
+	SDL_memcpy(json, *hand, (size_t) size);
+	ReleaseResource(hand);
+
+	/* Require the editor's version and Billy game marker before activating any key. */
+	if (!strstr(json, "\"schemaVersion\":1") || !strstr(json, "\"game\":\"billyfrontier\"")
+		|| !strstr(json, "\"properties\":{") )
+	{
+		SafeDisposePtr(json);
+		return;
+	}
+
+	gLevelMetadataJSON = json;
+}
+
+Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
+{
+	char needle[96];
+	const char *valueStart;
+	const char *valueEnd;
+	size_t length;
+
+	if (!gLevelMetadataJSON || !key || !value || valueSize == 0)
+		return false;
+
+	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
+	valueStart = strstr(gLevelMetadataJSON, needle);
+	if (!valueStart)
+		return false;
+	valueStart += SDL_strlen(needle);
+	valueEnd = strchr(valueStart, '\"');
+	if (!valueEnd)
+		return false;
+
+	length = (size_t) (valueEnd - valueStart);
+	if (length >= valueSize)
+		return false;
+
+	SDL_memcpy(value, valueStart, length);
+	value[length] = '\0';
+	return true;
+}
+
+Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
+{
+	char value[64];
+
+	if (!GetLevelMetadataString(key, value, sizeof(value))
+		|| !SDL_strcasecmp(value, "source-default"))
+		return fallback;
+	return !SDL_strcasecmp(value, profile);
+}
+
+void LoadCurrentAreaMetadata(void)
+{
+	static const char *const kAreaTerrainPaths[] =
+	{
+		":Terrain:town_duel.ter",
+		":Terrain:town_shootout.ter",
+		":Terrain:town_duel.ter",
+		":Terrain:town_stampede.ter",
+		":Terrain:town_duel.ter",
+		":Terrain:town_duel.ter",
+		":Terrain:swamp_duel.ter",
+		":Terrain:swamp_shootout.ter",
+		":Terrain:swamp_duel.ter",
+		":Terrain:swamp_stampede.ter",
+		":Terrain:swamp_duel.ter",
+		":Terrain:swamp_duel.ter"
+	};
+	FSSpec spec;
+	short refNum;
+	const char *path;
+
+	ClearLevelMetadata();
+	if (gCurrentArea < 0 || gCurrentArea >= (int) SDL_arraysize(kAreaTerrainPaths))
+		return;
+	path = gDirectTerrainPath[0] != '\0' ? gDirectTerrainPath : kAreaTerrainPaths[gCurrentArea];
+	if (FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, path, &spec) != noErr)
+		return;
+	refNum = FSpOpenResFile(&spec, fsRdPerm);
+	if (refNum < 0)
+		return;
+	UseResFile(refNum);
+	ReadLevelMetadata();
+	CloseResFile(refNum);
+}
+
 
 /********************** READ DATA FROM PLAYFIELD FILE ************************/
 
@@ -648,6 +773,7 @@ Ptr						tempBuffer16 = nil;
 	if (fRefNum == -1)
 		DoFatalAlert("LoadPlayfield: FSpOpenResFile failed.  You seem to have a corrupt or missing file.  Please reinstall the game.");
 	UseResFile(fRefNum);
+	ReadLevelMetadata();
 
 	
 			/************************/

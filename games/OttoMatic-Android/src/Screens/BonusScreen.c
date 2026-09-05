@@ -189,7 +189,7 @@ void DoBonusScreen(void)
 
 		/* DO SHIP DISSOLVE */
 
-	if (gLevelNum != LEVEL_NUM_BLOB)
+	if (!GetLevelMetadataBool("level.blobBonusScreen", gLevelNum == LEVEL_NUM_BLOB))
 		DoBonusShipDissolve();
 
 
@@ -212,7 +212,7 @@ void DoBonusScreen(void)
 
 			/* DO SAVE GAME */
 
-	if (gLevelNum < LEVEL_NUM_BRAINBOSS)		// dont save on last level
+	if (!GetLevelMetadataBool("level.finalLevel", gLevelNum == LEVEL_NUM_BRAINBOSS))		// dont save on last level
 	{
 		int saveMenuSelection = DoSaveGamePrompt();
 
@@ -228,7 +228,7 @@ void DoBonusScreen(void)
 
 		/* DO TRACTOR BEAM FOR JUNGLE-BOSS */
 
-	if (gLevelNum == LEVEL_NUM_JUNGLE)
+	if (GetLevelMetadataBool("level.bonusTractorBeam", gLevelNum == LEVEL_NUM_JUNGLE))
 	{
 		gShowScoreMode = SHOW_SCORE_MODE_OFF;		// reset stars
 
@@ -280,7 +280,7 @@ static const OGLColorRGBA	starColors[] =
 	viewDef.camera.hither 		= 20;
 	viewDef.camera.yon 			= 5000;
 
-	if (gLevelNum != LEVEL_NUM_BLOB)
+	if (!GetLevelMetadataBool("level.blobBonusScreen", gLevelNum == LEVEL_NUM_BLOB))
 	{
 		viewDef.camera.from.x		= -100;
 		viewDef.camera.from.z		= 800;
@@ -356,7 +356,7 @@ static const OGLColorRGBA	starColors[] =
 	LoadSoundBank(SOUNDBANK_BONUS);
 
 
-	if (gLevelNum != LEVEL_NUM_BLOB)
+	if (!GetLevelMetadataBool("level.blobBonusScreen", gLevelNum == LEVEL_NUM_BLOB))
 	{
 				/**************/
 				/* MAKE STARS */
@@ -427,7 +427,7 @@ static const OGLColorRGBA	starColors[] =
 	gNewObjectDefinition.scale 		= 3.0;
 	gInteriorObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
-	if (gLevelNum != LEVEL_NUM_BLOB)
+	if (!GetLevelMetadataBool("level.blobBonusScreen", gLevelNum == LEVEL_NUM_BLOB))
 		gInteriorObj->ColorFilter.a = 0;
 
 		/* MAKE GLOW DISCS */
@@ -1742,4 +1742,3 @@ static void MoveGlowDisc(ObjNode *theNode)
 {
 	theNode->ColorFilter.a = (.5f + RandomFloat() * .3f) * gInteriorObj->ColorFilter.a;
 }
-

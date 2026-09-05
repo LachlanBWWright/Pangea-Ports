@@ -134,7 +134,7 @@ Boolean AddEnemy_Flea(TerrainItemEntryType *itemPtr, float x, float z)
 {
 ObjNode	*newObj;
 
-	if (gLevelNum != LEVEL_NUM_FIDO)								// ALWAYS ADD ALL FOR FIDO LEVEL
+	if (LevelMetadataCaseFor("level.fido", gLevelNum) != LEVEL_NUM_FIDO)								// ALWAYS ADD ALL FOR FIDO LEVEL
 	{
 		if (gNumEnemies >= gMaxEnemies)								// keep from getting absurd
 			return(false);
@@ -266,7 +266,7 @@ static	void(*myMoveTable[])(ObjNode *) =
 					MoveFlea_GotHit,
 				};
 
-	if (gLevelNum != LEVEL_NUM_FIDO)						// don't bother deleting on Fido level
+	if (LevelMetadataCaseFor("level.fido", gLevelNum) != LEVEL_NUM_FIDO)						// don't bother deleting on Fido level
 	{
 		if (TrackTerrainItem(theNode))						// just check to see if it's gone
 		{
@@ -897,7 +897,7 @@ static void KillFlea(ObjNode *enemy)
 
 			/* SEE IF TALK ON FIDO LEVEL */
 
-	if (gLevelNum == LEVEL_NUM_FIDO)
+	if (LevelMetadataCaseFor("level.fido", gLevelNum) == LEVEL_NUM_FIDO)
 	{
 		if (gNumKilledFleas >= gTotalFleas)
 		{
@@ -1148,7 +1148,6 @@ void CountFleas(void)
 
 	gNumKilledFleas = 0;
 }
-
 
 
 

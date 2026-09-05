@@ -173,29 +173,21 @@ void DrawInfobar(ObjNode* infobarObj)
 
 
 
-	switch(gCurrentArea)
+	switch(GetBillyAreaMode())
 	{
-		case	AREA_TOWN_DUEL1:
-		case	AREA_TOWN_DUEL2:
-		case	AREA_TOWN_DUEL3:
-		case	AREA_SWAMP_DUEL1:
-		case	AREA_SWAMP_DUEL2:
-		case	AREA_SWAMP_DUEL3:
+		case	BILLY_AREA_MODE_DUEL:
 				DrawDuelInfobar();
 				break;
 		
-		case	AREA_TOWN_SHOOTOUT:
-		case	AREA_SWAMP_SHOOTOUT:
+		case	BILLY_AREA_MODE_SHOOTOUT:
 				DrawShootoutInfobar();
 				break;
 
-		case	AREA_TOWN_STAMPEDE:
-		case	AREA_SWAMP_STAMPEDE:
+		case	BILLY_AREA_MODE_STAMPEDE:
 				DrawStampedeInfobar();
 				break;
 
-		case	AREA_TARGETPRACTICE1:
-		case	AREA_TARGETPRACTICE2:
+		case	BILLY_AREA_MODE_TARGET_PRACTICE:
 				DrawTargetPracticeInfobar();
 				break;
 				
@@ -793,7 +785,6 @@ static void Infobar_DrawScore(OGLPoint2D offset)
 {
 	Infobar_DrawNumber(gScore, offset.x + SCORE_X, offset.y + SCORE_Y, SCORE_SCALE, SCORE_NUM_DIGITS, true);
 }
-
 
 
 
