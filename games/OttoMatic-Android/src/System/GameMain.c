@@ -490,23 +490,25 @@ float	fps = gFramesPerSecondFrac;
 
 	if (GetLevelMetadataBool("level.blobEffects", gLevelNum == LEVEL_NUM_BLOB))
 	{
-				MO_Object_OffsetUVs(gBG3DGroupList[MODEL_GROUP_LEVELSPECIFIC][SLIME_ObjType_BumperBubble], fps * .3, 0);	// scroll bumper bubble
-				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, SLIME_ObjType_BlobArrow, 0, fps * -.4, 0);	// scroll arrow texture
+				int modelGroup = GetOttoLevelModelGroup(LEVEL_NUM_BLOB);
+				MO_Object_OffsetUVs(gBG3DGroupList[modelGroup][SLIME_ObjType_BumperBubble], fps * .3, 0);	// scroll bumper bubble
+				MO_Geometry_OffserUVs(modelGroup, SLIME_ObjType_BlobArrow, 0, fps * -.4, 0);	// scroll arrow texture
 	}
 
 	if (GetLevelMetadataBool("level.blobBossEffects", gLevelNum == LEVEL_NUM_BLOBBOSS))
 	{
+				int modelGroup = GetOttoLevelModelGroup(LEVEL_NUM_BLOBBOSS);
 				gSpinningPlatformRot += SPINNING_PLATFORM_SPINSPEED * fps;
 				if (gSpinningPlatformRot > PI2)																			// wrap back rather than getting bigger and bigger
 					gSpinningPlatformRot -= PI2;
 
-				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_Tube_Bent, 2,  	0, -fps);			// scroll pipe slime texutre ooze
-				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_Tube_Loop1, 2,  	0, fps);
-				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_Tube_Loop2, 1,  	0, fps);
-				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_Tube_Straight1,1, 0, -fps);
-				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_Tube_Straight2,1, 0, -fps);
+				MO_Geometry_OffserUVs(modelGroup, BLOBBOSS_ObjType_Tube_Bent, 2,  0, -fps);			// scroll pipe slime texutre ooze
+				MO_Geometry_OffserUVs(modelGroup, BLOBBOSS_ObjType_Tube_Loop1, 2,  0, fps);
+				MO_Geometry_OffserUVs(modelGroup, BLOBBOSS_ObjType_Tube_Loop2, 1,  0, fps);
+				MO_Geometry_OffserUVs(modelGroup, BLOBBOSS_ObjType_Tube_Straight1,1, 0, -fps);
+				MO_Geometry_OffserUVs(modelGroup, BLOBBOSS_ObjType_Tube_Straight2,1, 0, -fps);
 
-				MO_Geometry_OffserUVs(MODEL_GROUP_LEVELSPECIFIC, BLOBBOSS_ObjType_TubeSegment,1, 0, -fps);
+				MO_Geometry_OffserUVs(modelGroup, BLOBBOSS_ObjType_TubeSegment,1, 0, -fps);
 	}
 
 	if (GetLevelMetadataBool("level.cloudEffects", gLevelNum == LEVEL_NUM_CLOUD))
@@ -523,6 +525,9 @@ static void InitArea(void)
 {
 OGLSetupInputType	viewDef;
 DeformationType		defData;
+	float				baseYon;
+	float				profileYon;
+	float				metadataValue;
 
 
 
@@ -554,6 +559,7 @@ DeformationType		defData;
 	viewDef.camera.hither 			= 50;
 	viewDef.camera.yon 				= (SUPERTILE_ACTIVE_RANGE * SUPERTILE_SIZE * TERRAIN_POLYGON_SIZE) * .95f;
 	viewDef.camera.fov 				= GAME_FOV;
+	baseYon = viewDef.camera.yon;
 
 
 	switch(LevelMetadataCaseFor("level.environment", gLevelNum))
@@ -662,6 +668,32 @@ DeformationType		defData;
 				viewDef.styles.fogStart			= viewDef.camera.yon * .8f;
 				viewDef.styles.fogEnd			= viewDef.camera.yon * 1.0f;
 				gDrawLensFlare = true;
+	}
+
+	profileYon = viewDef.camera.yon;
+	if (LevelMetadataUsesCustomValues("level.environment"))
+	{
+		if (GetLevelMetadataFloat("level.environmentViewDistance", &metadataValue)
+			&& metadataValue >= .5f && metadataValue <= 1.1f)
+		{
+			viewDef.camera.yon = baseYon * metadataValue;
+			if (profileYon > 0.0f)
+			{
+				float yonRatio = viewDef.camera.yon / profileYon;
+				viewDef.styles.fogStart *= yonRatio;
+				viewDef.styles.fogEnd *= yonRatio;
+			}
+		}
+		if (GetLevelMetadataFloat("level.environmentBackgroundR", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.view.clearColor.r = metadataValue;
+		if (GetLevelMetadataFloat("level.environmentBackgroundG", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.view.clearColor.g = metadataValue;
+		if (GetLevelMetadataFloat("level.environmentBackgroundB", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.view.clearColor.b = metadataValue;
+		gDrawLensFlare = GetLevelMetadataBool("level.environmentLensFlare", gDrawLensFlare);
 	}
 
 	/**************/
@@ -783,6 +815,44 @@ DeformationType		defData;
 				viewDef.lights.ambientColor.b 		= .36;
 				viewDef.lights.fillDirection[0] 	= gWorldSunDirection;
 				viewDef.lights.fillColor[0] 		= gFillColor1;
+	}
+
+	if (LevelMetadataUsesCustomValues("level.lighting"))
+	{
+		if (GetLevelMetadataFloat("level.lightingSunX", &metadataValue)
+			&& metadataValue >= -1.0f && metadataValue <= 1.0f)
+			gWorldSunDirection.x = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingSunY", &metadataValue)
+			&& metadataValue >= -1.0f && metadataValue <= 1.0f)
+			gWorldSunDirection.y = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingSunZ", &metadataValue)
+			&& metadataValue >= -1.0f && metadataValue <= 1.0f)
+			gWorldSunDirection.z = metadataValue;
+		if ((gWorldSunDirection.x * gWorldSunDirection.x)
+			+ (gWorldSunDirection.y * gWorldSunDirection.y)
+			+ (gWorldSunDirection.z * gWorldSunDirection.z) > .0001f)
+		{
+			OGLVector3D_Normalize(&gWorldSunDirection, &gWorldSunDirection);
+			viewDef.lights.fillDirection[0] = gWorldSunDirection;
+		}
+		if (GetLevelMetadataFloat("level.lightingAmbientR", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.lights.ambientColor.r = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingAmbientG", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.lights.ambientColor.g = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingAmbientB", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.lights.ambientColor.b = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFillR", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.lights.fillColor[0].r = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFillG", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.lights.fillColor[0].g = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFillB", &metadataValue)
+			&& metadataValue >= 0.0f && metadataValue <= 1.0f)
+			viewDef.lights.fillColor[0].b = metadataValue;
 	}
 
 
@@ -1008,6 +1078,13 @@ static void CleanupLevel(void)
 
 
 	DisposeSoundBank(kLevelSoundBanks[gLevelNum]);
+
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+	{
+		DisposeSoundBank(kLevelSoundBanks[levelIndex]);
+	}
+#endif
 
 	OGL_DisposeWindowSetup();	// do this last!
 

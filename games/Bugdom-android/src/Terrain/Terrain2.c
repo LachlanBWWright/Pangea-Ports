@@ -37,6 +37,8 @@ TerrainItemEntryType 	**gMasterItemList = nil;
 
 Ptr						gMaxItemAddress;			// addr of last item in current item list
 
+int gActiveItemModelGroup = MODEL_GROUP_LEVELSPECIFIC;
+
 TerrainYCoordType		**gMapYCoords = nil;		// 2D array of map vertex y coords
 
 TerrainInfoMatrixType	**gMapInfoMatrix = nil;
@@ -115,6 +117,47 @@ static Boolean (*gTerrainItemAddRoutines[])(TerrainItemEntryType *, long, long) 
 		AddFloorSpike,						// 62: Floor Spike
 		AddKingWaterPipe,					// 63: King Water Pipe
 };
+
+int GetBugdomItemModelGroup(int itemType)
+{
+#if !PANGEA_SAFE_ITEM_LOADING
+	(void) itemType;
+	return MODEL_GROUP_LEVELSPECIFIC;
+#else
+	int level = 0;
+	if (itemType >= 16 && itemType <= 25) level = 1;
+	if (itemType == 3 || itemType == 18 || (itemType >= 36 && itemType <= 44)) level = 2;
+	if ((itemType >= 26 && itemType <= 34) || (itemType >= 46 && itemType <= 49)) level = 3;
+	if (itemType >= 50 && itemType <= 58) level = 4;
+	if (itemType >= 59 && itemType <= 63) level = 5;
+	return MODEL_GROUP_LEVEL_BANK_BASE + level * 2;
+#endif
+}
+
+int GetBugdomCurrentModelGroup(void)
+{
+#if !PANGEA_SAFE_ITEM_LOADING
+	return MODEL_GROUP_LEVELSPECIFIC;
+#else
+	int level = 0;
+	switch (gResourceLevelType)
+	{
+		case LEVEL_TYPE_POND: level = 1; break;
+		case LEVEL_TYPE_FOREST: level = 2; break;
+		case LEVEL_TYPE_HIVE: level = 3; break;
+		case LEVEL_TYPE_NIGHT: level = 4; break;
+		case LEVEL_TYPE_ANTHILL: level = 5; break;
+		default: break;
+	}
+	return MODEL_GROUP_LEVEL_BANK_BASE + level * 2;
+#endif
+}
+
+Boolean IsBugdomLevelModelGroup(int group)
+{
+	return group >= MODEL_GROUP_LEVEL_BANK_BASE &&
+		group < MODEL_GROUP_LEVEL_BANK_BASE + MODEL_GROUP_LEVEL_BANK_COUNT;
+}
 
 
 /********************* BUILD TERRAIN ITEM LIST ***********************/
@@ -285,12 +328,20 @@ long			realX,realZ;
 				}
 				type = remappedType;
 #endif
+				#if PANGEA_SAFE_ITEM_LOADING
+				if (type < 0 || type > MAX_ITEM_NUM)
+					continue;
+				gActiveItemModelGroup = GetBugdomItemModelGroup((int)type);
+				#endif
 				if (type > MAX_ITEM_NUM)							// error check!
 				{
 					DoAlert("Illegal Map Item Type! (%d)", type);
 				}
 
 				flag = gTerrainItemAddRoutines[type](itemPtr,realX, realZ); // call item's ADD routine
+				#if PANGEA_SAFE_ITEM_LOADING
+				gActiveItemModelGroup = GetBugdomCurrentModelGroup();
+				#endif
 				if (flag)
 					itemPtr->flags |= ITEM_FLAGS_INUSE;				// set in-use flag
 				
@@ -698,12 +749,6 @@ Byte				**shadowFlags;
 	Free2DArray((void**) shadowFlags);
 	shadowFlags = nil;
 }
-
-
-
-
-
-
 
 
 

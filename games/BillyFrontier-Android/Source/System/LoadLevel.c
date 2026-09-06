@@ -15,6 +15,17 @@
 /*    PROTOTYPES            */
 /****************************/
 
+static void LoadSafeBillyModelBanks(void)
+{
+#if PANGEA_SAFE_ITEM_LOADING
+	FSSpec spec;
+	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:town.bg3d", &spec);
+	ImportBG3D(&spec, MODEL_GROUP_LEVEL_BANK_BASE);
+	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:swamp.bg3d", &spec);
+	ImportBG3D(&spec, MODEL_GROUP_LEVEL_BANK_BASE + 1);
+#endif
+}
+
 static void MakeTerrainSpec(FSSpec *spec, const char *defaultRelPath);
 
 static void MakeCurrentAreaTerrainSpec(FSSpec *spec)
@@ -79,6 +90,7 @@ static void MakeTerrainSpec(FSSpec *spec, const char *defaultRelPath)
 void LoadDuelArt(void)
 {
 FSSpec	spec;
+LoadSafeBillyModelBanks();
 
 
 
@@ -146,6 +158,7 @@ FSSpec	spec;
 void LoadShootoutArt(void)
 {
 FSSpec	spec;
+LoadSafeBillyModelBanks();
 
 
 
@@ -227,6 +240,7 @@ FSSpec	spec;
 void LoadStampedeArt(void)
 {
 FSSpec	spec;
+LoadSafeBillyModelBanks();
 
 
 
@@ -361,5 +375,4 @@ FSSpec	spec;
 	BG3D_SphereMapGeomteryMaterial(MODEL_GROUP_LEVELSPECIFIC, PRACTICE_ObjType_DeathSkull,
 								0, MULTI_TEXTURE_COMBINE_ADD, SPHEREMAP_SObjType_Satin);
 }
-
 

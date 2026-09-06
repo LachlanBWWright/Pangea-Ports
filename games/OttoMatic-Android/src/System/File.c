@@ -7,11 +7,13 @@
 
 
 #include "game.h"
+#include "LevelMetadataJSON.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
 
 
@@ -26,8 +28,10 @@
 static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *fsSpec, FSSpec* modelSpec, int skeletonType);
 static void ReadDataFromPlayfieldFile(FSSpec *specPtr);
 static void ReadLevelMetadata(void);
+#if defined(PANGEA_ENABLE_LEVEL_METADATA) && PANGEA_ENABLE_LEVEL_METADATA
 static Boolean ReadMetadataFloat(const char *json, const char *key, float *value);
 static char *gLevelMetadataJSON = NULL;
+#endif
 static void	ConvertTexture16To16(uint16_t *textureBuffer, int width, int height);
 static inline void Blit16(
 		const char*			src,
@@ -615,6 +619,7 @@ long				count;
 void LoadLevelArt(void)
 {
 FSSpec	spec;
+int		levelIndex;
 
 const char*	terrainFiles[NUM_LEVELS] =
 {
@@ -672,6 +677,13 @@ levelSpriteFiles[NUM_LEVELS] =
 
 	LoadSoundBank(kLevelSoundBanks[gLevelNum]);
 
+#if PANGEA_SAFE_ITEM_LOADING
+	for (levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+	{
+		LoadSoundBank(kLevelSoundBanks[levelIndex]);
+	}
+#endif
+
 
 			/* LOAD BG3D GEOMETRY */
 
@@ -680,6 +692,14 @@ levelSpriteFiles[NUM_LEVELS] =
 
 	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, levelModelFiles[gLevelNum], &spec);
 	ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
+
+	#if PANGEA_SAFE_ITEM_LOADING
+	for (levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+	{
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, levelModelFiles[levelIndex], &spec);
+		ImportBG3D(&spec, MODEL_GROUP_LEVEL_BANK_BASE + levelIndex);
+	}
+	#endif
 
 	if (gG4)
 	{
@@ -711,7 +731,7 @@ levelSpriteFiles[NUM_LEVELS] =
 
 			/* LOAD LEVEL-SPECIFIC SKELETONS & APPLY REFLECTION MAPS */
 
-	switch(LevelMetadataCaseFor("level.assetIdentity", gLevelNum))
+	switch(gLevelNum)
 	{
 		case	LEVEL_NUM_FARM:
 				LoadASkeleton(SKELETON_TYPE_ONION);
@@ -967,6 +987,17 @@ levelSpriteFiles[NUM_LEVELS] =
 	{
 		LoadSpriteGroup(SPRITE_GROUP_LEVELSPECIFIC, levelSpriteFiles[gLevelNum].numSprites, levelSpriteFiles[gLevelNum].groupName);
 	}
+
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+	{
+		if (levelSpriteFiles[levelIndex].numSprites != 0)
+		{
+			LoadSpriteGroup(GetOttoLevelSpriteGroup(levelIndex), levelSpriteFiles[levelIndex].numSprites,
+				levelSpriteFiles[levelIndex].groupName);
+		}
+	}
+#endif
 
 	LoadSpriteGroup(SPRITE_GROUP_INFOBAR, INFOBAR_SObjType_COUNT, "infobar");
 	LoadSpriteGroup(SPRITE_GROUP_FENCES, FENCE_TYPE_COUNT, "fence");
@@ -1562,52 +1593,50 @@ OSErr					iErr;
 	SafeDisposePtr(canvas);
 }
 
+#if defined(PANGEA_ENABLE_LEVEL_METADATA) && PANGEA_ENABLE_LEVEL_METADATA
 static Boolean ReadMetadataFloat(const char *json, const char *key, float *value)
 {
-	char needle[64];
+	char text[64];
 	char *valueEnd;
-	const char *valueStart;
 	float parsed;
 
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
-	valueStart = strstr(json, needle);
-	if (!valueStart)
+	if (!PangeaLevelMetadataJSONGetString(json, strlen(json), key, text, sizeof(text)))
 		return false;
-
-	valueStart += strlen(needle);
-	parsed = strtof(valueStart, &valueEnd);
-	if (valueEnd == valueStart || *valueEnd != '\"')
+	parsed = strtof(text, &valueEnd);
+	if (valueEnd == text || *valueEnd != '\0' || !isfinite(parsed))
 		return false;
 
 	*value = parsed;
 	return true;
 }
+#endif
 
 Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
 {
-	char needle[64];
-	const char *valueStart;
-	const char *valueEnd;
-	size_t length;
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	(void) key;
+	(void) value;
+	(void) valueSize;
+	return false;
+#else
+	if (!gLevelMetadataJSON || !key || !value || valueSize == 0)
+		return false;
+	return PangeaLevelMetadataJSONGetString(
+		gLevelMetadataJSON, strlen(gLevelMetadataJSON), key, value, valueSize) != 0;
+#endif
+}
 
-	if (!gLevelMetadataJSON || valueSize == 0)
+Boolean GetLevelMetadataFloat(const char *key, float *value)
+{
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	(void) key;
+	(void) value;
+	return false;
+#else
+	if (!gLevelMetadataJSON || !value)
 		return false;
-
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
-	valueStart = strstr(gLevelMetadataJSON, needle);
-	if (!valueStart)
-		return false;
-	valueStart += strlen(needle);
-	valueEnd = strchr(valueStart, '\"');
-	if (!valueEnd)
-		return false;
-
-	length = (size_t)(valueEnd - valueStart);
-	if (length >= valueSize)
-		return false;
-	SDL_memcpy(value, valueStart, length);
-	value[length] = '\0';
-	return true;
+	return ReadMetadataFloat(gLevelMetadataJSON, key, value);
+#endif
 }
 
 Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
@@ -1620,6 +1649,13 @@ Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
 	if (!SDL_strcasecmp(value, "false"))
 		return false;
 	return fallback;
+}
+
+Boolean LevelMetadataUsesCustomValues(const char *key)
+{
+	char value[64];
+	return GetLevelMetadataString(key, value, sizeof(value))
+		&& !SDL_strcasecmp(value, "custom");
 }
 
 Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
@@ -1647,8 +1683,6 @@ Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fal
 		if (SDL_strcasecmp(value, "none") && SDL_strcasecmp(value, "blob") && SDL_strcasecmp(value, "blob-boss")) return fallback;
 	if (!SDL_strcasecmp(key, "level.rocketExitTrigger"))
 		if (SDL_strcasecmp(value, "player-landed") && SDL_strcasecmp(value, "tractor-beam-active")) return fallback;
-	if (!SDL_strcasecmp(key, "level.rocketPersistence"))
-		if (SDL_strcasecmp(value, "jungle-boss") && SDL_strcasecmp(value, "saucer") && SDL_strcasecmp(value, "brain-boss")) return fallback;
 	if (!SDL_strcasecmp(key, "level.rocketFuel"))
 		if (SDL_strcasecmp(value, "required") && SDL_strcasecmp(value, "not-required")) return fallback;
 	return !SDL_strcasecmp(value, profile);
@@ -1659,23 +1693,55 @@ int LevelMetadataCaseFor(const char *key, int fallback)
 	char value[64];
 	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default"))
 		return fallback;
-	if (!SDL_strcasecmp(value, "standard") || !SDL_strcasecmp(value, "rocket-and-robot")) return -1;
-	if (!SDL_strcasecmp(value, "fog-only")) return LEVEL_NUM_BLOB;
-	if (!SDL_strcasecmp(value, "robot")) return LEVEL_NUM_BLOBBOSS;
-	if (!SDL_strcasecmp(value, "blob")) return LEVEL_NUM_BLOB;
-	if (!SDL_strcasecmp(value, "blob-boss")) return LEVEL_NUM_BLOBBOSS;
-	if (!SDL_strcasecmp(value, "apocalypse")) return LEVEL_NUM_APOCALYPSE;
-	if (!SDL_strcasecmp(value, "cloud")) return LEVEL_NUM_CLOUD;
-	if (!SDL_strcasecmp(value, "jungle")) return LEVEL_NUM_JUNGLE;
-	if (!SDL_strcasecmp(value, "jungle-boss")) return LEVEL_NUM_JUNGLEBOSS;
-	if (!SDL_strcasecmp(value, "fire-ice")) return LEVEL_NUM_FIREICE;
-	if (!SDL_strcasecmp(value, "saucer")) return LEVEL_NUM_SAUCER;
-	if (!SDL_strcasecmp(value, "brain-boss")) return LEVEL_NUM_BRAINBOSS;
+	if (!SDL_strcasecmp(key, "level.environment"))
+	{
+		if (!SDL_strcasecmp(value, "standard")) return -1;
+		if (!SDL_strcasecmp(value, "blob")) return LEVEL_NUM_BLOB;
+		if (!SDL_strcasecmp(value, "blob-boss")) return LEVEL_NUM_BLOBBOSS;
+		if (!SDL_strcasecmp(value, "apocalypse")) return LEVEL_NUM_APOCALYPSE;
+		if (!SDL_strcasecmp(value, "cloud")) return LEVEL_NUM_CLOUD;
+		if (!SDL_strcasecmp(value, "jungle")) return LEVEL_NUM_JUNGLE;
+		if (!SDL_strcasecmp(value, "fire-ice")) return LEVEL_NUM_FIREICE;
+		if (!SDL_strcasecmp(value, "saucer")) return LEVEL_NUM_SAUCER;
+		if (!SDL_strcasecmp(value, "brain-boss")) return LEVEL_NUM_BRAINBOSS;
+	}
+	if (!SDL_strcasecmp(key, "level.lighting"))
+	{
+		if (!SDL_strcasecmp(value, "standard")) return -1;
+		if (!SDL_strcasecmp(value, "blob-boss")) return LEVEL_NUM_BLOBBOSS;
+		if (!SDL_strcasecmp(value, "apocalypse")) return LEVEL_NUM_APOCALYPSE;
+		if (!SDL_strcasecmp(value, "jungle")) return LEVEL_NUM_JUNGLE;
+		if (!SDL_strcasecmp(value, "jungle-boss")) return LEVEL_NUM_JUNGLEBOSS;
+		if (!SDL_strcasecmp(value, "fire-ice")) return LEVEL_NUM_FIREICE;
+		if (!SDL_strcasecmp(value, "saucer")) return LEVEL_NUM_SAUCER;
+		if (!SDL_strcasecmp(value, "brain-boss")) return LEVEL_NUM_BRAINBOSS;
+	}
+	if (!SDL_strcasecmp(key, "level.autoFade"))
+	{
+		if (!SDL_strcasecmp(value, "standard")) return -1;
+		if (!SDL_strcasecmp(value, "fog-only")) return LEVEL_NUM_BLOB;
+		if (!SDL_strcasecmp(value, "apocalypse")) return LEVEL_NUM_APOCALYPSE;
+		if (!SDL_strcasecmp(value, "saucer")) return LEVEL_NUM_SAUCER;
+	}
+	if (!SDL_strcasecmp(key, "level.player"))
+	{
+		if (!SDL_strcasecmp(value, "rocket-and-robot")) return -1;
+		if (!SDL_strcasecmp(value, "robot")) return LEVEL_NUM_BLOBBOSS;
+		if (!SDL_strcasecmp(value, "saucer")) return LEVEL_NUM_SAUCER;
+	}
+	if (!SDL_strcasecmp(key, "level.sky"))
+	{
+		if (!SDL_strcasecmp(value, "standard")) return -1;
+		if (!SDL_strcasecmp(value, "apocalypse")) return LEVEL_NUM_APOCALYPSE;
+	}
 	return fallback;
 }
 
 static void ReadLevelMetadata(void)
 {
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	return;
+#else
 	Handle hand;
 	Size size;
 	char *json;
@@ -1701,6 +1767,12 @@ static void ReadLevelMetadata(void)
 		return;
 	}
 	SDL_memcpy(json, *hand, (size_t)size);
+	if (!PangeaLevelMetadataJSONIsValid(json, (size_t)size, "ottomatic"))
+	{
+		SafeDisposePtr(json);
+		ReleaseResource(hand);
+		return;
+	}
 	gLevelMetadataJSON = json;
 
 	if (ReadMetadataFloat(json, "level.gravity", &value) && value >= 0.0f)
@@ -1715,6 +1787,7 @@ static void ReadLevelMetadata(void)
 	}
 
 	ReleaseResource(hand);
+#endif
 }
 
 

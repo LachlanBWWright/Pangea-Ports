@@ -45,6 +45,13 @@ static const short			gFenceTexture[NUM_FENCE_TYPES][2] =
 	[FENCE_TYPE_INVISIBLEBLOCKENEMY]	= {SPRITE_GROUP_LEVELSPECIFIC,	LEVEL1_SObjType_Fence_BlockEnemy},
 };
 
+static int GetFenceSpriteGroup(int fenceType)
+{
+	if (fenceType == FENCE_TYPE_PINETREES)
+		return GetNanosaur2LevelSpriteGroup(BIOME_FOREST);
+	return SPRITE_GROUP_LEVELSPECIFIC;
+}
+
 
 static const float			gFenceHeight[NUM_FENCE_TYPES] =
 {
@@ -109,7 +116,7 @@ float					sink;
 		numNubs 			= fence->numNubs;					// get # nubs in fence
 		type 				= fence->type;						// get fence type
 
-		group = gFenceTexture[type][0];							// get sprite info
+		group = GetFenceSpriteGroup(type);							// get sprite info
 		sprite = gFenceTexture[type][1];						// get sprite info
 
 		if (sprite > gNumSpritesInGroupList[group])
@@ -235,7 +242,7 @@ float					minX,minY,minZ,maxX,maxY,maxZ;
 		type = fence->type;									// get fence type
 		height = gFenceHeight[type];						// get fence height
 
-		int group = gFenceTexture[type][0];					// get sprite info
+		int group = GetFenceSpriteGroup(type);					// get sprite info
 		int sprite = gFenceTexture[type][1];
 
 		if (group == SPRITE_GROUP_NULL)

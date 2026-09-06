@@ -68,7 +68,7 @@ static bool IsShapeTableHeaderValid(Handle shapeTable)
 /*     VARIABLES      */
 /**********************/
 
-Handle	gShapeTableHandle[MAX_SHAPE_GROUPS] = {nil,nil,nil,nil,nil,nil,nil,nil};
+Handle	gShapeTableHandle[MAX_SHAPE_GROUPS] = {nil};
 
 Ptr		gSHAPE_HEADER_Ptrs[MAX_SHAPE_GROUPS][MAX_SHAPES_IN_FILE];			// holds ptr to each shape type's SHAPE_HEADER
 
@@ -87,6 +87,19 @@ ObjNode *MakeNewShape(long groupNum, long type, long subType, short x, short y, 
 ObjNode	*newSpritePtr;
 Ptr		tempPtr;
 int32_t	offset;
+	long	resolvedGroupNum = groupNum;
+
+#if PANGEA_SAFE_ITEM_LOADING
+	if (groupNum == GROUP_AREA_SPECIFIC)
+		resolvedGroupNum = gActiveAreaShapeGroup;
+	else if (groupNum == GROUP_AREA_SPECIFIC2)
+		resolvedGroupNum = gActiveAreaShapeGroup2;
+
+	if (resolvedGroupNum < 0 || resolvedGroupNum >= MAX_SHAPE_GROUPS
+		|| type < 0 || type >= MAX_SHAPES_IN_FILE
+		|| gSHAPE_HEADER_Ptrs[resolvedGroupNum][type] == nil)
+		return nil;
+#endif
 
 	if (groupNum >= MAX_SHAPE_GROUPS)										// see if legal group
 		DoFatalAlert("Illegal shape group #");
@@ -98,7 +111,7 @@ int32_t	offset;
 
 	newSpritePtr->Type = type;								// set sprite type
 	newSpritePtr->SubType = subType;						// set sprite subtype
-	newSpritePtr->SpriteGroupNum = groupNum;				// set which sprite group it belongs to
+	newSpritePtr->SpriteGroupNum = resolvedGroupNum;				// set which sprite group it belongs to
 	newSpritePtr->UpdateBoxFlag = !pfRelativeFlag;			// no box if PF relative
 	newSpritePtr->DrawFlag = 								// init flags
 	newSpritePtr->EraseFlag =
@@ -133,7 +146,7 @@ int32_t	offset;
 	newSpritePtr->ClipNum = CLIP_REGION_PLAYFIELD;			// assume clip to playfield
 
 	newSpritePtr->SHAPE_HEADER_Ptr = tempPtr =
-				gSHAPE_HEADER_Ptrs[groupNum][type];			// set ptr to SHAPE_HEADER
+				gSHAPE_HEADER_Ptrs[resolvedGroupNum][type];			// set ptr to SHAPE_HEADER
 
 						/* INIT PTR TO ANIM_LIST */
 

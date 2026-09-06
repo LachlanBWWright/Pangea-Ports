@@ -185,7 +185,7 @@ int		i;
 			/* ATTACH KEY */
 			/**************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= newObj->Group;
 	gNewObjectDefinition.type 		= PLAYROOM_ObjType_OttoKey;
 	gNewObjectDefinition.coord		= newObj->Coord;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
@@ -734,7 +734,7 @@ const OGLVector3D	muzzleTipAim = {0, -1, -.3};
 				/* CREATE LASER BEAM */
 				/*********************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= enemy->Group;
 	gNewObjectDefinition.type 		= PLAYROOM_ObjType_OttoStunPulse;
 	gNewObjectDefinition.coord		= muzzleCoord;
 	gNewObjectDefinition.flags 		= STATUS_BIT_USEALIGNMENTMATRIX|STATUS_BIT_GLOW|STATUS_BIT_NOZWRITES|
@@ -944,6 +944,5 @@ float			fps = gFramesPerSecondFrac;
 
 
 }
-
 
 

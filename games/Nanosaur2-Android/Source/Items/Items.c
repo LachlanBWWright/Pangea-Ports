@@ -237,7 +237,7 @@ long	rot = itemPtr->parm[1];
 		.moveCall 	= MoveStaticObject,
 		.rot		= (rot == 0) ? (RandomFloat()*PI2) : ((float)(rot-1) * (PI2/8.0f)),
 	};
-	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[def.group][def.type].min.y;
+	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[GetNanosaur2ItemModelGroup(def.type)][def.type].min.y;
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
@@ -272,7 +272,7 @@ Boolean AddRiverRock(TerrainItemEntryType *itemPtr, float  x, float z)
 		.rot 		= RandomFloat()*PI2,
 	};
 
-	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[def.group][def.type].min.y;
+	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[GetNanosaur2ItemModelGroup(def.type)][def.type].min.y;
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
@@ -311,7 +311,7 @@ Boolean AddGasMound(TerrainItemEntryType *itemPtr, float  x, float z)
 		.rot 		= RandomFloat()*PI2,
 	};
 
-	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[def.group][def.type].min.y;
+	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[GetNanosaur2ItemModelGroup(def.type)][def.type].min.y;
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
@@ -490,7 +490,7 @@ Boolean AddAsteroid(TerrainItemEntryType *itemPtr, float  x, float z)
 		.rot 		= RandomFloat()*PI2,
 	};
 
-	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[def.group][def.type].min.y;
+	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale) - gObjectGroupBBoxList[GetNanosaur2ItemModelGroup(def.type)][def.type].min.y;
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
@@ -507,7 +507,6 @@ Boolean AddAsteroid(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	return(true);													// item was added
 }
-
 
 
 

@@ -1098,7 +1098,7 @@ static const float heights[] =
 			/* SUBMIT TEXTURE */
 
 	gGlobalMaterialFlags = BG3D_MATERIALFLAG_CLAMP_U;
-	MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][SLIME_SObjType_GreenSlime + slime->OozeColor].materialObject);
+	MO_DrawMaterial(gSpriteGroupList[GetOttoLevelSpriteGroup(LEVEL_NUM_BLOB)][SLIME_SObjType_GreenSlime + slime->OozeColor].materialObject);
 
 
 			/* CALC COORDS OF VERTICES */
@@ -2134,7 +2134,6 @@ static void RadiateGrave(ObjNode *theNode)
 {
 	GrowMutant(theNode->Coord.x, theNode->Coord.z);
 }
-
 
 
 

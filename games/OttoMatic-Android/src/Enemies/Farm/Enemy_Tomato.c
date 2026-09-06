@@ -848,7 +848,7 @@ ObjNode	*newObj;
 
 				/* SET DEFAULT STUFF */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FARM);
 	gNewObjectDefinition.type 		= FARM_ObjType_TomatoSlice;
 	gNewObjectDefinition.coord.x 	= enemy->Coord.x;
 	gNewObjectDefinition.coord.y 	= enemy->Coord.y + enemy->BottomOff + 30.0f;
@@ -917,7 +917,6 @@ float fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

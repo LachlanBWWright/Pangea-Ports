@@ -206,6 +206,12 @@ static void PlayGame(void)
 		Bugdom2Script_LoadLevelConfig(gLevelNum);
 #endif
 		LoadSoundBank(kLevelSoundBanks[gLevelNum]);
+#if PANGEA_SAFE_ITEM_LOADING
+		for (int levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+		{
+			LoadSoundBank(kLevelSoundBanks[levelIndex]);
+		}
+#endif
 		PlaySong(kLevelSongs[gLevelNum], true);
 
 				/* DO LEVEL INTRO */
@@ -245,6 +251,12 @@ static void PlayGame(void)
 #endif
 		CleanupLevel();
 		DisposeSoundBank(kLevelSoundBanks[gLevelNum]);
+#if PANGEA_SAFE_ITEM_LOADING
+		for (int levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+		{
+			DisposeSoundBank(kLevelSoundBanks[levelIndex]);
+		}
+#endif
 
 			/***************/
 			/* SEE IF LOST */
@@ -567,6 +579,7 @@ static void InitArea(void)
 static void InitArea_Exploration(void)
 {
 OGLSetupInputType	viewDef;
+float				metadataValue;
 
 
 			/*************/
@@ -593,8 +606,6 @@ OGLSetupInputType	viewDef;
 		gAnaglyphFocallength	= 130.0f * gAnaglyphScaleFactor;	// set camera info
 		gAnaglyphEyeSeparation 	= 20.0f * gAnaglyphScaleFactor;
 	}
-
-
 
 	switch(LevelMetadataCaseFor("level.rendering", gLevelNum))
 	{
@@ -741,6 +752,34 @@ OGLSetupInputType	viewDef;
 				viewDef.styles.fogStart			= viewDef.camera.yon * .7f;
 				viewDef.styles.fogEnd			= viewDef.camera.yon * 1.0f;
 				gDrawLensFlare = true;
+	}
+
+	if (LevelMetadataUsesCustomValues("level.rendering"))
+	{
+		if (GetLevelMetadataFloat("level.renderingTerrainScale", &metadataValue))
+			SetTerrainScale(DEFAULT_TERRAIN_SCALE * metadataValue);
+		if (GetLevelMetadataFloat("level.renderingFieldOfView", &metadataValue))
+			viewDef.camera.fov = metadataValue;
+		if (GetLevelMetadataBool("level.renderingFog", viewDef.styles.useFog))
+		{
+			viewDef.styles.useFog = true;
+			if (GetLevelMetadataFloat("level.renderingFogStart", &metadataValue))
+				viewDef.styles.fogStart = viewDef.camera.yon * metadataValue;
+			if (GetLevelMetadataFloat("level.renderingFogEnd", &metadataValue))
+				viewDef.styles.fogEnd = viewDef.camera.yon * metadataValue;
+		}
+		else
+		{
+			viewDef.styles.useFog = false;
+		}
+		if (GetLevelMetadataFloat("level.renderingBackgroundR", &metadataValue))
+			viewDef.view.clearColor.r = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingBackgroundG", &metadataValue))
+			viewDef.view.clearColor.g = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingBackgroundB", &metadataValue))
+			viewDef.view.clearColor.b = metadataValue;
+		viewDef.view.clearBackBuffer = true;
+		gDrawLensFlare = GetLevelMetadataBool("level.renderingLensFlare", gDrawLensFlare);
 	}
 
 
@@ -897,6 +936,29 @@ OGLSetupInputType	viewDef;
 				viewDef.lights.fillColor[0] 		= gFillColor1;
 	}
 
+	if (LevelMetadataUsesCustomValues("level.lighting"))
+	{
+		char fillCount[8];
+		viewDef.lights.numFillLights = 1;
+		if (GetLevelMetadataString("level.lightingFillCount", fillCount, sizeof(fillCount)) && !SDL_strcasecmp(fillCount, "two"))
+			viewDef.lights.numFillLights = 2;
+		if (GetLevelMetadataFloat("level.lightingAmbientR", &metadataValue)) viewDef.lights.ambientColor.r = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingAmbientG", &metadataValue)) viewDef.lights.ambientColor.g = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingAmbientB", &metadataValue)) viewDef.lights.ambientColor.b = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill1X", &metadataValue)) viewDef.lights.fillDirection[0].x = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill1Y", &metadataValue)) viewDef.lights.fillDirection[0].y = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill1Z", &metadataValue)) viewDef.lights.fillDirection[0].z = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill1R", &metadataValue)) viewDef.lights.fillColor[0].r = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill1G", &metadataValue)) viewDef.lights.fillColor[0].g = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill1B", &metadataValue)) viewDef.lights.fillColor[0].b = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill2X", &metadataValue)) viewDef.lights.fillDirection[1].x = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill2Y", &metadataValue)) viewDef.lights.fillDirection[1].y = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill2Z", &metadataValue)) viewDef.lights.fillDirection[1].z = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill2R", &metadataValue)) viewDef.lights.fillColor[1].r = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill2G", &metadataValue)) viewDef.lights.fillColor[1].g = metadataValue;
+		if (GetLevelMetadataFloat("level.lightingFill2B", &metadataValue)) viewDef.lights.fillColor[1].b = metadataValue;
+	}
+
 
 
 	OGL_SetupWindow(&viewDef, &gGameView);
@@ -1043,6 +1105,10 @@ static void CleanupLevel(void)
 	DisposeInfobar();
 	DisposeEffects();
 	DisposeSpriteGroup(SPRITE_GROUP_LEVELSPECIFIC);
+	#if PANGEA_SAFE_ITEM_LOADING
+	for (int levelIndex = 0; levelIndex < SPRITE_GROUP_LEVEL_BANK_COUNT; levelIndex++)
+		DisposeSpriteGroup(GetBugdom2LevelSpriteGroup(levelIndex));
+	#endif
 	DisposeSpriteGroup(SPRITE_GROUP_INFOBAR);
 
 	DisposeAllBG3DContainers();

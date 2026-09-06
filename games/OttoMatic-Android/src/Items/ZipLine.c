@@ -11,6 +11,14 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define ZIPLINE_MODEL_GROUP GetOttoLevelModelGroup(gLevelNum)
+#define ZIPLINE_SPRITE_GROUP GetOttoLevelSpriteGroup(gLevelNum)
+#else
+#define ZIPLINE_MODEL_GROUP MODEL_GROUP_LEVELSPECIFIC
+#define ZIPLINE_SPRITE_GROUP SPRITE_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -194,7 +202,7 @@ Boolean AddZipLinePost(TerrainItemEntryType *itemPtr, long  x, long z)
 ObjNode	*newObj;
 
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= ZIPLINE_MODEL_GROUP;
 	if (LevelMetadataProfileIs("level.zipLineStyle", "apocalypse", gLevelNum == LEVEL_NUM_APOCALYPSE))
 		gNewObjectDefinition.type 	= APOCALYPSE_ObjType_ZipLinePost;
 	else
@@ -421,9 +429,9 @@ static const OGLVector3D	up = {0,1,0};
 
 	mesh->numMaterials = 1;										// 1 material
 	if (LevelMetadataProfileIs("level.zipLineStyle", "apocalypse", gLevelNum == LEVEL_NUM_APOCALYPSE))
-		mesh->materials[0] = gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][APOCALYPSE_SObjType_Rope].materialObject;	// set ILLEGAL ref to this texture
+		mesh->materials[0] = gSpriteGroupList[ZIPLINE_SPRITE_GROUP][APOCALYPSE_SObjType_Rope].materialObject;	// set ILLEGAL ref to this texture
 	else
-		mesh->materials[0] = gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][FIREICE_SObjType_Rope].materialObject;
+		mesh->materials[0] = gSpriteGroupList[ZIPLINE_SPRITE_GROUP][FIREICE_SObjType_Rope].materialObject;
 	mesh->points 		= meshPoints;
 	mesh->normals 		= nil;
 	mesh->uvs[0]		= uvs;
@@ -561,7 +569,7 @@ static void AttachPullyToZip(short zipNum)
 {
 ObjNode	*newObj;
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= ZIPLINE_MODEL_GROUP;
 	if (LevelMetadataProfileIs("level.zipLineStyle", "apocalypse", gLevelNum == LEVEL_NUM_APOCALYPSE))
 		gNewObjectDefinition.type 		= APOCALYPSE_ObjType_ZipLinePully;
 	else
@@ -689,7 +697,6 @@ static void MoveZipPully_Completed(ObjNode *theNode)
 		theNode->MoveCall = MoveZipPully_Waiting;
 	}
 }
-
 
 
 

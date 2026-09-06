@@ -28,6 +28,8 @@ static Boolean NilAdd(TerrainItemEntryType *itemPtr,float x, float z);
 /*     VARIABLES      */
 /**********************/
 
+int gActiveItemModelGroup = MODEL_GROUP_LEVELSPECIFIC;
+
 short	  				gNumTerrainItems;
 TerrainItemEntryType 	**gMasterItemList = nil;
 
@@ -298,6 +300,10 @@ Boolean			flag;
 			continue;
 		type = BillyScript_RemapTerrainItemType(gCurrentArea, (int)type);
 #endif
+		#if PANGEA_SAFE_ITEM_LOADING
+		if (type < 0 || type > MAX_ITEM_NUM)
+			continue;
+		#endif
 		if (type > MAX_ITEM_NUM)								// error check!
 		{
 			DoFatalAlert("Illegal Map Item Type %d!", type);
@@ -311,7 +317,13 @@ Boolean			flag;
 		}
 #endif
 
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = MODEL_GROUP_LEVEL_BANK_BASE + (IsBillySwampArea() ? 1 : 0);
+		#endif
 		flag = gTerrainItemAddRoutines[type](&itemPtr[i],itemPtr[i].x, itemPtr[i].y); // call item's ADD routine
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = MODEL_GROUP_LEVEL_BANK_BASE + (IsBillySwampArea() ? 1 : 0);
+		#endif
 		if (flag)
 			itemPtr[i].flags |= ITEM_FLAGS_INUSE;				// set in-use flag
 	}

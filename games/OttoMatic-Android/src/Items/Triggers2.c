@@ -766,7 +766,7 @@ int		i;
 	gNewObjectDefinition.scale 		= s = .6;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
-	gNewObjectDefinition.coord.y	= GetTerrainY(x,z) - (gObjectGroupBBoxList[MODEL_GROUP_LEVELSPECIFIC][APOCALYPSE_ObjType_ExplodingCylinder].min.y * s);
+	gNewObjectDefinition.coord.y	= GetTerrainY(x,z) - (gObjectGroupBBoxList[gActiveItemModelGroup][APOCALYPSE_ObjType_ExplodingCylinder].min.y * s);
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits ;
 	gNewObjectDefinition.slot 		= 524;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject3;
@@ -1154,7 +1154,6 @@ Boolean DoTrig_TrapDoor(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	return(true);
 }
-
 
 
 

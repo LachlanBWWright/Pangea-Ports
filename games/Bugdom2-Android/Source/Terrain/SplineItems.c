@@ -154,6 +154,10 @@ void PrimeSplines(void)
 		{
 			SplineItemType* itemPtr = &spline->itemList[i];				// point to this item
 			int type = itemPtr->type;									// get item type
+			#if PANGEA_SAFE_ITEM_LOADING
+			if (type < 0 || type > MAX_SPLINE_ITEM_NUM)
+				continue;
+			#endif
 			GAME_ASSERT(type <= MAX_SPLINE_ITEM_NUM);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
@@ -169,7 +173,13 @@ void PrimeSplines(void)
 			}
 #endif
 
+			#if PANGEA_SAFE_ITEM_LOADING
+			gActiveItemModelGroup = GetBugdom2ItemModelGroup((int)type);
+			#endif
 			Boolean flag = gSplineItemPrimeRoutines[type](s,itemPtr); 	// call item's Prime routine
+			#if PANGEA_SAFE_ITEM_LOADING
+			gActiveItemModelGroup = GetBugdom2CurrentModelGroup();
+			#endif
 			if (flag)
 				itemPtr->flags |= ITEM_FLAGS_INUSE;						// set in-use flag
 		}

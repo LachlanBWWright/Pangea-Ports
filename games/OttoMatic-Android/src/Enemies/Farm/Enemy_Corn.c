@@ -701,7 +701,7 @@ float	y;
 
 			/* EXPLODE POPCORN */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FARM);
 	gNewObjectDefinition.type 		= FARM_ObjType_PopCorn;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
@@ -813,7 +813,7 @@ static void ShootCornKernel(ObjNode *enemy)
 ObjNode	*newObj;
 float	f;
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FARM);
 	gNewObjectDefinition.type 		= FARM_ObjType_CornKernel;
 	gNewObjectDefinition.coord.x 	= gCoord.x;
 	gNewObjectDefinition.coord.y 	= gCoord.y + 230.0f;
@@ -1094,7 +1094,6 @@ nuke:
 
 	UpdateObject(theNode);
 }
-
 
 
 

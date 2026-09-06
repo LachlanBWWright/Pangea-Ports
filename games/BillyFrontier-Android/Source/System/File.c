@@ -11,6 +11,7 @@
 /***************/
 
 #include "game.h"
+#include "LevelMetadataJSON.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "pangea_script.h"
 static int gScriptLoadedSaveSlot;
@@ -641,11 +642,78 @@ static void ClearLevelMetadata(void)
 	}
 }
 
+static Boolean MetadataJSONLooksValid(const char *json)
+{
+	Boolean inString = false;
+	Boolean escaped = false;
+	int braceDepth = 0;
+	int bracketDepth = 0;
+	char lastSignificant = '\0';
+	const char *cursor;
+
+	if (!json || json[0] == '\0')
+		return false;
+
+	for (cursor = json; *cursor != '\0'; cursor++)
+	{
+		unsigned char character = (unsigned char) *cursor;
+		if (character < 0x20 && character != '\n' && character != '\r' && character != '\t')
+			return false;
+
+		if (inString)
+		{
+			if (escaped)
+			{
+				escaped = false;
+				continue;
+			}
+			if (character == '\\')
+			{
+				escaped = true;
+				continue;
+			}
+			if (character == '"')
+				inString = false;
+			continue;
+		}
+		if (character != ' ' && character != '\n' && character != '\r' && character != '\t')
+			lastSignificant = (char) character;
+
+		if (character == '"')
+		{
+			inString = true;
+			continue;
+		}
+		if (character == '{')
+			braceDepth++;
+		else if (character == '}')
+		{
+			braceDepth--;
+			if (braceDepth < 0)
+				return false;
+		}
+		else if (character == '[')
+			bracketDepth++;
+		else if (character == ']')
+		{
+			bracketDepth--;
+			if (bracketDepth < 0)
+				return false;
+		}
+	}
+
+	return !inString && !escaped && braceDepth == 0 && bracketDepth == 0 && lastSignificant == '}';
+}
+
 static void ReadLevelMetadata(void)
 {
 	Handle hand;
 	Size size;
 	char *json;
+
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	return;
+#endif
 
 	ClearLevelMetadata();
 
@@ -670,8 +738,10 @@ static void ReadLevelMetadata(void)
 	SDL_memcpy(json, *hand, (size_t) size);
 	ReleaseResource(hand);
 
-	/* Require the editor's version and Billy game marker before activating any key. */
-	if (!strstr(json, "\"schemaVersion\":1") || !strstr(json, "\"game\":\"billyfrontier\"")
+	/* Require a complete JSON document and the editor's version/game marker before activating any key. */
+	if (!MetadataJSONLooksValid(json)
+		|| !PangeaLevelMetadataJSONIsValid(json, (size_t)size, "billyfrontier")
+		|| !strstr(json, "\"schemaVersion\":1") || !strstr(json, "\"game\":\"billyfrontier\"")
 		|| !strstr(json, "\"properties\":{") )
 	{
 		SafeDisposePtr(json);
@@ -683,30 +753,10 @@ static void ReadLevelMetadata(void)
 
 Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
 {
-	char needle[96];
-	const char *valueStart;
-	const char *valueEnd;
-	size_t length;
-
 	if (!gLevelMetadataJSON || !key || !value || valueSize == 0)
 		return false;
-
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
-	valueStart = strstr(gLevelMetadataJSON, needle);
-	if (!valueStart)
-		return false;
-	valueStart += SDL_strlen(needle);
-	valueEnd = strchr(valueStart, '\"');
-	if (!valueEnd)
-		return false;
-
-	length = (size_t) (valueEnd - valueStart);
-	if (length >= valueSize)
-		return false;
-
-	SDL_memcpy(value, valueStart, length);
-	value[length] = '\0';
-	return true;
+	return PangeaLevelMetadataJSONGetString(
+		gLevelMetadataJSON, SDL_strlen(gLevelMetadataJSON), key, value, valueSize) != 0;
 }
 
 Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)

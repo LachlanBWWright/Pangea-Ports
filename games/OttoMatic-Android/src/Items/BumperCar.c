@@ -11,6 +11,14 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define BUMPERCAR_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_CLOUD)
+#define BUMPERCAR_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_CLOUD)
+#else
+#define BUMPERCAR_MODEL_GROUP MODEL_GROUP_LEVELSPECIFIC
+#define BUMPERCAR_SPRITE_GROUP SPRITE_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -177,7 +185,7 @@ int		playerCar = itemPtr->parm[3] & 1;
 
 	area = itemPtr->parm[1];										// get area #
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BUMPERCAR_MODEL_GROUP;
 	if (playerCar)
 		gNewObjectDefinition.type 	= CLOUD_ObjType_BumperCar;
 	else
@@ -830,7 +838,7 @@ short	i;
 	tx = x;
 	tz = z;
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BUMPERCAR_MODEL_GROUP;
 	gNewObjectDefinition.type 		= CLOUD_ObjType_TireBumper;
 	gNewObjectDefinition.coord.y 	= GetTerrainY(x,z);
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
@@ -923,7 +931,7 @@ short	id = itemPtr->parm[0];
 				/* MAKE GENERATOR POST */
 				/***********************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+				gNewObjectDefinition.group 		= BUMPERCAR_MODEL_GROUP;
 	gNewObjectDefinition.type 		= CLOUD_ObjType_Generator;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -1176,7 +1184,7 @@ short	a;
 				u = RandomFloat() * 5.0f;
 				u2 = u + 5.0f;
 
-				MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][CLOUD_SObjType_BlueBeam].materialObject);
+				MO_DrawMaterial(gSpriteGroupList[BUMPERCAR_SPRITE_GROUP][CLOUD_SObjType_BlueBeam].materialObject);
 
 				glBegin(GL_QUADS);
 				glTexCoord2f(u,0);			glVertex3f(x,y+yo,z);
@@ -1228,7 +1236,7 @@ static const OGLPoint3D	sparkles[10] =
 				/* MAKE POSTS */
 				/**************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BUMPERCAR_MODEL_GROUP;
 	gNewObjectDefinition.type 		= CLOUD_ObjType_BumperGatePosts;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -1356,8 +1364,6 @@ int		j,i;
 
 
 }
-
-
 
 
 

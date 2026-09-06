@@ -66,7 +66,7 @@ ObjNode	*newObj,*frontLeftWheel, *backLeftWheel,*frontRightWheel,*backRightWheel
 				/* MAKE MAIN BODY */
 				/******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FARM);
 	gNewObjectDefinition.type 		= FARM_ObjType_Tractor;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;

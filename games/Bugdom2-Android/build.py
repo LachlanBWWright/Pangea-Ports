@@ -110,6 +110,9 @@ parser.add_argument("--print-artifact-name", default=False, action="store_true",
 parser.add_argument("--emscripten", default=False, action="store_true",
         help="build for WebAssembly/Emscripten instead of the native platform")
 
+parser.add_argument("--safe-item-loading", default=False, action="store_true",
+        help="use banked level model resolution and skip invalid native item records")
+
 if SYSTEM == "Linux":
     parser.add_argument("--system-sdl", default=False, action="store_true",
         help="use system SDL instead of building SDL from scratch")
@@ -598,6 +601,8 @@ if __name__ == "__main__":
 
     project.gen_args += common_gen_args
     project.gen_args.append("-DPANGEA_ENABLE_SCRIPTING=ON")
+    if args.safe_item_loading:
+        project.gen_args.append("-DPANGEA_SAFE_ITEM_LOADING=ON")
 
     #----------------------------------------------------------------
     # Gather build steps

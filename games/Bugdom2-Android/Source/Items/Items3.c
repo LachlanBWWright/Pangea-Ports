@@ -488,7 +488,7 @@ float	offset;
 	if (type == 1)
 	{
 		newObj->Rot.x = PI/2;								// lay on side
-		newObj->Coord.y += gObjectGroupBBoxList[MODEL_GROUP_LEVELSPECIFIC][GARBAGE_ObjType_TinCan].max.x * newObj->Scale.x;
+		newObj->Coord.y += gObjectGroupBBoxList[newObj->Group][GARBAGE_ObjType_TinCan].max.x * newObj->Scale.x;
 	}
 
 			/* SINK INTO GROUND */
@@ -614,7 +614,7 @@ int		part = itemPtr->parm[0];
 	gNewObjectDefinition.scale 		= 3.5;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
-	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_NOTEXTUREWRAP;
 	gNewObjectDefinition.slot 		= 199;
 	gNewObjectDefinition.moveCall 	= MoveDefaultPickup;
@@ -921,7 +921,6 @@ float			d;
 	}
 
 }
-
 
 
 

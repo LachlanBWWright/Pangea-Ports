@@ -896,6 +896,10 @@ Boolean		flag;
 					}
 					type = MikeScript_RemapMapItemType(gSceneNum, gAreaNum, (int)type);
 #endif
+					#if PANGEA_SAFE_ITEM_LOADING
+					if (type < 0 || type > MAX_ITEM_NUM)
+						continue;
+					#endif
 					if (type > MAX_ITEM_NUM)							// error check!
 						DoFatalAlert("Illegal Map Item Type!");
 					else

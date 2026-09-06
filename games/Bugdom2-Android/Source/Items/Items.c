@@ -989,7 +989,7 @@ ObjNode	*newObj;
 		gNewObjectDefinition.scale 		= 2.5;
 		gNewObjectDefinition.coord.x 	= x;
 		gNewObjectDefinition.coord.z 	= z;
-		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 		gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_NOTEXTUREWRAP;
 		gNewObjectDefinition.slot 		= 111;
 		gNewObjectDefinition.moveCall 	= MoveStaticObject;
@@ -1318,7 +1318,6 @@ static Boolean HurtGlassBottle(ObjNode *bottle, float damage)
 	PlayEffect3D(EFFECT_BOTTLECRACK, &bottle->Coord);
 	return(false);
 }
-
 
 
 

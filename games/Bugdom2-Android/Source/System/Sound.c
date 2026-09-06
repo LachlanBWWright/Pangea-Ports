@@ -436,6 +436,12 @@ void LoadSoundBank(int bankNum)
 
 		if (0 == SDL_strcmp(bankName, gEffectsTable[i].bank))
 		{
+#if PANGEA_SAFE_ITEM_LOADING
+			if (gSndHandles[i])
+			{
+				continue;
+			}
+#endif
 			LoadSoundEffect(i);
 		}
 	}

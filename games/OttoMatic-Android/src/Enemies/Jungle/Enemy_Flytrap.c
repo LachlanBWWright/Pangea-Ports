@@ -11,6 +11,12 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define JUNGLE_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_JUNGLE)
+#else
+#define JUNGLE_SPRITE_GROUP SPRITE_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -320,7 +326,7 @@ static Boolean FlyTrapHitByFreeze(ObjNode *weapon, ObjNode *enemy, OGLPoint3D *w
 
 			/* CHANGE THE TEXTURE */
 
-	enemy->Skeleton->overrideTexture = gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][JUNGLE_SObjType_FrozenFlyTrap].materialObject;
+		enemy->Skeleton->overrideTexture = gSpriteGroupList[JUNGLE_SPRITE_GROUP][JUNGLE_SObjType_FrozenFlyTrap].materialObject;
 
 
 	enemy->FrozenTimer = 4.0;			// set freeze timer
@@ -379,7 +385,6 @@ float		scale;
 
 	FindCoordOnJoint(enemy, FLYTRAP_JOINT_HEAD, &gJawOff, &gPlayerInfo.objNode->Coord);			// get coord of mouth
 }
-
 
 
 

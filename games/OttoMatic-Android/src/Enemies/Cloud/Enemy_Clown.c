@@ -740,7 +740,7 @@ Boolean			detach;
 
 	if (bubble == nil)
 	{
-		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+		gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_CLOUD);
 		gNewObjectDefinition.type 		= CLOUD_ObjType_ClownBubble;
 		gNewObjectDefinition.coord		= clown->Coord;
 		gNewObjectDefinition.flags 		= gAutoFadeStatusBits  | STATUS_BIT_GLOW;
@@ -954,7 +954,6 @@ static Boolean BubbleHitByDart(ObjNode *weapon, ObjNode *bubble, OGLPoint3D *wea
 
 	return(true);			// stop weapon
 }
-
 
 
 

@@ -11,6 +11,14 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define JUNGLE_BOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_JUNGLEBOSS)
+#define JUNGLE_BOSS_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_JUNGLEBOSS)
+#else
+#define JUNGLE_BOSS_MODEL_GROUP MODEL_GROUP_LEVELSPECIFIC
+#define JUNGLE_BOSS_SPRITE_GROUP SPRITE_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -159,7 +167,7 @@ ObjNode	*newObj;
 			/* INIT MESH DATA */
 
 	gTentacleMesh.numMaterials 	= 1;
-	gTentacleMesh.materials[0] 	= gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][JUNGLE_SObjType_Vine].materialObject;	// set illegal ref to material
+	gTentacleMesh.materials[0] 	= gSpriteGroupList[JUNGLE_BOSS_SPRITE_GROUP][JUNGLE_SObjType_Vine].materialObject;	// set illegal ref to material
 	gTentacleMesh.points 		= gTentaclePoints;
 	gTentacleMesh.triangles 	= gTentacleTriangles;
 	gTentacleMesh.normals		= gTentacleNormals;
@@ -206,7 +214,7 @@ ObjNode	*newObj;
 uint32_t	burned = itemPtr->flags & ITEM_FLAGS_USER1;
 
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= JUNGLE_ObjType_TentacleGenerator;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -714,7 +722,7 @@ ObjNode	*newObj,*grass;
 				/* ADD GRASS */
 				/*************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= JUNGLE_ObjType_PitcherPlant_Grass;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_KEEPBACKFACES;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
@@ -778,7 +786,7 @@ static void  MovePitcherPlant_Attack(ObjNode *theNode)
 
 		for (i = 0; i < 6; i++)
 		{
-			gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+			gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 			gNewObjectDefinition.type 		= JUNGLE_ObjType_PitcherPod_Pollen;
 
 			gNewObjectDefinition.coord.x = theNode->Coord.x + RandomFloat2() * 40.0f;
@@ -874,7 +882,7 @@ static Boolean PitcherPlantHitByFire(ObjNode *weapon, ObjNode *plant, OGLPoint3D
 
 				/* MAKE CORPSE */
 
-		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+		gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 		gNewObjectDefinition.type 		= JUNGLE_ObjType_PitcherPlant_Dead;
 		gNewObjectDefinition.coord.x	= plant->Coord.x;
 		gNewObjectDefinition.coord.z	= plant->Coord.z;
@@ -923,7 +931,7 @@ uint32_t	podDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 
 			/* CREATE STEM */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= JUNGLE_ObjType_PitcherPod_Stem;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -1096,7 +1104,7 @@ int		i;
 			/* CREATE SPORE */
 			/****************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= JUNGLE_ObjType_PitcherPod_Pollen;
 
 	gNewObjectDefinition.coord.x = pod->Coord.x;
@@ -1267,7 +1275,7 @@ static void InitTractorBeam(void)
 
 						/* MAKE BEAM */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= JUNGLE_ObjType_TractorBeam;
 	gNewObjectDefinition.coord.x	= gPlayerInfo.startX;
 	gNewObjectDefinition.coord.z	= gPlayerInfo.startZ;
@@ -1319,7 +1327,7 @@ Boolean AddTractorBeamPost(TerrainItemEntryType *itemPtr, long  x, long z)
 ObjNode	*newObj;
 int	i;
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= JUNGLE_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= JUNGLE_ObjType_TractorBeamPost;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -1365,8 +1373,6 @@ int	i;
 
 	return(true);													// item was added
 }
-
-
 
 
 

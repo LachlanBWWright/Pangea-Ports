@@ -11,6 +11,12 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define TELEPORTER_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_APOCALYPSE)
+#else
+#define TELEPORTER_MODEL_GROUP MODEL_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -105,7 +111,7 @@ ObjNode	*newObj,*console;
 			/* MAKE TELEPORTER ARCH */
 			/************************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= TELEPORTER_MODEL_GROUP;
 	gNewObjectDefinition.type 		= APOCALYPSE_ObjType_Teleporter;
 	gNewObjectDefinition.scale 		= 1.5;
 	gNewObjectDefinition.coord.x 	= x;
@@ -343,7 +349,7 @@ ObjNode	*zap1, *zap2;
 
 				/* ZAP 1 */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= TELEPORTER_MODEL_GROUP;
 	gNewObjectDefinition.type 		= APOCALYPSE_ObjType_TeleporterZap;
 	gNewObjectDefinition.coord		= teleporter->Coord;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_KEEPBACKFACES | STATUS_BIT_GLOW |
@@ -474,4 +480,3 @@ float	fps = gFramesPerSecondFrac;
 	UpdateObjectTransforms(player);
 	UpdateRobotHands(player);
 }
-

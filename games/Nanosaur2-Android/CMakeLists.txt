@@ -21,7 +21,12 @@ project(${GAME_TARGET}
 
 option(BUILD_SDL_FROM_SOURCE "Build SDL from source" OFF)
 option(SDL_STATIC "Static link SDL" OFF)
+option(PANGEA_SAFE_ITEM_LOADING "Skip invalid native item records instead of using strict alerts" OFF)
+if(PANGEA_SAFE_ITEM_LOADING)
+	add_compile_definitions(PANGEA_SAFE_ITEM_LOADING=1)
+endif()
 option(PANGEA_ENABLE_SCRIPTING "Enable Lua scripting support" OFF)
+option(PANGEA_ENABLE_LEVEL_METADATA "Enable optional level metadata overrides" ON)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 
@@ -123,9 +128,16 @@ configure_file(${GAME_SRCDIR}/Headers/version.h.in ${GAME_SRCDIR}/Headers/versio
 
 # Glob all source files
 file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS ${GAME_SRCDIR}/*.c ${GAME_SRCDIR}/*.cpp ${GAME_SRCDIR}/*.h)
+set(GAME_LOCAL_SOURCES ${GAME_SOURCES})
+list(APPEND GAME_SOURCES
+	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.c
+	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.h)
 
 # Make source groups match file tree
-source_group(TREE ${GAME_SRCDIR} PREFIX "" FILES ${GAME_SOURCES})
+source_group(TREE ${GAME_SRCDIR} PREFIX "" FILES ${GAME_LOCAL_SOURCES})
+source_group("Shared/Metadata" FILES
+	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.c
+	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.h)
 
 if(WIN32)
 	# Windows resource file
@@ -143,6 +155,7 @@ else()
 endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
+target_include_directories(${GAME_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/../../shared/metadata)
 if(PANGEA_ENABLE_SCRIPTING)
 	target_include_directories(${GAME_TARGET} PRIVATE
 		${GAME_SRCDIR}/Scripting
@@ -163,6 +176,10 @@ target_compile_definitions(${GAME_TARGET} PRIVATE
 
 if(PANGEA_ENABLE_SCRIPTING)
 	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+endif()
+
+if(PANGEA_ENABLE_LEVEL_METADATA)
+	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ENABLE_LEVEL_METADATA=1)
 endif()
 
 if(NOT MSVC)

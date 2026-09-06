@@ -31,6 +31,8 @@ static Boolean NilAdd(TerrainItemEntryType *itemPtr,long x, long z);
 /*     VARIABLES      */
 /**********************/
 
+int gActiveItemModelGroup = MODEL_GROUP_LEVELSPECIFIC;
+
 short	  				gNumTerrainItems;
 TerrainItemEntryType 	**gMasterItemList = nil;
 
@@ -310,6 +312,10 @@ Boolean			flag;
 		if (!gNetGameInProgress)
 			type = CroMagScript_RemapTerrainItemType(gTrackNum, originalType);
 #endif
+		#if PANGEA_SAFE_ITEM_LOADING
+		if (type < 0 || type > MAX_ITEM_NUM)
+			continue;
+		#endif
 		if (type < 0 || type > MAX_ITEM_NUM)					// error check!
 		{
 			DoAlert("Illegal Map Item Type!");
@@ -329,7 +335,13 @@ Boolean			flag;
 		}
 #endif
 
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = MODEL_GROUP_LEVEL_BANK_BASE + gTrackNum;
+		#endif
 		flag = gTerrainItemAddRoutines[type](&itemPtr[i],itemPtr[i].x, itemPtr[i].y); // call item's ADD routine
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = MODEL_GROUP_LEVEL_BANK_BASE + gTrackNum;
+		#endif
 		if (flag)
 			itemPtr[i].flags |= ITEM_FLAGS_INUSE;				// set in-use flag
 	}

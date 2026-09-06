@@ -198,6 +198,13 @@ ObjNode *MakeNewDisplayGroupObject(NewObjectDefinitionType *newObjDef)
 ObjNode	*newObj;
 Byte	group,type;
 
+#if PANGEA_SAFE_ITEM_LOADING
+	if (newObjDef->group == MODEL_GROUP_LEVELSPECIFIC)
+		newObjDef->group = gActiveItemModelGroup;
+	else if (newObjDef->group == MODEL_GROUP_LEVELSPECIFIC2)
+		newObjDef->group = gActiveItemModelGroup + 1;
+#endif
+
 	newObjDef->genre = DISPLAY_GROUP_GENRE;
 	
 	newObj = MakeNewObject(newObjDef);		

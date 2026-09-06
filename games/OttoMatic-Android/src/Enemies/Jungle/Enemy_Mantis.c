@@ -702,7 +702,7 @@ OGLMatrix4x4	m;
 		OGLPoint3D_Transform(&muzzleOff, &m, &gNewObjectDefinition.coord);	// calc start coord
 		OGLVector3D_Transform(&muzzleAim, &m, &aim);						// calc delta/aim vector
 
-		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+		gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_JUNGLE);
 		gNewObjectDefinition.type 		= JUNGLE_ObjType_AcidDrop;
 		gNewObjectDefinition.flags 		= gAutoFadeStatusBits|STATUS_BIT_USEALIGNMENTMATRIX;
 		gNewObjectDefinition.slot 		= 502;
@@ -787,7 +787,6 @@ OGLVector3D	aim;
 	SetAlignmentMatrix(&theNode->AlignmentMatrix, &aim);
 	UpdateObject(theNode);
 }
-
 
 
 

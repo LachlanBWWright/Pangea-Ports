@@ -104,6 +104,7 @@ extern int						gNumSplitScreenPanes;
 extern int						gPolysThisFrame;
 extern int						gTheAge;
 extern int						gTrackNum;
+extern int						gActiveItemModelGroup;
 extern int						gVRAMUsedThisFrame;
 extern long						gNumCheckpoints;
 extern long						gNumFences;
@@ -179,7 +180,9 @@ extern uint32_t					gGlobalMaterialFlags;
 extern uint32_t					gInfobarUpdateBits;
 
 extern Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize);
+extern Boolean GetLevelMetadataFloat(const char *key, float *value);
 extern Boolean GetLevelMetadataBool(const char *key, Boolean fallback);
+extern Boolean LevelMetadataUsesCustomValues(const char *key);
 extern Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback);
 
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)

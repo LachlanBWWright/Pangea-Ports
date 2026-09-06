@@ -1,10 +1,66 @@
 #include "myglobals.h"
 #include "externs.h"
+#include "LevelMetadataJSON.h"
 
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(PANGEA_ENABLE_LEVEL_METADATA) && PANGEA_ENABLE_LEVEL_METADATA
+
 static char* gLevelMetadataJSON = nil;
+
+static Boolean IsBalancedJSON(const char* json)
+{
+	int braceDepth = 0;
+	int bracketDepth = 0;
+	Boolean inString = false;
+	Boolean escaped = false;
+	Boolean rootClosed = false;
+	const unsigned char* cursor = (const unsigned char*)json;
+
+	if (!cursor || *cursor != '{')
+		return false;
+
+	for (; *cursor; cursor++)
+	{
+		if (rootClosed)
+		{
+			if (*cursor != ' ' && *cursor != '\t' && *cursor != '\r' && *cursor != '\n')
+				return false;
+			continue;
+		}
+		if (inString)
+		{
+			if (escaped)
+			{
+				escaped = false;
+				continue;
+			}
+			if (*cursor == '\\')
+			{
+				escaped = true;
+				continue;
+			}
+			if (*cursor == '"')
+				inString = false;
+			continue;
+		}
+
+		if (*cursor == '"')
+		{
+			inString = true;
+			continue;
+		}
+		if (*cursor == '{') braceDepth++;
+		else if (*cursor == '}' && --braceDepth < 0) return false;
+		else if (*cursor == '[') bracketDepth++;
+		else if (*cursor == ']' && --bracketDepth < 0) return false;
+		if (braceDepth == 0)
+			rootClosed = true;
+	}
+
+	return rootClosed && !inString && !escaped && braceDepth == 0 && bracketDepth == 0;
+}
 
 static void ClearLevelMetadata(void)
 {
@@ -17,27 +73,9 @@ static void ClearLevelMetadata(void)
 
 static Boolean ReadMetadataString(const char* json, const char* key, char* value, size_t valueSize)
 {
-	char needle[96];
-	const char* valueStart;
-	const char* valueEnd;
-	size_t length;
-
 	if (!json || !key || !value || valueSize == 0)
 		return false;
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
-	valueStart = strstr(json, needle);
-	if (!valueStart)
-		return false;
-	valueStart += strlen(needle);
-	valueEnd = strchr(valueStart, '\"');
-	if (!valueEnd)
-		return false;
-	length = (size_t)(valueEnd - valueStart);
-	if (length >= valueSize)
-		return false;
-	SDL_memcpy(value, valueStart, length);
-	value[length] = '\0';
-	return true;
+	return PangeaLevelMetadataJSONGetString(json, strlen(json), key, value, valueSize) != 0;
 }
 
 void LoadLevelMetadata(const char* mapPath)
@@ -92,8 +130,9 @@ void LoadLevelMetadata(const char* mapPath)
 	CloseResFile(metadataFile);
 	UseResFile(previousFile);
 
-	if (!strstr(json, "\"schemaVersion\":1") || !strstr(json, "\"properties\":{") ||
-		(!strstr(json, "\"game\":\"mightymike\"") && !strstr(json, "\"game\":\"Mighty Mike\"")))
+	if (!IsBalancedJSON(json) ||
+		(!PangeaLevelMetadataJSONIsValid(json, (size_t)resourceSize, "mightymike") &&
+		 !PangeaLevelMetadataJSONIsValid(json, (size_t)resourceSize, "Mighty Mike")))
 	{
 		DisposePtr(json);
 		return;
@@ -121,3 +160,25 @@ Boolean LevelMetadataProfileIs(const char* key, const char* profile, Boolean fal
 		return fallback;
 	return !SDL_strcasecmp(value, profile);
 }
+
+#else
+
+void LoadLevelMetadata(const char* mapPath)
+{
+	(void)mapPath;
+}
+
+int LevelMetadataScene(const char* key, int fallback)
+{
+	(void)key;
+	return fallback;
+}
+
+Boolean LevelMetadataProfileIs(const char* key, const char* profile, Boolean fallback)
+{
+	(void)key;
+	(void)profile;
+	return fallback;
+}
+
+#endif

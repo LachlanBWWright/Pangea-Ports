@@ -445,7 +445,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= .95;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
-	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 	gNewObjectDefinition.flags 		= STATUS_BIT_NOTEXTUREWRAP;
 	gNewObjectDefinition.slot 		= 110;
 	gNewObjectDefinition.moveCall 	= MoveMothBall;
@@ -695,7 +695,7 @@ Boolean	part = itemPtr->parm[0];
 	gNewObjectDefinition.scale 		= SILICON_DOOR_SCALE;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
-	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot 		= SILICONDOOR_SLOT+1;			// must be after door since this gets chained to door eventually
 	gNewObjectDefinition.moveCall 	= MoveSiliconPart;
@@ -790,7 +790,6 @@ float	fps = gFramesPerSecondFrac;
 	UpdateObject(theNode);
 
 }
-
 
 
 

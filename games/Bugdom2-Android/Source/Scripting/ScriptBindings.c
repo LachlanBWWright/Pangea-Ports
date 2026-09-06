@@ -972,14 +972,14 @@ static PangeaScriptStatus Bugdom2Script_SpawnNativeCallback(const char* id, floa
 {
 	if (strcmp(id, "bugdom2.dcell") == 0)
 	{
-		if (gBG3DContainerList[MODEL_GROUP_LEVELSPECIFIC] == nil)
+		if (gBG3DContainerList[GetBugdom2ItemModelGroup(PLAYROOM_ObjType_DCell)] == nil)
 		{
 			return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
 		}
 
 		ObjNode* newObj;
 		gNewObjectDefinition.genre = 0;
-		gNewObjectDefinition.group = MODEL_GROUP_LEVELSPECIFIC;
+		gNewObjectDefinition.group = GetBugdom2ItemModelGroup(PLAYROOM_ObjType_DCell);
 		gNewObjectDefinition.type = PLAYROOM_ObjType_DCell;
 		gNewObjectDefinition.scale = 1.0;
 		gNewObjectDefinition.coord.x = x;

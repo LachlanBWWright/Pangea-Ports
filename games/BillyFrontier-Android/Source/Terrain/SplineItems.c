@@ -130,6 +130,10 @@ SplinePointType	*points;
 		{
 			itemPtr = &(*spline->itemList)[i];					// point to this item
 			type = itemPtr->type;								// get item type
+	#if PANGEA_SAFE_ITEM_LOADING
+			if (type < 0 || type > MAX_SPLINE_ITEM_NUM)
+				continue;
+	#endif
 			if (type > MAX_SPLINE_ITEM_NUM)
 				DoFatalAlert("PrimeSplines: type > MAX_SPLINE_ITEM_NUM");
 
@@ -580,5 +584,4 @@ void DetachObjectFromSpline(ObjNode *theNode, movecall_t moveCall)
 	theNode->MoveCall = moveCall;
 
 }
-
 

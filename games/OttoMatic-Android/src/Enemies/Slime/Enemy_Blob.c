@@ -426,7 +426,7 @@ float	dx,dy,dz;
 		dz = RandomFloat2() * 500.0f;
 		dy = 300.0f + RandomFloat() * 400.0f;
 
-		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+		gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_BLOB);
 		gNewObjectDefinition.type 		= SLIME_ObjType_BlobChunk;
 		gNewObjectDefinition.coord.x 	= enemy->Coord.x + dx * .4f;
 		gNewObjectDefinition.coord.y 	= enemy->Coord.y + dy * .3f;
@@ -604,7 +604,6 @@ float	fps = gFramesPerSecondFrac;
 
 
 #pragma mark -
-
 
 
 

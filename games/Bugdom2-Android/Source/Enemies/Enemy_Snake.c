@@ -117,7 +117,7 @@ ObjNode	*newObj;
 			/* INIT MESH DATA */
 
 	gSnakeMesh.numMaterials 	= 1;
-	gSnakeMesh.materials[0] 	= gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][SIDEWALK_SObjType_SnakeSkin].materialObject;	// set illegal ref to material
+	gSnakeMesh.materials[0] 	= gSpriteGroupList[GetBugdom2LevelSpriteGroup(LEVEL_NUM_SIDEWALK)][SIDEWALK_SObjType_SnakeSkin].materialObject;	// set illegal ref to material
 	gSnakeMesh.points 			= gSnakePoints;
 	gSnakeMesh.triangles 		= gSnakeTriangles;
 	gSnakeMesh.normals			= gSnakeNormals;
@@ -661,7 +661,6 @@ void MovePlayer_EatenBySnake(ObjNode *player)
 		}
 	}
 }
-
 
 
 

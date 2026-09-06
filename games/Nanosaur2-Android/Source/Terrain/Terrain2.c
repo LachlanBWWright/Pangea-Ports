@@ -32,6 +32,7 @@ static void FindPlayerStartCoordItems(void);
 /**********************/
 
 int						gNumTerrainItems;
+int						gActiveItemModelGroup = MODEL_GROUP_LEVELSPECIFIC;
 TerrainItemEntryType 	*gMasterItemList = nil;
 
 float					**gMapYCoords = nil;			// 2D array of map vertex y coords
@@ -104,6 +105,56 @@ static Boolean (*gTerrainItemAddRoutines[MAX_ITEM_NUM+1])(TerrainItemEntryType *
 };
 
 
+
+int GetNanosaur2ItemModelGroup(int itemType)
+{
+#if !PANGEA_SAFE_ITEM_LOADING
+	(void) itemType;
+	return MODEL_GROUP_LEVELSPECIFIC;
+#else
+	int biome = BIOME_FOREST;
+	switch (gLevelNum)
+	{
+		case LEVEL_NUM_ADVENTURE2:
+		case LEVEL_NUM_RACE2:
+		case LEVEL_NUM_BATTLE2:
+			biome = BIOME_DESERT;
+			break;
+		case LEVEL_NUM_ADVENTURE3:
+		case LEVEL_NUM_RACE1:
+		case LEVEL_NUM_FLAG1:
+			biome = BIOME_SWAMP;
+			break;
+		default:
+			break;
+	}
+	if ((itemType >= 1 && itemType <= 2) || (itemType >= 7 && itemType <= 9) ||
+		(itemType >= 11 && itemType <= 13) || (itemType >= 23 && itemType <= 25))
+		return MODEL_GROUP_LEVEL_BANK_BASE + BIOME_FOREST;
+	if (itemType >= 27 && itemType <= 37)
+		return MODEL_GROUP_LEVEL_BANK_BASE + BIOME_DESERT;
+	if (itemType >= 38 && itemType <= 45)
+		return MODEL_GROUP_LEVEL_BANK_BASE + BIOME_SWAMP;
+	return MODEL_GROUP_LEVEL_BANK_BASE + biome;
+#endif
+}
+
+int GetNanosaur2CurrentModelGroup(void)
+{
+	return GetNanosaur2ItemModelGroup(-1);
+}
+
+int GetNanosaur2LevelSpriteGroup(int biome)
+{
+#if !PANGEA_SAFE_ITEM_LOADING
+	(void) biome;
+	return SPRITE_GROUP_LEVELSPECIFIC;
+#else
+	if (biome < BIOME_FOREST || biome >= NUM_BIOMES)
+		return SPRITE_GROUP_LEVELSPECIFIC;
+	return SPRITE_GROUP_LEVEL_BANK_BASE + biome;
+#endif
+}
 
 /********************* BUILD TERRAIN ITEM LIST ***********************/
 //
@@ -297,6 +348,10 @@ Boolean			flag;
 			continue;
 		type = Nanosaur2Script_RemapTerrainItemType(gLevelNum, (int)type);
 #endif
+		#if PANGEA_SAFE_ITEM_LOADING
+		if (type < 0 || type > MAX_ITEM_NUM)
+			continue;
+		#endif
 		if (type > MAX_ITEM_NUM)								// error check!
 		{
 			DoFatalAlert("Illegal Map Item Type %d!", type);
@@ -310,7 +365,13 @@ Boolean			flag;
 		}
 #endif
 
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = GetNanosaur2ItemModelGroup((int)type);
+		#endif
 		flag = gTerrainItemAddRoutines[type](&itemPtr[i],itemPtr[i].x, itemPtr[i].y); // call item's ADD routine
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = GetNanosaur2CurrentModelGroup();
+		#endif
 		if (flag)
 			itemPtr[i].flags |= ITEM_FLAGS_INUSE;				// set in-use flag
 	}

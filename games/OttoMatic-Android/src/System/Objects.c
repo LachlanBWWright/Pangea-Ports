@@ -225,7 +225,12 @@ uint32_t flags = newObjDef->flags;
 ObjNode *MakeNewDisplayGroupObject(NewObjectDefinitionType *newObjDef)
 {
 ObjNode	*newObj;
-Byte	group,type;
+	Byte	group,type;
+
+	#if PANGEA_SAFE_ITEM_LOADING
+	if (newObjDef->group == MODEL_GROUP_LEVELSPECIFIC)
+		newObjDef->group = gActiveItemModelGroup;
+	#endif
 
 
 	newObjDef->genre = DISPLAY_GROUP_GENRE;

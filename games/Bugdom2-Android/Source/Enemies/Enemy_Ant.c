@@ -699,7 +699,7 @@ ObjNode	*food;
 
 			/* MAKE FOOD OBJECT */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= enemy->Group;
 	gNewObjectDefinition.type 		= PARK_ObjType_CheeseBit + foodType;
 	gNewObjectDefinition.coord		= enemy->Coord;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
@@ -871,7 +871,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

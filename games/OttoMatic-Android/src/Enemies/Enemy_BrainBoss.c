@@ -11,6 +11,14 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define BRAIN_BOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_BRAINBOSS)
+#define BRAIN_BOSS_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_BRAINBOSS)
+#else
+#define BRAIN_BOSS_MODEL_GROUP MODEL_GROUP_LEVELSPECIFIC
+#define BRAIN_BOSS_SPRITE_GROUP SPRITE_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -173,7 +181,7 @@ DeformationType		defData;
 				/* MAKE BRAIN CORE */
 				/*******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BRAIN_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= BRAINBOSS_ObjType_BrainCore;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -217,7 +225,7 @@ DeformationType		defData;
 				/* MAKE LEFT BRAIN */
 				/*******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BRAIN_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= BRAINBOSS_ObjType_LeftBrain;
 	gNewObjectDefinition.coord		= core->Coord;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits ;
@@ -417,7 +425,7 @@ OGLPoint3D		pts[4];
 
 	gGlobalTransparency = .6;
 
-	MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][BRAINBOSS_SObjType_Static1+(MyRandomLong()&0x3)].materialObject);
+	MO_DrawMaterial(gSpriteGroupList[BRAIN_BOSS_SPRITE_GROUP][BRAINBOSS_SObjType_Static1+(MyRandomLong()&0x3)].materialObject);
 
 
 			/* DRAW QUAD */
@@ -983,7 +991,7 @@ int		i,id;
 
 			/* MAKE OBJECT */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BRAIN_BOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= BRAINBOSS_ObjType_BrainPort;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -1162,7 +1170,7 @@ float	x,y,z,x2,y2,z2,u,u2,yo;
 			u = RandomFloat() * 5.0f;
 			u2 = u + 3.0f;
 
-			MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][BRAINBOSS_SObjType_RedZap].materialObject);
+			MO_DrawMaterial(gSpriteGroupList[BRAIN_BOSS_SPRITE_GROUP][BRAINBOSS_SObjType_RedZap].materialObject);
 
 			glBegin(GL_QUADS);
 			glTexCoord2f(u,0);			glVertex3f(x,y+yo,z);
@@ -1219,7 +1227,6 @@ float	damage;
 
 	return(true);			// stop weapon
 }
-
 
 
 

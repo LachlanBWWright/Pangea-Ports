@@ -654,7 +654,7 @@ ObjNode	*stinger;
 
 			/* MAKE SPEAR OBJECT */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;	
+	gNewObjectDefinition.group 		= GetBugdomItemModelGroup(48);
 	gNewObjectDefinition.type 		= HIVE_MObjType_Stinger;	
 	gNewObjectDefinition.coord		= theNode->Coord;
 	gNewObjectDefinition.flags 		= theNode->StatusBits;
@@ -796,8 +796,6 @@ adios:
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

@@ -112,7 +112,7 @@ float	q;
 				/* MAKE MAIN BODY */
 				/******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);
 	gNewObjectDefinition.type 		= FIREICE_ObjType_HammerBot_Body;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -798,7 +798,7 @@ static const OGLPoint3D	bodyOff = {0, 17, -39};
 			/* CREATE 2 WHEELS */
 			/*******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;						// set basic info
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);						// set basic info
 	gNewObjectDefinition.type 		= FIREICE_ObjType_HammerBot_Chunk_Wheel;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
@@ -877,7 +877,6 @@ static const OGLPoint3D	bodyOff = {0, 17, -39};
 	DeleteEnemy(enemy);
 
 }
-
 
 
 

@@ -1009,7 +1009,7 @@ ObjNode		*flame;
 	OGLPoint3D_Transform(&gJawOff, &m, &gNewObjectDefinition.coord);
 
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_JUNGLE);
 	gNewObjectDefinition.type 		= JUNGLE_ObjType_FireRing;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits|STATUS_BIT_USEALIGNMENTMATRIX | STATUS_BIT_GLOW|
 									STATUS_BIT_KEEPBACKFACES|STATUS_BIT_NOZWRITES|STATUS_BIT_NOLIGHTING;
@@ -1150,7 +1150,6 @@ float					x,y,z;
 		}
 	}
 }
-
 
 
 

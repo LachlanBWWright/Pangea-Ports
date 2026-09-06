@@ -110,6 +110,9 @@ parser.add_argument("--print-artifact-name", default=False, action="store_true",
 parser.add_argument("--wasm", default=False, action="store_true",
         help="build a WebAssembly bundle using Emscripten (overrides platform auto-detection)")
 
+parser.add_argument("--safe-item-loading", default=False, action="store_true",
+        help="skip out-of-range native item records instead of using strict alerts")
+
 if SYSTEM == "Linux":
     parser.add_argument("--system-sdl", default=False, action="store_true",
         help="use system SDL instead of building SDL from scratch")
@@ -480,6 +483,7 @@ class EmscriptenProject(Project):
             "-DBUILD_SDL_FROM_SOURCE=ON",
             "-DSDL_STATIC=ON",              # Emscripten only supports static libs
             "-DPANGEA_ENABLE_SCRIPTING=ON",
+            "-DPANGEA_SAFE_ITEM_LOADING=ON" if args.safe_item_loading else "-DPANGEA_SAFE_ITEM_LOADING=OFF",
             f"-DSDL3_DIR={sdl_source_dir}",
         ])
 

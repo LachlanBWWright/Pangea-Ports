@@ -11,6 +11,12 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define BLOBBOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_BLOBBOSS)
+#else
+#define BLOBBOSS_MODEL_GROUP MODEL_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -200,7 +206,7 @@ float	y,r;
 			/* CREATE ENDS */
 			/***************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BLOBBOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= BLOBBOSS_ObjType_BeamEnd;
 	gNewObjectDefinition.coord.y 	= y;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
@@ -571,7 +577,7 @@ float	s,x,z,r;
 int		i;
 
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BLOBBOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= BLOBBOSS_ObjType_CircularPlatform_Grey;
 	gNewObjectDefinition.coord.y 	= GetTerrainY_Undeformed(centerX,centerZ) + (BEAM_YOFF - 30.0f);
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
@@ -660,7 +666,7 @@ float	r,s;
 			/* MAKE BASE */
 			/*************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BLOBBOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= BLOBBOSS_ObjType_Base;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -904,7 +910,7 @@ float	dx,dz,force;
 
 		/* CREATE BLOBULE */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= BLOBBOSS_MODEL_GROUP;
 	gNewObjectDefinition.type 		= BLOBBOSS_ObjType_Blobule;
 	gNewObjectDefinition.coord.x 	= horn->Coord.x + dx * 100.0f;
 	gNewObjectDefinition.coord.y 	= horn->Coord.y + 220.0f;
@@ -1075,8 +1081,6 @@ float	delay;
 
 	return(true);
 }
-
-
 
 
 

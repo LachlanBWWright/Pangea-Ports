@@ -11,6 +11,7 @@
 /***************/
 
 #include "game.h"
+#include "LevelMetadataJSON.h"
 #include "bones.h"
 #include "lzss.h"
 
@@ -45,27 +46,22 @@ static char *gLevelMetadataJSON = nil;
 
 Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
 {
-	char needle[96];
-	const char *valueStart;
-	const char *valueEnd;
-	size_t length;
+	if (!gLevelMetadataJSON || !key || !value || valueSize == 0) return false;
+	return PangeaLevelMetadataJSONGetString(
+		gLevelMetadataJSON, SDL_strlen(gLevelMetadataJSON), key, value, valueSize) != 0;
+}
 
-	if (!gLevelMetadataJSON || valueSize == 0) return false;
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":", key);
-	valueStart = strstr(gLevelMetadataJSON, needle);
-	if (!valueStart) return false;
-	valueStart += strlen(needle);
-	while (*valueStart == ' ' || *valueStart == '\t' || *valueStart == '\r' || *valueStart == '\n')
-		valueStart++;
-	if (*valueStart != '"') return false;
-	valueStart++;
-	valueEnd = strchr(valueStart, '\"');
-	if (!valueEnd) return false;
-	length = (size_t)(valueEnd - valueStart);
-	if (length >= valueSize) return false;
-	SDL_memcpy(value, valueStart, length);
-	value[length] = '\0';
-	return true;
+Boolean GetLevelMetadataFloat(const char *key, float *value)
+{
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	(void) key;
+	(void) value;
+	return false;
+#else
+	if (!gLevelMetadataJSON || !value) return false;
+	return PangeaLevelMetadataJSONGetFloat(
+		gLevelMetadataJSON, SDL_strlen(gLevelMetadataJSON), key, value) != 0;
+#endif
 }
 
 static Boolean IsValidLevelMetadataJSON(const char *json)
@@ -142,23 +138,51 @@ Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
 	return fallback;
 }
 
+Boolean LevelMetadataUsesCustomValues(const char *key)
+{
+	char value[64];
+	return GetLevelMetadataString(key, value, sizeof(value))
+		&& !SDL_strcasecmp(value, "custom");
+}
+
 Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
 {
 	char value[64];
 	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default")) return fallback;
-	if (!SDL_strcasecmp(value, "race") || !SDL_strcasecmp(value, "battle") ||
-		!SDL_strcasecmp(value, "car") || !SDL_strcasecmp(value, "submarine") ||
-		!SDL_strcasecmp(value, "none") || !SDL_strcasecmp(value, "snow") ||
-		!SDL_strcasecmp(value, "scroll-both") || !SDL_strcasecmp(value, "scroll-v") ||
-		!SDL_strcasecmp(value, "desert") || !SDL_strcasecmp(value, "jungle") ||
-		!SDL_strcasecmp(value, "atlantis") || !SDL_strcasecmp(value, "china") ||
-		!SDL_strcasecmp(value, "crete") || !SDL_strcasecmp(value, "egypt") ||
-		!SDL_strcasecmp(value, "europe") || !SDL_strcasecmp(value, "viking") ||
-		!SDL_strcasecmp(value, "ice") || !SDL_strcasecmp(value, "scandinavia") ||
-		!SDL_strcasecmp(value, "aztec") || !SDL_strcasecmp(value, "coliseum") ||
-		!SDL_strcasecmp(value, "tar") || !SDL_strcasecmp(value, "water") ||
-		!SDL_strcasecmp(value, "standard"))
-		return !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.mode"))
+		return (!SDL_strcasecmp(value, "race") || !SDL_strcasecmp(value, "battle")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.waterAnimation"))
+		return (!SDL_strcasecmp(value, "none") || !SDL_strcasecmp(value, "scroll-both") || !SDL_strcasecmp(value, "scroll-v")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.surfaceEffects"))
+		return (!SDL_strcasecmp(value, "none") || !SDL_strcasecmp(value, "snow")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.vehicle"))
+		return (!SDL_strcasecmp(value, "car") || !SDL_strcasecmp(value, "submarine")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.music"))
+		return (!SDL_strcasecmp(value, "desert") || !SDL_strcasecmp(value, "jungle") ||
+			!SDL_strcasecmp(value, "atlantis") || !SDL_strcasecmp(value, "china") ||
+			!SDL_strcasecmp(value, "egypt") || !SDL_strcasecmp(value, "crete") ||
+			!SDL_strcasecmp(value, "ice") || !SDL_strcasecmp(value, "europe") ||
+			!SDL_strcasecmp(value, "viking")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.lighting"))
+		return (!SDL_strcasecmp(value, "standard") || !SDL_strcasecmp(value, "ice") || !SDL_strcasecmp(value, "atlantis")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.sky"))
+		return (!SDL_strcasecmp(value, "desert") || !SDL_strcasecmp(value, "jungle") ||
+			!SDL_strcasecmp(value, "ice") || !SDL_strcasecmp(value, "crete") ||
+			!SDL_strcasecmp(value, "china") || !SDL_strcasecmp(value, "egypt") ||
+			!SDL_strcasecmp(value, "europe") || !SDL_strcasecmp(value, "scandinavia") ||
+			!SDL_strcasecmp(value, "atlantis") || !SDL_strcasecmp(value, "aztec") ||
+			!SDL_strcasecmp(value, "coliseum")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.liquidMaterial"))
+		return (!SDL_strcasecmp(value, "water") || !SDL_strcasecmp(value, "tar")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.campfire"))
+		return (!SDL_strcasecmp(value, "ice") || !SDL_strcasecmp(value, "scandinavia")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.startLineCollision"))
+		return (!SDL_strcasecmp(value, "standard") || !SDL_strcasecmp(value, "crete") ||
+			!SDL_strcasecmp(value, "jungle") || !SDL_strcasecmp(value, "none")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.startLineMovement"))
+		return (!SDL_strcasecmp(value, "standard") || !SDL_strcasecmp(value, "atlantis")) && !SDL_strcasecmp(value, profile);
+	if (!SDL_strcasecmp(key, "track.objectTint"))
+		return (!SDL_strcasecmp(value, "standard") || !SDL_strcasecmp(value, "underwater")) && !SDL_strcasecmp(value, profile);
 	return fallback;
 }
 
@@ -167,6 +191,10 @@ static void ReadLevelMetadata(void)
 	Handle hand;
 	Size size;
 	char *json;
+
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	return;
+#endif
 
 	if (gLevelMetadataJSON)
 	{
@@ -183,7 +211,7 @@ static void ReadLevelMetadata(void)
 		return;
 	}
 	SDL_memcpy(json, *hand, (size_t)size);
-	if (!IsValidLevelMetadataJSON(json) || !HasMetadataValue(json, "schemaVersion", "1", false) ||
+	if (!IsValidLevelMetadataJSON(json) || !PangeaLevelMetadataJSONIsValid(json, (size_t)size, "cromag") || !HasMetadataValue(json, "schemaVersion", "1", false) ||
 		!HasMetadataValue(json, "game", "cromag", true) || !HasMetadataValue(json, "identity", "", true) ||
 		!HasMetadataValue(json, "properties", "{", false))
 		SafeDisposePtr(json);
@@ -990,10 +1018,14 @@ static const char*	levelModelFiles[NUM_TRACKS] =
 				LoadSoundEffect(EFFECT_BUBBLES);
 				break;
 
-		case	TRACK_NUM_STONEHENGE:
+	case	TRACK_NUM_STONEHENGE:
 				LoadSoundEffect(EFFECT_CHANT);
 				break;
 	}
+
+#if PANGEA_SAFE_ITEM_LOADING
+	LoadSoundBank(SOUNDBANK_LEVELSPECIFIC);
+#endif
 
 
 			/* LOAD BG3D GEOMETRY */
@@ -1009,6 +1041,15 @@ static const char*	levelModelFiles[NUM_TRACKS] =
 
 	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, levelModelFiles[gTrackNum], &spec);
 	ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
+
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int trackIndex = 0; trackIndex < NUM_TRACKS; trackIndex++)
+	{
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, levelModelFiles[trackIndex], &spec);
+		ImportBG3D(&spec, MODEL_GROUP_LEVEL_BANK_BASE + trackIndex);
+	}
+	gActiveItemModelGroup = MODEL_GROUP_LEVEL_BANK_BASE + gTrackNum;
+#endif
 
 
 			/* LOAD SKELETONS */

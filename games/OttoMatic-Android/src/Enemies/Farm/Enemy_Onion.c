@@ -887,7 +887,7 @@ ObjNode	*newObj;
 
 				/* SET DEFAULT STUFF */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FARM);
 	gNewObjectDefinition.coord.x 	= enemy->Coord.x;
 	gNewObjectDefinition.coord.y 	= enemy->Coord.y + enemy->BottomOff + 50.0f;
 	gNewObjectDefinition.coord.z 	= enemy->Coord.z;
@@ -978,7 +978,6 @@ float fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

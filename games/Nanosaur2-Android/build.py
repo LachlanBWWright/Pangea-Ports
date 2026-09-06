@@ -95,6 +95,9 @@ parser.add_argument("-4", "--package", default=False, action="store_true", help=
 parser.add_argument("--wasm", default=False, action="store_true",
         help="target WebAssembly via Emscripten (requires emsdk active in PATH)")
 
+parser.add_argument("--safe-item-loading", default=False, action="store_true",
+        help="use banked level model resolution and skip invalid native item records")
+
 parser.add_argument("-G", metavar="<generator>", default=default_generator,
         help=f"cmake project generator for step 2 (default: {default_generator})")
 
@@ -575,6 +578,8 @@ if __name__ == "__main__":
 
     project.gen_args += common_gen_args
     project.gen_args.append("-DPANGEA_ENABLE_SCRIPTING=ON")
+    if args.safe_item_loading:
+        project.gen_args.append("-DPANGEA_SAFE_ITEM_LOADING=ON")
 
     #----------------------------------------------------------------
     # Gather build steps

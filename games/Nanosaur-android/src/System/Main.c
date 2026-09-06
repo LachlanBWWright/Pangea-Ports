@@ -205,12 +205,13 @@ TQ3ColorRGB		c2 = { 1, .9, .6 };
 	gWonGameFlag = false;
 	gMyHealth = 1.0;
 
-			/* LOAD ART */
+		/* LOAD ART */
 
 	MakeShadowTexture();
 
-	LoadNanosaurMetadata();
-	gStartLevelNum = gNanosaurMetadataLevel;
+	#if defined(PANGEA_ENABLE_LEVEL_METADATA) && PANGEA_ENABLE_LEVEL_METADATA
+	(void) LoadNanosaurMetadata();
+	#endif
 	LoadLevelArt(gStartLevelNum);
 
 	QD3D_InitShards();	

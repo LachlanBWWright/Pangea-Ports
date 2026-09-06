@@ -538,7 +538,7 @@ static Boolean SquooshyEnemyHitByFreeze(ObjNode *weapon, ObjNode *enemy, OGLPoin
 
 			/* CHANGE THE TEXTURE */
 
-	enemy->Skeleton->overrideTexture = gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][FIREICE_SObjType_FrozenSquooshy].materialObject;
+	enemy->Skeleton->overrideTexture = gSpriteGroupList[GetOttoLevelSpriteGroup(LEVEL_NUM_FIREICE)][FIREICE_SObjType_FrozenSquooshy].materialObject;
 
 
 			/* STOP MOMENTUM */
@@ -722,7 +722,7 @@ OGLMatrix4x4	m;
 		OGLPoint3D_Transform(&muzzleOff, &m, &gNewObjectDefinition.coord);	// calc start coord
 		OGLVector3D_Transform(&muzzleAim, &m, &aim);						// calc delta/aim vector
 
-		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+		gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);
 		gNewObjectDefinition.type 		= FIREICE_ObjType_Blobule;
 		gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 		gNewObjectDefinition.slot 		= 502;
@@ -803,8 +803,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

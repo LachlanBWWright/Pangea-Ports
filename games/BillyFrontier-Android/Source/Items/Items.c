@@ -1132,7 +1132,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
 	gNewObjectDefinition.coord.y 	= GetMinTerrainY(x,z, gNewObjectDefinition.group, gNewObjectDefinition.type, 1.0) - 
-									 gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y;
+									 gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y;
 	gNewObjectDefinition.flags 		= 0;
 	gNewObjectDefinition.slot 		= 384;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
@@ -1162,7 +1162,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
 	gNewObjectDefinition.coord.y 	= GetMinTerrainY(x,z, gNewObjectDefinition.group, gNewObjectDefinition.type, 1.0) - 
-									 gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y;
+									 gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y;
 	gNewObjectDefinition.flags 		= 0;
 	gNewObjectDefinition.slot 		= 384;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
@@ -1273,7 +1273,7 @@ Boolean	conform;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
 	gNewObjectDefinition.coord.y 	= GetMinTerrainY(x,z, gNewObjectDefinition.group, gNewObjectDefinition.type, 1.0) - 
-									 gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y;
+									 gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y;
 	gNewObjectDefinition.flags 		= 0;
 	gNewObjectDefinition.slot 		= FENCE_SLOT-2;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
@@ -1549,7 +1549,5 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
-
 
 

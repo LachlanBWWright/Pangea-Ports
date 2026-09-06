@@ -193,6 +193,7 @@ extern short gNumCollisions;
 extern short gNumFencesDrawn;
 extern short gNumSuperTilesDrawn;
 extern short gNumTerrainItems;
+extern int gActiveItemModelGroup;
 extern short gNumWaterDrawn;
 extern short gPrefsFolderVRefNum;
 extern signed char gNumEnemyOfKind[NUM_ENEMY_KINDS];

@@ -720,7 +720,7 @@ static const TQ3Point3D off = {0,-25,-55};
 
 	FindCoordOnJoint(bee, QUEENBEE_JOINT_HEAD, &off, &gNewObjectDefinition.coord);
 		
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;	
+	gNewObjectDefinition.group 		= GetBugdomItemModelGroup(49);
 	gNewObjectDefinition.type 		= HIVE_MObjType_HoneyBlob;
 	gNewObjectDefinition.flags 		= 0;
 	gNewObjectDefinition.slot 		= 550;
@@ -853,8 +853,6 @@ float	base;
 
 	UpdateObject(theNode);	
 }
-
-
 
 
 

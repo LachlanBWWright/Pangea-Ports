@@ -1780,7 +1780,7 @@ int		i;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
 	gNewObjectDefinition.coord.y	= GetTerrainY(x,z) -
-									(gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale);
+								(gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale);
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot 		= 522;
 	gNewObjectDefinition.moveCall 	= MoveProximityMine;
@@ -2257,7 +2257,6 @@ OGLPoint3D			p;
 
 
 }
-
 
 
 

@@ -964,7 +964,7 @@ ObjNode	*icicle;
 			/* CREATE ICICLE */
 			/*****************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);
 	gNewObjectDefinition.type 		= FIREICE_ObjType_Icicle;
 	gNewObjectDefinition.coord		= enemy->Coord;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits  | STATUS_BIT_NOLIGHTING;
@@ -1044,7 +1044,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

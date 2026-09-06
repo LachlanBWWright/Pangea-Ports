@@ -104,7 +104,7 @@ float	q;
 				/* MAKE MAIN BODY */
 				/******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);
 	gNewObjectDefinition.type 		= FIREICE_ObjType_JawsBot_Body;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -636,7 +636,7 @@ static const OGLPoint3D	jawOffs[2] =
 			/* CREATE 4 WHEELS */
 			/*******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;						// set basic info
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);						// set basic info
 	gNewObjectDefinition.type 		= FIREICE_ObjType_JawsBot_Chunk_Wheel;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
@@ -761,7 +761,6 @@ float			throwFactor;
 		MakeSparkExplosion(jawPt.x, jawPt.y, jawPt.z, 300.0f, .8, PARTICLE_SObjType_WhiteSpark3, 0);
 	}
 }
-
 
 
 

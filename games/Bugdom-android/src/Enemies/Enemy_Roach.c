@@ -563,11 +563,11 @@ ObjNode	*newObj;
 
 			/* MAKE CLOUD OBJECT */
 			
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;	
 	if (gLevelType == LEVEL_TYPE_ANTHILL)
-		gNewObjectDefinition.type 	= ANTHILL_MObjType_GasCloud;	
+		gNewObjectDefinition.type 	= ANTHILL_MObjType_GasCloud;
 	else
 		gNewObjectDefinition.type 	= NIGHT_MObjType_GasCloud;
+	gNewObjectDefinition.group 		= GetBugdomCurrentModelGroup();
 
 	gNewObjectDefinition.coord.x 	= theNode->Coord.x;
 	gNewObjectDefinition.coord.y 	= theNode->Coord.y + 100.0f + (RandomFloat()*120.0f);

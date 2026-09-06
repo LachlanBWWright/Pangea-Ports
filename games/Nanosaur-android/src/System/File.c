@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "LevelMetadataJSON.h"
 
 
 /****************************/
@@ -33,8 +34,8 @@ static void ReadDataFromSkeletonFile(SkeletonDefType *skeleton, FSSpec *target);
 /**********************/
 
 Ptr		gTileFilePtr = nil;
-short	gNanosaurMetadataLevel = LEVEL_NUM_0;
 
+#if defined(PANGEA_ENABLE_LEVEL_METADATA) && PANGEA_ENABLE_LEVEL_METADATA
 static Uint32 ReadMetadataBE32(const Byte* data)
 {
 	return ((Uint32)data[0] << 24) | ((Uint32)data[1] << 16) |
@@ -60,21 +61,10 @@ static Boolean ParseNanosaurMetadataJSON(const Byte* data, Uint32 length)
 	SDL_memcpy(json, data, length);
 	json[length] = 0;
 
-	Boolean valid = SDL_strstr(json, "\"schemaVersion\":1") != nil &&
-		SDL_strstr(json, "\"game\":\"Nanosaur\"") != nil &&
-		SDL_strstr(json, "\"identity\":\"") != nil &&
-		SDL_strstr(json, "\"properties\":{") != nil;
-	char* properties = SDL_strstr(json, "\"properties\":{");
-	char* levelID = SDL_strstr(json, "\"level.id\":\"");
-	if (valid && properties && properties[SDL_strlen("\"properties\":{")] != '}')
-		valid = levelID != nil;
-	if (valid && levelID)
-	{
-		levelID += SDL_strlen("\"level.id\":\"");
-		valid = levelID[0] == '0' && levelID[1] == '"';
-		if (valid)
-			gNanosaurMetadataLevel = LEVEL_NUM_0;
-	}
+	Boolean valid =
+		PangeaLevelMetadataJSONIsValid(json, length, "nanosaur1") != 0 ||
+		PangeaLevelMetadataJSONIsValid(json, length, "Nanosaur") != 0 ||
+		PangeaLevelMetadataJSONIsValid(json, length, "Nanosaur 1") != 0;
 
 	SDL_free(json);
 	return valid;
@@ -95,9 +85,18 @@ Boolean LoadNanosaurMetadata(void)
 	Uint16 typeCount;
 	Byte* typeList;
 
-	gNanosaurMetadataLevel = gStartLevelNum;
 	SDL_memset(&spec, 0, sizeof(spec));
-	error = FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Level1.Meta.rsrc", &spec);
+	if (gCustomTerrainFile[0] != '\0')
+	{
+		char metadataPath[sizeof(gCustomTerrainFile) + 16];
+		SDL_snprintf(metadataPath, sizeof(metadataPath), "%s.Meta.rsrc", gCustomTerrainFile);
+		FSMakeCustomSpec(metadataPath, &spec);
+		error = noErr;
+	}
+	else
+	{
+		error = FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:Level1.Meta.rsrc", &spec);
+	}
 	if (error != noErr || FSpOpenDF(&spec, fsRdPerm, &refNum) != noErr)
 		return false;
 	if (GetEOF(refNum, &fileSize) != noErr || fileSize < 16)
@@ -186,6 +185,12 @@ Boolean LoadNanosaurMetadata(void)
 	SDL_free(fileData);
 	return false;
 }
+#else
+Boolean LoadNanosaurMetadata(void)
+{
+	return false;
+}
+#endif
 
 
 /******************* LOAD SKELETON *******************/

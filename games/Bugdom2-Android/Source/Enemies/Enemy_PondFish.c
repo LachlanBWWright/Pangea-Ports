@@ -603,7 +603,7 @@ ObjNode		*lure;
 		if (lure->Slot > LURE_SLOT)									// see if past any lures
 			break;
 
-		if ((lure->Group == MODEL_GROUP_LEVELSPECIFIC) &&			// is this ObjNode a lure?
+		if (IsBugdom2LevelModelGroup(lure->Group) &&			// is this ObjNode a lure?
 			(lure->Type == PARK_ObjType_Lure))
 		{
 			if (lure->LureMaxWobbleDY > 0.0f)						// is this lure wobbling?
@@ -641,7 +641,7 @@ ObjNode	*lure;
 	if (lure->CType == INVALID_NODE_FLAG)								// see if deleted
 		goto bad_lure;
 
-	if ((lure->Group != MODEL_GROUP_LEVELSPECIFIC) || (lure->Type != PARK_ObjType_Lure))	// make sure objnode is still the lure
+	if ((!IsBugdom2LevelModelGroup(lure->Group)) || (lure->Type != PARK_ObjType_Lure))	// make sure objnode is still the lure
 		goto bad_lure;
 
 	if (lure->LureMaxWobbleDY <= 0.0f)										// see if lure is not wobbling, thus inactive now
@@ -696,7 +696,6 @@ float		dist;
 		gNumCaughtFish++;
 	}
 }
-
 
 
 

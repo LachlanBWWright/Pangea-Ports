@@ -1245,7 +1245,7 @@ OGLPoint3D	p[32];
 		if (thisNode->StatusBits & STATUS_BIT_ISCULLED)			// only collide with things we can see
 			goto next;
 
-		if (thisNode->Group != MODEL_GROUP_LEVELSPECIFIC)		// only collide with tunnel object models
+		if (!IsBugdom2LevelModelGroup(thisNode->Group))		// only collide with tunnel object models
 			goto next;
 
 				/************************************************/
@@ -1393,7 +1393,7 @@ OGLPoint3D	p[24];
 		if (thisNode->StatusBits & STATUS_BIT_ISCULLED)			// only collide with things we can see
 			goto next;
 
-		if (thisNode->Group != MODEL_GROUP_LEVELSPECIFIC)		// only collide with tunnel object models
+		if (!IsBugdom2LevelModelGroup(thisNode->Group))		// only collide with tunnel object models
 			goto next;
 
 				/************************************************/
@@ -1546,6 +1546,5 @@ float	fps = gFramesPerSecondFrac;
 	gPlayerTunnelIndex += gPlayerInfo.tunnelSpeed * fps;
 
 }
-
 
 

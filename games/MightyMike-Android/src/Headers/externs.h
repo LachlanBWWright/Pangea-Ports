@@ -68,6 +68,8 @@ extern	PrefsType				gGamePrefs;
 extern	long					gFrames;
 extern	Byte					gSceneNum;
 extern	Byte					gAreaNum;
+extern	long					gActiveAreaShapeGroup;
+extern	long					gActiveAreaShapeGroup2;
 extern	Byte					gPlayerMode;
 extern	Byte					gCurrentPlayer;
 extern	Byte					gDifficultySetting;			// set at start of game

@@ -143,6 +143,10 @@ SplinePointType	*points;
 		{
 			itemPtr = &gSplineList[s].itemList[i];					// point to this item
 			type = itemPtr->type;								// get item type
+	#if PANGEA_SAFE_ITEM_LOADING
+			if (type < 0 || type > MAX_SPLINE_ITEM_NUM)
+				continue;
+	#endif
 			if (type > MAX_SPLINE_ITEM_NUM)
 				DoFatalAlert("PrimeSplines: type > MAX_SPLINE_ITEM_NUM");
 
@@ -159,6 +163,9 @@ SplinePointType	*points;
 			}
 #endif
 
+			#if PANGEA_SAFE_ITEM_LOADING
+			gActiveItemModelGroup = GetNanosaur2CurrentModelGroup();
+			#endif
 			flag = gSplineItemPrimeRoutines[type](s,itemPtr); 	// call item's Prime routine
 			if (flag)
 				itemPtr->flags |= ITEM_FLAGS_INUSE;				// set in-use flag

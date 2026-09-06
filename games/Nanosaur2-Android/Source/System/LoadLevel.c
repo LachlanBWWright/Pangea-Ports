@@ -134,6 +134,15 @@ char	path[256];
 		ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC,  VERTEX_ARRAY_RANGE_TYPE_BG3DMODELS);
 	}
 
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int biome = BIOME_FOREST; biome <= BIOME_SWAMP; biome++)
+	{
+		SDL_snprintf(path, sizeof(path), ":Models:%s.bg3d", kBiomeNames[biome]);
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, path, &spec);
+		ImportBG3D(&spec, MODEL_GROUP_LEVEL_BANK_BASE + biome, VERTEX_ARRAY_RANGE_TYPE_BG3DMODELS);
+	}
+#endif
+
 
 	for (int i = 0; i < NUM_EGG_TYPES; i++)
 	{
@@ -177,6 +186,25 @@ char	path[256];
 			"too many level-specific sprites in array");
 
 	LoadSpriteGroupFromFiles(SPRITE_GROUP_LEVELSPECIFIC, numLevelSpecificSprites, levelSpecificSpritePaths);
+
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int biome = BIOME_FOREST; biome < NUM_BIOMES; biome++)
+	{
+		const char* biomeSpritePaths[2] =
+		{
+			":Sprites:textures:blockenemy",
+			NULL,
+		};
+		int numBiomeSprites = 1;
+
+		if (biome == BIOME_FOREST)
+			biomeSpritePaths[numBiomeSprites++] = ":Sprites:textures:pinefence";
+		else if (biome == BIOME_DESERT)
+			biomeSpritePaths[numBiomeSprites++] = ":Sprites:textures:dustdevil";
+
+		LoadSpriteGroupFromFiles(GetNanosaur2LevelSpriteGroup(biome), numBiomeSprites, biomeSpritePaths);
+	}
+#endif
 
 
 			/* LOAD OVERHEAD MAP */
@@ -262,8 +290,6 @@ char	path[256];
 
 	SDL_Log("%s: %d ms", __func__, (timeEndLoad.lo - timeStartLoad.lo) / 1000);
 }
-
-
 
 
 

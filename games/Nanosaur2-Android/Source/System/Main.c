@@ -412,6 +412,7 @@ static void InitLevel(void)
 {
 short				i;
 OGLSetupInputType	viewDef;
+float				metadataValue;
 
 
 	if (gTimeDemo)					// if time demo always reset random seed
@@ -511,6 +512,25 @@ OGLSetupInputType	viewDef;
 				gDrawLensFlare = true;
 				break;
 
+	}
+
+	if (LevelMetadataUsesCustomValues("level.rendering"))
+	{
+		if (GetLevelMetadataFloat("level.renderingBackgroundR", &metadataValue)) viewDef.view.clearColor.r = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingBackgroundG", &metadataValue)) viewDef.view.clearColor.g = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingBackgroundB", &metadataValue)) viewDef.view.clearColor.b = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingFogStart", &metadataValue)) viewDef.styles.fogStart = viewDef.camera.yon * metadataValue;
+		if (GetLevelMetadataFloat("level.renderingFogEnd", &metadataValue)) viewDef.styles.fogEnd = viewDef.camera.yon * metadataValue;
+		if (GetLevelMetadataFloat("level.renderingAmbientR", &metadataValue)) viewDef.lights.ambientColor.r = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingAmbientG", &metadataValue)) viewDef.lights.ambientColor.g = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingAmbientB", &metadataValue)) viewDef.lights.ambientColor.b = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingSunX", &metadataValue)) gWorldSunDirection.x = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingSunY", &metadataValue)) gWorldSunDirection.y = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingSunZ", &metadataValue)) gWorldSunDirection.z = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingFillR", &metadataValue)) gFillColor1.r = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingFillG", &metadataValue)) gFillColor1.g = metadataValue;
+		if (GetLevelMetadataFloat("level.renderingFillB", &metadataValue)) gFillColor1.b = metadataValue;
+		gDrawLensFlare = GetLevelMetadataBool("level.renderingLensFlare", gDrawLensFlare);
 	}
 
 
@@ -1228,6 +1248,10 @@ static void CleanupLevel(void)
 	DisposeInfobar();
 	DisposeParticleSystem();
 	DisposeSpriteGroup(SPRITE_GROUP_LEVELSPECIFIC);
+	#if PANGEA_SAFE_ITEM_LOADING
+	for (int biome = BIOME_FOREST; biome < NUM_BIOMES; biome++)
+		DisposeSpriteGroup(GetNanosaur2LevelSpriteGroup(biome));
+	#endif
 	DisposeSpriteGroup(SPRITE_GROUP_OVERHEADMAP);
 	DisposeAllBG3DContainers();
 	DisposeContrails();

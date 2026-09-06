@@ -107,6 +107,9 @@ parser.add_argument("--dist-dir", metavar="<dir>", default=dist_dir,
 parser.add_argument("--print-artifact-name", default=False, action="store_true",
         help="print artifact name and exit")
 
+parser.add_argument("--safe-item-loading", default=False, action="store_true",
+        help="load all area item model banks and skip invalid item records")
+
 parser.add_argument("--emscripten", default=False, action="store_true",
         help="build WebAssembly target using Emscripten")
 
@@ -537,6 +540,8 @@ if __name__ == "__main__":
 
     project.gen_args += common_gen_args
     project.gen_args.append("-DPANGEA_ENABLE_SCRIPTING=ON")
+    if args.safe_item_loading:
+        project.gen_args.append("-DPANGEA_SAFE_ITEM_LOADING=ON")
 
     #----------------------------------------------------------------
     # Gather build steps

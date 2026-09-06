@@ -11,6 +11,7 @@
 /***************/
 
 #include "game.h"
+#include "LevelMetadataJSON.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "pangea_script.h"
 #endif
@@ -581,27 +582,23 @@ long				count;
 
 Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
 {
-	char needle[96];
-	const char *valueStart;
-	const char *valueEnd;
-	size_t length;
-
 	if (!gLevelMetadataJSON || !key || !value || valueSize == 0)
 		return false;
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
-	valueStart = SDL_strstr(gLevelMetadataJSON, needle);
-	if (!valueStart)
-		return false;
-	valueStart += SDL_strlen(needle);
-	valueEnd = SDL_strchr(valueStart, '\"');
-	if (!valueEnd)
-		return false;
-	length = (size_t)(valueEnd - valueStart);
-	if (length >= valueSize)
-		return false;
-	SDL_memcpy(value, valueStart, length);
-	value[length] = '\0';
-	return true;
+	return PangeaLevelMetadataJSONGetString(
+		gLevelMetadataJSON, SDL_strlen(gLevelMetadataJSON), key, value, valueSize) != 0;
+}
+
+Boolean GetLevelMetadataFloat(const char *key, float *value)
+{
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	(void) key;
+	(void) value;
+	return false;
+#else
+	if (!gLevelMetadataJSON || !value) return false;
+	return PangeaLevelMetadataJSONGetFloat(
+		gLevelMetadataJSON, SDL_strlen(gLevelMetadataJSON), key, value) != 0;
+#endif
 }
 
 Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
@@ -616,6 +613,13 @@ Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
 	return fallback;
 }
 
+Boolean LevelMetadataUsesCustomValues(const char *key)
+{
+	char value[64];
+	return GetLevelMetadataString(key, value, sizeof(value))
+		&& !SDL_strcasecmp(value, "custom");
+}
+
 Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
 {
 	char value[64];
@@ -624,10 +628,75 @@ Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fal
 	return !SDL_strcasecmp(value, profile);
 }
 
+static Boolean IsValidLevelMetadataCase(const char *key, const char *value)
+{
+	static const char *const areaValues[] = {
+		"gnome-garden", "sidewalk", "fido", "plumbing", "playroom",
+		"closet", "gutter", "garbage", "balsa", "park",
+	};
+	static const char *const fidoValues[] = {"fido"};
+	static const char *const tunnelValues[] = {"plumbing", "gutter"};
+	static const char *const balsaValues[] = {"balsa"};
+	static const char *const parkValues[] = {"park"};
+	static const char *const sidewalkValues[] = {"sidewalk"};
+	static const char *const closetValues[] = {"closet"};
+	static const char *const playroomValues[] = {"playroom", "sidewalk"};
+	static const char *const garbageValues[] = {"garbage", "park"};
+	static const char *const gardenValues[] = {"gnome-garden", "playroom", "garbage", "park"};
+	static const char *const introValues[] = {
+		"gnome-garden", "sidewalk", "fido", "plumbing", "playroom",
+		"closet", "gutter", "garbage", "balsa", "park",
+	};
+	const char *const *values = nil;
+	int valueCount = 0;
+
+	if (!key || !value) return false;
+	if (!SDL_strcasecmp(value, "source-default")) return true;
+	if ((!SDL_strcasecmp(key, "level.rendering") || !SDL_strcasecmp(key, "level.lighting")) &&
+		!SDL_strcasecmp(value, "custom")) return true;
+	if (!SDL_strcasecmp(key, "level.bugdom2Area") ||
+		!SDL_strcasecmp(key, "level.rendering") ||
+		!SDL_strcasecmp(key, "level.lighting") ||
+		!SDL_strcasecmp(key, "level.levelInit") ||
+		!SDL_strcasecmp(key, "level.intro") ||
+		!SDL_strcasecmp(key, "level.infobar"))
+	{
+		values = !SDL_strcasecmp(key, "level.intro") || !SDL_strcasecmp(key, "level.infobar")
+			? introValues : areaValues;
+		valueCount = 10;
+	}
+	else if (!SDL_strcasecmp(key, "level.fido")) { values = fidoValues; valueCount = 1; }
+	else if (!SDL_strcasecmp(key, "level.cyclorama")) { values = (const char *const[]) {"playroom", "gutter", "park"}; valueCount = 3; }
+	else if (!SDL_strcasecmp(key, "level.itemObjects")) { values = (const char *const[]) {"gnome-garden", "sidewalk", "playroom", "garbage", "park"}; valueCount = 5; }
+	else if (!SDL_strcasecmp(key, "level.traps")) { values = (const char *const[]) {"gnome-garden", "sidewalk"}; valueCount = 2; }
+	else if (!SDL_strcasecmp(key, "level.water")) { values = garbageValues; valueCount = 2; }
+	else if (!SDL_strcasecmp(key, "level.terrain") || !SDL_strcasecmp(key, "level.dragonfly") || !SDL_strcasecmp(key, "level.objects") || !SDL_strcasecmp(key, "level.particles") || !SDL_strcasecmp(key, "level.powerups") || !SDL_strcasecmp(key, "level.fileScale")) { values = balsaValues; valueCount = 1; }
+	else if (!SDL_strcasecmp(key, "level.player")) { values = (const char *const[]) {"balsa", "garbage"}; valueCount = 2; }
+	else if (!SDL_strcasecmp(key, "level.camera")) { values = (const char *const[]) {"plumbing", "gutter", "balsa"}; valueCount = 3; }
+	else if (!SDL_strcasecmp(key, "level.enemyPlant")) { values = (const char *const[]) {"gnome-garden", "sidewalk"}; valueCount = 2; }
+	else if (!SDL_strcasecmp(key, "level.frog")) { values = (const char *const[]) {"park", "balsa"}; valueCount = 2; }
+	else if (!SDL_strcasecmp(key, "level.snake")) { values = parkValues; valueCount = 1; }
+	else if (!SDL_strcasecmp(key, "level.rideBall")) { values = playroomValues; valueCount = 2; }
+	else if (!SDL_strcasecmp(key, "level.specialItems")) { values = (const char *const[]) {"gnome-garden", "sidewalk", "playroom", "closet", "park", "garbage"}; valueCount = 6; }
+	else if (!SDL_strcasecmp(key, "level.trapRanges")) { values = sidewalkValues; valueCount = 1; }
+	else if (!SDL_strcasecmp(key, "level.tunnel")) { values = tunnelValues; valueCount = 2; }
+	else if (!SDL_strcasecmp(key, "level.areaUpdate")) { values = gardenValues; valueCount = 4; }
+	else if (!SDL_strcasecmp(key, "level.autoFade")) { values = (const char *const[]) {"fido", "balsa", "closet"}; valueCount = 3; }
+	else if (!SDL_strcasecmp(key, "level.completion")) { values = (const char *const[]) {"gnome-garden", "sidewalk", "playroom", "closet"}; valueCount = 4; }
+	else if (!SDL_strcasecmp(key, "level.mapPowerup")) { values = closetValues; valueCount = 1; }
+	else return false;
+
+	for (int i = 0; i < valueCount; i++)
+		if (!SDL_strcasecmp(value, values[i])) return true;
+	return false;
+}
+
 int LevelMetadataCaseFor(const char *key, int fallback)
 {
 	char value[64];
 	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default"))
+		return fallback;
+	if (!IsValidLevelMetadataCase(key, value))
 		return fallback;
 	if (!SDL_strcasecmp(value, "gnome-garden")) return LEVEL_NUM_GNOMEGARDEN;
 	if (!SDL_strcasecmp(value, "sidewalk")) return LEVEL_NUM_SIDEWALK;
@@ -704,6 +773,10 @@ static void ReadLevelMetadata(void)
 	Size size;
 	char *json;
 
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	return;
+#endif
+
 	if (gLevelMetadataJSON)
 	{
 		SafeDisposePtr(gLevelMetadataJSON);
@@ -718,6 +791,7 @@ static void ReadLevelMetadata(void)
 	{
 		SDL_memcpy(json, *hand, (size_t)size);
 		if (IsValidLevelMetadataJSON(json, size) &&
+			PangeaLevelMetadataJSONIsValid(json, (size_t)size, "bugdom2") &&
 			SDL_strstr(json, "\"schemaVersion\":1") &&
 			SDL_strstr(json, "\"game\":\"bugdom2\"") &&
 			SDL_strstr(json, "\"identity\":\"") &&

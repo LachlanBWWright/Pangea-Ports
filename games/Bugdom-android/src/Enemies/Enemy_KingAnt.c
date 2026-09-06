@@ -575,7 +575,7 @@ ObjNode	*staff;
 
 			/* MAKE STAFF OBJECT */
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;	
+	gNewObjectDefinition.group 		= GetBugdomItemModelGroup(59);
 	gNewObjectDefinition.type 		= ANTHILL_MObjType_Staff;	
 	gNewObjectDefinition.coord		= king->Coord;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits|STATUS_BIT_GLOW|STATUS_BIT_NULLSHADER|STATUS_BIT_NOZWRITE;
@@ -900,8 +900,6 @@ TQ3Vector3D		delta;
 
 
 }
-
-
 
 
 

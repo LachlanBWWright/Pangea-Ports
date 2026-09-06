@@ -158,8 +158,8 @@ float	r,x,z;
 	do
 	{
 		if ((thisNodePtr->Genre == DISPLAY_GROUP_GENRE)	&&					// is this a cannon obj?
-			(thisNodePtr->Group == MODEL_GROUP_LEVELSPECIFIC) &&
-			(thisNodePtr->Type == CLOUD_ObjType_Cannon))
+				(thisNodePtr->Group == GetOttoLevelModelGroup(LEVEL_NUM_CLOUD)) &&
+				(thisNodePtr->Type == CLOUD_ObjType_Cannon))
 		{
 			/* CALC HOT-SPOT IN FRONT OF CANNON */
 
@@ -198,8 +198,6 @@ void StartCannonFuse(ObjNode *theNode)
 
 
 }
-
-
 
 
 

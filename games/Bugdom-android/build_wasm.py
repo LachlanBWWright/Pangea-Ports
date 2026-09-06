@@ -4,6 +4,7 @@ WebAssembly/Emscripten build script for Bugdom.
 
 Usage:
   python3 build_wasm.py [--dependencies] [--configure] [--build] [--package]
+                         [--safe-item-loading]
   python3 build_wasm.py --print-artifact-name
 
 Steps:
@@ -64,6 +65,8 @@ parser.add_argument("--dependencies", action="store_true", help="Download and bu
 parser.add_argument("--configure",    action="store_true", help="Configure with emcmake")
 parser.add_argument("--build",        action="store_true", help="Build with emmake")
 parser.add_argument("--package",      action="store_true", help="Copy artifacts to dist-wasm/")
+parser.add_argument("--safe-item-loading", action="store_true",
+                    help="Enable safe cross-level item and resource loading")
 parser.add_argument("--print-artifact-name", action="store_true", help="Print artifact name and exit")
 args = parser.parse_args()
 
@@ -170,6 +173,7 @@ if args.configure:
     call(["emcmake", "cmake", "-S", ".", "-B", build_dir,
           "-DCMAKE_BUILD_TYPE=Release",
           "-DPANGEA_ENABLE_SCRIPTING=ON",
+          f"-DPANGEA_SAFE_ITEM_LOADING={'ON' if args.safe_item_loading else 'OFF'}",
           f"-DSDL3_DIR={sdl3_cmake_dir}"])
 
 # ---- STEP 3: Build ----

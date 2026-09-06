@@ -11,6 +11,7 @@
 /***************/
 
 #include "game.h"
+#include "LevelMetadataJSON.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "pangea_script.h"
 #endif
@@ -784,23 +785,9 @@ OSErr DeleteSavedGame(int slot)
 
 Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
 {
-	char needle[96];
-	const char *valueStart;
-	const char *valueEnd;
-	size_t length;
-
-	if (!gLevelMetadataJSON || valueSize == 0) return false;
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
-	valueStart = strstr(gLevelMetadataJSON, needle);
-	if (!valueStart) return false;
-	valueStart += strlen(needle);
-	valueEnd = strchr(valueStart, '\"');
-	if (!valueEnd) return false;
-	length = (size_t)(valueEnd - valueStart);
-	if (length >= valueSize) return false;
-	SDL_memcpy(value, valueStart, length);
-	value[length] = '\0';
-	return true;
+	if (!gLevelMetadataJSON || !key || !value || valueSize == 0) return false;
+	return PangeaLevelMetadataJSONGetString(
+		gLevelMetadataJSON, strlen(gLevelMetadataJSON), key, value, valueSize) != 0;
 }
 
 Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
@@ -917,6 +904,10 @@ static void ReadLevelMetadata(void)
 	Size size;
 	char *json;
 
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	return;
+#endif
+
 	ClearLevelMetadata();
 	hand = GetResource('Meta', 1000);
 	if (!hand) return;
@@ -929,7 +920,7 @@ static void ReadLevelMetadata(void)
 	}
 	SDL_memcpy(json, *hand, (size_t)size);
 	json[size] = '\0';
-	if (!MetadataJSONIsValid(json, size) || !strstr(json, "\"schemaVersion\":1") || !strstr(json, "\"game\":\"bugdom1\"") ||
+	if (!MetadataJSONIsValid(json, size) || !PangeaLevelMetadataJSONIsValid(json, (size_t)size, "bugdom1") || !strstr(json, "\"schemaVersion\":1") || !strstr(json, "\"game\":\"bugdom1\"") ||
 		!strstr(json, "\"identity\":\"") || !strstr(json, "\"properties\":{"))
 		DisposePtr((Ptr)json);
 	else
@@ -1521,6 +1512,32 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 
 	LoadSoundBank(SOUNDBANK_MAIN);
 
+#if PANGEA_SAFE_ITEM_LOADING
+	static const char* levelModelFiles[] =
+	{
+		":Models:Lawn_Models1.3dmf",
+		":Models:Pond_Models.3dmf",
+		":Models:Forest_Models.3dmf",
+		":Models:BeeHive_Models.3dmf",
+		":Models:Night_Models.3dmf",
+		":Models:AntHill_Models.3dmf",
+	};
+	for (int levelIndex = 0; levelIndex < 6; levelIndex++)
+	{
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, levelModelFiles[levelIndex], &spec);
+		LoadGrouped3DMF(&spec, MODEL_GROUP_LEVEL_BANK_BASE + levelIndex * 2);
+	}
+	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Models:Lawn_Models2.3dmf", &spec);
+	LoadGrouped3DMF(&spec, MODEL_GROUP_LEVEL_BANK_BASE + 1);
+
+	LoadSoundBank(SOUNDBANK_LAWN);
+	LoadSoundBank(SOUNDBANK_POND);
+	LoadSoundBank(SOUNDBANK_HIVE);
+	LoadSoundBank(SOUNDBANK_NIGHT);
+	LoadSoundBank(SOUNDBANK_FOREST);
+	LoadSoundBank(SOUNDBANK_ANTHILL);
+#endif
+
 	LoadASkeleton(SKELETON_TYPE_ME);			
 	LoadASkeleton(SKELETON_TYPE_LADYBUG);			
 	LoadASkeleton(SKELETON_TYPE_BUDDY);			
@@ -1748,6 +1765,7 @@ Boolean	hasTerrainOverride = (gLevelTerrainOverride[0] != '\0');
 	}
 	
 	
+
 			/* CAST SHADOWS */
 			
 	DoItemShadowCasting();

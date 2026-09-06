@@ -141,6 +141,10 @@ Boolean			flag;
 		{
 				itemPtr = &(*spline->itemList)[i];					// point to this item
 				type = itemPtr->type;								// get item type
+			#if PANGEA_SAFE_ITEM_LOADING
+				if (type < 0 || type > MAX_SPLINE_ITEM_NUM)
+					continue;
+			#endif
 				GAME_ASSERT(type <= MAX_SPLINE_ITEM_NUM);
 #ifdef PANGEA_ENABLE_SCRIPTING
 				if (BugdomScript_TryReplaceSplineItem(itemPtr, (int)s, (int)i))

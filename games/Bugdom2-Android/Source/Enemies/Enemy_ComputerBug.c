@@ -664,7 +664,7 @@ float		scale = VIRUS_SCALE;
 
 	where.x = gCoord.x;
 	where.z = gCoord.z;
-	where.y = GetTerrainY(gCoord.x, gCoord.z) - gObjectGroupBBoxList[MODEL_GROUP_LEVELSPECIFIC][CLOSET_ObjType_Virus].min.y * scale;
+	where.y = GetTerrainY(gCoord.x, gCoord.z) - gObjectGroupBBoxList[gActiveItemModelGroup][CLOSET_ObjType_Virus].min.y * scale;
 
 	delta.x = delta.y = delta.z = 0;
 
@@ -682,7 +682,7 @@ int		i;
 	if (gNumViri >= MAX_VIRI)									// make sure don't overload
 		return;
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetBugdom2ItemModelGroup(CLOSET_ObjType_Virus);
 	gNewObjectDefinition.type 		= CLOSET_ObjType_Virus;
 	gNewObjectDefinition.coord		= *where;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_NOTEXTUREWRAP;
@@ -865,8 +865,6 @@ OGLPoint3D	where = virus->Coord;
 
 	return(true);
 }
-
-
 
 
 

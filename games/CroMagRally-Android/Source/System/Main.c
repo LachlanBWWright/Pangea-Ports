@@ -1213,9 +1213,15 @@ static void PlayTrackMusic(void)
 }
 
 
+static Boolean TrackMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
+{
+	return LevelMetadataUsesCustomValues(key) ? fallback : LevelMetadataProfileIs(key, profile, fallback);
+}
+
 static void SetTrackLighting(OGLSetupInputType* viewDef)
 {
-	if (LevelMetadataProfileIs("track.lighting", "ice", gTrackNum == TRACK_NUM_ICE))
+	float metadataValue;
+	if (TrackMetadataProfileIs("track.lighting", "ice", gTrackNum == TRACK_NUM_ICE))
 	{
 		viewDef->lights.numFillLights = 1;
 		viewDef->lights.ambientColor.r = .7;
@@ -1224,7 +1230,7 @@ static void SetTrackLighting(OGLSetupInputType* viewDef)
 		viewDef->lights.fillDirection[0] = (OGLVector3D){1.0, -.1, 1.0};
 		viewDef->lights.fillColor[0] = (OGLColorRGBA){1.0, 1.0, 1.0, 1.0};
 	}
-	else if (LevelMetadataProfileIs("track.lighting", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS))
+	else if (TrackMetadataProfileIs("track.lighting", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS))
 	{
 		viewDef->lights.numFillLights = 1;
 		viewDef->lights.ambientColor.r = .5;
@@ -1245,6 +1251,18 @@ static void SetTrackLighting(OGLSetupInputType* viewDef)
 		viewDef->lights.fillDirection[1] = (OGLVector3D){-gWorldSunDirection.x, gWorldSunDirection.y, -gWorldSunDirection.z};
 		viewDef->lights.fillColor[1] = gFillColor2;
 	}
+	if (LevelMetadataUsesCustomValues("track.lighting"))
+	{
+		if (GetLevelMetadataFloat("track.lightingSunX", &metadataValue)) viewDef->lights.fillDirection[0].x = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingSunY", &metadataValue)) viewDef->lights.fillDirection[0].y = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingSunZ", &metadataValue)) viewDef->lights.fillDirection[0].z = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingAmbientR", &metadataValue)) viewDef->lights.ambientColor.r = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingAmbientG", &metadataValue)) viewDef->lights.ambientColor.g = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingAmbientB", &metadataValue)) viewDef->lights.ambientColor.b = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingFillR", &metadataValue)) viewDef->lights.fillColor[0].r = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingFillG", &metadataValue)) viewDef->lights.fillColor[0].g = metadataValue;
+		if (GetLevelMetadataFloat("track.lightingFillB", &metadataValue)) viewDef->lights.fillColor[0].b = metadataValue;
+	}
 }
 
 
@@ -1255,28 +1273,35 @@ static void SetTrackSkyColor(OGLSetupInputType* viewDef)
 	const Boolean crete = gTrackNum == TRACK_NUM_SPIRAL || gTrackNum == TRACK_NUM_CRETE || gTrackNum == TRACK_NUM_CELTIC || gTrackNum == TRACK_NUM_MAZE;
 	const Boolean egypt = gTrackNum == TRACK_NUM_EGYPT || gTrackNum == TRACK_NUM_TARPITS;
 	const Boolean scandinavia = gTrackNum == TRACK_NUM_SCANDINAVIA || gTrackNum == TRACK_NUM_STONEHENGE;
-	if (LevelMetadataProfileIs("track.sky", "desert", gTrackNum == TRACK_NUM_DESERT))
+	if (TrackMetadataProfileIs("track.sky", "desert", gTrackNum == TRACK_NUM_DESERT))
 		viewDef->view.clearColor = (OGLColorRGBA){153.0/255.0, 171.0/255.0, 237.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "jungle", blueJungle))
+	else if (TrackMetadataProfileIs("track.sky", "jungle", blueJungle))
 		viewDef->view.clearColor = (OGLColorRGBA){82.0/255.0, 148.0/255.0, 198.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "ice", ice))
+	else if (TrackMetadataProfileIs("track.sky", "ice", ice))
 		viewDef->view.clearColor = (OGLColorRGBA){115.0/255.0, 198.0/255.0, 255.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "crete", crete))
+	else if (TrackMetadataProfileIs("track.sky", "crete", crete))
 		viewDef->view.clearColor = (OGLColorRGBA){44.0/255.0, 73.0/255.0, 195.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "china", gTrackNum == TRACK_NUM_CHINA))
+	else if (TrackMetadataProfileIs("track.sky", "china", gTrackNum == TRACK_NUM_CHINA))
 		viewDef->view.clearColor = (OGLColorRGBA){179.0/255.0, 153.0/255.0, 91.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "egypt", egypt))
+	else if (TrackMetadataProfileIs("track.sky", "egypt", egypt))
 		viewDef->view.clearColor = (OGLColorRGBA){222.0/255.0, 181.0/255.0, 99.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "europe", gTrackNum == TRACK_NUM_EUROPE))
+	else if (TrackMetadataProfileIs("track.sky", "europe", gTrackNum == TRACK_NUM_EUROPE))
 		viewDef->view.clearColor = (OGLColorRGBA){16.0/255.0, 16.0/255.0, 74.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "scandinavia", scandinavia))
+	else if (TrackMetadataProfileIs("track.sky", "scandinavia", scandinavia))
 		viewDef->view.clearColor = (OGLColorRGBA){74.0/255.0, 90.0/255.0, 148.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS))
+	else if (TrackMetadataProfileIs("track.sky", "atlantis", gTrackNum == TRACK_NUM_ATLANTIS))
 		viewDef->view.clearColor = (OGLColorRGBA){5.0/255.0, 160.0/255.0, 190.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "aztec", gTrackNum == TRACK_NUM_AZTEC))
+	else if (TrackMetadataProfileIs("track.sky", "aztec", gTrackNum == TRACK_NUM_AZTEC))
 		viewDef->view.clearColor = (OGLColorRGBA){82.0/255.0, 148.0/255.0, 198.0/255.0, 1};
-	else if (LevelMetadataProfileIs("track.sky", "coliseum", gTrackNum == TRACK_NUM_COLISEUM))
+	else if (TrackMetadataProfileIs("track.sky", "coliseum", gTrackNum == TRACK_NUM_COLISEUM))
 		viewDef->view.clearColor = (OGLColorRGBA){61.0/255.0, 87.0/255.0, 198.0/255.0, 1};
+	if (LevelMetadataUsesCustomValues("track.sky"))
+	{
+		float metadataValue;
+		if (GetLevelMetadataFloat("track.skyRed", &metadataValue)) viewDef->view.clearColor.r = metadataValue;
+		if (GetLevelMetadataFloat("track.skyGreen", &metadataValue)) viewDef->view.clearColor.g = metadataValue;
+		if (GetLevelMetadataFloat("track.skyBlue", &metadataValue)) viewDef->view.clearColor.b = metadataValue;
+	}
 }
 
 

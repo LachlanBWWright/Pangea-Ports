@@ -141,7 +141,7 @@ static const Byte type[] =
 				/* CREATE THE THREAD */
 				/*********************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;	
+	gNewObjectDefinition.group 		= GetBugdomCurrentModelGroup();
 	gNewObjectDefinition.type 		= type[gLevelType];
 	gNewObjectDefinition.coord.y 	+= THREAD_YOFF;
 	gNewObjectDefinition.flags 		= STATUS_BIT_HIDDEN;			// initially its hidden
@@ -535,7 +535,7 @@ static const Byte type[] =
 
 	FindCoordOnJoint(theEnemy, 0, &inPt, &gNewObjectDefinition.coord);	// get coord of mouth
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;	
+	gNewObjectDefinition.group 		= GetBugdomCurrentModelGroup();
 	gNewObjectDefinition.type 		= type[gLevelType];	
 	gNewObjectDefinition.flags 		= STATUS_BIT_NULLSHADER | STATUS_BIT_GLOW | STATUS_BIT_ROTXZY | STATUS_BIT_KEEPBACKFACES;
 	gNewObjectDefinition.slot 		= TRIGGER_SLOT;
@@ -653,7 +653,7 @@ static const Byte type[] =
 			/* CREATE THE SPHERE */
 		
 	gNewObjectDefinition.coord 		= gPlayerObj->Coord;	
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;	
+	gNewObjectDefinition.group 		= GetBugdomCurrentModelGroup();
 	gNewObjectDefinition.type 		= type[gLevelType];	
 	gNewObjectDefinition.flags 		= STATUS_BIT_NULLSHADER | STATUS_BIT_GLOW | STATUS_BIT_KEEPBACKFACES_2PASS;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB+20;
@@ -948,8 +948,6 @@ Boolean isVisible;
 //			theNode->ShadowNode->StatusBits |= STATUS_BIT_HIDDEN;	
 	}
 }
-
-
 
 
 

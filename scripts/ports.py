@@ -22,7 +22,7 @@ PORTS = [
         'path': 'games/BillyFrontier-Android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build.py', '--emscripten', '--dependencies', '--configure', '--build'],
+        'wasm_build': ['python3', 'build.py', '--emscripten', '--safe-item-loading', '--dependencies', '--configure', '--build'],
         'wasm_outputs': [
             'build/billyfrontier.html',
             'build/billyfrontier.js',
@@ -57,7 +57,7 @@ PORTS = [
         'path': 'games/Bugdom-android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build_wasm.py', '--dependencies', '--configure', '--build', '--package'],
+        'wasm_build': ['python3', 'build_wasm.py', '--safe-item-loading', '--dependencies', '--configure', '--build', '--package'],
         'wasm_outputs': [
             'dist-wasm/Bugdom.html',
             'dist-wasm/Bugdom.js',
@@ -92,7 +92,7 @@ PORTS = [
         'path': 'games/Bugdom2-Android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build.py', '--emscripten', '--dependencies', '--configure', '--build', '--package'],
+        'wasm_build': ['python3', 'build.py', '--emscripten', '--safe-item-loading', '--dependencies', '--configure', '--build', '--package'],
         'wasm_outputs': [
             'build-wasm/Bugdom2.html',
             'build-wasm/Bugdom2.js',
@@ -121,7 +121,7 @@ PORTS = [
         'path': 'games/CroMagRally-Android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build.py'],
+        'wasm_build': ['python3', 'build.py', '--safe-item-loading'],
         'wasm_outputs': [
             'build-wasm/CroMagRally.html',
             'build-wasm/CroMagRally.js',
@@ -150,7 +150,7 @@ PORTS = [
         'path': 'games/MightyMike-Android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build.py', '--wasm', '--dependencies', '--configure', '--build', '--package'],
+        'wasm_build': ['python3', 'build.py', '--wasm', '--safe-item-loading', '--dependencies', '--configure', '--build', '--package'],
         'wasm_outputs': [
             'build-wasm/MightyMike.js',
             'build-wasm/MightyMike.wasm',
@@ -177,7 +177,7 @@ PORTS = [
         'path': 'games/Nanosaur-android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build.py', '--wasm'],
+        'wasm_build': ['python3', 'build.py', '--wasm', '--safe-item-loading'],
         'wasm_outputs': [
             'build/Nanosaur.html',
             'build/Nanosaur.js',
@@ -212,7 +212,7 @@ PORTS = [
         'path': 'games/Nanosaur2-Android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build.py', '--wasm'],
+        'wasm_build': ['python3', 'build.py', '--wasm', '--safe-item-loading'],
         'wasm_outputs': [
             'build-wasm/Nanosaur2.html',
             'build-wasm/Nanosaur2.js',
@@ -241,7 +241,7 @@ PORTS = [
         'path': 'games/OttoMatic-Android',
         'native_smoke': False,
         'native_build': ['python3', 'build.py', '--dependencies', '--configure', '--build'],
-        'wasm_build': ['python3', 'build.py', '--wasm'],
+        'wasm_build': ['python3', 'build.py', '--wasm', '--safe-item-loading'],
         'wasm_outputs': [
             'build/OttoMatic.html',
             'build/OttoMatic.js',

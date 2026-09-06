@@ -243,7 +243,7 @@ Boolean	part = itemPtr->parm[0];
 	gNewObjectDefinition.scale 		= 2.2;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
-	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+	gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_NOTEXTUREWRAP;
 	gNewObjectDefinition.slot 		= 281+part;
 	gNewObjectDefinition.moveCall 	= MoveKindling;
@@ -590,7 +590,6 @@ float	r,d;
 		Update3DSoundChannel(EFFECT_BUMBLERUMBLE, &bee->EffectChannel, &bee->Coord);
 
 }
-
 
 
 

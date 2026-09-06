@@ -52,6 +52,8 @@ Boolean		gIsInGame = false;
 
 long		gFrames=0;				// # frames tick counter
 Byte		gSceneNum,gAreaNum;
+long		gActiveAreaShapeGroup = GROUP_AREA_SPECIFIC;
+long		gActiveAreaShapeGroup2 = GROUP_AREA_SPECIFIC2;
 
 Byte		gPlayerMode = ONE_PLAYER;
 Byte		gCurrentPlayer;
@@ -172,9 +174,9 @@ void InitArea(void)
 	OptimizeMemory();
 
 	InitThermometer();											// prepare thermometer dial
-	PlayAreaMusic();											// start area song
 	FillThermometer(10);
 	LoadAreaArt();												// load art
+	PlayAreaMusic();											// start area song
 	LoadAreaSound();											// load sound
 	FillThermometer(100);
 
@@ -222,6 +224,9 @@ void InitArea(void)
 void LoadAreaArt(void)
 {
 	char path[256];
+#if PANGEA_SAFE_ITEM_LOADING
+	const char* sceneNames[MAX_SCENES] = {"jurassic", "candy", "fairy", "clown", "bargain"};
+#endif
 
 	const char* sceneName = nil;
 	switch (gSceneNum)
@@ -246,6 +251,18 @@ void LoadAreaArt(void)
 	SDL_snprintf(path, sizeof(path), ":Shapes:%s2.shapes", sceneName);
 	LoadShapeTable(path, GROUP_AREA_SPECIFIC2);
 	FillThermometer(60);
+
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int scene = 0; scene < MAX_SCENES; scene++)
+	{
+		SDL_snprintf(path, sizeof(path), ":Shapes:%s1.shapes", sceneNames[scene]);
+		LoadShapeTable(path, MODEL_GROUP_SCENE_BANK_BASE + scene * 2);
+		SDL_snprintf(path, sizeof(path), ":Shapes:%s2.shapes", sceneNames[scene]);
+		LoadShapeTable(path, MODEL_GROUP_SCENE_BANK_BASE + scene * 2 + 1);
+	}
+	gActiveAreaShapeGroup = MODEL_GROUP_SCENE_BANK_BASE + gSceneNum * 2;
+	gActiveAreaShapeGroup2 = gActiveAreaShapeGroup + 1;
+#endif
 
 	GAME_ASSERT(gAreaNum < 3);
 	SDL_snprintf(path, sizeof(path), ":Maps:%s.map-%d", sceneName, gAreaNum + 1);

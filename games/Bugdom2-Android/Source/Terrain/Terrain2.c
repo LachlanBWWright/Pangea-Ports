@@ -31,6 +31,7 @@ static Boolean NilAdd(TerrainItemEntryType *itemPtr,float x, float z);
 /**********************/
 
 int						gNumTerrainItems;
+int						gActiveItemModelGroup = MODEL_GROUP_LEVELSPECIFIC;
 TerrainItemEntryType 	*gMasterItemList = NULL;
 
 float					**gMapYCoords = nil;			// 2D array of map vertex y coords
@@ -140,6 +141,64 @@ static Boolean (*gTerrainItemAddRoutines[MAX_ITEM_NUM+1])(TerrainItemEntryType *
 };
 
 
+
+int GetBugdom2ItemModelGroup(int itemType)
+{
+#if !PANGEA_SAFE_ITEM_LOADING
+	(void) itemType;
+	return MODEL_GROUP_LEVELSPECIFIC;
+#else
+	int modelLevel = gLevelNum;
+	if (gLevelNum == 2) modelLevel = 0;
+	if (gLevelNum == 5) modelLevel = 5;
+	if (gLevelNum == 7) modelLevel = 6;
+	if (gLevelNum == 8) modelLevel = 7;
+	if (gLevelNum == 9) modelLevel = 8;
+	if (itemType == 11) modelLevel = 0;
+	if (itemType == 2 || (itemType >= 23 && itemType <= 34) || itemType == 37) modelLevel = 1;
+	if (itemType == 15 || itemType == 16 || itemType == 31 || (itemType >= 41 && itemType <= 50)) modelLevel = 4;
+	if (itemType == 48 || (itemType >= 55 && itemType <= 57) || itemType == 59 ||
+		itemType == 62 || itemType == 64 || itemType == 66 || itemType == 67) modelLevel = 5;
+	if (itemType >= 70 && itemType <= 78) modelLevel = 8;
+	if (itemType >= 79 && itemType <= 85) modelLevel = 7;
+	return MODEL_GROUP_LEVEL_BANK_BASE + modelLevel;
+#endif
+}
+
+int GetBugdom2CurrentModelGroup(void)
+{
+	return GetBugdom2ItemModelGroup(-1);
+}
+
+int GetBugdom2LevelModelGroup(int level)
+{
+#if !PANGEA_SAFE_ITEM_LOADING
+	(void) level;
+	return MODEL_GROUP_LEVELSPECIFIC;
+#else
+	if (level < 0 || level >= MODEL_GROUP_LEVEL_BANK_COUNT)
+		return MODEL_GROUP_LEVELSPECIFIC;
+	return MODEL_GROUP_LEVEL_BANK_BASE + level;
+#endif
+}
+
+int GetBugdom2LevelSpriteGroup(int level)
+{
+#if !PANGEA_SAFE_ITEM_LOADING
+	(void) level;
+	return SPRITE_GROUP_LEVELSPECIFIC;
+#else
+	if (level < 0 || level >= SPRITE_GROUP_LEVEL_BANK_COUNT)
+		return SPRITE_GROUP_LEVELSPECIFIC;
+	return SPRITE_GROUP_LEVEL_BANK_BASE + level;
+#endif
+}
+
+Boolean IsBugdom2LevelModelGroup(int group)
+{
+	return group >= MODEL_GROUP_LEVEL_BANK_BASE &&
+		group < MODEL_GROUP_LEVEL_BANK_BASE + MODEL_GROUP_LEVEL_BANK_COUNT;
+}
 
 /********************* BUILD TERRAIN ITEM LIST ***********************/
 //
@@ -300,12 +359,22 @@ Boolean			flag;
 			type = remappedType;
 		}
 #endif
+		#if PANGEA_SAFE_ITEM_LOADING
+		if (type < 0 || type > MAX_ITEM_NUM)
+			continue;
+		#endif
 		if (type > MAX_ITEM_NUM)								// error check!
 		{
 			DoFatalAlert("Illegal Map Item Type! %d", type);
 		}
 
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = GetBugdom2ItemModelGroup((int)type);
+		#endif
 		flag = gTerrainItemAddRoutines[type](&itemPtr[i],itemPtr[i].x, itemPtr[i].y); // call item's ADD routine
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = GetBugdom2CurrentModelGroup();
+		#endif
 		if (flag)
 			itemPtr[i].flags |= ITEM_FLAGS_INUSE;				// set in-use flag
 	}

@@ -273,7 +273,7 @@ ObjNode *bomb;
 	FindCoordOnJoint(fish, 0, &gBombOff, &gNewObjectDefinition.coord);
 
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_CLOUD);
 	gNewObjectDefinition.type 		= CLOUD_ObjType_FishBomb;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
@@ -414,7 +414,7 @@ DeformationType		defData;
 		/* MAKE SHOCKWAVE */
 		/******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_CLOUD);
 	gNewObjectDefinition.type 		= CLOUD_ObjType_Shockwave;
 	gNewObjectDefinition.coord		= gCoord;
 	gNewObjectDefinition.flags 		= STATUS_BIT_NOFOG|STATUS_BIT_GLOW|STATUS_BIT_KEEPBACKFACES|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOZWRITES|STATUS_BIT_NOTEXTUREWRAP;
@@ -431,7 +431,7 @@ DeformationType		defData;
 		/* MAKE CONE BLAST */
 		/*******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_CLOUD);
 	gNewObjectDefinition.type 		= CLOUD_ObjType_ConeBlast;
 	gNewObjectDefinition.coord.x 	= gCoord.x;
 	gNewObjectDefinition.coord.y 	= GetTerrainY(gCoord.x, gCoord.z);
@@ -529,7 +529,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObjectTransforms(theNode);
 }
-
 
 
 

@@ -116,7 +116,7 @@ float	q;
 				/* MAKE MAIN BODY */
 				/******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);
 	gNewObjectDefinition.type 		= FIREICE_ObjType_DrillBot_Body;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
@@ -743,7 +743,7 @@ static const OGLPoint3D	drillOff = {0, 71, -271};
 			/* CREATE 4 WHEELS */
 			/*******************/
 
-	gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;						// set basic info
+	gNewObjectDefinition.group 		= GetOttoLevelModelGroup(LEVEL_NUM_FIREICE);						// set basic info
 	gNewObjectDefinition.type 		= FIREICE_ObjType_DrillBot_Chunk_Wheel;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
@@ -947,7 +947,6 @@ OGLMatrix3x3	m;
 	player->StatusBits &= ~STATUS_BIT_ROTZXY;
 	player->Rot.z = 0;
 }
-
 
 
 

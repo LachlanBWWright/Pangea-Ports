@@ -33,6 +33,10 @@ extern "C"
 #include "sound2.h"
 #include "3dmf.h"
 #include "file.h"
+int GetBugdomItemModelGroup(int itemType);
+int GetBugdomCurrentModelGroup(void);
+Boolean IsBugdomLevelModelGroup(int group);
+extern int gActiveItemModelGroup;
 #include "input.h"
 #include "terrain.h"
 #include "myguy.h"

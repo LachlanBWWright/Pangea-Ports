@@ -11,6 +11,12 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define CLOUD_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_CLOUD)
+#else
+#define CLOUD_SPRITE_GROUP SPRITE_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -223,7 +229,7 @@ static const float	scale[4] = {.5, .7, .9, .6};
 	z = theNode->Coord.z;
 
 
-	MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][CLOUD_SObjType_Cloud].materialObject);
+	MO_DrawMaterial(gSpriteGroupList[CLOUD_SPRITE_GROUP][CLOUD_SObjType_Cloud].materialObject);
 
 			/*******************/
 			/* DRAW ALL LAYERS */
@@ -551,7 +557,6 @@ short	i;
 	}
 
 }
-
 
 
 

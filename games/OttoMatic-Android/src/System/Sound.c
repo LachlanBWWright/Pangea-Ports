@@ -1138,10 +1138,26 @@ uint32_t			lv2,rv2;
 
 			/* GET BANK & SOUND #'S FROM TABLE */
 
+	GAME_ASSERT_MESSAGE(effectNum >= 0 && effectNum < NUM_EFFECTS, "illegal effect number");
+	if (effectNum < 0 || effectNum >= NUM_EFFECTS)
+	{
+		return -1;
+	}
+
 	LoadedEffect* sound = &gLoadedEffects[effectNum];
 
-	GAME_ASSERT_MESSAGE(effectNum >= 0 && effectNum < NUM_EFFECTS, "illegal effect number");
+#if PANGEA_SAFE_ITEM_LOADING
+	if (!sound->sndHandle)
+	{
+		LoadSoundEffect(effectNum);
+	}
+	if (!sound->sndHandle)
+	{
+		return -1;
+	}
+#else
 	GAME_ASSERT_MESSAGE(sound->sndHandle, "effect wasn't loaded!");
+#endif
 
 
 			/* DON'T PLAY EFFECT MULTIPLE TIMES AT ONCE IF EFFECTS TABLE PREVENTS IT */
@@ -1419,4 +1435,3 @@ SCStatus	theStatus;
 	SndChannelStatus(gSndChannel[chanNum],sizeof(SCStatus),&theStatus);	// get channel info
 	return (theStatus.scChannelBusy);
 }
-

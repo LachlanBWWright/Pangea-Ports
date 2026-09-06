@@ -133,6 +133,16 @@ const int levelSpriteCount[NUM_LEVELS] =
 		ImportBG3D(&spec, MODEL_GROUP_LEVELSPECIFIC);
 	}
 
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+	{
+		if (levelModelFiles[levelIndex][0] == 0)
+			continue;
+		FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, levelModelFiles[levelIndex], &spec);
+		ImportBG3D(&spec, MODEL_GROUP_LEVEL_BANK_BASE + levelIndex);
+	}
+#endif
+
 
 			/* LOAD SPRITES */
 
@@ -140,6 +150,15 @@ const int levelSpriteCount[NUM_LEVELS] =
 	{
 		LoadSpriteGroupFromSeries(SPRITE_GROUP_LEVELSPECIFIC, levelSpriteCount[gLevelNum], levelSpriteFiles[gLevelNum]);
 	}
+
+#if PANGEA_SAFE_ITEM_LOADING
+	for (int levelIndex = 0; levelIndex < NUM_LEVELS; levelIndex++)
+	{
+		if (levelSpriteCount[levelIndex] == 0)
+			continue;
+		LoadSpriteGroupFromSeries(GetBugdom2LevelSpriteGroup(levelIndex), levelSpriteCount[levelIndex], levelSpriteFiles[levelIndex]);
+	}
+#endif
 
 	LoadSpriteGroupFromSeries(SPRITE_GROUP_INFOBAR, INFOBAR_SObjType_COUNT, "Infobar");
 
@@ -796,4 +815,3 @@ FSSpec	spec;
 //		SetSphereMapInfoOnMaterialObject(gTunnelTextureObj,	MULTI_TEXTURE_COMBINE_ADD, SPHEREMAP_SObjType_DarkYosemite);
 	}
 }
-

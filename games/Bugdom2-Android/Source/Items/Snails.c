@@ -872,7 +872,7 @@ int		taskCompleted = itemPtr->flags & ITEM_FLAGS_USER1;
 		gNewObjectDefinition.scale 		= SCARECROW_SCALE;
 		gNewObjectDefinition.coord.x 	= x;
 		gNewObjectDefinition.coord.z 	= z;
-		gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+		gNewObjectDefinition.coord.y	= FindHighestCollisionAtXZ(x, z, CTYPE_MISC|CTYPE_MPLATFORM|CTYPE_TERRAIN) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 		gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 		gNewObjectDefinition.slot 		= SCARECROW_SLOT+1;
 		gNewObjectDefinition.moveCall 	= MoveScarecrowHead;
@@ -1008,7 +1008,7 @@ int		i;
 			if (targetObj)
 			{
 				if ((targetObj->Genre == DISPLAY_GROUP_GENRE) &&
-					(targetObj->Group == MODEL_GROUP_LEVELSPECIFIC) &&
+					IsBugdom2LevelModelGroup(targetObj->Group) &&
 					(targetObj->Type == GARDEN_ObjType_ScarecrowBody))
 				{
 					ScarecrowHeadLandedOnBody(theNode, targetObj);
@@ -1107,7 +1107,7 @@ ObjNode	*guts,*sphere;
 	gNewObjectDefinition.scale 		= .8;
 	gNewObjectDefinition.coord.x 	= x;
 	gNewObjectDefinition.coord.z 	= z;
-	gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+	gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_DOUBLESIDED | STATUS_BIT_NOZWRITES;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB-10;
 	gNewObjectDefinition.moveCall 	= MoveBowlingMarble;
@@ -1351,7 +1351,7 @@ OGLMatrix3x3	m;
 	{
 		gNewObjectDefinition.coord.x 	= x + pinOff[i].x;
 		gNewObjectDefinition.coord.z 	= z + pinOff[i].y;
-		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 		gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 		pin = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
@@ -1479,7 +1479,7 @@ float			speed;
 		hitObj = gCollisionList[i].objectPtr;							// get the hit obj
 		if (hitObj->Genre != DISPLAY_GROUP_GENRE)						// see if it's a pin
 			continue;
-		if (hitObj->Group != MODEL_GROUP_LEVELSPECIFIC)
+		if (!IsBugdom2LevelModelGroup(hitObj->Group))
 			continue;
 		if (hitObj->Type != PLAYROOM_ObjType_Battery)
 			continue;
@@ -1549,7 +1549,7 @@ float			speed;
 		hitObj = gCollisionList[i].objectPtr;							// get the hit obj
 		if (hitObj->Genre != DISPLAY_GROUP_GENRE)						// see if it's a pin
 			continue;
-		if (hitObj->Group != MODEL_GROUP_LEVELSPECIFIC)
+		if (!IsBugdom2LevelModelGroup(hitObj->Group))
 			continue;
 		if (hitObj->Type != PLAYROOM_ObjType_Battery)
 			continue;
@@ -1620,7 +1620,7 @@ ObjNode	*newObj;
 		gNewObjectDefinition.scale 		= 1.0;
 		gNewObjectDefinition.coord.x 	= x;
 		gNewObjectDefinition.coord.z 	= z;
-		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale + 1.0f;
+		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale + 1.0f;
 		gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_NOTEXTUREWRAP;
 		gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 		gNewObjectDefinition.moveCall 	= MoveSquishedBerry;
@@ -1642,7 +1642,7 @@ ObjNode	*newObj;
 		gNewObjectDefinition.scale 		= 1.0;
 		gNewObjectDefinition.coord.x 	= x;
 		gNewObjectDefinition.coord.z 	= z;
-		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gNewObjectDefinition.group][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
+		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 		gNewObjectDefinition.flags 		= gAutoFadeStatusBits | STATUS_BIT_NOTEXTUREWRAP;
 		gNewObjectDefinition.slot 		= 258;
 		gNewObjectDefinition.moveCall 	= MoveSquishBerry;
@@ -1785,8 +1785,6 @@ static void MoveSquishedBerry(ObjNode *theNode)
 	SetObjectTransformMatrix(theNode);
 
 }
-
-
 
 
 

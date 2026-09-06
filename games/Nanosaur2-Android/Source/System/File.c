@@ -12,6 +12,7 @@
 
 #include <SDL3/SDL_time.h>
 #include "game.h"
+#include "LevelMetadataJSON.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "pangea_script.h"
 static int gScriptLoadedSaveSlot;
@@ -64,22 +65,22 @@ static Boolean IsMetadataJSONWellFormed(const char *json)
 
 Boolean GetLevelMetadataString(const char *key, char *value, size_t valueSize)
 {
-	char needle[96];
-	const char *start;
-	const char *end;
-	size_t length;
 	if (!gLevelMetadataJSON || !key || !value || valueSize == 0) return false;
-	SDL_snprintf(needle, sizeof(needle), "\"%s\":\"", key);
-	start = strstr(gLevelMetadataJSON, needle);
-	if (!start) return false;
-	start += strlen(needle);
-	end = strchr(start, '\"');
-	if (!end) return false;
-	length = (size_t)(end - start);
-	if (length >= valueSize) return false;
-	SDL_memcpy(value, start, length);
-	value[length] = '\0';
-	return true;
+	return PangeaLevelMetadataJSONGetString(
+		gLevelMetadataJSON, SDL_strlen(gLevelMetadataJSON), key, value, valueSize) != 0;
+}
+
+Boolean GetLevelMetadataFloat(const char *key, float *value)
+{
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	(void) key;
+	(void) value;
+	return false;
+#else
+	if (!gLevelMetadataJSON || !value) return false;
+	return PangeaLevelMetadataJSONGetFloat(
+		gLevelMetadataJSON, SDL_strlen(gLevelMetadataJSON), key, value) != 0;
+#endif
 }
 
 Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
@@ -91,10 +92,24 @@ Boolean GetLevelMetadataBool(const char *key, Boolean fallback)
 	return fallback;
 }
 
+Boolean LevelMetadataUsesCustomValues(const char *key)
+{
+	char value[64];
+	return GetLevelMetadataString(key, value, sizeof(value))
+		&& !SDL_strcasecmp(value, "custom");
+}
+
 Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback)
 {
 	char value[64];
-	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (!GetLevelMetadataString(key, value, sizeof(value)) || !SDL_strcasecmp(value, "source-default")) return fallback;
+	if (SDL_strcasecmp(key, "level.items") &&
+		SDL_strcasecmp(key, "level.minePlacement") &&
+		SDL_strcasecmp(key, "level.turretRange") &&
+		SDL_strcasecmp(key, "level.doorMotion") &&
+		SDL_strcasecmp(key, "level.flightHeight") &&
+		SDL_strcasecmp(key, "level.raceMarkers") &&
+		SDL_strcasecmp(key, "level.intro")) return fallback;
 	if (!SDL_strcasecmp(key, "level.items") &&
 		SDL_strcasecmp(value, "forest") && SDL_strcasecmp(value, "desert") && SDL_strcasecmp(value, "swamp")) return fallback;
 	if (!SDL_strcasecmp(key, "level.minePlacement") &&
@@ -107,8 +122,6 @@ Boolean LevelMetadataProfileIs(const char *key, const char *profile, Boolean fal
 		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "adventure1")) return fallback;
 	if (!SDL_strcasecmp(key, "level.raceMarkers") &&
 		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "race")) return fallback;
-	if (!SDL_strcasecmp(key, "level.player") &&
-		SDL_strcasecmp(value, "standard") && SDL_strcasecmp(value, "adventure1") && SDL_strcasecmp(value, "race")) return fallback;
 	if (!SDL_strcasecmp(key, "level.intro") &&
 		SDL_strcasecmp(value, "none") && SDL_strcasecmp(value, "level1") && SDL_strcasecmp(value, "level2")) return fallback;
 	return !SDL_strcasecmp(value, profile);
@@ -119,13 +132,20 @@ int LevelMetadataCaseFor(const char *key, int fallback)
 	char value[64];
 	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
 	if (!SDL_strcasecmp(value, "source-default")) return fallback;
-	if (!SDL_strcasecmp(value, "forest")) return BIOME_FOREST;
-	if (!SDL_strcasecmp(value, "desert")) return BIOME_DESERT;
-	if (!SDL_strcasecmp(value, "swamp")) return BIOME_SWAMP;
-	if (!SDL_strcasecmp(value, "adventure")) return VS_MODE_NONE;
-	if (!SDL_strcasecmp(value, "race")) return VS_MODE_RACE;
-	if (!SDL_strcasecmp(value, "battle")) return VS_MODE_BATTLE;
-	if (!SDL_strcasecmp(value, "capture-the-flag")) return VS_MODE_CAPTURETHEFLAG;
+	if (!SDL_strcasecmp(key, "level.biome") || !SDL_strcasecmp(key, "level.items") || !SDL_strcasecmp(key, "level.rendering"))
+	{
+		if (!SDL_strcasecmp(value, "forest")) return BIOME_FOREST;
+		if (!SDL_strcasecmp(value, "desert")) return BIOME_DESERT;
+		if (!SDL_strcasecmp(value, "swamp")) return BIOME_SWAMP;
+		return fallback;
+	}
+	if (!SDL_strcasecmp(key, "level.mode"))
+	{
+		if (!SDL_strcasecmp(value, "adventure")) return VS_MODE_NONE;
+		if (!SDL_strcasecmp(value, "race")) return VS_MODE_RACE;
+		if (!SDL_strcasecmp(value, "battle")) return VS_MODE_BATTLE;
+		if (!SDL_strcasecmp(value, "capture-the-flag")) return VS_MODE_CAPTURETHEFLAG;
+	}
 	return fallback;
 }
 
@@ -133,6 +153,7 @@ int LevelMetadataMapViewFor(const char *key, int fallback)
 {
 	char value[32];
 	if (!GetLevelMetadataString(key, value, sizeof(value))) return fallback;
+	if (SDL_strcasecmp(key, "level.mapView")) return fallback;
 	if (!SDL_strcasecmp(value, "level1")) return LEVEL_NUM_ADVENTURE1;
 	if (!SDL_strcasecmp(value, "level2")) return LEVEL_NUM_ADVENTURE2;
 	if (!SDL_strcasecmp(value, "level3")) return LEVEL_NUM_ADVENTURE3;
@@ -161,9 +182,16 @@ int GetDefaultBiomeForLevel(short levelNum)
 
 void ReadLevelMetadata(void)
 {
-	Handle hand = GetResource('Meta', 1000);
+	Handle hand;
 	Size size;
 	char *json;
+
+#if !defined(PANGEA_ENABLE_LEVEL_METADATA) || !PANGEA_ENABLE_LEVEL_METADATA
+	return;
+#endif
+
+	hand = GetResource('Meta', 1000);
+
 	if (gLevelMetadataJSON)
 	{
 		SafeDisposePtr(gLevelMetadataJSON);
@@ -183,7 +211,7 @@ void ReadLevelMetadata(void)
 		return;
 	}
 	SDL_memcpy(json, *hand, (size_t) size);
-	if (!IsMetadataJSONWellFormed(json) || json[0] != '{' ||
+	if (!IsMetadataJSONWellFormed(json) || !PangeaLevelMetadataJSONIsValid(json, (size_t)size, "nanosaur2") || json[0] != '{' ||
 		!strstr(json, "\"schemaVersion\":1,\"game\":\"nanosaur2\"") ||
 		!strstr(json, "\"properties\":{"))
 	{

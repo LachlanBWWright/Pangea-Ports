@@ -508,7 +508,7 @@ float	fps = gFramesPerSecondFrac;
 
 			/* SEE IF HIT HIVE */
 	
-		if ((gCollisionList[0].objectPtr->Group == MODEL_GROUP_LEVELSPECIFIC) &&
+		if (IsBugdomLevelModelGroup(gCollisionList[0].objectPtr->Group) &&
 			(gCollisionList[0].objectPtr->Type == FOREST_MObjType_Hive))
 		{
 			RattleHive(gCollisionList[0].objectPtr);
@@ -638,7 +638,6 @@ TQ3Vector3D		delta;
 
 	DeleteObject(theNode);
 }
-
 
 
 

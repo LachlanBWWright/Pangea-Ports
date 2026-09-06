@@ -1023,6 +1023,10 @@ float			minX,maxX,minZ,maxZ;
 
 			/* POINT TO BOUNDING BOX */
 
+	#if PANGEA_SAFE_ITEM_LOADING
+	if (group == MODEL_GROUP_LEVELSPECIFIC)
+		group = gActiveItemModelGroup;
+	#endif
 	bBox =  &gObjectGroupBBoxList[group][type];				// get ptr to this model's bounding box
 
 	minX = x + bBox->min.x * scale;
@@ -1438,7 +1442,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
 
 
 

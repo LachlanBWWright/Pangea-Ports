@@ -30,6 +30,7 @@ static Boolean NilAdd(TerrainItemEntryType *itemPtr,long x, long z);
 /**********************/
 
 int						gNumTerrainItems;
+int						gActiveItemModelGroup = MODEL_GROUP_LEVELSPECIFIC;
 TerrainItemEntryType 	**gMasterItemList = nil;
 int						*gTerrainItemFileIDs = nil;		// maps sorted terrain item IDs to the order in which they appear in the .ter.rsrc file (for debugging)
 
@@ -159,6 +160,57 @@ static Boolean (*gTerrainItemAddRoutines[MAX_ITEM_NUM+1])(TerrainItemEntryType *
 		AddNeuronStrand,					// 107:  neuron strand
 		AddBrainPort,						// 108:  brain port
 };
+
+int GetOttoItemModelGroup(int itemType)
+{
+	#if !PANGEA_SAFE_ITEM_LOADING
+	(void) itemType;
+	return MODEL_GROUP_LEVELSPECIFIC;
+	#else
+	int level = gLevelNum;
+
+	if (itemType == 58 && (level == LEVEL_NUM_APOCALYPSE || level == LEVEL_NUM_FIREICE)) return MODEL_GROUP_LEVEL_BANK_BASE + level;
+	if (itemType == 83 && (level == LEVEL_NUM_CLOUD || level == LEVEL_NUM_FIREICE)) return MODEL_GROUP_LEVEL_BANK_BASE + level;
+	if (itemType >= 28 && itemType <= 38) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_BLOB;
+	if (itemType >= 39 && itemType <= 43) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_BLOBBOSS;
+	if (itemType == 44 || (itemType >= 50 && itemType <= 55) || (itemType >= 71 && itemType <= 74)) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_JUNGLE;
+	if (itemType == 45 || itemType == 46 || (itemType >= 57 && itemType <= 70)) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_APOCALYPSE;
+	if ((itemType >= 47 && itemType <= 48) || (itemType >= 75 && itemType <= 85)) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_CLOUD;
+	if (itemType >= 87 && itemType <= 99) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_FIREICE;
+	if (itemType >= 100 && itemType <= 104) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_SAUCER;
+	if (itemType == 105 || itemType == 107 || itemType == 108) return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_BRAINBOSS;
+	return MODEL_GROUP_LEVEL_BANK_BASE + LEVEL_NUM_FARM;
+	#endif
+}
+
+int GetOttoLevelModelGroup(int level)
+{
+	#if !PANGEA_SAFE_ITEM_LOADING
+	(void) level;
+	return MODEL_GROUP_LEVELSPECIFIC;
+	#else
+	if (level < 0 || level >= NUM_LEVELS)
+		return MODEL_GROUP_LEVELSPECIFIC;
+	return MODEL_GROUP_LEVEL_BANK_BASE + level;
+	#endif
+}
+
+int GetOttoLevelSpriteGroup(int level)
+{
+	#if !PANGEA_SAFE_ITEM_LOADING
+	(void) level;
+	return SPRITE_GROUP_LEVELSPECIFIC;
+	#else
+	if (level < 0 || level >= NUM_LEVELS)
+		return SPRITE_GROUP_LEVELSPECIFIC;
+	return SPRITE_GROUP_LEVEL_BANK_BASE + level;
+	#endif
+}
+
+int GetOttoCurrentModelGroup(void)
+{
+	return GetOttoItemModelGroup(-1);
+}
 
 
 
@@ -338,6 +390,10 @@ Boolean			flag;
 			continue;
 		}
 #endif
+		#if PANGEA_SAFE_ITEM_LOADING
+		if (type < 0 || type > MAX_ITEM_NUM)
+			continue;
+		#endif
 		if (type > MAX_ITEM_NUM)								// error check!
 		{
 			DoFatalAlert("Illegal Map Item Type!");
@@ -351,7 +407,13 @@ Boolean			flag;
 		}
 #endif
 
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = GetOttoItemModelGroup((int)type);
+		#endif
 		flag = gTerrainItemAddRoutines[type](&itemPtr[i],itemPtr[i].x, itemPtr[i].y); // call item's ADD routine
+		#if PANGEA_SAFE_ITEM_LOADING
+		gActiveItemModelGroup = GetOttoCurrentModelGroup();
+		#endif
 		if (flag)
 			itemPtr[i].flags |= ITEM_FLAGS_INUSE;				// set in-use flag
 	}
@@ -582,5 +644,3 @@ static OGLPoint3D	p4 = {TERRAIN_POLYGON_SIZE, 0, 0};
 		CalcFaceNormal_NotNormalized(&p3, &p4, &p2, n2);		// fr, nl, nr
 	}
 }
-
-

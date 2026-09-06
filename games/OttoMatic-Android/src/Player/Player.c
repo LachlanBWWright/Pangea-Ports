@@ -1420,8 +1420,7 @@ ObjNode	*door = rocket->ChainNode;
 
 			/* SEE IF OUT OF RANGE */
 
-	if (!GetLevelMetadataBool("level.rocketPersistence", gLevelNum == LEVEL_NUM_JUNGLEBOSS
-		|| gLevelNum == LEVEL_NUM_SAUCER || gLevelNum == LEVEL_NUM_BRAINBOSS))
+	if (gLevelNum != LEVEL_NUM_JUNGLEBOSS && gLevelNum != LEVEL_NUM_SAUCER && gLevelNum != LEVEL_NUM_BRAINBOSS)
 	{
 				if (TrackTerrainItem(rocket))
 				{
@@ -1454,7 +1453,7 @@ ObjNode	*door = rocket->ChainNode;
 
 		if (gPlayerInfo.fuel < 1.0f)								// see if have enough fuel to leave
 		{
-			if (!GetLevelMetadataBool("level.rocketFuel", gLevelNum != LEVEL_NUM_JUNGLEBOSS && gLevelNum != LEVEL_NUM_SAUCER))					// don't need fuel on selected levels
+			if (!LevelMetadataProfileIs("level.rocketFuel", "required", gLevelNum != LEVEL_NUM_JUNGLEBOSS && gLevelNum != LEVEL_NUM_SAUCER))					// don't need fuel on selected levels
 				goto open_door;
 
 			DisplayHelpMessage(HELP_MESSAGE_NOTENOUGHFUELTOLEAVE, 1.0, true);
@@ -1490,8 +1489,7 @@ ObjNode	*door = rocket->ChainNode;
 
 			/* SEE IF OUT OF RANGE */
 
-	if (!GetLevelMetadataBool("level.rocketPersistence", gLevelNum == LEVEL_NUM_JUNGLEBOSS
-		|| gLevelNum == LEVEL_NUM_SAUCER || gLevelNum == LEVEL_NUM_BRAINBOSS))
+	if (gLevelNum != LEVEL_NUM_JUNGLEBOSS && gLevelNum != LEVEL_NUM_SAUCER && gLevelNum != LEVEL_NUM_BRAINBOSS)
 	{
 				if (TrackTerrainItem(rocket))
 				{

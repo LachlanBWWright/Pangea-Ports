@@ -843,10 +843,10 @@ void UpdateHoneyTubeTextureAnimation(void)
 				type == HIVE_MObjType_BentTube || type == HIVE_MObjType_SquiggleTube || type == HIVE_MObjType_StraightTube || type == HIVE_MObjType_TaperTube,
 				"Did Beehive tube object types get shuffled around in the enum?");
 
-		GAME_ASSERT(gObjectGroupList[MODEL_GROUP_LEVELSPECIFIC][type].numMeshes == 2);
+		GAME_ASSERT(gObjectGroupList[GetBugdomCurrentModelGroup()][type].numMeshes == 2);
 
 		// Mesh #0 is the lattice; Mesh #1 is the inner tube
-		QD3D_ScrollUVs(gObjectGroupList[MODEL_GROUP_LEVELSPECIFIC][type].meshes[1], du, dv);
+		QD3D_ScrollUVs(gObjectGroupList[GetBugdomCurrentModelGroup()][type].meshes[1], du, dv);
 	}
 }
 
@@ -1024,6 +1024,5 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
 
 

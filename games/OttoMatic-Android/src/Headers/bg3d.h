@@ -12,7 +12,9 @@
 												
 #define	MAX_BG3D_MATERIALS			400			// max # of materials in a bg3d file
 
-#define	MAX_BG3D_GROUPS			((int)MODEL_GROUP_SKELETONBASE+(int)MAX_SKELETON_TYPES)	// skeletons are @ end of list, so can use these counts for max #
+#define MODEL_GROUP_LEVEL_BANK_BASE ((int)MODEL_GROUP_SKELETONBASE + (int)MAX_SKELETON_TYPES)
+#define MODEL_GROUP_LEVEL_BANK_COUNT 10
+#define MAX_BG3D_GROUPS (MODEL_GROUP_LEVEL_BANK_BASE + MODEL_GROUP_LEVEL_BANK_COUNT)
 #define	MAX_OBJECTS_IN_GROUP	100
 
 		/***********************/

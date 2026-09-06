@@ -303,7 +303,11 @@ MetaObjectPtr	waterObj;
 	}
 
 
+	#if PANGEA_SAFE_ITEM_LOADING
+	waterObj = gBG3DGroupList[gActiveItemModelGroup][JUNGLE_ObjType_Waterfall];
+	#else
 	waterObj = gBG3DGroupList[MODEL_GROUP_LEVELSPECIFIC][JUNGLE_ObjType_Waterfall];
+	#endif
 
 	MO_VertexArray_OffsetUVs(waterObj, 0, -gFramesPerSecondFrac * .9f);
 #endif
@@ -372,6 +376,5 @@ float				y;
 
 	return(true);													// item was added
 }
-
 
 

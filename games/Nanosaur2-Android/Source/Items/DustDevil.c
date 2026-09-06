@@ -435,7 +435,7 @@ ObjNode	*theNode;
 
 		glPushMatrix();
 
-		MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_LEVELSPECIFIC][LEVEL2_SObjType_DustDevil].materialObject);		// activate material
+		MO_DrawMaterial(gSpriteGroupList[GetNanosaur2LevelSpriteGroup(BIOME_DESERT)][LEVEL2_SObjType_DustDevil].materialObject);		// activate material
 
 
 					/* TRANSLATE */
@@ -772,7 +772,6 @@ short	p = player->PlayerNum;
 	gPlayerInfo[p].ejectedFromDustDevil = false;
 
 }
-
 
 
 

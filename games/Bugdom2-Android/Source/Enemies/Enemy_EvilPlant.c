@@ -656,12 +656,11 @@ float				speed;
 
 					/* MAKE POLLEN OBJ */
 
-		gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
-
 		if (LevelMetadataCaseFor("level.enemyPlant", gLevelNum) == LEVEL_NUM_GNOMEGARDEN)
 			gNewObjectDefinition.type 	= GARDEN_ObjType_PollenSpore;
 		else
 			gNewObjectDefinition.type 	= SIDEWALK_ObjType_PollenSpore;
+		gNewObjectDefinition.group 		= GetBugdom2LevelModelGroup(LevelMetadataCaseFor("level.enemyPlant", gLevelNum));
 
 		gNewObjectDefinition.coord		= coord;
 		gNewObjectDefinition.flags 		= 0;
@@ -760,9 +759,6 @@ boom:
 
 	UpdateObject(spore);
 }
-
-
-
 
 
 

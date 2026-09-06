@@ -11,6 +11,12 @@
 
 #include "game.h"
 
+#if PANGEA_SAFE_ITEM_LOADING
+#define SPACEPOD_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_APOCALYPSE)
+#else
+#define SPACEPOD_MODEL_GROUP MODEL_GROUP_LEVELSPECIFIC
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -125,7 +131,7 @@ OGLVector3D	aim;
 
 					/* CREATE NEW POD OBJECT */
 
-			gNewObjectDefinition.group 		= MODEL_GROUP_LEVELSPECIFIC;
+			gNewObjectDefinition.group 		= SPACEPOD_MODEL_GROUP;
 			gNewObjectDefinition.type 		= APOCALYPSE_ObjType_SpacePod;
 			gNewObjectDefinition.coord.x 	= theNode->Coord.x + RandomFloat2() * 900.0f ;
 			gNewObjectDefinition.coord.z 	= theNode->Coord.z + RandomFloat2() * 900.0f ;
@@ -684,7 +690,6 @@ const int	numNubs = NUM_SPLINE_NUBS;
 	gPodWorms[wormNum].numPoints = numPoints;
 	Free_2d_array(space);
 }
-
 
 
 
