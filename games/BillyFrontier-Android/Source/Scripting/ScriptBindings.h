@@ -20,12 +20,13 @@ Boolean BillyScript_OnSplineItem(SplineItemType* itemPtr, int areaNum, int splin
 // --- Live-object scripting extension ---
 typedef struct ObjNode ObjNode;
 Boolean BillyScript_OnDamage(ObjNode* source, float damage, int cause, float* outDamage);
+Boolean BillyScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);
 void BillyScript_OnDamageApplied(ObjNode* player, float damage, int cause);
 void BillyScript_OnDeath(ObjNode* player, int eventValue);
 void BillyScript_ResetObjectRegistry(void);
 void BillyScript_RegisterPlayerObject(ObjNode* playerObj);
 void BillyScript_UnregisterPlayerObject(ObjNode* playerObj);
-void BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+Boolean BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
 void BillyScript_RegisterObject(ObjNode* obj, const char* nativeId, const char* category);
 void BillyScript_UnregisterObject(ObjNode* obj);
 void BillyScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);

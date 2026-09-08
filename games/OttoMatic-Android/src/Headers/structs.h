@@ -309,6 +309,8 @@ struct ObjNode
 	uint32_t		ScriptObjectGeneration;
 	char			ScriptDefinitionID[96];
 	Boolean			ScriptAnimationCompletionSent;
+	Boolean			ScriptActiveStateInitialized;
+	Boolean			ScriptActive;
 	Boolean			ScriptDeleteRequested;
 	Boolean			ScriptStreamOutSent;
 	

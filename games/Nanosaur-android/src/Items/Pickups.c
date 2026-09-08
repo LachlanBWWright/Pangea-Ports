@@ -123,7 +123,8 @@ short	species;
 		ObjNode	*whoHasMe;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-		NanosaurScript_OnPickupCollected(theNode, (ObjNode *)theNode->WhoHasPickUp, theNode->Kind, 1.0f, "nanosaur.egg");
+		if (!NanosaurScript_OnPickupCollected(theNode, (ObjNode *)theNode->WhoHasPickUp, theNode->Kind, 1.0f, "nanosaur.egg"))
+			return;
 #endif
 		
 		/* EGG HAS BEEN RECOVERED */
@@ -487,7 +488,6 @@ int	i;
 
 	SeeIfAllEggSpeciesRecovered();
 }
-
 
 
 

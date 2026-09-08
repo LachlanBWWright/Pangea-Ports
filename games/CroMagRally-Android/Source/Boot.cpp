@@ -509,6 +509,10 @@ extern "C"
 		(void) json;
 		(void) byteCount;
 	}
+	EMSCRIPTEN_KEEPALIVE void CroMag_RequestQuit(void)
+	{
+		gGameOver = true;
+	}
 #endif
 }
 

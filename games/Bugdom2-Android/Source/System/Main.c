@@ -1085,6 +1085,7 @@ void StartLevelCompletion(float coolDownTimer)
 		gLevelCompleted = true;
 		gLevelCompletedCoolDownTimer = coolDownTimer;
 #ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_OnObjectiveComplete(0, 0);
 		Bugdom2Script_OnLevelComplete(gLevelNum);
 #endif
 	}

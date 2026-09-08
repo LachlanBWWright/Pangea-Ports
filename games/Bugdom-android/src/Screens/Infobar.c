@@ -900,6 +900,27 @@ Boolean DoWeHaveTheKey(long keyID)
 	return(false);
 }
 
+int BugdomScript_GetKeyCount(void)
+{
+	int count = 0;
+	for (int keyID = 0; keyID < MAX_KEY_TYPES; keyID++)
+		if (gGotKey[keyID]) count++;
+	return count;
+}
+
+bool BugdomScript_GetKey(int keyID)
+{
+	return keyID >= 0 && keyID < MAX_KEY_TYPES && gGotKey[keyID];
+}
+
+bool BugdomScript_SetKey(int keyID, bool enabled)
+{
+	if (keyID < 0 || keyID >= MAX_KEY_TYPES) return false;
+	if (enabled) GetKey(keyID);
+	else UseKey(keyID);
+	return true;
+}
+
 
 #pragma mark -
 

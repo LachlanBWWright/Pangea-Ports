@@ -332,6 +332,11 @@ Boolean	thud = false;
 	playerNum = whoNode->PlayerNum;
 	powType = theNode->POWType;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!CroMagScript_OnPickupCollected(theNode, whoNode, powType, 1.0f, "cromag.pow"))
+		return(false);
+#endif
+
 	if (gPlayerInfo[playerNum].powType == powType)		// see if we already have this
 	{
 		gPlayerInfo[playerNum].powQuantity += 1;
@@ -351,10 +356,6 @@ Boolean	thud = false;
 		else
 			thud = true;
 	}
-
-#ifdef PANGEA_ENABLE_SCRIPTING
-	CroMagScript_OnPickupCollected(theNode, whoNode, powType, 1.0f, "cromag.pow");
-#endif
 
 	if (thud)
 		PlayEffect_Parms3D(EFFECT_GETPOW, &theNode->Coord, NORMAL_CHANNEL_RATE, 2.0);
@@ -472,12 +473,13 @@ short	playerNum;
 	if (gPlayerInfo[playerNum].isComputer)		// CPU players cannot collect these, only real players can
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!CroMagScript_OnPickupCollected(theNode, whoNode, theNode->Kind, 1.0f, "cromag.token"))
+		return(false);
+#endif
+
 	gPlayerInfo[playerNum].numTokens++;			// inc token counter
 	gTotalTokens++;
-
-#ifdef PANGEA_ENABLE_SCRIPTING
-	CroMagScript_OnPickupCollected(theNode, whoNode, theNode->Kind, 1.0f, "cromag.token");
-#endif
 
 			/* AUDIO */
 
@@ -2074,6 +2076,5 @@ short	p;
 
 	return(true);
 }
-
 
 

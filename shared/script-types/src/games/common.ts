@@ -6,8 +6,18 @@ import type {
   MikeMapItemContext,
   ObjectFrameContext,
   ObjectFrameResult,
+  DamageContext,
+  DamageResult,
+  ObjectiveEventContext,
+  PickupContext,
+  PickupResult,
+  PlayerEventContext,
   SplineItemContext,
   TerrainItemContext,
+  TriggerContext,
+  TriggerResult,
+  WeaponHitContext,
+  WeaponHitResult,
 } from "../pangea";
 
 export interface AreaContext extends GameContext {
@@ -45,10 +55,25 @@ export interface RaceResults {
   readonly placements: readonly RacePlayer[];
 }
 
+export type GameplayLifecycleModule = Partial<{
+  onPickupCollected(ctx: PickupContext): PickupResult | void;
+  onWeaponHit(ctx: WeaponHitContext): WeaponHitResult | void;
+  onTriggerEnter(ctx: TriggerContext): TriggerResult | void;
+  onDamage(ctx: DamageContext): DamageResult | void;
+  onDamageApplied(ctx: DamageContext): void;
+  onPlayerSpawn(ctx: PlayerEventContext): void;
+  onPlayerRespawn(ctx: PlayerEventContext): void;
+  onCheckpointReached(ctx: PlayerEventContext): void;
+  onLapComplete(ctx: PlayerEventContext): void;
+  onRaceFinish(ctx: PlayerEventContext): void;
+  onObjectiveComplete(ctx: ObjectiveEventContext): void;
+  onDeath(ctx: PlayerEventContext): void;
+}>;
+
 export type AdventureLifecycleModule<
   TLevel extends LevelContext,
   TFrame extends FrameContext,
-> = Partial<{
+> = GameplayLifecycleModule & Partial<{
   onLevelLoad(ctx: TLevel): void;
   onLevelStart(ctx: TLevel): void;
   onFrame(ctx: TFrame): void;
@@ -62,7 +87,7 @@ export type AdventureLifecycleModule<
 export type MikeLifecycleModule<
   TScene extends SceneAreaContext,
   TArea extends SceneAreaContext,
-> = Partial<{
+> = GameplayLifecycleModule & Partial<{
   onSceneLoad(ctx: TScene): void;
   onAreaLoad(ctx: TArea): void;
   onAreaStart(ctx: TArea): void;
@@ -72,7 +97,7 @@ export type MikeLifecycleModule<
   onAreaUnload(ctx: TArea): void;
 }>;
 
-export type RaceLifecycleModule<TRace extends RaceContext> = Partial<{
+export type RaceLifecycleModule<TRace extends RaceContext> = GameplayLifecycleModule & Partial<{
   onRaceConfig(ctx: RaceConfigContext): void;
   onRaceStart(ctx: TRace): void;
   onObjectFrame(ctx: ObjectFrameContext): ObjectFrameResult | void;

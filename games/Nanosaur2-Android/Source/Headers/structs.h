@@ -355,6 +355,8 @@ struct ObjNode
 	Boolean ScriptDeleteRequested;
 	Boolean ScriptStreamOutSent;
 	Boolean ScriptAnimationCompletionSent;
+	Boolean ScriptActiveStateInitialized;
+	Boolean ScriptActive;
 
 			/* 3D CALCULATION STUFF */
 

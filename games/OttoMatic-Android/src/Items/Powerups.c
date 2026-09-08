@@ -1462,7 +1462,8 @@ void AddPowerupToInventory(ObjNode *pow)
 	DisableHelpType(HELP_MESSAGE_PICKUPPOW);					// dont need to show any help now that they've done it
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	OttoScript_OnPickupCollected(pow, gPlayerInfo.objNode, pow->POWType, pow->POWType == POW_TYPE_HEALTH ? .1f : 1.0f, "ottomatic.powerupPod");
+	if (!OttoScript_OnPickupCollected(pow, gPlayerInfo.objNode, pow->POWType, pow->POWType == POW_TYPE_HEALTH ? .1f : 1.0f, "ottomatic.powerupPod"))
+		return;
 #endif
 
 	switch(pow->POWType)
@@ -1805,6 +1806,5 @@ float			speed;
 
 
 #pragma mark -
-
 
 

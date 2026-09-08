@@ -34,7 +34,9 @@ void Bugdom2Script_ApplyObjectScripting(ObjNode* obj);
 void Bugdom2Script_RunObjectFrame(ObjNode* obj);
 void Bugdom2Script_OnAnimationEvent(ObjNode* obj, int eventValue);
 Boolean Bugdom2Script_OnDamage(ObjNode* source, float damage, int cause, float* outDamage);
-void Bugdom2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+Boolean Bugdom2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+void Bugdom2Script_OnMouseRescued(ObjNode* mouse, ObjNode* player, Boolean drowning);
+void Bugdom2Script_OnObjectiveComplete(int playerNum, int outcome);
 void Bugdom2Script_OnDamageApplied(float damage, int cause);
 Boolean Bugdom2Script_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);
 void Bugdom2Script_OnDeath(int deathType);
@@ -51,6 +53,7 @@ int Bugdom2Script_SelectSplineItemForReplacementJS(void);
 int Bugdom2Script_GetSelectedSplineItemFieldJS(int field);
 float Bugdom2Script_GetSelectedSplinePlacementJS(void);
 int Bugdom2Script_ProbeDamageJS(float damage);
+int Bugdom2Script_ProbeBuddyLaunchJS(void);
 int Bugdom2Script_ProbeSaveLoadJS(int saveSlot);
 
 #endif

@@ -28,6 +28,9 @@ void ProcessBallTimer(void);
 void GetKey(long keyID);
 void UseKey(long keyID);
 Boolean DoWeHaveTheKey(long keyID);
+int BugdomScript_GetKeyCount(void);
+bool BugdomScript_GetKey(int keyID);
+bool BugdomScript_SetKey(int keyID, bool enabled);
 void GetMoney(void);
 void UseMoney(void);
 Boolean DoWeHaveEnoughMoney(void);
@@ -39,7 +42,6 @@ void GetHealth(float amount);
 void GetGreenClover(void);
 void GetBlueClover(void);
 void GetGoldClover(void);
-
 
 
 

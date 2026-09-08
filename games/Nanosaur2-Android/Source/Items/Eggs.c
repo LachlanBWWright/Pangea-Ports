@@ -436,7 +436,8 @@ ObjNode *nest;
 #endif
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	Nanosaur2Script_OnPickupCollected(egg, gPlayerInfo[playerNum].objNode, egg->Kind, 1.0f, "nanosaur2.egg");
+	if (!Nanosaur2Script_OnPickupCollected(egg, gPlayerInfo[playerNum].objNode, egg->Kind, 1.0f, "nanosaur2.egg"))
+		return;
 #endif
 
 			/* LET NEST KNOW THE EGG IS GONE */
@@ -856,7 +857,6 @@ void PangeaNet_ApplyEggNetworkState(int eggIndex, int state, int carrier, float 
 }
 
 #endif // __EMSCRIPTEN__
-
 
 
 

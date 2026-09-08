@@ -335,7 +335,10 @@ static void PlayGame(void)
 		GammaFadeOut(true);
 #ifdef PANGEA_ENABLE_SCRIPTING
 		if (gAreaCompleted)
+		{
+			BugdomScript_OnObjectiveComplete(0, 0);
 			BugdomScript_OnLevelComplete(gRealLevel);
+		}
 		BugdomScript_OnLevelUnload(gRealLevel);
 #endif
 		CleanupLevel();

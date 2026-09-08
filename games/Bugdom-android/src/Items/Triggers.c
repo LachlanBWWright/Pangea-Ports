@@ -1223,7 +1223,10 @@ static Boolean DoTrig_Powerup(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	(void) sideBits;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	BugdomScript_OnPickupCollected(theNode, whoNode, theNode->NutContents, theNode->NutContents == NUT_CONTENTS_HEALTH ? .5f : 1.0f, "bugdom.nut");
+	if (!BugdomScript_OnPickupCollected(theNode, whoNode, theNode->NutContents,
+		theNode->NutContents == NUT_CONTENTS_KEY ? theNode->KeyNum : 0,
+		theNode->NutContents == NUT_CONTENTS_HEALTH ? .5f : 1.0f, "bugdom.nut"))
+		return(false);
 #endif
 
 	switch(theNode->NutContents)
@@ -1475,8 +1478,6 @@ ObjNode *handle;
 	
 	return(true);
 }
-
-
 
 
 

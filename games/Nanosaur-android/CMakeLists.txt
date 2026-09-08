@@ -409,6 +409,7 @@ if(EMSCRIPTEN)
 		"_GetGameScore"
 		"_SetCustomTerrainFile"
 		"_ClearCustomTerrainFile"
+		"_Nanosaur_RequestQuit"
 	)
 	if(PANGEA_ENABLE_SCRIPTING)
 		list(APPEND WASM_EXPORTED_FUNCTIONS
@@ -429,6 +430,12 @@ if(EMSCRIPTEN)
 			"_PangeaScript_ProbeTerrainReplacementJS"
 			"_NanosaurScript_ProbeTerrainReplacementJS"
 			"_NanosaurScript_ProbeCheckpointResetJS"
+			"_NanosaurScript_ProbeDeathJS"
+			"_NanosaurScript_ProbePickupJS"
+			"_NanosaurScript_ProbeCrystalPickupJS"
+			"_NanosaurScript_ProbeEggRecoveryJS"
+			"_NanosaurScript_ProbeShieldPickupJS"
+			"_NanosaurScript_ProbeWeaponPowerPickupJS"
 		)
 	endif()
 	list(JOIN WASM_EXPORTED_FUNCTIONS "," WASM_EXPORTED_FUNCTIONS_STR)
@@ -438,7 +445,7 @@ if(EMSCRIPTEN)
 		"SHELL:-s ALLOW_MEMORY_GROWTH=1"
 		"SHELL:-s MAXIMUM_MEMORY=1gb"
 		"SHELL:-s ENVIRONMENT=web"
-		"SHELL:-s EXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"FS\"]"
+		"SHELL:-s EXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"FS\",\"setCanvasSize\"]"
 		"SHELL:-lidbfs.js"
 		"SHELL:-s EXPORTED_FUNCTIONS=[${WASM_EXPORTED_FUNCTIONS_STR}]"
 		"SHELL:--preload-file ${GAME_DATADIR}@/Data"

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -232,9 +236,21 @@ int		i;
 	
 			if (ctype & CTYPE_HURTENEMY)
 			{
-				if (theEnemy->HurtCallback != nil)							// if has a hurt callback
-					if (theEnemy->HurtCallback(theEnemy, hitObj->Damage))	// handle hit (returns true if was deleted)
-						return(true);			
+				float damage = hitObj->Damage;
+				Boolean applyDamage = true;
+				Boolean destroyTarget = false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				applyDamage = BillyScript_OnWeaponHit(hitObj, theEnemy, damage, &damage, &destroyTarget);
+				if (destroyTarget)
+				{
+					DeleteEnemy(theEnemy);
+					return(true);
+				}
+#endif
+				if (applyDamage && theEnemy->HurtCallback != nil)						// if has a hurt callback
+					if (theEnemy->HurtCallback(theEnemy, damage))	// handle hit (returns true if was deleted)
+						return(true);
+
 			}
 			
 				/* TOUCHED PLAYER */
@@ -547,8 +563,6 @@ void DecEnemiesAtStopPoint(void)
 		gShootoutCanProceedToNextStopPoint = true;
 	}
 }
-
-
 
 
 

@@ -602,7 +602,12 @@ static void PangeaNetEmitMatchResultJson(const PangeaNetMatchResultPacket* packe
 
 	gPangeaNetHasMatchResult = 1;
 	gPangeaNetLastMatchEndReason = packet->endReason;
-	PangeaNet_ReportMatchResult(json);
+PangeaNet_ReportMatchResult(json);
+}
+
+EMSCRIPTEN_KEEPALIVE void Nanosaur2_RequestQuit(void)
+{
+	gGameOver = true;
 }
 
 /****************************/
@@ -629,6 +634,16 @@ EMSCRIPTEN_KEEPALIVE int Nanosaur2_GetFenceCollisionsEnabled(void)
 EMSCRIPTEN_KEEPALIVE int Nanosaur2_GetCurrentLevel(void)
 {
 	return (int)gLevelNum;
+}
+
+// Returns gameplay state bits for browser diagnostics: 1=in level, 2=player exists,
+// 4=game over, 8=level completed.
+EMSCRIPTEN_KEEPALIVE int Nanosaur2_DebugGetGameplayState(void)
+{
+	return (gIsInGame ? 1 : 0)
+		| (gPlayerInfo[0].objNode ? 2 : 0)
+		| (gGameOver ? 4 : 0)
+		| (gLevelCompleted ? 8 : 0);
 }
 
 // Set a terrain override file path for the next level load.

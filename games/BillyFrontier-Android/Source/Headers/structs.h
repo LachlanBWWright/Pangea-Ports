@@ -331,6 +331,9 @@ struct ObjNode
 	Boolean			ScriptDeleteRequested;
 	Boolean			ScriptStreamOutSent;
 	Boolean			ScriptAnimationCompletionSent;
+	uint32_t		ScriptActiveCType;
+	uint32_t		ScriptActiveCBits;
+	Boolean			ScriptActiveStateInitialized;
 	
 	float			Health;				// health 0..1
 	float			Damage;				// damage
@@ -413,5 +416,4 @@ enum
 };
 
 #endif
-
 

@@ -15,13 +15,14 @@ void CroMagScript_OnRaceComplete(int trackNum);
 void CroMagScript_OnRaceUnload(int trackNum);
 int CroMagScript_RemapTerrainItemType(int trackNum, int itemType);
 Boolean CroMagScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int trackNum, int playerNum, int originalType, int remappedType, float x, float z);
+Boolean CroMagScript_OnSplineItem(SplineItemType* itemPtr, int trackNum, int splineNum);
 
 // --- Live-object scripting extension ---
 typedef struct ObjNode ObjNode;
 void CroMagScript_ResetObjectRegistry(void);
 void CroMagScript_RegisterPlayerObject(ObjNode* playerObj, short playerNum);
 void CroMagScript_UnregisterPlayerObject(ObjNode* playerObj);
-void CroMagScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+Boolean CroMagScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
 Boolean CroMagScript_OnDamage(short playerNum, float damage, int cause, float* outDamage);
 void CroMagScript_OnDamageApplied(short playerNum, float damage, int cause);
 void CroMagScript_OnDeath(short playerNum, int eventValue);
@@ -37,6 +38,7 @@ void CroMagScript_OnAnimationEvent(ObjNode* obj, int eventValue);
 void CroMagScript_OnObjectDeleted(ObjNode* obj);
 Boolean CroMagScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);
 int CroMagScript_ProbeTerrainReplacementJS(int itemIndex, int nativeType, float x, float z);
+int CroMagScript_ProbePickupSuppressionJS(int pickupKind);
 Boolean CroMagScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 void CroMagScript_OnCustomTrigger(ObjNode* trigger, ObjNode* who, Byte sideBits);
 

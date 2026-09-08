@@ -254,7 +254,8 @@ short	weaponType, playerNum, quan;
 	playerNum 	= theNode->PlayerNum;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	Nanosaur2Script_OnPickupCollected(trigger, theNode, weaponType, (float) quan, "nanosaur2.weaponPow");
+	if (!Nanosaur2Script_OnPickupCollected(trigger, theNode, weaponType, (float) quan, "nanosaur2.weaponPow"))
+		return(false);
 #endif
 
 	gPlayerInfo[playerNum].weaponQuantity[weaponType] += quan;		// add in quantity
@@ -354,7 +355,8 @@ short	playerNum;
 	playerNum 	= theNode->PlayerNum;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	Nanosaur2Script_OnPickupCollected(trigger, theNode, 21, 0.5f, "nanosaur2.healthPow");
+	if (!Nanosaur2Script_OnPickupCollected(trigger, theNode, 21, 0.5f, "nanosaur2.healthPow"))
+		return(false);
 #endif
 
 	gPlayerInfo[playerNum].health += .5f;
@@ -429,6 +431,9 @@ Boolean AddFuelPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 5, 2, true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.fuelPow", "pickup");
+#endif
 
 	return(true);													// item was added
 }
@@ -445,6 +450,11 @@ static Boolean DoTrig_FuelPOW(ObjNode *trigger, ObjNode *theNode)
 short	playerNum;
 
 	playerNum 	= theNode->PlayerNum;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!Nanosaur2Script_OnPickupCollected(trigger, theNode, 22, gVSMode == VS_MODE_NONE ? .5f : .25f, "nanosaur2.fuelPow"))
+		return(false);
+#endif
 
 	if (gVSMode == VS_MODE_NONE)
 		gPlayerInfo[playerNum].jetpackFuel += .5f;
@@ -521,6 +531,9 @@ Boolean AddShieldPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 5, 2, true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.shieldPow", "pickup");
+#endif
 
 	return(true);													// item was added
 }
@@ -539,6 +552,11 @@ short	playerNum;
 			/* GIVE PLAYER SHIELD POWER */
 
 	playerNum 	= theNode->PlayerNum;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!Nanosaur2Script_OnPickupCollected(trigger, theNode, 23, .5f, "nanosaur2.shieldPow"))
+		return(false);
+#endif
 
 	gPlayerInfo[playerNum].shieldPower += MAX_SHIELD_POWER * .5f;
 	if (gPlayerInfo[playerNum].shieldPower > MAX_SHIELD_POWER)
@@ -616,6 +634,9 @@ Boolean AddFreeLifePOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 4, 1.5, true);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.freeLifePow", "pickup");
+#endif
 
 	return(true);													// item was added
 }
@@ -634,6 +655,11 @@ short	playerNum;
 
 	playerNum 	= theNode->PlayerNum;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!Nanosaur2Script_OnPickupCollected(trigger, theNode, 24, 1.0f, "nanosaur2.freeLifePow"))
+		return(false);
+#endif
+
 	gPlayerInfo[playerNum].numFreeLives++;
 
 
@@ -650,8 +676,6 @@ short	playerNum;
 
 	return(false);
 }
-
-
 
 
 

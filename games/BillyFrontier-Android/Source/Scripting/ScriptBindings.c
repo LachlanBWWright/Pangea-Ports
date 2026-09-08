@@ -68,7 +68,7 @@ static PangeaScriptFrameContext gScriptFrameContext;
 EMSCRIPTEN_KEEPALIVE int BillyScript_ProbeAreaCompletionJS(void)
 {
 	StartLevelCompletion(0.05f);
-	return 0;
+	return gLevelCompleted ? 1 : 0;
 }
 #endif
 
@@ -122,6 +122,26 @@ typedef struct ScriptModelCacheEntry { char path[260]; } ScriptModelCacheEntry;
 static ScriptModelCacheEntry gScriptModelCache[MODEL_GROUP_SCRIPT_CUSTOM_COUNT];
 typedef struct ScriptSkeletonCacheEntry { char modelPath[260]; char skeletonPath[260]; } ScriptSkeletonCacheEntry;
 static ScriptSkeletonCacheEntry gScriptSkeletonCache[SKELETON_TYPE_SCRIPT_CUSTOM_COUNT];
+
+static void BillyScript_ReleaseCustomAssets(void)
+{
+	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		Byte type = (Byte)(SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i);
+		if (IsSkeletonTypeLoaded(type))
+			FreeSkeletonFile(type);
+		gScriptSkeletonCache[i].modelPath[0] = '\0';
+		gScriptSkeletonCache[i].skeletonPath[0] = '\0';
+	}
+	for (int i = 0; i < MODEL_GROUP_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		short group = (short)(MODEL_GROUP_SCRIPT_CUSTOM_BASE + i);
+		if (gBG3DContainerList[group])
+			DisposeBG3DContainer(group);
+		gNumObjectsInBG3DGroupList[group] = 0;
+		gScriptModelCache[i].path[0] = '\0';
+	}
+}
 
 static bool MakeDataAssetPath(const char* source, char* destination, size_t capacity)
 {
@@ -231,6 +251,15 @@ static bool BillyScript_SetObjectPosition(void* nativeObject, const PangeaScript
 	return true;
 }
 
+static bool BillyScript_GetObjectVelocity(void* nativeObject, PangeaScriptVector3* outVelocity)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outVelocity || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outVelocity = (PangeaScriptVector3){obj->Delta.x, obj->Delta.y, obj->Delta.z};
+	return true;
+}
+
 static bool BillyScript_SetObjectVelocity(void* nativeObject, const PangeaScriptVector3* velocity)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -243,12 +272,30 @@ static bool BillyScript_SetObjectVelocity(void* nativeObject, const PangeaScript
 	return true;
 }
 
+static bool BillyScript_GetObjectRotation(void* nativeObject, PangeaScriptVector3* outRotation)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outRotation || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outRotation = (PangeaScriptVector3){obj->Rot.x, obj->Rot.y, obj->Rot.z};
+	return true;
+}
+
 static bool BillyScript_SetObjectRotation(void* nativeObject, const PangeaScriptVector3* rotation)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
 	if (!obj || !rotation || obj->CType == INVALID_NODE_FLAG) return false;
 	obj->Rot = (OGLVector3D){rotation->x, rotation->y, rotation->z};
 	UpdateObjectTransforms(obj);
+	return true;
+}
+
+static bool BillyScript_GetObjectScale(void* nativeObject, float* outScale)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outScale || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outScale = obj->Scale.x;
 	return true;
 }
 
@@ -270,6 +317,14 @@ static bool BillyScript_SetObjectCollisionEnabled(void* nativeObject, bool enabl
 	return true;
 }
 
+static bool BillyScript_GetObjectCollisionEnabled(void* nativeObject, bool* outEnabled)
+{
+	ObjNode* obj = (ObjNode*)nativeObject;
+	if (!obj || !outEnabled || obj->CType == INVALID_NODE_FLAG) return false;
+	*outEnabled = (obj->StatusBits & STATUS_BIT_NOCOLLISION) == 0;
+	return true;
+}
+
 static int ResolveNamedAnimation(const ObjNode* obj, const char* animation)
 {
 	const PangeaScriptCustomObjectDefinition* definition;
@@ -279,6 +334,15 @@ static int ResolveNamedAnimation(const ObjNode* obj, const char* animation)
 	for (int i = 0; i < definition->animationCount; i++)
 		if (strcmp(definition->animationNames[i], animation) == 0) return definition->animationIndices[i];
 	return -1;
+}
+
+static bool BillyScript_GetObjectAnimation(void* nativeObject, int* outAnimation)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outAnimation || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outAnimation = obj->Skeleton->AnimNum;
+	return true;
 }
 
 static bool BillyScript_SetObjectAnimation(void* nativeObject, int animation, float speed, float blendSeconds)
@@ -319,9 +383,51 @@ static bool BillyScript_DeleteObject(void* nativeObject)
 	return true;
 }
 
+static bool BillyScript_GetObjectActive(void* nativeObject, bool* outActive)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outActive || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outActive = !obj->ScriptActiveStateInitialized || obj->CType != 0;
+	return true;
+}
+
+static bool BillyScript_SetObjectActive(void* nativeObject, bool active)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	if (!obj->ScriptDefinitionID[0])
+		return true;
+	if (!obj->ScriptActiveStateInitialized)
+	{
+		obj->ScriptActiveCType = obj->CType;
+		obj->ScriptActiveCBits = obj->CBits;
+		obj->ScriptActiveStateInitialized = true;
+	}
+	if (active)
+	{
+		obj->CType = obj->ScriptActiveCType;
+		obj->CBits = obj->ScriptActiveCBits;
+		ShowObject(obj);
+	}
+	else
+	{
+		obj->CType = 0;
+		obj->CBits = 0;
+		HideObject(obj);
+	}
+	return true;
+}
+
 static const PangeaScriptObjectOps kBillyPlayerObjectOps =
 {
 	.getPosition = BillyScript_GetObjectPosition,
+	.getVelocity = BillyScript_GetObjectVelocity,
+	.getRotation = BillyScript_GetObjectRotation,
+	.getScale = BillyScript_GetObjectScale,
+	.getAnimation = BillyScript_GetObjectAnimation,
+	.getActive = BillyScript_GetObjectActive,
 	.setPosition = BillyScript_SetObjectPosition,
 	.setVelocity = BillyScript_SetObjectVelocity,
 	.setRotation = BillyScript_SetObjectRotation,
@@ -329,6 +435,8 @@ static const PangeaScriptObjectOps kBillyPlayerObjectOps =
 	.setAnimation = BillyScript_SetObjectAnimation,
 	.setAnimationNamed = BillyScript_SetObjectAnimationNamed,
 	.setCollisionEnabled = BillyScript_SetObjectCollisionEnabled,
+	.getCollisionEnabled = BillyScript_GetObjectCollisionEnabled,
+	.setActive = BillyScript_SetObjectActive,
 	.deleteObject = BillyScript_DeleteObject,
 };
 
@@ -341,6 +449,7 @@ void BillyScript_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 void BillyScript_ResetObjectRegistry(void)
 {
 	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+	BillyScript_ReleaseCustomAssets();
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
 	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
 	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
@@ -435,11 +544,15 @@ Boolean BillyScript_OnDamage(ObjNode* source, float damage, int cause, float* ou
 	PangeaScriptDamageResult result = {0};
 	PangeaScriptStatus status;
 	ObjNode* player = gPlayerInfo.objNode;
+	PangeaScriptObjectHandle target;
 
 	if (!outDamage)
 		return true;
 	*outDamage = damage;
 	if (!player || player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+		return true;
+	target = (PangeaScriptObjectHandle){player->ScriptObjectID, (uint32_t) player->ScriptObjectGeneration};
+	if (!PangeaScript_ObjectExists(target))
 		return true;
 
 	context = (PangeaScriptDamageContext)
@@ -449,11 +562,15 @@ Boolean BillyScript_OnDamage(ObjNode* source, float damage, int cause, float* ou
 		.cause = cause,
 		.damage = damage,
 		.source = {0},
-		.target = {player->ScriptObjectID, player->ScriptObjectGeneration},
+		.target = target,
 		.position = {player->Coord.x, player->Coord.y, player->Coord.z},
 	};
 	if (source && source->ScriptObjectID > 0 && source->ScriptObjectGeneration > 0)
-		context.source = (PangeaScriptObjectHandle){source->ScriptObjectID, source->ScriptObjectGeneration};
+	{
+		PangeaScriptObjectHandle handle = (PangeaScriptObjectHandle){source->ScriptObjectID, (uint32_t) source->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			context.source = handle;
+	}
 
 	status = PangeaScript_CallDamageHook(&context, &result);
 	LogScriptStatus("onDamage", status);
@@ -461,6 +578,57 @@ Boolean BillyScript_OnDamage(ObjNode* source, float damage, int cause, float* ou
 		return true;
 	if (result.hasDamage)
 		*outDamage = result.damage;
+	return result.hasApplyDamage ? result.applyDamage : true;
+}
+
+Boolean BillyScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget)
+{
+	PangeaScriptWeaponHitContext context;
+	PangeaScriptWeaponHitResult result = {0};
+	PangeaScriptStatus status;
+	int64_t score;
+	if (!outDamage || !outDestroyTarget)
+		return true;
+	*outDamage = damage;
+	*outDestroyTarget = false;
+	context = (PangeaScriptWeaponHitContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = 0,
+		.weaponType = weapon ? weapon->Type : -1,
+		.targetType = target ? target->Type : -1,
+		.targetFlags = target ? target->StatusBits : 0,
+		.damage = damage,
+		.weaponId = "billy.projectile",
+		.weapon = {0},
+		.target = {0},
+		.position = target ? (PangeaScriptVector3){target->Coord.x, target->Coord.y, target->Coord.z} : (PangeaScriptVector3){0},
+	};
+	if (weapon && weapon->ScriptObjectID > 0 && weapon->ScriptObjectGeneration > 0)
+	{
+		PangeaScriptObjectHandle handle = (PangeaScriptObjectHandle){weapon->ScriptObjectID, (uint32_t) weapon->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			context.weapon = handle;
+	}
+	if (target && target->ScriptObjectID > 0 && target->ScriptObjectGeneration > 0)
+	{
+		PangeaScriptObjectHandle handle = (PangeaScriptObjectHandle){target->ScriptObjectID, (uint32_t) target->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			context.target = handle;
+	}
+	status = PangeaScript_CallWeaponHitHook(&context, &result);
+	LogScriptStatus("onWeaponHit", status);
+	if (status != PANGEA_SCRIPT_OK)
+		return true;
+	score = (int64_t) gScore + (int64_t) result.scoreDelta;
+	if (score < 0)
+		gScore = 0;
+	else if (score > UINT32_MAX)
+		gScore = UINT32_MAX;
+	else
+		gScore = (uint32_t) score;
+	*outDamage = result.damage;
+	*outDestroyTarget = result.destroyTarget;
 	return result.hasApplyDamage ? result.applyDamage : true;
 }
 
@@ -482,15 +650,21 @@ void BillyScript_OnDamageApplied(ObjNode* player, float damage, int cause)
 	LogScriptStatus("onDamageApplied", PangeaScript_CallDamageAppliedHook(&context));
 }
 
-void BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId)
+Boolean BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId)
 {
 	PangeaScriptPickupContext context;
 	PangeaScriptPickupResult result = {0};
 	PangeaScriptStatus status;
+	PangeaScriptObjectHandle pickupHandle;
+	PangeaScriptObjectHandle playerHandle;
 	int64_t score;
 	if (!pickup || !player || pickup->ScriptObjectID <= 0 || pickup->ScriptObjectGeneration <= 0 ||
 		player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
-		return;
+		return true;
+	pickupHandle = (PangeaScriptObjectHandle){pickup->ScriptObjectID, (uint32_t) pickup->ScriptObjectGeneration};
+	playerHandle = (PangeaScriptObjectHandle){player->ScriptObjectID, (uint32_t) player->ScriptObjectGeneration};
+	if (!PangeaScript_ObjectExists(pickupHandle) || !PangeaScript_ObjectExists(playerHandle))
+		return true;
 	context = (PangeaScriptPickupContext)
 	{
 		.levelNum = gScriptFrameContext.levelNum,
@@ -498,14 +672,14 @@ void BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupT
 		.pickupType = pickupType,
 		.amount = amount,
 		.pickupId = pickupId,
-		.pickup = {pickup->ScriptObjectID, pickup->ScriptObjectGeneration},
-		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
+		.pickup = pickupHandle,
+		.player = playerHandle,
 		.position = {pickup->Coord.x, pickup->Coord.y, pickup->Coord.z},
 	};
 	status = PangeaScript_CallPickupHook(&context, &result);
 	LogScriptStatus("onPickupCollected", status);
 	if (status != PANGEA_SCRIPT_OK)
-		return;
+		return true;
 	if (isfinite(result.healthDelta))
 	{
 		player->Health += result.healthDelta;
@@ -521,6 +695,7 @@ void BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupT
 		gScore = UINT32_MAX;
 	else
 		gScore = (uint32_t) score;
+	return result.hasConsumePickup ? result.consumePickup : true;
 }
 
 void BillyScript_OnDeath(ObjNode* player, int eventValue)
@@ -748,6 +923,12 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "pickup",
 		.dependencySummary = "stampede boost assets, stampede speed state, and terrain systems",
 	},
+#define BILLY_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current area assets, terrain systems, and the native item initializer" },
+	BILLY_TERRAIN_NATIVE_ITEM(1) BILLY_TERRAIN_NATIVE_ITEM(2) BILLY_TERRAIN_NATIVE_ITEM(3) BILLY_TERRAIN_NATIVE_ITEM(4) BILLY_TERRAIN_NATIVE_ITEM(5) BILLY_TERRAIN_NATIVE_ITEM(6) BILLY_TERRAIN_NATIVE_ITEM(7) BILLY_TERRAIN_NATIVE_ITEM(8) BILLY_TERRAIN_NATIVE_ITEM(9) BILLY_TERRAIN_NATIVE_ITEM(10)
+	BILLY_TERRAIN_NATIVE_ITEM(11) BILLY_TERRAIN_NATIVE_ITEM(12) BILLY_TERRAIN_NATIVE_ITEM(13) BILLY_TERRAIN_NATIVE_ITEM(14) BILLY_TERRAIN_NATIVE_ITEM(15) BILLY_TERRAIN_NATIVE_ITEM(16) BILLY_TERRAIN_NATIVE_ITEM(17) BILLY_TERRAIN_NATIVE_ITEM(18) BILLY_TERRAIN_NATIVE_ITEM(19) BILLY_TERRAIN_NATIVE_ITEM(20)
+	BILLY_TERRAIN_NATIVE_ITEM(21) BILLY_TERRAIN_NATIVE_ITEM(22) BILLY_TERRAIN_NATIVE_ITEM(23) BILLY_TERRAIN_NATIVE_ITEM(24) BILLY_TERRAIN_NATIVE_ITEM(25) BILLY_TERRAIN_NATIVE_ITEM(26) BILLY_TERRAIN_NATIVE_ITEM(27) BILLY_TERRAIN_NATIVE_ITEM(28) BILLY_TERRAIN_NATIVE_ITEM(29) BILLY_TERRAIN_NATIVE_ITEM(30)
+	BILLY_TERRAIN_NATIVE_ITEM(31) BILLY_TERRAIN_NATIVE_ITEM(32) BILLY_TERRAIN_NATIVE_ITEM(33) BILLY_TERRAIN_NATIVE_ITEM(34) BILLY_TERRAIN_NATIVE_ITEM(35) BILLY_TERRAIN_NATIVE_ITEM(36)
+#undef BILLY_TERRAIN_NATIVE_ITEM
 };
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status)
@@ -771,7 +952,42 @@ static int GetScriptPlayerCount(void) { return gPlayerInfo.objNode ? 1 : 0; }
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerInfo.objNode) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .health = gPlayerInfo.objNode->Health, .hasHealth = true, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){
+		.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z},
+		.velocity = {gPlayerInfo.objNode->Delta.x, gPlayerInfo.objNode->Delta.y, gPlayerInfo.objNode->Delta.z},
+		.hasVelocity = true,
+		.collisionEnabled = gPlayerInfo.objNode->CType != 0 && (gPlayerInfo.objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0,
+		.hasCollisionEnabled = true,
+		.health = gPlayerInfo.objNode->Health,
+		.hasHealth = true,
+		.score = (int64_t) gScore,
+		.hasScore = true,
+		.pesoCount = gPlayerInfo.pesos,
+		.hasPesoState = true,
+		.lives = gPlayerInfo.lives,
+		.hasLives = true,
+		.activeWeapon = 0,
+		.hasWeaponState = true,
+		.weaponCount = 1,
+		.weapons = {{0, 999}},
+		.shieldActive = gPlayerInfo.shieldPower > 0.0f,
+		.hasShieldState = true,
+		.active = true,
+	};
+	if (gGameViewInfoPtr)
+	{
+		outPlayer->camera = (PangeaScriptVector3){gGameViewInfoPtr->cameraPlacement.cameraLocation.x, gGameViewInfoPtr->cameraPlacement.cameraLocation.y, gGameViewInfoPtr->cameraPlacement.cameraLocation.z};
+		outPlayer->hasCameraState = true;
+	}
+	outPlayer->weapons[0].quantity = gPlayerInfo.ammoCount;
+	outPlayer->rotation = (PangeaScriptVector3){gPlayerInfo.objNode->Rot.x, gPlayerInfo.objNode->Rot.y, gPlayerInfo.objNode->Rot.z};
+	outPlayer->hasRotation = true;
+	outPlayer->aim = (PangeaScriptVector3){
+		-sinf(gPlayerInfo.objNode->Rot.y),
+		0.0f,
+		-cosf(gPlayerInfo.objNode->Rot.y),
+	};
+	outPlayer->hasAimState = true;
 	return true;
 }
 
@@ -781,6 +997,7 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerInfo.coord = (OGLPoint3D){position->x, position->y, position->z};
 	gPlayerInfo.objNode->Coord = gPlayerInfo.coord;
+	UpdateObjectTransforms(gPlayerInfo.objNode);
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -796,6 +1013,37 @@ static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 	if (playerNum != 0 || !gPlayerInfo.objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerInfo.objNode->Health = health;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
+{
+	if (playerNum != 0 || lives < 0 || lives > 255 || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.lives = (Byte) lives;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerScore(int playerNum, int64_t score)
+{
+	if (playerNum != 0 || score < 0 || score > UINT32_MAX || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gScore = (uint32_t) score;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerWeaponQuantity(int playerNum, int weaponType, int quantity)
+{
+	if (playerNum != 0 || weaponType != 0 || quantity < 0 || quantity > 999 || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.ammoCount = quantity;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerShieldActive(int playerNum, bool active)
+{
+	if (playerNum != 0 || !gPlayerInfo.objNode) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gPlayerInfo.shieldPower = active ? MAX_SHIELD : 0.0f;
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -820,6 +1068,10 @@ void BillyScript_Init(void)
 		.setPlayerPosition = SetScriptPlayerPosition,
 		.setPlayerVelocity = SetScriptPlayerVelocity,
 		.setPlayerHealth = SetScriptPlayerHealth,
+		.setPlayerLives = SetScriptPlayerLives,
+		.setPlayerScore = SetScriptPlayerScore,
+		.setPlayerWeaponQuantity = SetScriptPlayerWeaponQuantity,
+		.setPlayerShieldActive = SetScriptPlayerShieldActive,
 		.setPlayerInvulnerable = SetScriptPlayerInvulnerable,
 		.capabilities = PANGEA_SCRIPT_BILLY_FRONTIER_CAPABILITIES,
 	};
@@ -875,14 +1127,41 @@ static const char* BillyScript_AreaMode(int areaNum)
 	}
 }
 
+static void BillyScript_ModeState(int areaNum, int* phase, int* wave, float* timer)
+{
+	const char* mode = BillyScript_AreaMode(areaNum);
+	*phase = 0;
+	*wave = 0;
+	*timer = 0.0f;
+	if (strcmp(mode, "targetPractice") == 0)
+	{
+		*timer = gTargetPracticeTimer;
+		return;
+	}
+	if (strcmp(mode, "duel") == 0)
+	{
+		*phase = gDuelKeySequenceMode;
+		return;
+	}
+	*phase = gShootoutMode;
+	*wave = gStopPointNum;
+}
+
 static void CallAreaHook(PangeaScriptHook hook, int areaNum, const char* action)
 {
+	int modePhase, modeWave;
+	float modeTimer;
+	BillyScript_ModeState(areaNum, &modePhase, &modeWave, &modeTimer);
 	const PangeaScriptLevelContext context =
 	{
 		.levelNum = areaNum,
 		.levelName = NULL,
 		.mode = BillyScript_AreaMode(areaNum),
 		.networked = false,
+		.modePhase = modePhase,
+		.modeWave = modeWave,
+		.modeTimer = modeTimer,
+		.hasModeState = true,
 	};
 
 	PangeaScriptStatus status = PangeaScript_CallLevelHook(hook, &context);
@@ -901,6 +1180,9 @@ void BillyScript_OnAreaStart(int areaNum)
 
 void BillyScript_OnAreaFrame(int areaNum, unsigned int frameNum, float deltaSeconds, float areaTimeSeconds)
 {
+	int modePhase, modeWave;
+	float modeTimer;
+	BillyScript_ModeState(areaNum, &modePhase, &modeWave, &modeTimer);
 	const PangeaScriptFrameContext context =
 	{
 		.levelNum = areaNum,
@@ -909,6 +1191,10 @@ void BillyScript_OnAreaFrame(int areaNum, unsigned int frameNum, float deltaSeco
 		.levelTimeSeconds = areaTimeSeconds,
 		.mode = BillyScript_AreaMode(areaNum),
 		.networked = false,
+		.modePhase = modePhase,
+		.modeWave = modeWave,
+		.modeTimer = modeTimer,
+		.hasModeState = true,
 	};
 	BillyScript_CacheFrameContext(&context);
 	PangeaScript_ExpireTriggerContacts(&context);

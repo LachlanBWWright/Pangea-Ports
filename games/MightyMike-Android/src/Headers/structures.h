@@ -136,6 +136,12 @@ struct ObjNode
 	int32_t			ScriptVisualOffsetY;
 	uint32_t		ScriptObjectID;
 	uint32_t		ScriptObjectGeneration;
+	unsigned long		ScriptCollisionBits;
+	Boolean			ScriptCollisionStateInitialized;
+	Boolean			ScriptActiveDrawFlag;
+	Boolean			ScriptActiveMoveFlag;
+	Boolean			ScriptActiveStateInitialized;
+	Boolean			ScriptActive;
 	char			ScriptDefinitionID[96];
 	Boolean			ScriptDeleteRequested;
 	Boolean			ScriptStreamOutSent;

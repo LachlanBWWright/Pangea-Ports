@@ -2821,6 +2821,36 @@ float		fistSize = 30.0f * gPlayerInfo.scale;
 	}
 }
 
+int OttoScript_ProbePunchWeaponJS(void)
+{
+	static OGLPoint3D fistOff = {0, -12, 0};
+	ObjNode *target = NULL;
+	OGLPoint3D originalCoord;
+	OGLPoint3D fistCoord;
+	if (!gPlayerInfo.objNode) return 0;
+	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node != gPlayerInfo.objNode && node->HitByWeaponHandler[WEAPON_TYPE_FIST])
+		{
+			target = node;
+			break;
+		}
+	}
+	if (!target) return 0;
+	FindCoordOnJoint(gPlayerInfo.objNode, PLAYER_JOINT_RIGHTHAND, &fistOff, &fistCoord);
+	originalCoord = target->Coord;
+	target->Coord = fistCoord;
+	UpdateObjectTransforms(target);
+	gPlayerInfo.objNode->PunchCanHurt = true;
+	CheckPunchCollision(gPlayerInfo.objNode);
+	if (target->CType != INVALID_NODE_FLAG)
+	{
+		target->Coord = originalCoord;
+		UpdateObjectTransforms(target);
+	}
+	return gPlayerInfo.objNode->PunchCanHurt ? 0 : 1;
+}
+
 
 #pragma mark -
 

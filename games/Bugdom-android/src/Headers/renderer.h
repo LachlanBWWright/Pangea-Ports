@@ -156,6 +156,7 @@ void Render_Load3DMFTextures(TQ3MetaFile* metaFile, GLuint* outTextureNames, boo
 // Instructs the renderer to get ready to draw a new frame.
 // Call this function before any draw/submit calls.
 void Render_StartFrame(void);
+bool BugdomScript_MakeRendererCurrent(void);
 
 // Flushes the rendering queue.
 // May be called multiple times between Render_StartFrame and Render_EndFrame.

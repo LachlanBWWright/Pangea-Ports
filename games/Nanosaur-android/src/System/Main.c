@@ -56,6 +56,7 @@ Boolean		gFenceCollisionsDisabled = false;
 
 #ifdef __EMSCRIPTEN__
 static float	sEmscriptenKillDelay;
+Boolean		gEmscriptenQuitRequested = false;
 #endif
 
 QD3DSetupOutputType		*gGameViewInfoPtr = nil;
@@ -505,6 +506,17 @@ unsigned long	someLong;
 void EmscriptenGameFrameImpl(void* arg)
 {
 	(void) arg;
+
+	if (gEmscriptenQuitRequested)
+	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		NanosaurScript_OnLevelUnload(gStartLevelNum);
+#endif
+		CleanupLevel();
+		gIsInGame = false;
+		emscripten_cancel_main_loop();
+		return;
+	}
 
 	float fps = gFramesPerSecondFrac;
 

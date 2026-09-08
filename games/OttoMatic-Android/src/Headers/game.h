@@ -115,6 +115,9 @@ extern	Boolean					gFreezeCameraFromXZ;
 extern	Boolean					gFreezeCameraFromY;
 extern	Boolean					gG4;
 extern	Boolean					gGameOver;
+#ifdef __EMSCRIPTEN__
+extern	Boolean					gEmscriptenQuitRequested;
+#endif
 extern	Boolean					gGamePaused;
 extern	Boolean					gHelpMessageDisabled[NUM_HELP_MESSAGES];
 extern	Boolean					gIceCracked;

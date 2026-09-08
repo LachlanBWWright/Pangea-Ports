@@ -58,10 +58,10 @@ enum
 
 extern	void InitMyGuy(void);
 extern	void StartMyShield(ObjNode *theNode);
+extern	float gShieldTimer;
 extern	void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean overrideShield);
 extern	void ResetPlayer(void);
-
-
+extern	int NanosaurScript_ProbeDeathJS(void);
 
 
 

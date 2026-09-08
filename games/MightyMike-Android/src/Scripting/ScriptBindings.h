@@ -20,7 +20,7 @@ void MikeScript_ResetObjectRegistry(void);
 void MikeScript_RegisterPlayerObject(ObjNode* playerObj);
 void MikeScript_OnPlayerSpawn(ObjNode* playerObj);
 void MikeScript_OnPlayerRespawn(ObjNode* playerObj);
-void MikeScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+Boolean MikeScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
 Boolean MikeScript_IsInvulnerable(void);
 Boolean MikeScript_OnDamage(float damage, float* outDamage);
 Boolean MikeScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);

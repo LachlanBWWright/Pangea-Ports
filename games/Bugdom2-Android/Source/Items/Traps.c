@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -1019,9 +1022,12 @@ OGLPoint2D	pl[4];
 
 					PlayEffect_Parms3D(EFFECT_PULLTRAP, &thisNode->Coord, NORMAL_CHANNEL_RATE, .4f);
 
-			  		gPlayerInfo.numMiceRescued++;
-			  		if (thisNode->Drowning)											// was that a special garbage can drowning mouse?
-			  			gNumDrowningMiceRescued++;
+			gPlayerInfo.numMiceRescued++;
+			if (thisNode->Drowning)                    // was that a special garbage can drowning mouse?
+				gNumDrowningMiceRescued++;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			Bugdom2Script_OnMouseRescued(mouse, player, thisNode->Drowning);
+#endif
 					return;
 			  	}
 			  }
@@ -1401,10 +1407,6 @@ float	x,z,r;
 	gPlayerInfo.suckSpeed = 50;
 
 }
-
-
-
-
 
 
 

@@ -77,6 +77,9 @@ extern	Boolean					gDisableAnimSounds;
 extern	Boolean					gGamePaused;
 extern	Boolean					gIsInGame;
 extern	Boolean					gGameOverFlag;
+#ifdef __EMSCRIPTEN__
+extern	Boolean					gEmscriptenQuitRequested;
+#endif
 extern	Boolean					gMuteMusicFlag;
 extern	Boolean					gPlayerGotKilledFlag;
 extern	Boolean					gPossibleAttackModes[];

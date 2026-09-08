@@ -254,6 +254,12 @@ extern "C"
 	{
 		SDL_strlcpy(gCustomMapPath, path, sizeof(gCustomMapPath));
 	}
+
+	// Request the current area loop to unwind before the preview replaces it.
+	EMSCRIPTEN_KEEPALIVE void MightyMike_RequestQuit(void)
+	{
+		gAbortGameFlag = true;
+	}
 }
 #endif // __EMSCRIPTEN__
 

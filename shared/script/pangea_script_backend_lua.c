@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,7 @@
 #define PANGEA_LUA_PERSISTENCE_MAX_VALUE_BYTES 4096
 #define PANGEA_LUA_PERSISTENCE_MAX_TOTAL_BYTES 16384
 #define PANGEA_LUA_OBJECTIVE_RESULT_CAPACITY 16
+#define PANGEA_LUA_CHECKPOINT_RESULT_CAPACITY 16
 
 typedef struct PangeaScriptPersistenceEntry
 {
@@ -31,6 +33,14 @@ typedef struct PangeaScriptObjectiveResult
 	int playerNum;
 	int outcome;
 } PangeaScriptObjectiveResult;
+
+typedef struct PangeaScriptCheckpointResult
+{
+	bool active;
+	int levelNum;
+	int playerNum;
+	int checkpoint;
+} PangeaScriptCheckpointResult;
 
 struct PangeaScriptBackend
 {
@@ -84,7 +94,10 @@ struct PangeaScriptBackend
 	PangeaScriptPersistenceEntry persistence[PANGEA_LUA_PERSISTENCE_MAX_ENTRIES];
 	int persistentBytes;
 	PangeaScriptObjectiveResult objectiveResults[PANGEA_LUA_OBJECTIVE_RESULT_CAPACITY];
+	PangeaScriptCheckpointResult checkpointResults[PANGEA_LUA_CHECKPOINT_RESULT_CAPACITY];
 };
+
+static PangeaScriptBackend* current_backend(lua_State* lua);
 
 enum
 {
@@ -522,6 +535,72 @@ static int lua_object_position(lua_State* lua)
 	return 1;
 }
 
+static int lua_object_velocity(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptVector3 velocity;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectVelocity(handle, &velocity))
+		push_vector(lua, velocity.x, velocity.y, velocity.z);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_rotation(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	PangeaScriptVector3 rotation;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectRotation(handle, &rotation))
+		push_vector(lua, rotation.x, rotation.y, rotation.z);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_scale(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	float scale;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectScale(handle, &scale))
+		lua_pushnumber(lua, scale);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_animation(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	int animation;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectAnimation(handle, &animation))
+		lua_pushinteger(lua, animation);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_active(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	bool active;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectActive(handle, &active))
+		lua_pushboolean(lua, active);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_collision_enabled(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	bool enabled;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectCollisionEnabled(handle, &enabled))
+		lua_pushboolean(lua, enabled);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
 static const char* object_source_kind_name(PangeaScriptObjectSourceKind kind)
 {
 	if (kind == PANGEA_SCRIPT_SOURCE_TERRAIN) return "terrain";
@@ -791,6 +870,33 @@ static int lua_object_state(lua_State* lua)
 	lua_getfield(lua, -1, key);
 	if (!lua_istable(lua, -1)) { lua_pop(lua, 1); lua_createtable(lua, 0, 8); lua_pushvalue(lua, -1); lua_setfield(lua, -3, key); }
 	lua_remove(lua, -2); return 1;
+}
+
+static int lua_object_capture_checkpoint(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	PangeaScriptObjectHandle handle;
+	if (!read_handle(lua, 1, &handle) || !PangeaScript_ObjectExists(handle))
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	PangeaScriptBackend_CaptureObjectCheckpointState(backend, handle);
+	lua_pushboolean(lua, true);
+	return 1;
+}
+
+static int lua_object_restore_checkpoint(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	PangeaScriptObjectHandle handle;
+	if (!read_handle(lua, 1, &handle) || !PangeaScript_ObjectExists(handle))
+	{
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	lua_pushboolean(lua, PangeaScriptBackend_RestoreObjectCheckpointState(backend, handle));
+	return 1;
 }
 
 static bool clone_checkpoint_value(lua_State* lua, int index, int depth)
@@ -1381,13 +1487,139 @@ static int lua_player_get(lua_State* lua)
 		lua_pushnil(lua);
 		return 1;
 	}
-	lua_createtable(lua, 0, 3);
+	lua_createtable(lua, 0, 9);
 	lua_pushinteger(lua, playerNum); lua_setfield(lua, -2, "playerNum");
 	push_vector(lua, player.position.x, player.position.y, player.position.z); lua_setfield(lua, -2, "position");
+	if (player.hasVelocity)
+	{
+		push_vector(lua, player.velocity.x, player.velocity.y, player.velocity.z);
+		lua_setfield(lua, -2, "velocity");
+	}
+	if (player.hasCollisionEnabled)
+	{
+		lua_pushboolean(lua, player.collisionEnabled);
+		lua_setfield(lua, -2, "collisionEnabled");
+	}
+	if (player.hasRotation)
+	{
+		push_vector(lua, player.rotation.x, player.rotation.y, player.rotation.z);
+		lua_setfield(lua, -2, "rotation");
+	}
+	if (player.hasAimState)
+	{
+		push_vector(lua, player.aim.x, player.aim.y, player.aim.z);
+		lua_setfield(lua, -2, "aim");
+	}
 	if (player.hasHealth)
 	{
 		lua_pushnumber(lua, player.health);
 		lua_setfield(lua, -2, "health");
+	}
+	if (player.hasFuelState)
+	{
+		lua_pushnumber(lua, player.fuel);
+		lua_setfield(lua, -2, "fuel");
+	}
+	if (player.hasScore)
+	{
+		lua_pushinteger(lua, (lua_Integer) player.score);
+		lua_setfield(lua, -2, "score");
+	}
+	if (player.hasCoinState)
+	{
+		lua_pushinteger(lua, player.coinCount);
+		lua_setfield(lua, -2, "coinCount");
+	}
+	if (player.hasPesoState)
+	{
+		lua_pushinteger(lua, player.pesoCount);
+		lua_setfield(lua, -2, "pesoCount");
+	}
+	if (player.hasLives)
+	{
+		lua_pushinteger(lua, player.lives);
+		lua_setfield(lua, -2, "lives");
+	}
+	if (player.hasWeaponState)
+	{
+		lua_pushinteger(lua, player.activeWeapon); lua_setfield(lua, -2, "activeWeapon");
+		lua_createtable(lua, player.weaponCount, 0);
+		int weaponCount = player.weaponCount;
+		if (weaponCount < 0) weaponCount = 0;
+		if (weaponCount > PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY) weaponCount = PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY;
+		for (int i = 0; i < weaponCount; i++)
+		{
+			lua_createtable(lua, 0, 2);
+			lua_pushinteger(lua, player.weapons[i].type); lua_setfield(lua, -2, "type");
+			lua_pushinteger(lua, player.weapons[i].quantity); lua_setfield(lua, -2, "quantity");
+			lua_rawseti(lua, -2, i + 1);
+		}
+		lua_setfield(lua, -2, "weapons");
+	}
+	if (player.hasKeyState)
+	{
+		int keyCount = player.keyCount;
+		if (keyCount < 0) keyCount = 0;
+		if (keyCount > PANGEA_SCRIPT_PLAYER_KEY_CAPACITY) keyCount = PANGEA_SCRIPT_PLAYER_KEY_CAPACITY;
+		lua_createtable(lua, keyCount, 0);
+		for (int i = 0; i < keyCount; i++)
+		{
+			lua_pushinteger(lua, player.keys[i]);
+			lua_rawseti(lua, -2, i + 1);
+		}
+		lua_setfield(lua, -2, "keys");
+	}
+	if (player.hasTokenState)
+	{
+		lua_pushinteger(lua, player.tokenCount);
+		lua_setfield(lua, -2, "tokenCount");
+	}
+	if (player.hasCollectibleState)
+	{
+		lua_pushinteger(lua, player.greenCloverCount); lua_setfield(lua, -2, "greenCloverCount");
+		lua_pushinteger(lua, player.blueCloverCount); lua_setfield(lua, -2, "blueCloverCount");
+		lua_pushinteger(lua, player.goldCloverCount); lua_setfield(lua, -2, "goldCloverCount");
+	}
+	if (player.hasShieldState)
+	{
+		lua_pushboolean(lua, player.shieldActive);
+		lua_setfield(lua, -2, "shieldActive");
+	}
+	if (player.hasForm)
+	{
+		lua_pushstring(lua, player.form == PANGEA_SCRIPT_PLAYER_FORM_BALL ? "ball" : "bug");
+		lua_setfield(lua, -2, "form");
+	}
+	if (player.hasMiceState)
+	{
+		lua_pushinteger(lua, player.miceRescued);
+		lua_setfield(lua, -2, "miceRescued");
+		lua_pushinteger(lua, player.miceTotal);
+		lua_setfield(lua, -2, "miceTotal");
+		lua_pushinteger(lua, player.drowningMiceRescued);
+		lua_setfield(lua, -2, "drowningMiceRescued");
+		lua_pushinteger(lua, player.drowningMiceRequired);
+		lua_setfield(lua, -2, "drowningMiceRequired");
+	}
+	if (player.hasChildObjectState)
+	{
+		lua_pushinteger(lua, player.childObjectCount);
+		lua_setfield(lua, -2, "childObjectCount");
+	}
+	if (player.hasEggState)
+	{
+		int eggCount = player.eggCount;
+		if (eggCount < 0) eggCount = 0;
+		if (eggCount > PANGEA_SCRIPT_PLAYER_EGG_CAPACITY) eggCount = PANGEA_SCRIPT_PLAYER_EGG_CAPACITY;
+		lua_createtable(lua, eggCount, 0);
+		for (int i = 0; i < eggCount; i++)
+		{
+			lua_createtable(lua, 0, 2);
+			lua_pushinteger(lua, player.eggs[i]); lua_setfield(lua, -2, "recovered");
+			lua_pushinteger(lua, player.eggRequired[i]); lua_setfield(lua, -2, "required");
+			lua_rawseti(lua, -2, i + 1);
+		}
+		lua_setfield(lua, -2, "eggs");
 	}
 	if (player.hasRaceState)
 	{
@@ -1395,6 +1627,34 @@ static int lua_player_get(lua_State* lua)
 		lua_pushinteger(lua, player.checkpointNum); lua_setfield(lua, -2, "checkpointNum");
 		lua_pushinteger(lua, player.placement); lua_setfield(lua, -2, "placement");
 		lua_pushboolean(lua, player.raceComplete); lua_setfield(lua, -2, "raceComplete");
+	}
+	if (player.hasVehicleState)
+	{
+		lua_pushinteger(lua, player.vehicleType); lua_setfield(lua, -2, "vehicleType");
+		lua_pushnumber(lua, player.vehicleMaxSpeed); lua_setfield(lua, -2, "vehicleMaxSpeed");
+		lua_pushnumber(lua, player.vehicleAcceleration); lua_setfield(lua, -2, "vehicleAcceleration");
+		lua_pushnumber(lua, player.vehicleTraction); lua_setfield(lua, -2, "vehicleTraction");
+		lua_pushnumber(lua, player.vehicleSuspension); lua_setfield(lua, -2, "vehicleSuspension");
+	}
+	if (player.hasTeamState)
+	{
+		lua_pushinteger(lua, player.team); lua_setfield(lua, -2, "team");
+	}
+	if (player.hasCaptureState)
+	{
+		lua_pushboolean(lua, player.carryingFlag); lua_setfield(lua, -2, "carryingFlag");
+		lua_pushinteger(lua, player.captureScore); lua_setfield(lua, -2, "captureScore");
+	}
+	if (player.hasLevelFlowState)
+	{
+		lua_pushinteger(lua, player.sceneNum); lua_setfield(lua, -2, "sceneNum");
+		lua_pushinteger(lua, player.areaNum); lua_setfield(lua, -2, "areaNum");
+		lua_pushboolean(lua, player.areaComplete); lua_setfield(lua, -2, "areaComplete");
+	}
+	if (player.hasCameraState)
+	{
+		push_vector(lua, player.camera.x, player.camera.y, player.camera.z);
+		lua_setfield(lua, -2, "camera");
 	}
 	return 1;
 }
@@ -1472,6 +1732,49 @@ static int lua_player_objective_results(lua_State* lua)
 	return 1;
 }
 
+static void record_checkpoint_result(PangeaScriptBackend* backend, const PangeaScriptPlayerEventContext* context)
+{
+	int freeIndex = -1;
+	if (!backend || !context) return;
+	for (int index = 0; index < PANGEA_LUA_CHECKPOINT_RESULT_CAPACITY; index++)
+	{
+		PangeaScriptCheckpointResult* result = &backend->checkpointResults[index];
+		if (!result->active && freeIndex < 0) freeIndex = index;
+		if (result->active && result->levelNum == context->levelNum && result->playerNum == context->playerNum)
+		{
+			result->checkpoint = context->eventValue;
+			return;
+		}
+	}
+	if (freeIndex >= 0)
+	{
+		backend->checkpointResults[freeIndex] = (PangeaScriptCheckpointResult){true, context->levelNum, context->playerNum, context->eventValue};
+	}
+}
+
+static int lua_player_checkpoint_results(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int resultCount = 0;
+	lua_createtable(lua, 0, 0);
+	for (int index = 0; index < PANGEA_LUA_CHECKPOINT_RESULT_CAPACITY; index++)
+	{
+		const PangeaScriptCheckpointResult* result = &backend->checkpointResults[index];
+		if (!result->active) continue;
+		lua_createtable(lua, 0, 3);
+		lua_pushinteger(lua, result->levelNum); lua_setfield(lua, -2, "levelNum");
+		lua_pushinteger(lua, result->playerNum); lua_setfield(lua, -2, "playerNum");
+		lua_pushinteger(lua, result->checkpoint); lua_setfield(lua, -2, "checkpoint");
+		lua_rawseti(lua, -2, ++resultCount);
+	}
+	if (resultCount == 0)
+	{
+		lua_pop(lua, 1);
+		lua_pushnil(lua);
+	}
+	return 1;
+}
+
 static int lua_player_set_health(lua_State* lua)
 {
 	PangeaScriptBackend* backend = current_backend(lua);
@@ -1491,6 +1794,158 @@ static int lua_player_set_health(lua_State* lua)
 	else
 		status = backend->gameInfo.setPlayerHealth(playerNum, health);
 	PangeaScript_RecordCommand("pangea.player.setHealth", target, status);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
+	return 1;
+}
+
+static int lua_player_set_lives(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = (int) luaL_checkinteger(lua, 1);
+	int lives = (int) luaL_checkinteger(lua, 2);
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (lives < 0)
+	{
+		PangeaScript_RecordCommand("pangea.player.setLives", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (!get_active_player(backend, playerNum, &player) || !player.hasLives || !backend->gameInfo.setPlayerLives)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerLives(playerNum, lives);
+	PangeaScript_RecordCommand("pangea.player.setLives", target, status);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
+	return 1;
+}
+
+static int lua_player_set_score(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = (int) luaL_checkinteger(lua, 1);
+	int64_t score = (int64_t) luaL_checkinteger(lua, 2);
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (score < 0 || score > UINT32_MAX)
+	{
+		PangeaScript_RecordCommand("pangea.player.setScore", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (!get_active_player(backend, playerNum, &player) || !player.hasScore || !backend->gameInfo.setPlayerScore)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerScore(playerNum, score);
+	PangeaScript_RecordCommand("pangea.player.setScore", target, status);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
+	return 1;
+}
+
+static int lua_player_set_weapon_quantity(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = (int) luaL_checkinteger(lua, 1);
+	int weaponType = (int) luaL_checkinteger(lua, 2);
+	int quantity = (int) luaL_checkinteger(lua, 3);
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (weaponType < 0 || weaponType >= PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY || quantity < 0 || quantity > 999)
+	{
+		PangeaScript_RecordCommand("pangea.player.setWeaponQuantity", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (!get_active_player(backend, playerNum, &player) || !player.hasWeaponState || !backend->gameInfo.setPlayerWeaponQuantity)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerWeaponQuantity(playerNum, weaponType, quantity);
+	PangeaScript_RecordCommand("pangea.player.setWeaponQuantity", target, status);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
+	return 1;
+}
+
+static int lua_player_set_key(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = (int) luaL_checkinteger(lua, 1);
+	int keyId = (int) luaL_checkinteger(lua, 2);
+	bool enabled = lua_toboolean(lua, 3) != 0;
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (keyId < 0 || keyId >= PANGEA_SCRIPT_PLAYER_KEY_CAPACITY || !lua_isboolean(lua, 3))
+	{
+		PangeaScript_RecordCommand("pangea.player.setKey", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (!get_active_player(backend, playerNum, &player) || !player.hasKeyState || !backend->gameInfo.setPlayerKey)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerKey(playerNum, keyId, enabled);
+	PangeaScript_RecordCommand("pangea.player.setKey", target, status);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
+	return 1;
+}
+
+static bool read_clover_color(lua_State* lua, int index, int* outColor)
+{
+	const char* color = lua_tostring(lua, index);
+	if (!color || !outColor) return false;
+	if (strcmp(color, "green") == 0) *outColor = 0;
+	else if (strcmp(color, "blue") == 0) *outColor = 1;
+	else if (strcmp(color, "gold") == 0) *outColor = 2;
+	else return false;
+	return true;
+}
+
+static int lua_player_set_clover_count(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = (int) luaL_checkinteger(lua, 1);
+	int color = -1;
+	int count = (int) luaL_checkinteger(lua, 3);
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (!read_clover_color(lua, 2, &color) || count < 0 || count > 999)
+	{
+		PangeaScript_RecordCommand("pangea.player.setCloverCount", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (!get_active_player(backend, playerNum, &player) || !player.hasCollectibleState || !backend->gameInfo.setPlayerCloverCount)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerCloverCount(playerNum, color, count);
+	PangeaScript_RecordCommand("pangea.player.setCloverCount", target, status);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
+	return 1;
+}
+
+static int lua_player_set_shield_active(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = (int) luaL_checkinteger(lua, 1);
+	bool active = lua_toboolean(lua, 2) != 0;
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (!lua_isboolean(lua, 2))
+	{
+		PangeaScript_RecordCommand("pangea.player.setShieldActive", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	if (!get_active_player(backend, playerNum, &player) || !player.hasShieldState || !backend->gameInfo.setPlayerShieldActive)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerShieldActive(playerNum, active);
+	PangeaScript_RecordCommand("pangea.player.setShieldActive", target, status);
 	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
 	return 1;
 }
@@ -1592,9 +2047,36 @@ static int lua_player_set_velocity(lua_State* lua)
 	return 1;
 }
 
+static int lua_player_set_form(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	const char* formName = lua_tostring(lua, 2);
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptObjectHandle target = {(int) luaL_checkinteger(lua, 1), 0};
+	PangeaScriptPlayerForm form;
+	PangeaScriptStatus status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!formName || (strcmp(formName, "bug") != 0 && strcmp(formName, "ball") != 0))
+	{
+		PangeaScript_RecordCommand("pangea.player.setForm", target, status);
+		lua_pushboolean(lua, false);
+		return 1;
+	}
+	form = strcmp(formName, "ball") == 0 ? PANGEA_SCRIPT_PLAYER_FORM_BALL : PANGEA_SCRIPT_PLAYER_FORM_BUG;
+	if (backend->gameInfo.capabilities.playerForm && get_active_player(backend, target.id, &player) && player.hasForm && backend->gameInfo.setPlayerForm)
+		status = backend->gameInfo.setPlayerForm(target.id, form);
+	else
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	PangeaScript_RecordCommand("pangea.player.setForm", target, status);
+	lua_pushboolean(lua, status == PANGEA_SCRIPT_OK);
+	return 1;
+}
+
 typedef enum PlayerCommandResultKind
 {
 	PLAYER_COMMAND_SET_HEALTH,
+	PLAYER_COMMAND_SET_LIVES,
+	PLAYER_COMMAND_SET_SCORE,
+	PLAYER_COMMAND_SET_SHIELD_ACTIVE,
 	PLAYER_COMMAND_HEAL,
 	PLAYER_COMMAND_SET_INVULNERABLE,
 	PLAYER_COMMAND_SET_POSITION,
@@ -1612,8 +2094,12 @@ static int lua_player_command_result(lua_State* lua, PlayerCommandResultKind kin
 	const char* invalidMessage = "Player command arguments are invalid";
 	const char* unavailableMessage = "Player command is unsupported by the active adapter";
 	float value = 0.0f;
+	int64_t integerValue = 0;
 	PangeaScriptVector3 position = {0};
 	if (kind == PLAYER_COMMAND_SET_HEALTH) commandId = "pangea.player.setHealth";
+	else if (kind == PLAYER_COMMAND_SET_LIVES) commandId = "pangea.player.setLives";
+	else if (kind == PLAYER_COMMAND_SET_SCORE) commandId = "pangea.player.setScore";
+	else if (kind == PLAYER_COMMAND_SET_SHIELD_ACTIVE) commandId = "pangea.player.setShieldActive";
 	else if (kind == PLAYER_COMMAND_HEAL) commandId = "pangea.player.heal";
 	else if (kind == PLAYER_COMMAND_SET_INVULNERABLE) commandId = "pangea.player.setInvulnerable";
 	else if (kind == PLAYER_COMMAND_SET_POSITION) commandId = "pangea.player.setPosition";
@@ -1636,13 +2122,25 @@ static int lua_player_command_result(lua_State* lua, PlayerCommandResultKind kin
 	}
 	else
 	{
-		if (!lua_isnumber(lua, 2))
+		if ((kind == PLAYER_COMMAND_SET_LIVES || kind == PLAYER_COMMAND_SET_SCORE) && !lua_isinteger(lua, 2))
 		{
 			PangeaScript_RecordCommand(commandId, target, PANGEA_SCRIPT_BAD_ARGUMENT);
 			return push_player_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, invalidMessage, playerNum);
 		}
+		if (kind == PLAYER_COMMAND_SET_SHIELD_ACTIVE && !lua_isboolean(lua, 2))
+		{
+			PangeaScript_RecordCommand(commandId, target, PANGEA_SCRIPT_BAD_ARGUMENT);
+			return push_player_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, invalidMessage, playerNum);
+		}
+		if (kind != PLAYER_COMMAND_SET_SHIELD_ACTIVE && !lua_isnumber(lua, 2))
+		{
+			PangeaScript_RecordCommand(commandId, target, PANGEA_SCRIPT_BAD_ARGUMENT);
+			return push_player_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, invalidMessage, playerNum);
+		}
+		if (kind == PLAYER_COMMAND_SET_LIVES || kind == PLAYER_COMMAND_SET_SCORE)
+			integerValue = (int64_t) lua_tointeger(lua, 2);
 		value = (float) lua_tonumber(lua, 2);
-		if (!isfinite((double)value) || value < 0.0f || (kind == PLAYER_COMMAND_SET_HEALTH && value > 1.0f) || (kind == PLAYER_COMMAND_HEAL && value > 1.0f) || (kind == PLAYER_COMMAND_SET_INVULNERABLE && value > 3600.0f))
+		if ((kind == PLAYER_COMMAND_SET_LIVES && (integerValue < 0 || integerValue > 32767)) || (kind == PLAYER_COMMAND_SET_SCORE && (integerValue < 0 || integerValue > UINT32_MAX)) || (kind != PLAYER_COMMAND_SET_LIVES && kind != PLAYER_COMMAND_SET_SCORE && (!isfinite((double)value) || value < 0.0f || (kind == PLAYER_COMMAND_SET_HEALTH && value > 1.0f) || (kind == PLAYER_COMMAND_HEAL && value > 1.0f) || (kind == PLAYER_COMMAND_SET_INVULNERABLE && value > 3600.0f))))
 		{
 			PangeaScript_RecordCommand(commandId, target, PANGEA_SCRIPT_BAD_ARGUMENT);
 			return push_player_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, invalidMessage, playerNum);
@@ -1660,6 +2158,21 @@ static int lua_player_command_result(lua_State* lua, PlayerCommandResultKind kin
 			if (kind == PLAYER_COMMAND_HEAL && health > 1.0f) health = 1.0f;
 			status = backend->gameInfo.setPlayerHealth(playerNum, health);
 		}
+	}
+	else if (kind == PLAYER_COMMAND_SET_LIVES)
+	{
+		if (!player.hasLives || !backend->gameInfo.setPlayerLives) status = PANGEA_SCRIPT_RUNTIME_ERROR;
+		else status = backend->gameInfo.setPlayerLives(playerNum, (int) integerValue);
+	}
+	else if (kind == PLAYER_COMMAND_SET_SCORE)
+	{
+		if (!player.hasScore || !backend->gameInfo.setPlayerScore) status = PANGEA_SCRIPT_RUNTIME_ERROR;
+		else status = backend->gameInfo.setPlayerScore(playerNum, integerValue);
+	}
+	else if (kind == PLAYER_COMMAND_SET_SHIELD_ACTIVE)
+	{
+		if (!player.hasShieldState || !backend->gameInfo.setPlayerShieldActive) status = PANGEA_SCRIPT_RUNTIME_ERROR;
+		else status = backend->gameInfo.setPlayerShieldActive(playerNum, lua_toboolean(lua, 2) != 0);
 	}
 	else if (kind == PLAYER_COMMAND_SET_INVULNERABLE)
 	{
@@ -1686,6 +2199,121 @@ static int lua_player_command_result(lua_State* lua, PlayerCommandResultKind kin
 static int lua_player_set_health_result(lua_State* lua)
 {
 	return lua_player_command_result(lua, PLAYER_COMMAND_SET_HEALTH);
+}
+
+static int lua_player_set_lives_result(lua_State* lua)
+{
+	return lua_player_command_result(lua, PLAYER_COMMAND_SET_LIVES);
+}
+
+static int lua_player_set_score_result(lua_State* lua)
+{
+	return lua_player_command_result(lua, PLAYER_COMMAND_SET_SCORE);
+}
+
+static int lua_player_set_shield_active_result(lua_State* lua)
+{
+	return lua_player_command_result(lua, PLAYER_COMMAND_SET_SHIELD_ACTIVE);
+}
+
+static int lua_player_set_weapon_quantity_result(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = -1;
+	int weaponType = -1;
+	int quantity = -1;
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (!lua_isinteger(lua, 1) || !lua_isinteger(lua, 2) || !lua_isinteger(lua, 3))
+	{
+		PangeaScript_RecordCommand("pangea.player.setWeaponQuantity", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		return push_player_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, "Player inventory arguments are invalid", playerNum);
+	}
+	playerNum = (int) lua_tointeger(lua, 1);
+	weaponType = (int) lua_tointeger(lua, 2);
+	quantity = (int) lua_tointeger(lua, 3);
+	target.id = playerNum;
+	if (weaponType < 0 || weaponType >= PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY || quantity < 0 || quantity > 999)
+		status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	else if (!get_active_player(backend, playerNum, &player) || !player.active)
+		status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	else if (!player.hasWeaponState || !backend->gameInfo.setPlayerWeaponQuantity)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerWeaponQuantity(playerNum, weaponType, quantity);
+	PangeaScript_RecordCommand("pangea.player.setWeaponQuantity", target, status);
+	if (status == PANGEA_SCRIPT_OK)
+		return push_player_command_result(lua, status, "", playerNum);
+	if (status == PANGEA_SCRIPT_BAD_ARGUMENT)
+		return push_player_command_result(lua, status, "Player inventory arguments are invalid or unavailable", playerNum);
+	return push_player_command_result(lua, status, "Player inventory mutation is unsupported by the active adapter", playerNum);
+}
+
+static int lua_player_set_key_result(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = -1;
+	int keyId = -1;
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (!lua_isinteger(lua, 1) || !lua_isinteger(lua, 2) || !lua_isboolean(lua, 3))
+	{
+		PangeaScript_RecordCommand("pangea.player.setKey", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		return push_player_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, "Player key arguments are invalid", playerNum);
+	}
+	playerNum = (int) lua_tointeger(lua, 1);
+	keyId = (int) lua_tointeger(lua, 2);
+	bool enabled = lua_toboolean(lua, 3) != 0;
+	target.id = playerNum;
+	if (keyId < 0 || keyId >= PANGEA_SCRIPT_PLAYER_KEY_CAPACITY)
+		status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	else if (!get_active_player(backend, playerNum, &player) || !player.active)
+		status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	else if (!player.hasKeyState || !backend->gameInfo.setPlayerKey)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerKey(playerNum, keyId, enabled);
+	PangeaScript_RecordCommand("pangea.player.setKey", target, status);
+	if (status == PANGEA_SCRIPT_OK)
+		return push_player_command_result(lua, status, "", playerNum);
+	if (status == PANGEA_SCRIPT_BAD_ARGUMENT)
+		return push_player_command_result(lua, status, "Player key arguments are invalid or unavailable", playerNum);
+	return push_player_command_result(lua, status, "Player key mutation is unsupported by the active adapter", playerNum);
+}
+
+static int lua_player_set_clover_count_result(lua_State* lua)
+{
+	PangeaScriptBackend* backend = current_backend(lua);
+	int playerNum = -1;
+	int color = -1;
+	int count = -1;
+	PangeaScriptObjectHandle target = {playerNum, 0};
+	PangeaScriptPlayerSnapshot player = {0};
+	PangeaScriptStatus status = PANGEA_SCRIPT_OK;
+	if (!lua_isinteger(lua, 1) || !lua_isstring(lua, 2) || !lua_isinteger(lua, 3) || !read_clover_color(lua, 2, &color))
+	{
+		PangeaScript_RecordCommand("pangea.player.setCloverCount", target, PANGEA_SCRIPT_BAD_ARGUMENT);
+		return push_player_command_result(lua, PANGEA_SCRIPT_BAD_ARGUMENT, "Player clover arguments are invalid", playerNum);
+	}
+	playerNum = (int) lua_tointeger(lua, 1);
+	count = (int) lua_tointeger(lua, 3);
+	target.id = playerNum;
+	if (count < 0 || count > 999)
+		status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	else if (!get_active_player(backend, playerNum, &player) || !player.active)
+		status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	else if (!player.hasCollectibleState || !backend->gameInfo.setPlayerCloverCount)
+		status = PANGEA_SCRIPT_RUNTIME_ERROR;
+	else
+		status = backend->gameInfo.setPlayerCloverCount(playerNum, color, count);
+	PangeaScript_RecordCommand("pangea.player.setCloverCount", target, status);
+	if (status == PANGEA_SCRIPT_OK)
+		return push_player_command_result(lua, status, "", playerNum);
+	if (status == PANGEA_SCRIPT_BAD_ARGUMENT)
+		return push_player_command_result(lua, status, "Player clover arguments are invalid or unavailable", playerNum);
+	return push_player_command_result(lua, status, "Player clover mutation is unsupported by the active adapter", playerNum);
 }
 
 static int lua_player_heal_result(lua_State* lua)
@@ -2053,7 +2681,12 @@ static int lua_capabilities(lua_State* lua)
 	lua_pushboolean(lua, backend->gameInfo.capabilities.mapItems); lua_setfield(lua, -2, "mapItems");
 	lua_pushboolean(lua, backend->gameInfo.capabilities.pickupScoreEffects); lua_setfield(lua, -2, "pickupScoreEffects");
 	lua_pushboolean(lua, backend->gameInfo.capabilities.objectCollision); lua_setfield(lua, -2, "objectCollision");
-	lua_pushboolean(lua, backend->gameInfo.setPlayerHealth != NULL || backend->gameInfo.setPlayerInvulnerable != NULL || backend->gameInfo.setPlayerPosition != NULL); lua_setfield(lua, -2, "playerCommands");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.playerScore); lua_setfield(lua, -2, "playerScore");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.playerLives); lua_setfield(lua, -2, "playerLives");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.playerInventory); lua_setfield(lua, -2, "playerInventory");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.weaponScoreEffects); lua_setfield(lua, -2, "weaponScoreEffects");
+	lua_pushboolean(lua, backend->gameInfo.capabilities.playerForm); lua_setfield(lua, -2, "playerForm");
+	lua_pushboolean(lua, backend->gameInfo.setPlayerHealth != NULL || backend->gameInfo.setPlayerLives != NULL || backend->gameInfo.setPlayerScore != NULL || backend->gameInfo.setPlayerWeaponQuantity != NULL || backend->gameInfo.setPlayerKey != NULL || backend->gameInfo.setPlayerCloverCount != NULL || backend->gameInfo.setPlayerShieldActive != NULL || backend->gameInfo.setPlayerInvulnerable != NULL || backend->gameInfo.setPlayerPosition != NULL || backend->gameInfo.setPlayerVelocity != NULL || backend->gameInfo.setPlayerForm != NULL); lua_setfield(lua, -2, "playerCommands");
 	lua_pushboolean(lua, backend->gameInfo.setPlayerInvulnerable != NULL); lua_setfield(lua, -2, "playerInvulnerability");
 	lua_pushinteger(lua, PANGEA_LUA_MEMORY_LIMIT); lua_setfield(lua, -2, "memoryLimitBytes");
 	lua_pushinteger(lua, PANGEA_LUA_LOAD_BUDGET); lua_setfield(lua, -2, "loadInstructionBudget");
@@ -2080,7 +2713,7 @@ static int lua_diagnostics(lua_State* lua)
 		if (backend->subscriptions[i].active) activeSubscriptions++;
 	for (int i = 0; i < PANGEA_LUA_PERSISTENCE_MAX_ENTRIES; i++)
 		if (backend->persistence[i].active) activePersistentEntries++;
-	lua_createtable(lua, 0, 12);
+	lua_createtable(lua, 0, 15);
 	lua_pushinteger(lua, (lua_Integer) backend->allocatedBytes); lua_setfield(lua, -2, "memoryUsedBytes");
 	lua_pushinteger(lua, (lua_Integer) backend->memoryLimitBytes); lua_setfield(lua, -2, "memoryLimitBytes");
 	lua_pushinteger(lua, activeTimers); lua_setfield(lua, -2, "activeTimers");
@@ -2098,14 +2731,36 @@ static int lua_diagnostics(lua_State* lua)
 		PangeaScriptCommandTraceEntry entry;
 		if (!PangeaScript_GetCommandTraceEntry(index, &entry))
 			continue;
-		lua_createtable(lua, 0, 4);
+		lua_createtable(lua, 0, 6);
 		lua_pushstring(lua, entry.commandId); lua_setfield(lua, -2, "id");
+		lua_pushstring(lua, entry.applicationPhase); lua_setfield(lua, -2, "applicationPhase");
+		lua_pushinteger(lua, (lua_Integer) entry.order); lua_setfield(lua, -2, "order");
 		lua_pushinteger(lua, entry.target.id); lua_setfield(lua, -2, "objectId");
 		lua_pushinteger(lua, (lua_Integer) entry.target.generation); lua_setfield(lua, -2, "generation");
 		lua_pushinteger(lua, entry.status); lua_setfield(lua, -2, "status");
 		lua_rawseti(lua, -2, index + 1);
 	}
 	lua_setfield(lua, -2, "commandTrace");
+	PangeaScriptLifecycleTrace lifecycleTrace;
+	PangeaScript_GetLifecycleTrace(&lifecycleTrace);
+	lua_pushinteger(lua, (lua_Integer) lifecycleTrace.eventCount); lua_setfield(lua, -2, "lifecycleEventCount");
+	lua_pushboolean(lua, lifecycleTrace.overflow); lua_setfield(lua, -2, "lifecycleTraceOverflow");
+	lua_createtable(lua, (int) lifecycleTrace.entryCount, 0);
+	for (int index = 0; index < (int) lifecycleTrace.entryCount; index++)
+	{
+		PangeaScriptLifecycleTraceEntry entry;
+		if (!PangeaScript_GetLifecycleTraceEntry(index, &entry))
+			continue;
+		lua_createtable(lua, 0, 6);
+		lua_pushstring(lua, entry.eventId); lua_setfield(lua, -2, "id");
+		lua_pushstring(lua, entry.applicationPhase); lua_setfield(lua, -2, "applicationPhase");
+		lua_pushinteger(lua, (lua_Integer) entry.order); lua_setfield(lua, -2, "order");
+		lua_pushinteger(lua, entry.target.id); lua_setfield(lua, -2, "objectId");
+		lua_pushinteger(lua, (lua_Integer) entry.target.generation); lua_setfield(lua, -2, "generation");
+		lua_pushinteger(lua, entry.status); lua_setfield(lua, -2, "status");
+		lua_rawseti(lua, -2, index + 1);
+	}
+	lua_setfield(lua, -2, "lifecycleTrace");
 	lua_pushinteger(lua, backend->persistentBytes); lua_setfield(lua, -2, "persistentBytes");
 	lua_pushinteger(lua, activePersistentEntries); lua_setfield(lua, -2, "persistentEntries");
 	return 1;
@@ -2194,14 +2849,14 @@ static void install_pangea(PangeaScriptBackend* backend)
 	}
 	lua_setfield(lua, -2, "log");
 	lua_createtable(lua, 0, 3); set_function(lua, "native", lua_spawn_native); set_function(lua, "nativeResult", lua_spawn_native_result); set_function(lua, "scripted", lua_spawn_scripted); lua_setfield(lua, -2, "spawn");
-	lua_createtable(lua, 0, 29); set_function(lua, "exists", lua_object_exists); set_function(lua, "all", lua_object_all); set_function(lua, "findByTag", lua_object_find_by_tag); set_function(lua, "nearest", lua_object_nearest); set_function(lua, "position", lua_object_position); set_function(lua, "source", lua_object_source); set_function(lua, "setPosition", lua_object_set_position); set_function(lua, "setPositionResult", lua_object_set_position_result); set_function(lua, "setPositionOffset", lua_object_set_position_offset); set_function(lua, "setPositionOffsetResult", lua_object_set_position_offset_result); set_function(lua, "setVelocity", lua_object_set_velocity); set_function(lua, "setVelocityResult", lua_object_set_velocity_result); set_function(lua, "setRotation", lua_object_set_rotation); set_function(lua, "setRotationResult", lua_object_set_rotation_result); set_function(lua, "setScale", lua_object_set_scale); set_function(lua, "setScaleResult", lua_object_set_scale_result); set_function(lua, "setAnimation", lua_object_set_animation); set_function(lua, "setAnimationResult", lua_object_set_animation_result); set_function(lua, "setCollisionEnabled", lua_object_set_collision_enabled); set_function(lua, "setCollisionEnabledResult", lua_object_set_collision_enabled_result); set_function(lua, "setActive", lua_object_set_active); set_function(lua, "setActiveResult", lua_object_set_active_result); set_function(lua, "tags", lua_object_tags); set_function(lua, "hasTag", lua_object_has_tag); set_function(lua, "state", lua_object_state); set_function(lua, "delete", lua_object_delete); set_function(lua, "deleteResult", lua_object_delete_result); lua_setfield(lua, -2, "object");
+	lua_createtable(lua, 0, 37); set_function(lua, "exists", lua_object_exists); set_function(lua, "all", lua_object_all); set_function(lua, "findByTag", lua_object_find_by_tag); set_function(lua, "nearest", lua_object_nearest); set_function(lua, "position", lua_object_position); set_function(lua, "velocity", lua_object_velocity); set_function(lua, "rotation", lua_object_rotation); set_function(lua, "scale", lua_object_scale); set_function(lua, "animation", lua_object_animation); set_function(lua, "active", lua_object_active); set_function(lua, "collisionEnabled", lua_object_collision_enabled); set_function(lua, "source", lua_object_source); set_function(lua, "setPosition", lua_object_set_position); set_function(lua, "setPositionResult", lua_object_set_position_result); set_function(lua, "setPositionOffset", lua_object_set_position_offset); set_function(lua, "setPositionOffsetResult", lua_object_set_position_offset_result); set_function(lua, "setVelocity", lua_object_set_velocity); set_function(lua, "setVelocityResult", lua_object_set_velocity_result); set_function(lua, "setRotation", lua_object_set_rotation); set_function(lua, "setRotationResult", lua_object_set_rotation_result); set_function(lua, "setScale", lua_object_set_scale); set_function(lua, "setScaleResult", lua_object_set_scale_result); set_function(lua, "setAnimation", lua_object_set_animation); set_function(lua, "setAnimationResult", lua_object_set_animation_result); set_function(lua, "setCollisionEnabled", lua_object_set_collision_enabled); set_function(lua, "setCollisionEnabledResult", lua_object_set_collision_enabled_result); set_function(lua, "setActive", lua_object_set_active); set_function(lua, "setActiveResult", lua_object_set_active_result); set_function(lua, "tags", lua_object_tags); set_function(lua, "hasTag", lua_object_has_tag); set_function(lua, "state", lua_object_state); set_backend_function(lua, "captureCheckpoint", lua_object_capture_checkpoint, backend); set_backend_function(lua, "restoreCheckpoint", lua_object_restore_checkpoint, backend); set_function(lua, "delete", lua_object_delete); set_function(lua, "deleteResult", lua_object_delete_result); lua_setfield(lua, -2, "object");
 	lua_createtable(lua, 0, 2); set_function(lua, "setting", lua_level_setting); set_backend_function(lua, "current", lua_level_current, backend); lua_setfield(lua, -2, "level");
 	lua_createtable(lua, 0, 7); set_backend_function(lua, "frame", lua_time_frame, backend); set_backend_function(lua, "delta", lua_time_delta, backend); set_backend_function(lua, "level", lua_time_level, backend); set_backend_function(lua, "after", lua_time_after, backend); set_backend_function(lua, "every", lua_time_every, backend); set_backend_function(lua, "cancel", lua_time_cancel, backend); set_backend_function(lua, "isActive", lua_time_is_active, backend); lua_setfield(lua, -2, "time");
 	lua_createtable(lua, 0, 4); set_backend_function(lua, "start", lua_task_start, backend); set_function(lua, "wait", lua_task_wait); set_backend_function(lua, "cancel", lua_task_cancel, backend); set_backend_function(lua, "isActive", lua_task_is_active, backend); lua_setfield(lua, -2, "task");
 	lua_createtable(lua, 0, 4); set_backend_function(lua, "on", lua_events_on, backend); set_backend_function(lua, "once", lua_events_once, backend); set_backend_function(lua, "off", lua_events_off, backend); set_backend_function(lua, "emit", lua_events_emit, backend); lua_setfield(lua, -2, "events");
 	lua_createtable(lua, 0, 3); set_backend_function(lua, "number", lua_random_number, backend); set_backend_function(lua, "integer", lua_random_integer, backend); set_backend_function(lua, "seed", lua_random_seed, backend); lua_setfield(lua, -2, "random");
 	lua_createtable(lua, 0, 3); set_backend_function(lua, "get", lua_persistence_get, backend); set_backend_function(lua, "set", lua_persistence_set, backend); set_backend_function(lua, "delete", lua_persistence_delete, backend); lua_setfield(lua, -2, "persistence");
-	lua_createtable(lua, 0, 14); set_backend_function(lua, "count", lua_player_count, backend); set_backend_function(lua, "get", lua_player_get, backend); set_backend_function(lua, "raceResults", lua_player_race_results, backend); set_backend_function(lua, "objectiveResults", lua_player_objective_results, backend); set_backend_function(lua, "setHealth", lua_player_set_health, backend); set_backend_function(lua, "setHealthResult", lua_player_set_health_result, backend); set_backend_function(lua, "heal", lua_player_heal, backend); set_backend_function(lua, "healResult", lua_player_heal_result, backend); set_backend_function(lua, "setInvulnerable", lua_player_set_invulnerable, backend); set_backend_function(lua, "setInvulnerableResult", lua_player_set_invulnerable_result, backend); set_backend_function(lua, "setPosition", lua_player_set_position, backend); set_backend_function(lua, "setPositionResult", lua_player_set_position_result, backend); set_backend_function(lua, "setVelocity", lua_player_set_velocity, backend); set_backend_function(lua, "setVelocityResult", lua_player_set_velocity_result, backend); lua_setfield(lua, -2, "player");
+	lua_createtable(lua, 0, 28); set_backend_function(lua, "count", lua_player_count, backend); set_backend_function(lua, "get", lua_player_get, backend); set_backend_function(lua, "raceResults", lua_player_race_results, backend); set_backend_function(lua, "objectiveResults", lua_player_objective_results, backend); set_backend_function(lua, "checkpointResults", lua_player_checkpoint_results, backend); set_backend_function(lua, "setHealth", lua_player_set_health, backend); set_backend_function(lua, "setHealthResult", lua_player_set_health_result, backend); set_backend_function(lua, "setLives", lua_player_set_lives, backend); set_backend_function(lua, "setLivesResult", lua_player_set_lives_result, backend); set_backend_function(lua, "setScore", lua_player_set_score, backend); set_backend_function(lua, "setScoreResult", lua_player_set_score_result, backend); set_backend_function(lua, "setWeaponQuantity", lua_player_set_weapon_quantity, backend); set_backend_function(lua, "setWeaponQuantityResult", lua_player_set_weapon_quantity_result, backend); set_backend_function(lua, "setKey", lua_player_set_key, backend); set_backend_function(lua, "setKeyResult", lua_player_set_key_result, backend); set_backend_function(lua, "setCloverCount", lua_player_set_clover_count, backend); set_backend_function(lua, "setCloverCountResult", lua_player_set_clover_count_result, backend); set_backend_function(lua, "setShieldActive", lua_player_set_shield_active, backend); set_backend_function(lua, "setShieldActiveResult", lua_player_set_shield_active_result, backend); set_backend_function(lua, "heal", lua_player_heal, backend); set_backend_function(lua, "healResult", lua_player_heal_result, backend); set_backend_function(lua, "setInvulnerable", lua_player_set_invulnerable, backend); set_backend_function(lua, "setInvulnerableResult", lua_player_set_invulnerable_result, backend); set_backend_function(lua, "setPosition", lua_player_set_position, backend); set_backend_function(lua, "setPositionResult", lua_player_set_position_result, backend); set_backend_function(lua, "setVelocity", lua_player_set_velocity, backend); set_backend_function(lua, "setVelocityResult", lua_player_set_velocity_result, backend); set_backend_function(lua, "setForm", lua_player_set_form, backend); lua_setfield(lua, -2, "player");
 	lua_createtable(lua, 0, 4); lua_pushstring(lua, gameInfo->gameId); lua_setfield(lua, -2, "id"); lua_pushstring(lua, gameInfo->gameName); lua_setfield(lua, -2, "name"); push_supported_hooks(lua, gameInfo->gameId); lua_setfield(lua, -2, "supportedHooks"); lua_createtable(lua, 0, 0); lua_setfield(lua, -2, "tags"); lua_setfield(lua, -2, "game");
 	lua_pushvalue(lua, -1); lua_setglobal(lua, "pangea");
 	lua_getglobal(lua, "package"); lua_getfield(lua, -1, "preload"); lua_pushvalue(lua, -3); lua_pushcclosure(lua, load_pangea_module, 1); lua_setfield(lua, -2, "pangea"); lua_pop(lua, 3);
@@ -2307,7 +2962,10 @@ static void push_base_context(PangeaScriptBackend* backend, int levelNum)
 {
 	lua_State* lua = backend->lua;
 	if (backend->currentLevelNum != levelNum)
+	{
 		memset(backend->objectiveResults, 0, sizeof(backend->objectiveResults));
+		memset(backend->checkpointResults, 0, sizeof(backend->checkpointResults));
+	}
 	backend->currentLevelNum = levelNum;
 	lua_createtable(lua, 0, 8);
 	lua_pushstring(lua, backend->gameInfo.gameId); lua_setfield(lua, -2, "gameId");
@@ -2391,7 +3049,7 @@ PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backen
 		backend->currentLevelTimeSeconds = 0.0f;
 	}
 	if (!push_hook(backend, hook_name(backend, hook))) return PANGEA_SCRIPT_OK;
-	push_base_context(backend, context->levelNum); lua_pushstring(backend->lua, context->levelName ? context->levelName : ""); lua_setfield(backend->lua, -2, "levelName"); push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
+	push_base_context(backend, context->levelNum); lua_pushstring(backend->lua, context->levelName ? context->levelName : ""); lua_setfield(backend->lua, -2, "levelName"); push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } if (context->hasModeState) { lua_pushinteger(backend->lua, context->modePhase); lua_setfield(backend->lua, -2, "modePhase"); lua_pushinteger(backend->lua, context->modeWave); lua_setfield(backend->lua, -2, "modeWave"); lua_pushnumber(backend->lua, context->modeTimer); lua_setfield(backend->lua, -2, "modeTimer"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
 
 }
 
@@ -2457,7 +3115,7 @@ PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backen
 	PangeaScriptStatus taskStatus = call_due_tasks(backend, error, errorCapacity);
 	if (taskStatus != PANGEA_SCRIPT_OK) return taskStatus;
 	if (!push_hook(backend, hook_name(backend, PANGEA_SCRIPT_HOOK_FRAME))) return PANGEA_SCRIPT_OK;
-	push_base_context(backend, context->levelNum); if (context->levelName) { lua_pushstring(backend->lua, context->levelName); lua_setfield(backend->lua, -2, "levelName"); } if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); lua_pushinteger(backend->lua, context->frameNum); lua_setfield(backend->lua, -2, "frameNum"); lua_pushnumber(backend->lua, context->deltaSeconds); lua_setfield(backend->lua, -2, "deltaSeconds"); lua_pushnumber(backend->lua, context->levelTimeSeconds); lua_setfield(backend->lua, -2, "levelTimeSeconds"); return protected_call(backend->lua, 1, 0, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity);
+	push_base_context(backend, context->levelNum); if (context->levelName) { lua_pushstring(backend->lua, context->levelName); lua_setfield(backend->lua, -2, "levelName"); } if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); lua_pushinteger(backend->lua, context->frameNum); lua_setfield(backend->lua, -2, "frameNum"); lua_pushnumber(backend->lua, context->deltaSeconds); lua_setfield(backend->lua, -2, "deltaSeconds"); lua_pushnumber(backend->lua, context->levelTimeSeconds); lua_setfield(backend->lua, -2, "levelTimeSeconds"); if (context->hasModeState) { lua_pushinteger(backend->lua, context->modePhase); lua_setfield(backend->lua, -2, "modePhase"); lua_pushinteger(backend->lua, context->modeWave); lua_setfield(backend->lua, -2, "modeWave"); lua_pushnumber(backend->lua, context->modeTimer); lua_setfield(backend->lua, -2, "modeTimer"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity);
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallTerrainItemHook(PangeaScriptBackend* backend, PangeaScriptTerrainItemContext* context, char* error, int errorCapacity)
@@ -2546,6 +3204,22 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 	lua_setfield(backend->lua, -2, "object");
 	push_vector(backend->lua, context->position.x, context->position.y, context->position.z);
 	lua_setfield(backend->lua, -2, "position");
+	{
+		PangeaScriptVector3 velocity;
+		if (PangeaScript_GetObjectVelocity(context->object, &velocity))
+		{
+			push_vector(backend->lua, velocity.x, velocity.y, velocity.z);
+			lua_setfield(backend->lua, -2, "velocity");
+		}
+	}
+	{
+		bool collisionEnabled;
+		if (PangeaScript_GetObjectCollisionEnabled(context->object, &collisionEnabled))
+		{
+			lua_pushboolean(backend->lua, collisionEnabled);
+			lua_setfield(backend->lua, -2, "collisionEnabled");
+		}
+	}
 	lua_pushstring(backend->lua, context->objectType ? context->objectType : "");
 	lua_setfield(backend->lua, -2, "objectType");
 	lua_pushstring(backend->lua, context->event ? context->event : "frame");
@@ -2641,6 +3315,7 @@ PangeaScriptStatus PangeaScriptBackend_CallPickupHook(PangeaScriptBackend* backe
 	lua_pushinteger(backend->lua, context->playerNum); lua_setfield(backend->lua, -2, "playerNum");
 	lua_pushstring(backend->lua, context->pickupId ? context->pickupId : ""); lua_setfield(backend->lua, -2, "pickupId");
 	lua_pushinteger(backend->lua, context->pickupType); lua_setfield(backend->lua, -2, "pickupType");
+	lua_pushinteger(backend->lua, context->pickupVariant); lua_setfield(backend->lua, -2, "pickupVariant");
 	lua_pushnumber(backend->lua, context->amount); lua_setfield(backend->lua, -2, "amount");
 	push_handle(backend->lua, context->pickup); lua_setfield(backend->lua, -2, "pickup");
 	push_handle(backend->lua, context->player); lua_setfield(backend->lua, -2, "player");
@@ -2752,6 +3427,7 @@ static bool is_supported_player_event(const char* event)
 PangeaScriptStatus PangeaScriptBackend_CallPlayerEvent(PangeaScriptBackend* backend, const PangeaScriptPlayerEventContext* context, const char* event, char* error, int errorCapacity)
 {
 	if (!backend || !context || !is_supported_player_event(event)) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (strcmp(event, "onCheckpointReached") == 0) record_checkpoint_result(backend, context);
 	if (strcmp(event, "onObjectiveComplete") == 0) record_objective_result(backend, context);
 	if (!push_hook(backend, event)) return PANGEA_SCRIPT_OK;
 	push_base_context(backend, context->levelNum);
@@ -2769,6 +3445,25 @@ PangeaScriptStatus PangeaScriptBackend_CallPlayerEvent(PangeaScriptBackend* back
 		}
 		push_vector(backend->lua, context->position.x, context->position.y, context->position.z);
 		lua_setfield(backend->lua, -2, "position");
+		if (backend->gameInfo.getPlayer)
+		{
+			PangeaScriptPlayerSnapshot player = {0};
+			if (backend->gameInfo.getPlayer(context->playerNum, &player) && player.hasVelocity)
+			{
+				push_vector(backend->lua, player.velocity.x, player.velocity.y, player.velocity.z);
+				lua_setfield(backend->lua, -2, "velocity");
+			}
+			if (backend->gameInfo.getPlayer(context->playerNum, &player) && player.hasCollisionEnabled)
+			{
+				lua_pushboolean(backend->lua, player.collisionEnabled);
+				lua_setfield(backend->lua, -2, "collisionEnabled");
+			}
+			if (backend->gameInfo.getPlayer(context->playerNum, &player) && player.hasRotation)
+			{
+				push_vector(backend->lua, player.rotation.x, player.rotation.y, player.rotation.z);
+				lua_setfield(backend->lua, -2, "rotation");
+			}
+		}
 	}
 	bool previousHasObject = backend->hasCurrentObject;
 	PangeaScriptObjectHandle previousObject = backend->currentObject;

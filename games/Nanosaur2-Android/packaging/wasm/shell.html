@@ -83,6 +83,8 @@
       accent-color: var(--accent);
     }
     #progress-label { font-size: 0.78rem; color: var(--dim); }
+    #play-btn { display: none; margin: 1rem auto 0; }
+    body.deferred-start #loading-card { display: block !important; }
 
     /* Canvas — always in the DOM with proper dimensions for SDL3.
        Visually obscured by the loading-card overlay until game starts. */
@@ -260,6 +262,7 @@
       <div id="status-text">Preparing…</div>
       <progress id="progress-bar" value="0" max="1"></progress>
       <div id="progress-label"></div>
+      <button class="btn" id="play-btn" onclick="startGame()">Start game</button>
     </div>
 
     <!-- SDL3 canvas — must be visible and sized when SDL creates the window -->
@@ -365,8 +368,15 @@
       } catch (error) { console.error('[Pangea] persistence mount failed', error); }
     }
 
+    var _deferredStart = new URLSearchParams(window.location.search).get('deferStart') === '1';
+    if (_deferredStart) {
+      document.body.classList.add('deferred-start');
+      var deferredPlayButton = document.getElementById('play-btn');
+      if (deferredPlayButton) deferredPlayButton.style.display = 'block';
+    }
     var Module = {
       canvas: document.getElementById('canvas'),
+      noInitialRun: _deferredStart,
       preRun: [function() { mountPangeaPersistence(Module); }],
 
       // Emscripten calls setStatus during load to report download progress
@@ -408,6 +418,13 @@
 
       onRuntimeInitialized: function() {
         stabilizeStartupCanvasSize();
+        if (_deferredStart) {
+          var playButton = document.getElementById('play-btn');
+          if (playButton) playButton.style.display = 'block';
+          var status = document.getElementById('status-text');
+          if (status) status.textContent = 'Ready';
+          return;
+        }
         // Hide loading overlay, show toolbar
         var card = document.getElementById('loading-card');
         if (card) card.style.display = 'none';
@@ -449,6 +466,13 @@
         if (bar) bar.style.display = 'none';
       },
     };
+
+    function startGame() {
+      if (!_deferredStart || !Module.callMain) return;
+      _deferredStart = false;
+      var level = new URLSearchParams(window.location.search).get('level');
+      Module.callMain(level === null ? [] : ['--level', level]);
+    }
 
     // ── Browser compatibility check ──────────────────────────────────────
     (function() {

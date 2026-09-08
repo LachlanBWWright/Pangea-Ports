@@ -1290,6 +1290,11 @@ GAME_ASSERT(!gFrameStarted);
 gFrameStarted = true;
 }
 
+bool BugdomScript_MakeRendererCurrent(void)
+{
+	return SDL_GL_MakeCurrent(gSDLWindow, gGLContext);
+}
+
 void Render_SetViewport(int x, int y, int w, int h)
 {
 glViewport(x, y, w, h);

@@ -82,6 +82,7 @@ extern	MikeFixed				gOneMinusTweenFrameFactor;	// 1 - gTweenFrameFactor
 extern	short					gMainAppRezFile;
 extern	long					someLong;
 extern	Boolean					gFinishedArea;
+extern	Boolean					gAbortGameFlag;
 extern	Boolean					gScreenScrollFlag;
 extern	Boolean					gIsInGame;
 

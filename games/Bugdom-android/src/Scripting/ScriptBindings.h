@@ -13,6 +13,7 @@ void BugdomScript_OnLevelStart(int levelNum);
 void BugdomScript_OnCheckpointReset(void);
 void BugdomScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds);
 void BugdomScript_OnLevelComplete(int levelNum);
+void BugdomScript_OnObjectiveComplete(int playerNum, int outcome);
 void BugdomScript_OnLevelUnload(int levelNum);
 int BugdomScript_RemapTerrainItemType(int levelNum, int itemType);
 Boolean BugdomScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
@@ -26,7 +27,7 @@ Boolean BugdomScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum
 // --- Live-object scripting extension ---
 typedef struct ObjNode ObjNode;
 Boolean BugdomScript_OnDamage(ObjNode* source, float damage, int cause, float* outDamage);
-void BugdomScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+Boolean BugdomScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, int pickupVariant, float amount, const char* pickupId);
 Boolean BugdomScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);
 void BugdomScript_OnDamageApplied(float damage, int cause);
 void BugdomScript_OnPlayerSpawn(ObjNode* playerObj);

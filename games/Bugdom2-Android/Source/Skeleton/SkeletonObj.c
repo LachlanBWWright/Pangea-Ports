@@ -209,8 +209,8 @@ ObjNode	*newNode;
 		switch (newObjDef->type)
 		{
 			case SKELETON_TYPE_MOUSE:
-				nativeId = "bugdom2.player";
-				category = "player";
+				nativeId = "bugdom2.mouse";
+				category = "pickup";
 				break;
 			case SKELETON_TYPE_SNAIL:
 				nativeId = "bugdom2.enemy.snail";
@@ -529,8 +529,6 @@ MOMaterialObject	*overrideTexture, *oldTexture = nil;
 			gLocalTriMeshesOfSkelType[skelType][i].materials[0] = oldTexture;
 	}
 }
-
-
 
 
 

@@ -242,7 +242,9 @@ struct ObjNode
 	char			ScriptDefinitionID[96];
 	Boolean			ScriptDeleteRequested;
 	Boolean			ScriptStreamOutSent;
-	Boolean			ScriptAnimationCompletionSent;
+			Boolean			ScriptAnimationCompletionSent;
+			Boolean			ScriptActiveStateInitialized;
+			Boolean			ScriptActive;
 	float			Health;				// health 0..1
 	float			Damage;				// damage
 	

@@ -6,6 +6,12 @@
 #include <emscripten.h>
 #include "game.h"
 
+EMSCRIPTEN_KEEPALIVE
+void BillyFrontier_RequestQuit(void)
+{
+	gGameOver = true;
+}
+
 // -------------------------------------------------------------------------
 // LEGACY OPENGL STUBS
 // Emscripten's LEGACY_GL_EMULATION does not implement every fixed-function

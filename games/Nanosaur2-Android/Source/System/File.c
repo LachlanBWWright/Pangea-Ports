@@ -19,6 +19,8 @@ static int gScriptLoadedSaveSlot;
 #endif
 #include "stb_image.h"
 
+#define NANOSAUR2_BONE_RESOURCE_TYPE ((ResType)0x426f6e65U)
+
 static char *gLevelMetadataJSON;
 
 /****************************/
@@ -387,6 +389,7 @@ OSErr					iErr;
 FSSpec					target;
 Boolean					wasChanged;
 OGLPoint3D				*pointPtr;
+short					skeletonResFile;
 
 
 			/************************/
@@ -422,7 +425,9 @@ OGLPoint3D				*pointPtr;
 #if 1
 	// Source port change: original game used to resolve path to BG3D via alias resource within skeleton rez fork.
 	// Instead, we're forcing the BG3D's filename (sans extension) to match the skeleton's.
+	skeletonResFile = CurResFile();
 	LoadBonesReferenceModel(fsSpecBG3D, skeleton, skeletonType);
+	UseResFile(skeletonResFile);
 #else
 	alias = (AliasHandle)GetResource(rAliasType,1000);				// alias to geometry BG3D file
 	if (alias != nil)
@@ -450,9 +455,14 @@ OGLPoint3D				*pointPtr;
 
 			/* READ BONE DATA */
 
-		hand = GetResource('Bone',1000+i);
+		hand = GetResource(NANOSAUR2_BONE_RESOURCE_TYPE,1000+i);
 		if (hand == nil)
+		{
+			SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+				"Missing Bone resource skeletonType=%d joint=%d numJoints=%d boneResources=%d",
+				skeletonType, i, numJoints, Count1Resources(NANOSAUR2_BONE_RESOURCE_TYPE));
 			DoFatalAlert("Error reading Bone resource!");
+		}
 		HLock(hand);
 		bonePtr = (File_BoneDefinitionType *)*hand;
 

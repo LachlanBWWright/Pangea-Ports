@@ -55,6 +55,12 @@ extern "C"
 		else
 			gLevelTerrainOverride[0] = '\0';
 	}
+
+	EMSCRIPTEN_KEEPALIVE
+	void Bugdom_RequestQuit(void)
+	{
+		gGameOverFlag = true;
+	}
 #endif
 }
 

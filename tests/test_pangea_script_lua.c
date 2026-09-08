@@ -201,8 +201,9 @@ static bool nearly_equal(float actual, float expected)
 static int get_player_count(void) { return 1; }
 
 static float gScriptPlayerHealth = 0.75f;
-static float gScriptPlayerInvulnerability = 0.0f;
 static int gScriptPlayerHealthMutationCalls = 0;
+static int gScriptPlayerLives = 3;
+static int64_t gScriptPlayerScore = 42;
 static int gScriptPlayerInvulnerabilityMutationCalls = 0;
 static int gScriptPlayerPositionMutationCalls = 0;
 static int gScriptPlayerVelocityMutationCalls = 0;
@@ -210,7 +211,31 @@ static int gScriptPlayerVelocityMutationCalls = 0;
 static bool get_player(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {7, 8, 9}, .health = gScriptPlayerHealth, .hasHealth = true, .lapNum = 2, .checkpointNum = 6, .placement = 1, .raceComplete = false, .hasRaceState = true, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {7, 8, 9}, .health = gScriptPlayerHealth, .hasHealth = true, .score = gScriptPlayerScore, .hasScore = true, .lives = gScriptPlayerLives, .hasLives = true, .lapNum = 2, .checkpointNum = 6, .placement = 1, .raceComplete = false, .hasRaceState = true, .active = true};
+	outPlayer->vehicleType = 3;
+	outPlayer->vehicleMaxSpeed = 120.0f;
+	outPlayer->vehicleAcceleration = 8.5f;
+	outPlayer->vehicleTraction = 4.0f;
+	outPlayer->vehicleSuspension = 2.5f;
+	outPlayer->hasVehicleState = true;
+	outPlayer->team = 1;
+	outPlayer->hasTeamState = true;
+	outPlayer->carryingFlag = true;
+	outPlayer->captureScore = 2;
+	outPlayer->hasCaptureState = true;
+	outPlayer->activeWeapon = 2;
+	outPlayer->hasWeaponState = true;
+	outPlayer->weaponCount = 2;
+	outPlayer->weapons[0] = (PangeaScriptPlayerInventoryEntry){1, 99};
+	outPlayer->weapons[1] = (PangeaScriptPlayerInventoryEntry){2, 4};
+	outPlayer->eggCount = 3;
+	outPlayer->eggs[0] = 2;
+	outPlayer->eggs[1] = 0;
+	outPlayer->eggs[2] = 5;
+	outPlayer->eggRequired[0] = 5;
+	outPlayer->eggRequired[1] = 5;
+	outPlayer->eggRequired[2] = 5;
+	outPlayer->hasEggState = true;
 	return true;
 }
 
@@ -222,11 +247,31 @@ static PangeaScriptStatus set_player_health(int playerNum, float health)
 	return PANGEA_SCRIPT_OK;
 }
 
+static PangeaScriptStatus set_player_lives(int playerNum, int lives)
+{
+	if (playerNum != 0 || lives < 0) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gScriptPlayerLives = lives;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus set_player_score(int playerNum, int64_t score)
+{
+	if (playerNum != 0 || score < 0) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gScriptPlayerScore = score;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus set_player_weapon_quantity(int playerNum, int weaponType, int quantity)
+{
+	if (playerNum != 0 || weaponType < 0 || weaponType >= 2 || quantity < 0 || quantity > 999) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gScriptPlayerScore = quantity;
+	return PANGEA_SCRIPT_OK;
+}
+
 static PangeaScriptStatus set_player_invulnerable(int playerNum, float durationSeconds)
 {
 	gScriptPlayerInvulnerabilityMutationCalls++;
 	if (playerNum != 0 || durationSeconds < 0.0f) return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gScriptPlayerInvulnerability = durationSeconds;
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -334,7 +379,7 @@ static void test_gameplay_hooks(PangeaScriptBackend* backend, char* error, int e
 	const char* source =
 		"return {"
 		" onTriggerEnter=function(ctx) assert(ctx.gameId=='Test' and ctx.position.x==1 and ctx.other.id==12 and ctx.other.generation==4 and ctx.playerNum==2); return {handled=true,solid=false,scoreDelta=3} end,"
-		" onPickupCollected=function(ctx) assert(ctx.pickupType==4); return {handled=true,consumePickup=true,healthDelta=2} end,"
+		" onPickupCollected=function(ctx) assert(ctx.pickupType==4 and ctx.pickupVariant==6); return {handled=true,consumePickup=true,healthDelta=2} end,"
 		" onWeaponHit=function(ctx) assert(ctx.damage==5); return {handled=true,applyDamage=true,damage=7,destroyTarget=true} end"
 		"}";
 	assert(PangeaScriptBackend_Load(backend, source, error, errorCapacity) == PANGEA_SCRIPT_OK);
@@ -342,7 +387,7 @@ static void test_gameplay_hooks(PangeaScriptBackend* backend, char* error, int e
 	PangeaScriptTriggerResult triggerResult = {0};
 	assert(PangeaScriptBackend_CallTriggerHook(backend, &trigger, &triggerResult, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	assert(triggerResult.handled && triggerResult.hasSolid && !triggerResult.solid && triggerResult.scoreDelta == 3);
-	PangeaScriptPickupContext pickup = {.levelNum = 2, .pickupType = 4};
+	PangeaScriptPickupContext pickup = {.levelNum = 2, .pickupType = 4, .pickupVariant = 6};
 	PangeaScriptPickupResult pickupResult = {0};
 	assert(PangeaScriptBackend_CallPickupHook(backend, &pickup, &pickupResult, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	assert(pickupResult.handled && pickupResult.hasConsumePickup && pickupResult.consumePickup && pickupResult.healthDelta == 2);
@@ -515,6 +560,8 @@ static void test_object_command_results(PangeaScriptBackend* backend, char* erro
 		"local handle={id=%d,generation=%u}\n"
 		"local moved=pangea.object.setPositionResult(handle,{x=4,y=5,z=6})\n"
 		"assert(moved.ok and moved.code==0 and moved.reason=='ok' and moved.primary.id==handle.id)\n"
+		"local state=pangea.object.state(handle); state.health=10; state.nested={value=3}; assert(pangea.object.captureCheckpoint(handle), 'capture')\n"
+		"state.health=20; state.nested.value=9; assert(pangea.object.restoreCheckpoint(handle), 'restore'); assert(state.health==10 and state.nested.value==3, 'state')\n"
 		"local unsupported=pangea.object.setVelocityResult(handle,{x=1,y=2,z=3})\n"
 		"assert(not unsupported.ok and unsupported.reason=='runtime-error' and string.find(unsupported.message,'velocity',1,true))\n"
 		"local stale=pangea.object.deleteResult({id=999,generation=1})\n"
@@ -526,7 +573,9 @@ static void test_object_command_results(PangeaScriptBackend* backend, char* erro
 		"assert(#diagnostics.commandTrace==3 and diagnostics.commandTrace[1].id=='pangea.object.setPosition' and diagnostics.commandTrace[1].objectId==handle.id)\n"
 		"return {}\n",
 		handle.id, handle.generation);
-	assert(PangeaScriptBackend_Load(backend, source, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptStatus commandStatus = PangeaScriptBackend_Load(backend, source, error, errorCapacity);
+	if (commandStatus != PANGEA_SCRIPT_OK) fprintf(stderr, "checkpoint fixture failed: %s\n", error);
+	assert(commandStatus == PANGEA_SCRIPT_OK);
 	assert(nearly_equal(visual.position.x, 4) && nearly_equal(visual.position.y, 5) && nearly_equal(visual.position.z, 6));
 	PangeaScriptCommandTrace firstTrace;
 	PangeaScript_GetCommandTrace(&firstTrace);
@@ -884,9 +933,9 @@ static void test_reload_isolation(PangeaScriptBackend* backend, char* error, int
 static void prepare_script_test_directories(void)
 {
 #ifdef __EMSCRIPTEN__
-	EM_ASM({ FS.mkdirTree("Data/Scripts/config"); FS.mkdirTree("Data/Scripts/dist"); });
+	EM_ASM({ FS.mkdirTree("Data/Scripts/config"); FS.mkdirTree("Data/Scripts/dist"); FS.mkdirTree("Data/Scripts/persistence"); });
 #else
-	system("mkdir -p Data/Scripts/config Data/Scripts/dist");
+	system("mkdir -p Data/Scripts/config Data/Scripts/dist Data/Scripts/persistence");
 #endif
 }
 
@@ -988,9 +1037,69 @@ static void test_public_object_lifecycle(void)
 	assert(PangeaScript_GetObjectSource(refreshedHandle, &storedSource));
 	assert(storedSource.kind == PANGEA_SCRIPT_SOURCE_TERRAIN && storedSource.itemIndex == 12);
 	PangeaScriptFrameContext frame = {.levelNum = 1, .frameNum = 1};
+	PangeaScript_ResetLifecycleTrace();
 	assert(PangeaScript_CallObjectEvent(handle, &frame, "spawn") == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_CallObjectEventWithValue(handle, &frame, "animationEvent", 37) == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_CallObjectEvent(handle, &frame, "animationComplete") == PANGEA_SCRIPT_OK);
+	PangeaScriptLifecycleTrace lifecycleTrace;
+	PangeaScript_GetLifecycleTrace(&lifecycleTrace);
+	assert(lifecycleTrace.eventCount == 3 && lifecycleTrace.entryCount == 3 && !lifecycleTrace.overflow);
+	PangeaScriptLifecycleTraceEntry lifecycleEntry;
+	assert(PangeaScript_GetLifecycleTraceEntry(0, &lifecycleEntry));
+	assert(strcmp(lifecycleEntry.eventId, "spawn") == 0);
+	assert(strcmp(lifecycleEntry.applicationPhase, "callback") == 0 && lifecycleEntry.order == 0);
+	assert(lifecycleEntry.target.id == handle.id && lifecycleEntry.target.generation == handle.generation);
+	assert(lifecycleEntry.status == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_GetLifecycleTraceEntry(1, &lifecycleEntry));
+	assert(strcmp(lifecycleEntry.eventId, "animationEvent") == 0);
+	assert(strcmp(lifecycleEntry.applicationPhase, "callback") == 0 && lifecycleEntry.order == 1);
+	assert(PangeaScript_GetLifecycleTraceEntry(2, &lifecycleEntry));
+	assert(strcmp(lifecycleEntry.eventId, "animationComplete") == 0);
+	assert(strcmp(lifecycleEntry.applicationPhase, "callback") == 0 && lifecycleEntry.order == 2);
+	assert(!PangeaScript_GetLifecycleTraceEntry(3, &lifecycleEntry));
+	PangeaScriptLifecycleTraceEntry expectedLifecycleEntries[3];
+	for (int index = 0; index < 3; index++)
+		assert(PangeaScript_GetLifecycleTraceEntry(index, &expectedLifecycleEntries[index]));
+	PangeaScriptLifecycleTraceComparison lifecycleComparison;
+	assert(PangeaScript_CompareLifecycleTrace(&lifecycleTrace, expectedLifecycleEntries, 3, &lifecycleComparison) == PANGEA_SCRIPT_OK);
+	assert(lifecycleComparison.matches);
+	assert(lifecycleComparison.firstMismatchIndex == UINT32_MAX);
+	for (int index = 0; index < 3; index++)
+		expectedLifecycleEntries[index].target = (PangeaScriptObjectHandle){99, 20};
+	assert(PangeaScript_CompareNormalizedLifecycleTrace(&lifecycleTrace, expectedLifecycleEntries, 3, &lifecycleComparison) == PANGEA_SCRIPT_OK);
+	assert(lifecycleComparison.matches);
+	assert(lifecycleComparison.firstMismatchIndex == UINT32_MAX);
+	for (int index = 0; index < 3; index++)
+		expectedLifecycleEntries[index].target = lifecycleEntry.target;
+	expectedLifecycleEntries[1].status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	assert(PangeaScript_CompareLifecycleTrace(&lifecycleTrace, expectedLifecycleEntries, 3, &lifecycleComparison) == PANGEA_SCRIPT_OK);
+	assert(!lifecycleComparison.matches);
+	assert(lifecycleComparison.firstMismatchIndex == 1);
+	assert(strcmp(lifecycleComparison.expectedEventId, "animationEvent") == 0);
+	assert(strcmp(lifecycleComparison.actualEventId, "animationEvent") == 0);
+	expectedLifecycleEntries[1].status = PANGEA_SCRIPT_OK;
+	PangeaScriptLifecycleTrace overflowLifecycleTrace = lifecycleTrace;
+	overflowLifecycleTrace.overflow = true;
+	assert(PangeaScript_CompareLifecycleTrace(&overflowLifecycleTrace, expectedLifecycleEntries, 3, &lifecycleComparison) == PANGEA_SCRIPT_OK);
+	assert(!lifecycleComparison.matches && lifecycleComparison.firstMismatchIndex == 3);
+	assert(PangeaScript_CompareLifecycleTrace(NULL, expectedLifecycleEntries, 3, &lifecycleComparison) == PANGEA_SCRIPT_BAD_ARGUMENT);
+	assert(PangeaScript_CompareLifecycleTrace(&lifecycleTrace, expectedLifecycleEntries, 2, &lifecycleComparison) == PANGEA_SCRIPT_BAD_ARGUMENT);
+	assert(PangeaScript_CompareLifecycleTrace(&lifecycleTrace, expectedLifecycleEntries, 3, NULL) == PANGEA_SCRIPT_BAD_ARGUMENT);
+	PangeaScript_ResetLifecycleTrace();
+	PangeaScriptFrameContext adventureFrame = {.levelNum = 1, .frameNum = 1, .mode = "adventure"};
+	PangeaScriptFrameContext raceFrame = adventureFrame;
+	raceFrame.frameNum = 2;
+	raceFrame.mode = "race";
+	assert(PangeaScript_CallFrameHook(&adventureFrame) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_CallFrameHook(&raceFrame) == PANGEA_SCRIPT_OK);
+	PangeaScript_GetLifecycleTrace(&lifecycleTrace);
+	assert(lifecycleTrace.eventCount == 1 && lifecycleTrace.entryCount == 1 && !lifecycleTrace.overflow);
+	assert(PangeaScript_GetLifecycleTraceEntry(0, &lifecycleEntry));
+	assert(strcmp(lifecycleEntry.eventId, "modeTransition") == 0);
+	assert(strcmp(lifecycleEntry.applicationPhase, "mode") == 0);
+	PangeaScriptLifecycleTraceEntry expectedModeEntry = lifecycleEntry;
+	assert(PangeaScript_CompareNormalizedLifecycleTrace(&lifecycleTrace, &expectedModeEntry, 1, &lifecycleComparison) == PANGEA_SCRIPT_OK);
+	assert(lifecycleComparison.matches && lifecycleComparison.firstMismatchIndex == UINT32_MAX);
 	PangeaScriptStatus firstCheckpointStatus = PangeaScript_ApplyObjectLifecycle(handle, &frame, PANGEA_SCRIPT_OBJECT_CHECKPOINT_RESET);
 	if (firstCheckpointStatus != PANGEA_SCRIPT_OK)
 		fprintf(stderr, "first checkpoint failed: %s\n", PangeaScript_GetLastError());
@@ -1344,7 +1453,7 @@ static void test_public_player_gameplay_events(void)
 		" onDeath=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==7) end,"
 		" onPlayerSpawn=function(ctx) assert(ctx.player.id==%d and ctx.position.x==4) end,"
 		" onPlayerRespawn=function(ctx) assert(ctx.player.id==%d and ctx.position.z==6) end,"
-		" onCheckpointReached=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==3 and ctx.position.y==5) end,"
+		" onCheckpointReached=function(ctx) local results=pangea.player.checkpointResults(); assert(ctx.player.id==%d and ctx.eventValue==3 and ctx.position.y==5 and #results==1 and results[1].levelNum==3 and results[1].playerNum==0 and results[1].checkpoint==3) end,"
 		" onLapComplete=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==2 and ctx.position.z==6) end,"
 		" onRaceFinish=function(ctx) assert(ctx.player.id==%d and ctx.eventValue==1 and ctx.position.x==4) end,"
 		" onObjectiveComplete=function(ctx) local results=pangea.player.objectiveResults(); assert(ctx.player.id==%d and ctx.eventValue==0 and ctx.position.y==5 and #results==1 and results[1].levelNum==3 and results[1].playerNum==0 and results[1].outcome==0) end"
@@ -1352,6 +1461,7 @@ static void test_public_player_gameplay_events(void)
 		handle.id, handle.generation, handle.id, handle.id, handle.id, handle.id, handle.id, handle.id, handle.id, handle.id);
 	write_script(path, source);
 	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
+	PangeaScript_ResetLifecycleTrace();
 	damageContext = (PangeaScriptDamageContext)
 	{
 		.levelNum = 3,
@@ -1389,6 +1499,22 @@ static void test_public_player_gameplay_events(void)
 	write_script(path, "return { onDamage=function() return {damage=-1} end }");
 	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_CallDamageHook(&damageContext, &damageResult) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	PangeaScriptLifecycleTrace trace;
+	PangeaScript_GetLifecycleTrace(&trace);
+	assert(trace.eventCount == 11 && trace.entryCount == 11 && !trace.overflow);
+	const char* expectedEvents[] = {
+		"damage", "damageApplied", "onPlayerSpawn", "onPlayerRespawn", "onDeath",
+		"onCheckpointReached", "onLapComplete", "onRaceFinish", "onObjectiveComplete",
+		"onUnsupportedPlayerEvent", "damage",
+	};
+	for (int index = 0; index < 11; index++)
+	{
+		PangeaScriptLifecycleTraceEntry entry;
+		assert(PangeaScript_GetLifecycleTraceEntry(index, &entry));
+		assert(strcmp(entry.eventId, expectedEvents[index]) == 0);
+		assert(strcmp(entry.applicationPhase, index < 2 || index == 10 ? "damage" : "callback") == 0);
+		assert(entry.order == (uint32_t)index);
+	}
 	assert(PangeaScript_UnregisterObject(handle));
 	assert(remove(path) == 0);
 }
@@ -1651,6 +1777,9 @@ static void test_public_network_gate(void)
 	assert(PangeaScript_IsNetworkedMode());
 	assert(!PangeaScript_HasRunnableModule());
 	assert(PangeaScript_CallFrameHook(&frame) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	PangeaScriptObjectHandle blockedHandle = {0};
+	assert(PangeaScript_RegisterScriptedObject("network-blocked", 1, 2, 3, &blockedHandle) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	assert(blockedHandle.id == 0 && blockedHandle.generation == 0);
 	PangeaScript_SetNetworkedMode(false);
 	assert(!PangeaScript_IsNetworkedMode());
 	assert(PangeaScript_HasRunnableModule());
@@ -1671,10 +1800,17 @@ static void test_command_descriptors(void)
 {
 	static const char* expectedIds[] = {
 		"pangea.player.setHealth",
+		"pangea.player.setLives",
+		"pangea.player.setScore",
+		"pangea.player.setWeaponQuantity",
+		"pangea.player.setKey",
+		"pangea.player.setCloverCount",
+		"pangea.player.setShieldActive",
 		"pangea.player.heal",
 		"pangea.player.setInvulnerable",
 		"pangea.player.setPosition",
 		"pangea.player.setVelocity",
+		"pangea.player.setForm",
 		"pangea.object.setPosition",
 		"pangea.object.setPositionOffset",
 		"pangea.object.setVelocity",
@@ -1687,10 +1823,17 @@ static void test_command_descriptors(void)
 	};
 	static const char* expectedCapabilities[] = {
 		"player-health",
+		"player-lives",
+		"player-score",
+		"player-inventory",
+		"player-keys",
+		"player-collectibles",
+		"player-shield",
 		"player-heal",
 		"player-invulnerability",
 		"player-position",
 		"player-velocity",
+		"player-form",
 		"object-position",
 		"object-position-offset",
 		"object-velocity",
@@ -1701,7 +1844,7 @@ static void test_command_descriptors(void)
 		"object-activation",
 		"object-delete",
 	};
-	assert(PangeaScript_GetCommandDescriptorCount() == 14);
+	assert(PangeaScript_GetCommandDescriptorCount() == 21);
 	for (int index = 0; index < PangeaScript_GetCommandDescriptorCount(); index++)
 	{
 		const PangeaScriptCommandDescriptor* descriptor = PangeaScript_GetCommandDescriptor(index);
@@ -1715,7 +1858,7 @@ static void test_command_descriptors(void)
 		assert(descriptor->validation != NULL && descriptor->validation[0] != '\0');
 	}
 	assert(PangeaScript_GetCommandDescriptor(-1) == NULL);
-	assert(PangeaScript_GetCommandDescriptor(14) == NULL);
+	assert(PangeaScript_GetCommandDescriptor(21) == NULL);
 	static const char* expectedEventIds[] = {
 		"onTriggerEnter", "onPickupCollected", "onWeaponHit", "onDamage", "onDamageApplied", "onDeath", "onPlayerSpawn", "onPlayerRespawn", "onCheckpointReached", "onLapComplete", "onRaceFinish", "onObjectiveComplete", "animationComplete", "destroy"
 	};
@@ -1907,14 +2050,19 @@ static void test_default_persistence_fallback(const PangeaScriptGameInfo* source
 	fallbackGameInfo.savePersistent = NULL;
 	assert(PangeaScript_Init(&fallbackGameInfo) == PANGEA_SCRIPT_OK);
 	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.set('fallback', 3, 'native-file'))\nreturn {}\n");
-	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/default-persistence.lua") == PANGEA_SCRIPT_OK);
+	PangeaScriptStatus startupStatus = PangeaScript_SetStartupScript("Data/Scripts/dist/default-persistence.lua");
+	assert(startupStatus == PANGEA_SCRIPT_OK);
 	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.get('fallback', 3) == 'native-file')\nassert(pangea.persistence.delete('fallback'))\nreturn {}\n");
 	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
 	(void)error;
 	(void)errorCapacity;
 	assert(PangeaScript_Init(sourceGameInfo) == PANGEA_SCRIPT_OK);
 	assert(remove("Data/Scripts/dist/default-persistence.lua") == 0);
+#ifdef __EMSCRIPTEN__
+	(void)remove("Data/Scripts/persistence/.pangea-persistence-fallback.bin");
+#else
 	(void)remove("Data/Scripts/.pangea-persistence-fallback.bin");
+#endif
 }
 
 int main(void)
@@ -1927,6 +2075,9 @@ int main(void)
 		.getPlayerCount = get_player_count,
 		.getPlayer = get_player,
 		.setPlayerHealth = set_player_health,
+		.setPlayerLives = set_player_lives,
+		.setPlayerScore = set_player_score,
+		.setPlayerWeaponQuantity = set_player_weapon_quantity,
 		.setPlayerInvulnerable = set_player_invulnerable,
 		.setPlayerPosition = set_player_position,
 		.setPlayerVelocity = set_player_velocity,
@@ -1950,13 +2101,20 @@ int main(void)
 		"assert(capabilities.contractVersion == 1 and capabilities.apiVersion == 1 and capabilities.objectMutation and capabilities.events and capabilities.timers)\n"
 		"assert(capabilities.terrainItems and capabilities.splineItems and capabilities.mapItems)\n"
 		"assert(not capabilities.pickupScoreEffects)\n"
+		"assert(not capabilities.weaponScoreEffects)\n"
 		"assert(not capabilities.objectCollision and capabilities.playerCommands and capabilities.playerInvulnerability)\n"
 		"assert(pangea.object.setPositionResult and pangea.object.setPositionOffset and pangea.object.setPositionOffsetResult and pangea.object.setVelocityResult and pangea.object.setRotationResult and pangea.object.setScaleResult and pangea.object.setAnimationResult and pangea.object.setActiveResult and pangea.object.deleteResult)\n"
 		"assert(pangea.player.count() == 1)\n"
 		"assert(pangea.player.get('zero') == nil)\n"
 		"local player = pangea.player.get(0)\n"
 		"assert(player.playerNum == 0 and player.position.x == 7 and player.health == 0.75)\n"
+		"assert(player.lives == 3)\n"
+		"assert(player.score == 42)\n"
 		"assert(player.lapNum == 2 and player.checkpointNum == 6 and player.placement == 1 and not player.raceComplete)\n"
+		"assert(player.vehicleType == 3 and player.vehicleMaxSpeed == 120 and player.vehicleAcceleration == 8.5 and player.vehicleTraction == 4 and player.vehicleSuspension == 2.5)\n"
+		"assert(player.team == 1 and player.carryingFlag and player.captureScore == 2)\n"
+		"assert(player.activeWeapon == 2 and #player.weapons == 2 and player.weapons[1].type == 1 and player.weapons[2].quantity == 4)\n"
+		"assert(#player.eggs == 3 and player.eggs[1].recovered == 2 and player.eggs[1].required == 5 and player.eggs[2].recovered == 0 and player.eggs[3].recovered == 5)\n"
 		"local raceResults = pangea.player.raceResults()\n"
 		"assert(#raceResults == 1 and raceResults[1].playerNum == 0 and raceResults[1].placement == 1 and not raceResults[1].raceComplete)\n"
 		"assert(pangea.player.setHealth(0, 0.5) == true and pangea.player.get(0).health == 0.5)\n"
@@ -1976,6 +2134,18 @@ int main(void)
 		"local commandDiagnostics = pangea.api.diagnostics()\n"
 		"assert(commandDiagnostics.commandCount == 14 and not commandDiagnostics.commandTraceOverflow)\n"
 		"assert(commandDiagnostics.commandTrace[1].id == 'pangea.player.setHealth' and commandDiagnostics.commandTrace[13].id == 'pangea.player.setVelocity')\n"
+		"assert(pangea.player.setLives(0, 5) == true and pangea.player.get(0).lives == 5)\n"
+		"assert(pangea.player.setLives(0, -1) == false and pangea.player.get(0).lives == 5)\n"
+		"local livesResult = pangea.player.setLivesResult(0, 7)\n"
+		"assert(livesResult.ok and pangea.player.get(0).lives == 7)\n"
+		"assert(pangea.player.setScore(0, 100000) == true and pangea.player.get(0).score == 100000)\n"
+		"assert(pangea.player.setScore(0, -1) == false and pangea.player.get(0).score == 100000)\n"
+		"local scoreResult = pangea.player.setScoreResult(0, 200000)\n"
+		"assert(scoreResult.ok and pangea.player.get(0).score == 200000)\n"
+		"assert(pangea.player.setWeaponQuantity(0, 1, 12) == true)\n"
+		"assert(pangea.player.setWeaponQuantity(0, -1, 12) == false)\n"
+		"local weaponQuantityResult = pangea.player.setWeaponQuantityResult(0, 1, 24)\n"
+		"assert(weaponQuantityResult.ok and weaponQuantityResult.playerNum == 0)\n"
 		"local healthResult = pangea.player.setHealthResult(0, 0.25)\n"
 		"assert(healthResult.ok and healthResult.reason == 'ok' and healthResult.playerNum == 0)\n"
 		"local healResult = pangea.player.healResult(0, 0.25)\n"

@@ -76,6 +76,8 @@
       accent-color: var(--accent);
     }
     #progress-label { font-size: 0.78rem; color: var(--dim); }
+    #play-btn { display: none; margin: 1rem auto 0; }
+    body.deferred-start #loading-card { display: block !important; }
 
     /* Canvas — always in the DOM with proper dimensions for SDL3 */
     #canvas {
@@ -276,6 +278,7 @@
       <div id="status-text">Initializing…</div>
       <progress id="progress-bar" value="0" max="1"></progress>
       <div id="progress-label">Downloading game data…</div>
+      <button class="btn" id="play-btn" onclick="startGame()">Start game</button>
     </div>
 
     <!-- WebGL canvas (always visible with real dimensions for SDL3 sizing) -->
@@ -388,6 +391,18 @@
 
     var _fenceEnabled = true;
     var _isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+    var _deferredStart = new URLSearchParams(window.location.search).get('deferStart') === '1';
+    if (_deferredStart) {
+      document.body.classList.add('deferred-start');
+      document.getElementById('play-btn').style.display = 'block';
+    }
+
+    function startGame() {
+      if (!_deferredStart || !Module.callMain) return;
+      _deferredStart = false;
+      var level = new URLSearchParams(window.location.search).get('level');
+      Module.callMain(level === null ? [] : ['--level', level]);
+    }
 
     if (_isEmbedded) {
       document.body.classList.add('embedded-shell');
@@ -419,6 +434,7 @@
     // ── Emscripten Module pre-config ──────────────────────
     var Module = {
       canvas: document.getElementById('canvas'),
+      noInitialRun: _deferredStart,
 
       // Request the high-performance (discrete/dedicated) GPU where available
       webglContextAttributes: {
@@ -455,6 +471,10 @@
         console.log('[MightyMike] Runtime initialized');
         var el = document.getElementById('status-text');
         if (el) el.textContent = 'Starting game…';
+        if (_deferredStart) {
+          if (el) el.textContent = 'Ready to start';
+          return;
+        }
 
         // Apply direct-boot params (safety net; Boot.cpp also reads URLSearchParams)
         if (window._directLevel) {

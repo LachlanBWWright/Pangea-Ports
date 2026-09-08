@@ -38,6 +38,25 @@ static void MovePlayer_Death(ObjNode *theNode);
 static void KillPlayer(ObjNode *theNode);
 static void MovePlayer_Exit(ObjNode *theNode);
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
+
+EMSCRIPTEN_KEEPALIVE int NanosaurScript_ProbeDeathJS(void)
+{
+	if (!gPlayerObj)
+		return 0;
+	gMyHealth = 0;
+	gPlayerObj->Health = 0;
+	KillPlayer(gPlayerObj);
+	if (!gPlayerGotKilledFlag)
+		return 0;
+	ResetPlayer();
+	return gPlayerGotKilledFlag ? 0 : 1;
+}
+
 static Boolean DoMyKickCollision(ObjNode *theNode);
 static void MoveShield(ObjNode *theNode);
 

@@ -429,7 +429,8 @@ Boolean DoTrig_Powerup(ObjNode *pow, ObjNode *who, Byte sideBits)
 	(void) sideBits;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	Bugdom2Script_OnPickupCollected(pow, who, pow->POWKind, pow->POWKind == POW_KIND_HEALTH ? .15f : 1.0f, "bugdom2.powerup");
+	if (!Bugdom2Script_OnPickupCollected(pow, who, pow->POWKind, pow->POWKind == POW_KIND_HEALTH ? .15f : 1.0f, "bugdom2.powerup"))
+		return(false);
 #endif
 
 	switch(pow->POWKind)
@@ -697,7 +698,6 @@ float	y;
 
 	UpdateObject(theNode);
 }
-
 
 
 

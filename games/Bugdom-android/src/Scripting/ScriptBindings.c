@@ -124,6 +124,26 @@ static ScriptModelCacheEntry gScriptModelCache[MODEL_GROUP_SCRIPT_CUSTOM_COUNT];
 typedef struct ScriptSkeletonCacheEntry { char modelPath[260]; char skeletonPath[260]; } ScriptSkeletonCacheEntry;
 static ScriptSkeletonCacheEntry gScriptSkeletonCache[SKELETON_TYPE_SCRIPT_CUSTOM_COUNT];
 
+static void BugdomScript_ReleaseCustomAssets(void)
+{
+	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		Byte type = (Byte)(SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i);
+		if (IsSkeletonTypeLoaded(type))
+			FreeSkeletonFile(type);
+		gScriptSkeletonCache[i].modelPath[0] = '\0';
+		gScriptSkeletonCache[i].skeletonPath[0] = '\0';
+	}
+	for (int i = 0; i < MODEL_GROUP_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		short group = (short)(MODEL_GROUP_SCRIPT_CUSTOM_BASE + i);
+		if (gNumObjectsInGroupList[group] != 0)
+			Free3DMFGroup((Byte)group);
+		gNumObjectsInGroupList[group] = 0;
+		gScriptModelCache[i].path[0] = '\0';
+	}
+}
+
 extern bool BugdomScript_LoadCustom3DMF(FSSpec* spec, Byte group);
 
 static bool MakeDataAssetPath(const char* source, char* destination, size_t capacity)
@@ -261,6 +281,15 @@ static bool BugdomScript_SetObjectPosition(void* nativeObject, const PangeaScrip
 	return true;
 }
 
+static bool BugdomScript_GetObjectVelocity(void* nativeObject, PangeaScriptVector3* outVelocity)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outVelocity || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outVelocity = (PangeaScriptVector3){obj->Delta.x, obj->Delta.y, obj->Delta.z};
+	return true;
+}
+
 static bool BugdomScript_SetObjectVelocity(void* nativeObject, const PangeaScriptVector3* velocity)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -270,6 +299,15 @@ static bool BugdomScript_SetObjectVelocity(void* nativeObject, const PangeaScrip
 	obj->Delta.x = velocity->x;
 	obj->Delta.y = velocity->y;
 	obj->Delta.z = velocity->z;
+	return true;
+}
+
+static bool BugdomScript_GetObjectRotation(void* nativeObject, PangeaScriptVector3* outRotation)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outRotation || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outRotation = (PangeaScriptVector3){obj->Rot.x, obj->Rot.y, obj->Rot.z};
 	return true;
 }
 
@@ -283,6 +321,15 @@ static bool BugdomScript_SetObjectRotation(void* nativeObject, const PangeaScrip
 	obj->Rot.y = rotation->y;
 	obj->Rot.z = rotation->z;
 	UpdateObjectTransforms(obj);
+	return true;
+}
+
+static bool BugdomScript_GetObjectScale(void* nativeObject, float* outScale)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outScale || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outScale = obj->Scale.x;
 	return true;
 }
 
@@ -301,8 +348,37 @@ static bool BugdomScript_SetObjectCollisionEnabled(void* nativeObject, bool enab
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (enabled) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
+	if (enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive)) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
 	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
+	return true;
+}
+
+static bool BugdomScript_GetObjectCollisionEnabled(void* nativeObject, bool* outEnabled)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outEnabled || obj->CType == INVALID_NODE_FLAG) return false;
+	*outEnabled = (obj->StatusBits & STATUS_BIT_NOCOLLISION) == 0;
+	return true;
+}
+
+static bool BugdomScript_GetObjectActive(void* nativeObject, bool* outActive)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outActive || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outActive = !obj->ScriptActiveStateInitialized || obj->ScriptActive;
+	return true;
+}
+
+static bool BugdomScript_SetObjectActive(void* nativeObject, bool active)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+	if (!obj->ScriptDefinitionID[0]) return true;
+	obj->ScriptActiveStateInitialized = true;
+	obj->ScriptActive = active;
+	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
+	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
 	return true;
 }
 
@@ -321,6 +397,15 @@ static int ResolveNamedAnimation(const ObjNode* obj, const char* animation)
 			return definition->animationIndices[i];
 	}
 	return -1;
+}
+
+static bool BugdomScript_GetObjectAnimation(void* nativeObject, int* outAnimation)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outAnimation || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outAnimation = obj->Skeleton->AnimNum;
+	return true;
 }
 
 static bool BugdomScript_SetObjectAnimation(void* nativeObject, int animation, float speed, float blendSeconds)
@@ -371,6 +456,12 @@ static bool BugdomScript_DeleteObject(void* nativeObject)
 static const PangeaScriptObjectOps kBugdomPlayerObjectOps =
 {
 	.getPosition = BugdomScript_GetObjectPosition,
+	.getVelocity = BugdomScript_GetObjectVelocity,
+	.getRotation = BugdomScript_GetObjectRotation,
+	.getScale = BugdomScript_GetObjectScale,
+	.getAnimation = BugdomScript_GetObjectAnimation,
+	.getActive = BugdomScript_GetObjectActive,
+	.getCollisionEnabled = BugdomScript_GetObjectCollisionEnabled,
 	.setPosition = BugdomScript_SetObjectPosition,
 	.setVelocity = BugdomScript_SetObjectVelocity,
 	.setRotation = BugdomScript_SetObjectRotation,
@@ -378,6 +469,7 @@ static const PangeaScriptObjectOps kBugdomPlayerObjectOps =
 	.setAnimation = BugdomScript_SetObjectAnimation,
 	.setAnimationNamed = BugdomScript_SetObjectAnimationNamed,
 	.setCollisionEnabled = BugdomScript_SetObjectCollisionEnabled,
+	.setActive = BugdomScript_SetObjectActive,
 	.deleteObject = BugdomScript_DeleteObject,
 };
 
@@ -390,6 +482,7 @@ void BugdomScript_CacheFrameContext(const PangeaScriptFrameContext* ctx)
 void BugdomScript_ResetObjectRegistry(void)
 {
 	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+	BugdomScript_ReleaseCustomAssets();
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
 	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
 	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
@@ -478,7 +571,8 @@ Boolean BugdomScript_OnDamage(ObjNode* source, float damage, int cause, float* o
 	if (!outDamage)
 		return true;
 	*outDamage = damage;
-	if (!gPlayerObj || gPlayerObj->ScriptObjectID <= 0 || gPlayerObj->ScriptObjectGeneration <= 0)
+	if (!gPlayerObj || gPlayerObj->ScriptObjectID <= 0 || gPlayerObj->ScriptObjectGeneration <= 0 ||
+		!PangeaScript_ObjectExists((PangeaScriptObjectHandle){gPlayerObj->ScriptObjectID, (uint32_t)gPlayerObj->ScriptObjectGeneration}))
 		return true;
 
 	context = (PangeaScriptDamageContext)
@@ -492,7 +586,11 @@ Boolean BugdomScript_OnDamage(ObjNode* source, float damage, int cause, float* o
 		.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z},
 	};
 	if (source && source->ScriptObjectID > 0 && source->ScriptObjectGeneration > 0)
-		context.source = (PangeaScriptObjectHandle){source->ScriptObjectID, (uint32_t)source->ScriptObjectGeneration};
+	{
+		PangeaScriptObjectHandle handle = {source->ScriptObjectID, (uint32_t)source->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			context.source = handle;
+	}
 
 	status = PangeaScript_CallDamageHook(&context, &result);
 	LogScriptStatus("onDamage", status);
@@ -503,35 +601,60 @@ Boolean BugdomScript_OnDamage(ObjNode* source, float damage, int cause, float* o
 	return result.hasApplyDamage ? result.applyDamage : true;
 }
 
-void BugdomScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId)
+Boolean BugdomScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, int pickupVariant, float amount, const char* pickupId)
 {
 	PangeaScriptPickupContext context;
 	PangeaScriptPickupResult result = {0};
 	PangeaScriptStatus status;
+	PangeaScriptObjectHandle pickupHandle = {0};
+	PangeaScriptObjectHandle playerHandle = {0};
 
-	if (!pickup || !player || pickup->ScriptObjectID <= 0 || pickup->ScriptObjectGeneration <= 0 ||
-		player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
-		return;
+	if (!pickup || !player)
+		return true;
+	if (pickup->ScriptObjectID > 0 && pickup->ScriptObjectGeneration > 0)
+	{
+		PangeaScriptObjectHandle handle = {pickup->ScriptObjectID, (uint32_t)pickup->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			pickupHandle = handle;
+	}
+	if (player->ScriptObjectID > 0 && player->ScriptObjectGeneration > 0)
+	{
+		PangeaScriptObjectHandle handle = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			playerHandle = handle;
+	}
 	context = (PangeaScriptPickupContext)
 	{
 		.levelNum = gScriptFrameContext.levelNum,
 		.playerNum = 0,
 		.pickupType = pickupType,
+		.pickupVariant = pickupVariant,
 		.amount = amount,
 		.pickupId = pickupId,
-		.pickup = {pickup->ScriptObjectID, (uint32_t)pickup->ScriptObjectGeneration},
-		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
+		.pickup = pickupHandle,
+		.player = playerHandle,
 		.position = {pickup->Coord.x, pickup->Coord.y, pickup->Coord.z},
 	};
 	status = PangeaScript_CallPickupHook(&context, &result);
 	LogScriptStatus("onPickupCollected", status);
-	if (status != PANGEA_SCRIPT_OK || !isfinite(result.healthDelta))
-		return;
-	gMyHealth += result.healthDelta;
-	if (gMyHealth < 0.0f)
-		gMyHealth = 0.0f;
-	else if (gMyHealth > 1.0f)
-		gMyHealth = 1.0f;
+	if (status != PANGEA_SCRIPT_OK)
+		return true;
+	if (isfinite(result.healthDelta))
+	{
+		gMyHealth += result.healthDelta;
+		if (gMyHealth < 0.0f)
+			gMyHealth = 0.0f;
+		else if (gMyHealth > 1.0f)
+			gMyHealth = 1.0f;
+	}
+	if (result.scoreDelta != 0)
+	{
+		int64_t score = (int64_t)gScore + (int64_t)result.scoreDelta;
+		if (score < 0) score = 0;
+		if (score > UINT32_MAX) score = UINT32_MAX;
+		gScore = (unsigned long)score;
+	}
+	return result.hasConsumePickup ? result.consumePickup : true;
 }
 
 Boolean BugdomScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget)
@@ -557,13 +680,28 @@ Boolean BugdomScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage,
 		.position = target ? (PangeaScriptVector3){target->Coord.x, target->Coord.y, target->Coord.z} : (PangeaScriptVector3){0},
 	};
 	if (weapon && weapon->ScriptObjectID > 0 && weapon->ScriptObjectGeneration > 0)
-		context.weapon = (PangeaScriptObjectHandle){weapon->ScriptObjectID, (uint32_t)weapon->ScriptObjectGeneration};
+	{
+		PangeaScriptObjectHandle handle = {weapon->ScriptObjectID, (uint32_t)weapon->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			context.weapon = handle;
+	}
 	if (target && target->ScriptObjectID > 0 && target->ScriptObjectGeneration > 0)
-		context.target = (PangeaScriptObjectHandle){target->ScriptObjectID, (uint32_t)target->ScriptObjectGeneration};
+	{
+		PangeaScriptObjectHandle handle = {target->ScriptObjectID, (uint32_t)target->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			context.target = handle;
+	}
 	status = PangeaScript_CallWeaponHitHook(&context, &result);
 	LogScriptStatus("onWeaponHit", status);
 	if (status != PANGEA_SCRIPT_OK)
 		return true;
+	if (result.scoreDelta != 0)
+	{
+		int64_t score = (int64_t)gScore + (int64_t)result.scoreDelta;
+		if (score < 0) score = 0;
+		if (score > UINT32_MAX) score = UINT32_MAX;
+		gScore = (unsigned long)score;
+	}
 	*outDamage = result.damage;
 	*outDestroyTarget = result.destroyTarget;
 	return result.hasApplyDamage ? result.applyDamage : true;
@@ -922,6 +1060,15 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "trigger",
 		.dependencySummary = "checkpoint state and terrain systems",
 	},
+#define BUGDOM_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current level assets, terrain systems, and the native item initializer" },
+	BUGDOM_TERRAIN_NATIVE_ITEM(1) BUGDOM_TERRAIN_NATIVE_ITEM(2) BUGDOM_TERRAIN_NATIVE_ITEM(3) BUGDOM_TERRAIN_NATIVE_ITEM(4) BUGDOM_TERRAIN_NATIVE_ITEM(5) BUGDOM_TERRAIN_NATIVE_ITEM(6) BUGDOM_TERRAIN_NATIVE_ITEM(7) BUGDOM_TERRAIN_NATIVE_ITEM(8) BUGDOM_TERRAIN_NATIVE_ITEM(9) BUGDOM_TERRAIN_NATIVE_ITEM(10)
+	BUGDOM_TERRAIN_NATIVE_ITEM(11) BUGDOM_TERRAIN_NATIVE_ITEM(12) BUGDOM_TERRAIN_NATIVE_ITEM(13) BUGDOM_TERRAIN_NATIVE_ITEM(14) BUGDOM_TERRAIN_NATIVE_ITEM(15) BUGDOM_TERRAIN_NATIVE_ITEM(16) BUGDOM_TERRAIN_NATIVE_ITEM(17) BUGDOM_TERRAIN_NATIVE_ITEM(18) BUGDOM_TERRAIN_NATIVE_ITEM(19) BUGDOM_TERRAIN_NATIVE_ITEM(20)
+	BUGDOM_TERRAIN_NATIVE_ITEM(21) BUGDOM_TERRAIN_NATIVE_ITEM(22) BUGDOM_TERRAIN_NATIVE_ITEM(23) BUGDOM_TERRAIN_NATIVE_ITEM(24) BUGDOM_TERRAIN_NATIVE_ITEM(25) BUGDOM_TERRAIN_NATIVE_ITEM(26) BUGDOM_TERRAIN_NATIVE_ITEM(27) BUGDOM_TERRAIN_NATIVE_ITEM(28) BUGDOM_TERRAIN_NATIVE_ITEM(29) BUGDOM_TERRAIN_NATIVE_ITEM(30)
+	BUGDOM_TERRAIN_NATIVE_ITEM(31) BUGDOM_TERRAIN_NATIVE_ITEM(32) BUGDOM_TERRAIN_NATIVE_ITEM(33) BUGDOM_TERRAIN_NATIVE_ITEM(34) BUGDOM_TERRAIN_NATIVE_ITEM(35) BUGDOM_TERRAIN_NATIVE_ITEM(36) BUGDOM_TERRAIN_NATIVE_ITEM(37) BUGDOM_TERRAIN_NATIVE_ITEM(38) BUGDOM_TERRAIN_NATIVE_ITEM(39) BUGDOM_TERRAIN_NATIVE_ITEM(40)
+	BUGDOM_TERRAIN_NATIVE_ITEM(41) BUGDOM_TERRAIN_NATIVE_ITEM(42) BUGDOM_TERRAIN_NATIVE_ITEM(43) BUGDOM_TERRAIN_NATIVE_ITEM(44) BUGDOM_TERRAIN_NATIVE_ITEM(45) BUGDOM_TERRAIN_NATIVE_ITEM(46) BUGDOM_TERRAIN_NATIVE_ITEM(47) BUGDOM_TERRAIN_NATIVE_ITEM(48) BUGDOM_TERRAIN_NATIVE_ITEM(49) BUGDOM_TERRAIN_NATIVE_ITEM(50)
+	BUGDOM_TERRAIN_NATIVE_ITEM(51) BUGDOM_TERRAIN_NATIVE_ITEM(52) BUGDOM_TERRAIN_NATIVE_ITEM(53) BUGDOM_TERRAIN_NATIVE_ITEM(54) BUGDOM_TERRAIN_NATIVE_ITEM(55) BUGDOM_TERRAIN_NATIVE_ITEM(56) BUGDOM_TERRAIN_NATIVE_ITEM(57) BUGDOM_TERRAIN_NATIVE_ITEM(58) BUGDOM_TERRAIN_NATIVE_ITEM(59) BUGDOM_TERRAIN_NATIVE_ITEM(60)
+	BUGDOM_TERRAIN_NATIVE_ITEM(61) BUGDOM_TERRAIN_NATIVE_ITEM(62) BUGDOM_TERRAIN_NATIVE_ITEM(63)
+#undef BUGDOM_TERRAIN_NATIVE_ITEM
 };
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status)
@@ -953,7 +1100,16 @@ static int GetScriptPlayerCount(void) { return gPlayerObj ? 1 : 0; }
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerObj) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .health = gMyHealth, .hasHealth = true, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .velocity = {gPlayerObj->Delta.x, gPlayerObj->Delta.y, gPlayerObj->Delta.z}, .hasVelocity = true, .collisionEnabled = gPlayerObj->CType != 0 && (gPlayerObj->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gMyHealth, .hasHealth = true, .score = (int64_t) gScore, .hasScore = true, .lives = gNumLives, .hasLives = true, .keyCount = 0, .hasKeyState = true, .greenCloverCount = gNumGreenClovers, .blueCloverCount = gNumBlueClovers, .goldCloverCount = gNumGoldClovers, .hasCollectibleState = true, .shieldActive = gShieldTimer > 0.0f, .hasShieldState = true, .form = gPlayerMode == PLAYER_MODE_BALL ? PANGEA_SCRIPT_PLAYER_FORM_BALL : PANGEA_SCRIPT_PLAYER_FORM_BUG, .hasForm = true, .active = true};
+	if (gGameViewInfoPtr)
+	{
+		outPlayer->camera = (PangeaScriptVector3){gGameViewInfoPtr->cameraPlacement.cameraLocation.x, gGameViewInfoPtr->cameraPlacement.cameraLocation.y, gGameViewInfoPtr->cameraPlacement.cameraLocation.z};
+		outPlayer->hasCameraState = true;
+	}
+	outPlayer->rotation = (PangeaScriptVector3){gPlayerObj->Rot.x, gPlayerObj->Rot.y, gPlayerObj->Rot.z};
+	outPlayer->hasRotation = true;
+	for (int keyID = 0; keyID < PANGEA_SCRIPT_PLAYER_KEY_CAPACITY; keyID++)
+		if (BugdomScript_GetKey(keyID)) outPlayer->keys[outPlayer->keyCount++] = keyID;
 	return true;
 }
 
@@ -962,6 +1118,7 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 	if (playerNum != 0 || !position || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerObj->Coord = (TQ3Point3D){position->x, position->y, position->z};
+	UpdateObjectTransforms(gPlayerObj);
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -972,11 +1129,73 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 	return BugdomScript_SetObjectVelocity(gPlayerObj, velocity) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
+static PangeaScriptStatus SetScriptPlayerForm(int playerNum, PangeaScriptPlayerForm form)
+{
+	TQ3Point3D position;
+	if (playerNum != 0 || !gPlayerObj)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (form == PANGEA_SCRIPT_PLAYER_FORM_BALL)
+	{
+		if (gPlayerMode == PLAYER_MODE_BALL)
+			return PANGEA_SCRIPT_OK;
+		position = gPlayerObj->Coord;
+		InitPlayer_Ball(gPlayerObj, &position);
+		return PANGEA_SCRIPT_OK;
+	}
+	if (form == PANGEA_SCRIPT_PLAYER_FORM_BUG && gPlayerMode == PLAYER_MODE_BUG)
+		return PANGEA_SCRIPT_OK;
+	if (form != PANGEA_SCRIPT_PLAYER_FORM_BUG || !BallHasHeadroomToMorphToBug())
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	position = gPlayerObj->Coord;
+	gPlayerObj = InitPlayer_Bug(gPlayerObj, &position, gPlayerObj->Rot.y, PLAYER_ANIM_STAND);
+	return PANGEA_SCRIPT_OK;
+}
+
 static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 {
 	if (playerNum != 0 || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gMyHealth = health;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
+{
+	if (playerNum != 0 || lives < 0 || !gPlayerObj)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gNumLives = (short) lives;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerScore(int playerNum, int64_t score)
+{
+	if (playerNum != 0 || score < 0 || score > UINT32_MAX || !gPlayerObj)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gScore = (unsigned long) score;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerKey(int playerNum, int keyId, bool enabled)
+{
+	if (playerNum != 0 || keyId < 0 || !gPlayerObj || !BugdomScript_SetKey(keyId, enabled))
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerCloverCount(int playerNum, int color, int count)
+{
+	if (playerNum != 0 || color < 0 || color > 2 || count < 0 || count > 999 || !gPlayerObj)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (color == 0) gNumGreenClovers = (short) count;
+	else if (color == 1) gNumBlueClovers = (short) count;
+	else gNumGoldClovers = (short) count;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus SetScriptPlayerShieldActive(int playerNum, bool active)
+{
+	if (playerNum != 0 || !gPlayerObj) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gShieldTimer = active ? SHIELD_TIME : 0.0f;
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -1000,7 +1219,13 @@ void BugdomScript_Init(void)
 		.getPlayer = GetScriptPlayer,
 		.setPlayerPosition = SetScriptPlayerPosition,
 		.setPlayerVelocity = SetScriptPlayerVelocity,
+		.setPlayerForm = SetScriptPlayerForm,
 		.setPlayerHealth = SetScriptPlayerHealth,
+		.setPlayerLives = SetScriptPlayerLives,
+		.setPlayerScore = SetScriptPlayerScore,
+		.setPlayerKey = SetScriptPlayerKey,
+		.setPlayerCloverCount = SetScriptPlayerCloverCount,
+		.setPlayerShieldActive = SetScriptPlayerShieldActive,
 		.setPlayerInvulnerable = SetScriptPlayerInvulnerable,
 		.capabilities = PANGEA_SCRIPT_BUGDOM_CAPABILITIES,
 	};
@@ -1090,6 +1315,32 @@ void BugdomScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSecond
 void BugdomScript_OnLevelComplete(int levelNum)
 {
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_COMPLETE, levelNum, "onLevelComplete");
+}
+
+void BugdomScript_OnObjectiveComplete(int playerNum, int outcome)
+{
+	PangeaScriptPlayerEventContext context;
+
+	if (playerNum != 0 || !gPlayerObj)
+		return;
+	if (gPlayerObj->ScriptObjectID <= 0 || gPlayerObj->ScriptObjectGeneration <= 0 ||
+		!PangeaScript_ObjectExists((PangeaScriptObjectHandle){gPlayerObj->ScriptObjectID, (uint32_t)gPlayerObj->ScriptObjectGeneration}))
+	{
+		gPlayerObj->ScriptObjectID = 0;
+		gPlayerObj->ScriptObjectGeneration = 0;
+		BugdomScript_RegisterPlayerObject(gPlayerObj);
+	}
+	if (gPlayerObj->ScriptObjectID <= 0 || gPlayerObj->ScriptObjectGeneration <= 0)
+		return;
+	context = (PangeaScriptPlayerEventContext)
+	{
+		.levelNum = gScriptFrameContext.levelNum,
+		.playerNum = playerNum,
+		.eventValue = outcome,
+		.player = {gPlayerObj->ScriptObjectID, (uint32_t)gPlayerObj->ScriptObjectGeneration},
+		.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z},
+	};
+	LogScriptStatus("onObjectiveComplete", PangeaScript_CallPlayerEvent(&context, "onObjectiveComplete"));
 }
 
 void BugdomScript_OnLevelUnload(int levelNum)

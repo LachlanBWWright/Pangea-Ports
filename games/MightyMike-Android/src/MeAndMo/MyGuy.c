@@ -1209,6 +1209,22 @@ void SetMySwimAnim(void)
 
 void MeHitBonusObject(ObjNode *targetNode)
 {
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	const char *pickupID = nil;
+	if (targetNode->CType & CTYPE_WEAPONPOW)
+		pickupID = "mightymike.weaponPow";
+	else if (targetNode->CType & CTYPE_MISCPOW)
+		pickupID = "mightymike.miscPow";
+	else if (targetNode->CType & CTYPE_HEALTH)
+		pickupID = "mightymike.healthPow";
+	else if (targetNode->CType & CTYPE_KEY)
+		pickupID = "mightymike.key";
+	else if ((targetNode->Type == ObjType_Coin) && (targetNode->SpriteGroupNum == GroupNum_Coin))
+		pickupID = "mightymike.coin";
+	if (pickupID && !MikeScript_OnPickupCollected(targetNode, gMyNodePtr, targetNode->Type, 1.0f, pickupID))
+		return;
+	#endif
+
 						/* SEE IF HIT WEAPON POWERUP */
 
 	if (targetNode->CType & CTYPE_WEAPONPOW)
@@ -1234,9 +1250,6 @@ void MeHitBonusObject(ObjNode *targetNode)
 	else
 	if (targetNode->CType & CTYPE_HEALTH)
 	{
-	#ifdef PANGEA_ENABLE_SCRIPTING
-		MikeScript_OnPickupCollected(targetNode, gMyNodePtr, targetNode->Type, 1.0f, "mightymike.healthPow");
-	#endif
 		if (gMyHealth < gMyMaxHealth)						// only get health if need it!
 		{
 			MakeMikeMessage(MESSAGE_NUM_FOOD);				// put message

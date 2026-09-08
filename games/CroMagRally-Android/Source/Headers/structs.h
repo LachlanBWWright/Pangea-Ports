@@ -345,6 +345,8 @@ struct ObjNode
 		Boolean		ScriptDeleteRequested;
 		Boolean		ScriptStreamOutSent;
 		Boolean		ScriptAnimationCompletionSent;
+		Boolean		ScriptActiveStateInitialized;
+		Boolean		ScriptActive;
 };
 typedef struct ObjNode ObjNode;
 

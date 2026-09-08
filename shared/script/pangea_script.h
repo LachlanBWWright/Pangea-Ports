@@ -12,7 +12,10 @@ extern "C" {
 #define PANGEA_SCRIPT_CONTRACT_VERSION 1
 #define PANGEA_SCRIPT_API_VERSION 1
 #define PANGEA_SCRIPT_COMMAND_ID_CAPACITY 64
+#define PANGEA_SCRIPT_COMMAND_PHASE_CAPACITY 24
 #define PANGEA_SCRIPT_COMMAND_TRACE_CAPACITY 256
+#define PANGEA_SCRIPT_LIFECYCLE_EVENT_ID_CAPACITY 32
+#define PANGEA_SCRIPT_LIFECYCLE_TRACE_CAPACITY 4096
 #define PANGEA_SCRIPT_DEFERRED_ACTION_CAPACITY 64
 
 typedef enum PangeaScriptStatus
@@ -58,16 +61,95 @@ typedef struct PangeaScriptObjectHandle
 	uint32_t generation;
 } PangeaScriptObjectHandle;
 
+#define PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY 16
+#define PANGEA_SCRIPT_PLAYER_KEY_CAPACITY 8
+#define PANGEA_SCRIPT_PLAYER_EGG_CAPACITY 8
+
+typedef struct PangeaScriptPlayerInventoryEntry
+{
+	int type;
+	int quantity;
+} PangeaScriptPlayerInventoryEntry;
+
+typedef enum PangeaScriptPlayerForm
+{
+	PANGEA_SCRIPT_PLAYER_FORM_BUG = 0,
+	PANGEA_SCRIPT_PLAYER_FORM_BALL = 1,
+} PangeaScriptPlayerForm;
+
 typedef struct PangeaScriptPlayerSnapshot
 {
 	PangeaScriptVector3 position;
+	PangeaScriptVector3 velocity;
+	bool hasVelocity;
+	bool collisionEnabled;
+	bool hasCollisionEnabled;
+	PangeaScriptVector3 rotation;
+	bool hasRotation;
+	PangeaScriptVector3 aim;
+	bool hasAimState;
 	float health;
 	bool hasHealth;
+	float fuel;
+	bool hasFuelState;
+	int64_t score;
+	bool hasScore;
+	int coinCount;
+	bool hasCoinState;
+	int pesoCount;
+	bool hasPesoState;
+	int lives;
+	bool hasLives;
+	int activeWeapon;
+	bool hasWeaponState;
+	int weaponCount;
+	PangeaScriptPlayerInventoryEntry weapons[PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY];
+	int keyCount;
+	int keys[PANGEA_SCRIPT_PLAYER_KEY_CAPACITY];
+	bool hasKeyState;
+	int greenCloverCount;
+	int blueCloverCount;
+	int goldCloverCount;
+	bool hasCollectibleState;
+	int tokenCount;
+	bool hasTokenState;
+	bool shieldActive;
+	bool hasShieldState;
+	PangeaScriptPlayerForm form;
+	bool hasForm;
+	int miceRescued;
+	bool hasMiceState;
+	int miceTotal;
+	int drowningMiceRescued;
+	int drowningMiceRequired;
+	int childObjectCount;
+	bool hasChildObjectState;
+	int eggCount;
+	int eggs[PANGEA_SCRIPT_PLAYER_EGG_CAPACITY];
+	int eggRequired[PANGEA_SCRIPT_PLAYER_EGG_CAPACITY];
+	bool hasEggState;
 	int lapNum;
 	int checkpointNum;
 	int placement;
 	bool raceComplete;
 	bool hasRaceState;
+	int vehicleType;
+	float vehicleMaxSpeed;
+	float vehicleAcceleration;
+	float vehicleTraction;
+	float vehicleSuspension;
+	bool hasVehicleState;
+	int team;
+	bool hasTeamState;
+	bool carryingFlag;
+	int captureScore;
+	bool hasCaptureState;
+	int sceneNum;
+	int areaNum;
+	bool areaComplete;
+	bool hasLevelFlowState;
+	PangeaScriptVector3 camera;
+	bool hasCameraState;
 	bool active;
 } PangeaScriptPlayerSnapshot;
 
@@ -78,6 +160,11 @@ typedef struct PangeaScriptGameCapabilities
 	bool mapItems;
 	bool pickupScoreEffects;
 	bool objectCollision;
+	bool playerScore;
+	bool playerLives;
+	bool playerInventory;
+	bool weaponScoreEffects;
+	bool playerForm;
 } PangeaScriptGameCapabilities;
 
 typedef struct PangeaScriptGameInfo
@@ -89,9 +176,16 @@ typedef struct PangeaScriptGameInfo
 	int (*getPlayerCount)(void);
 	bool (*getPlayer)(int playerNum, PangeaScriptPlayerSnapshot* outPlayer);
 	PangeaScriptStatus (*setPlayerHealth)(int playerNum, float health);
+	PangeaScriptStatus (*setPlayerLives)(int playerNum, int lives);
+	PangeaScriptStatus (*setPlayerScore)(int playerNum, int64_t score);
+	PangeaScriptStatus (*setPlayerWeaponQuantity)(int playerNum, int weaponType, int quantity);
+	PangeaScriptStatus (*setPlayerKey)(int playerNum, int keyId, bool enabled);
+	PangeaScriptStatus (*setPlayerCloverCount)(int playerNum, int color, int count);
+	PangeaScriptStatus (*setPlayerShieldActive)(int playerNum, bool active);
 	PangeaScriptStatus (*setPlayerInvulnerable)(int playerNum, float durationSeconds);
 	PangeaScriptStatus (*setPlayerPosition)(int playerNum, const PangeaScriptVector3* position);
 	PangeaScriptStatus (*setPlayerVelocity)(int playerNum, const PangeaScriptVector3* velocity);
+	PangeaScriptStatus (*setPlayerForm)(int playerNum, PangeaScriptPlayerForm form);
 	PangeaScriptStatus (*loadPersistent)(const char* key, unsigned char* outData, int capacity, int* outSize);
 	PangeaScriptStatus (*savePersistent)(const char* key, const unsigned char* data, int size);
 	PangeaScriptGameCapabilities capabilities;
@@ -107,6 +201,10 @@ typedef struct PangeaScriptLevelContext
 	const char* sceneName;
 	const char* areaName;
 	const char* playerMode;
+	int modePhase;
+	int modeWave;
+	float modeTimer;
+	bool hasModeState;
 } PangeaScriptLevelContext;
 
 typedef struct PangeaScriptFrameContext
@@ -122,6 +220,10 @@ typedef struct PangeaScriptFrameContext
 	const char* areaName;
 	const char* levelName;
 	const char* playerMode;
+	int modePhase;
+	int modeWave;
+	float modeTimer;
+	bool hasModeState;
 } PangeaScriptFrameContext;
 
 typedef struct PangeaScriptTerrainItemContext
@@ -176,6 +278,12 @@ typedef struct PangeaScriptMapItemContext
 typedef struct PangeaScriptObjectOps
 {
 	bool (*getPosition)(void* nativeObject, PangeaScriptVector3* outPosition);
+	bool (*getVelocity)(void* nativeObject, PangeaScriptVector3* outVelocity);
+	bool (*getRotation)(void* nativeObject, PangeaScriptVector3* outRotation);
+	bool (*getScale)(void* nativeObject, float* outScale);
+	bool (*getAnimation)(void* nativeObject, int* outAnimation);
+	bool (*getActive)(void* nativeObject, bool* outActive);
+	bool (*getCollisionEnabled)(void* nativeObject, bool* outEnabled);
 	bool (*setPosition)(void* nativeObject, const PangeaScriptVector3* position);
 	bool (*setVelocity)(void* nativeObject, const PangeaScriptVector3* velocity);
 	bool (*setRotation)(void* nativeObject, const PangeaScriptVector3* rotation);
@@ -183,6 +291,7 @@ typedef struct PangeaScriptObjectOps
 	bool (*setAnimation)(void* nativeObject, int animation, float speed, float blendSeconds);
 	bool (*setAnimationNamed)(void* nativeObject, const char* animation, float speed, float blendSeconds);
 	bool (*setCollisionEnabled)(void* nativeObject, bool enabled);
+	bool (*setActive)(void* nativeObject, bool active);
 	bool (*deleteObject)(void* nativeObject);
 } PangeaScriptObjectOps;
 
@@ -233,9 +342,27 @@ typedef struct PangeaScriptCommandTrace
 typedef struct PangeaScriptCommandTraceEntry
 {
 	char commandId[PANGEA_SCRIPT_COMMAND_ID_CAPACITY];
+	char applicationPhase[PANGEA_SCRIPT_COMMAND_PHASE_CAPACITY];
+	uint32_t order;
 	PangeaScriptObjectHandle target;
 	PangeaScriptStatus status;
 } PangeaScriptCommandTraceEntry;
+
+typedef struct PangeaScriptLifecycleTrace
+{
+	uint32_t eventCount;
+	uint32_t entryCount;
+	bool overflow;
+} PangeaScriptLifecycleTrace;
+
+typedef struct PangeaScriptLifecycleTraceEntry
+{
+	char eventId[PANGEA_SCRIPT_LIFECYCLE_EVENT_ID_CAPACITY];
+	char applicationPhase[PANGEA_SCRIPT_COMMAND_PHASE_CAPACITY];
+	uint32_t order;
+	PangeaScriptObjectHandle target;
+	PangeaScriptStatus status;
+} PangeaScriptLifecycleTraceEntry;
 
 typedef struct PangeaScriptCommandTraceComparison
 {
@@ -252,6 +379,20 @@ typedef struct PangeaScriptCommandTraceComparison
 	PangeaScriptStatus expectedStatus;
 	PangeaScriptStatus actualStatus;
 } PangeaScriptCommandTraceComparison;
+
+typedef struct PangeaScriptLifecycleTraceComparison
+{
+	bool matches;
+	uint32_t firstMismatchIndex;
+	uint32_t expectedEventCount;
+	uint32_t actualEventCount;
+	char expectedEventId[PANGEA_SCRIPT_LIFECYCLE_EVENT_ID_CAPACITY];
+	char actualEventId[PANGEA_SCRIPT_LIFECYCLE_EVENT_ID_CAPACITY];
+	PangeaScriptObjectHandle expectedTarget;
+	PangeaScriptObjectHandle actualTarget;
+	PangeaScriptStatus expectedStatus;
+	PangeaScriptStatus actualStatus;
+} PangeaScriptLifecycleTraceComparison;
 
 typedef struct PangeaScriptObjectRegistration
 {
@@ -349,6 +490,7 @@ typedef struct PangeaScriptPickupContext
 	int levelNum;
 	int playerNum;
 	int pickupType;
+	int pickupVariant;
 	float amount;
 	const char* pickupId;
 	PangeaScriptObjectHandle pickup;
@@ -564,6 +706,7 @@ PangeaScriptStatus PangeaScript_RegisterObject(const PangeaScriptObjectRegistrat
 PangeaScriptStatus PangeaScript_RegisterScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle);
 bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle);
 bool PangeaScript_ObjectExists(PangeaScriptObjectHandle handle);
+int PangeaScript_GetScriptedObjectCount(void);
 bool PangeaScript_GetObjectNativeObject(PangeaScriptObjectHandle handle, void** outNativeObject);
 PangeaScriptStatus PangeaScript_AssociateObjectSource(PangeaScriptObjectHandle handle, const PangeaScriptObjectSource* source);
 bool PangeaScript_GetObjectSource(PangeaScriptObjectHandle handle, PangeaScriptObjectSource* outSource);
@@ -573,6 +716,12 @@ bool PangeaScript_GetRegisteredObjectHandle(int index, PangeaScriptObjectHandle*
 int PangeaScript_GetObjectTagCount(PangeaScriptObjectHandle handle);
 const char* PangeaScript_GetObjectTag(PangeaScriptObjectHandle handle, int index);
 bool PangeaScript_GetObjectPosition(PangeaScriptObjectHandle handle, PangeaScriptVector3* outPosition);
+bool PangeaScript_GetObjectVelocity(PangeaScriptObjectHandle handle, PangeaScriptVector3* outVelocity);
+bool PangeaScript_GetObjectRotation(PangeaScriptObjectHandle handle, PangeaScriptVector3* outRotation);
+bool PangeaScript_GetObjectScale(PangeaScriptObjectHandle handle, float* outScale);
+bool PangeaScript_GetObjectAnimation(PangeaScriptObjectHandle handle, int* outAnimation);
+bool PangeaScript_GetObjectActive(PangeaScriptObjectHandle handle, bool* outActive);
+bool PangeaScript_GetObjectCollisionEnabled(PangeaScriptObjectHandle handle, bool* outEnabled);
 bool PangeaScript_SetObjectPosition(PangeaScriptObjectHandle handle, const PangeaScriptVector3* position);
 bool PangeaScript_SetObjectPositionOffset(PangeaScriptObjectHandle handle, const PangeaScriptVector3* offset);
 bool PangeaScript_SetObjectVelocity(PangeaScriptObjectHandle handle, const PangeaScriptVector3* velocity);
@@ -604,6 +753,20 @@ PangeaScriptStatus PangeaScript_CompareCommandTrace(
 	const PangeaScriptCommandTraceEntry* expectedEntries,
 	uint32_t expectedEntryCount,
 	PangeaScriptCommandTraceComparison* outComparison);
+void PangeaScript_ResetLifecycleTrace(void);
+void PangeaScript_RecordLifecycleEvent(const char* eventId, PangeaScriptObjectHandle target, PangeaScriptStatus status);
+void PangeaScript_GetLifecycleTrace(PangeaScriptLifecycleTrace* outTrace);
+bool PangeaScript_GetLifecycleTraceEntry(int index, PangeaScriptLifecycleTraceEntry* outEntry);
+PangeaScriptStatus PangeaScript_CompareLifecycleTrace(
+	const PangeaScriptLifecycleTrace* expectedTrace,
+	const PangeaScriptLifecycleTraceEntry* expectedEntries,
+	uint32_t expectedEntryCount,
+	PangeaScriptLifecycleTraceComparison* outComparison);
+PangeaScriptStatus PangeaScript_CompareNormalizedLifecycleTrace(
+	const PangeaScriptLifecycleTrace* expectedTrace,
+	const PangeaScriptLifecycleTraceEntry* expectedEntries,
+	uint32_t expectedEntryCount,
+	PangeaScriptLifecycleTraceComparison* outComparison);
 
 typedef enum PangeaScriptLogLevel
 {

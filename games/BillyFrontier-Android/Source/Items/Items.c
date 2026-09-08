@@ -780,7 +780,8 @@ static Boolean DoTrig_FreeLife(ObjNode *item, ObjNode *who, Byte sideBits)
 	(void) sideBits;
 
 	#ifdef PANGEA_ENABLE_SCRIPTING
-	BillyScript_OnPickupCollected(item, who, item->Type, 1.0f, "billy.freeLifePow");
+	if (!BillyScript_OnPickupCollected(item, who, item->Type, 1.0f, "billy.freeLifePow"))
+		return(false);
 	#endif
 
 	BulletHitFreeLifePOW(nil, item, &item->Coord);
@@ -913,7 +914,8 @@ static Boolean DoTrig_Peso(ObjNode *item, ObjNode *who, Byte sideBits)
 	(void) sideBits;
 
 	#ifdef PANGEA_ENABLE_SCRIPTING
-	BillyScript_OnPickupCollected(item, who, item->Type, 1.0f, "billy.peso");
+	if (!BillyScript_OnPickupCollected(item, who, item->Type, 1.0f, "billy.peso"))
+		return(false);
 	#endif
 
 	item->CType = 0;
@@ -1549,5 +1551,4 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
 

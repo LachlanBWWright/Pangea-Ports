@@ -176,6 +176,11 @@ SplinePointType	*points;
 				itemPtr->flags |= ITEM_FLAGS_INUSE;
 				continue;
 			}
+			if (CroMagScript_OnSplineItem(itemPtr, gTrackNum, (int)s))
+			{
+				itemPtr->flags |= ITEM_FLAGS_INUSE;
+				continue;
+			}
 #endif
 			#if PANGEA_SAFE_ITEM_LOADING
 			gActiveItemModelGroup = MODEL_GROUP_LEVEL_BANK_BASE + gTrackNum;
@@ -444,4 +449,3 @@ float			numPointsInSpline;
 		}
 	}
 }
-

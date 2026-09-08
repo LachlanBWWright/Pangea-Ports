@@ -37,6 +37,11 @@
 extern Boolean gDisableFenceCollision;
 extern int gStartLevel;
 
+EMSCRIPTEN_KEEPALIVE void Bugdom2_RequestQuit(void)
+{
+	gGameOver = true;
+}
+
 
 /************** SET FENCE COLLISION ENABLED **************/
 //

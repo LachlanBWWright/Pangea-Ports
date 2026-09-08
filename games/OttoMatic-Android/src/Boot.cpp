@@ -74,6 +74,14 @@ EMSCRIPTEN_KEEPALIVE extern "C" void OttoMatic_SetTerrainPath(const char* path)
 	sHasTerrainOverride = false;	// will be rebuilt on next level load
 }
 
+// Ask the active game loop to leave its current level before the preview host
+// tears down the canvas and restores the browser globals.
+EMSCRIPTEN_KEEPALIVE extern "C" void OttoMatic_RequestQuit(void)
+{
+	gEmscriptenQuitRequested = true;
+	gGameOver = true;
+}
+
 // God-mode flag: when >0 the player cannot lose health
 static int sGodMode = 0;
 

@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
+
+#include <limits.h>
 
 /****************************/
 /*    PROTOTYPES            */
@@ -18,7 +21,7 @@
 static void StartPunch(ObjNode *player);
 static void ShootWeapon(ObjNode *theNode);
 static void MoveStunPulse(ObjNode *theNode);
-static void ShootStunPulse(ObjNode *theNode, OGLPoint3D *where, OGLVector3D *aim);
+static ObjNode *ShootStunPulse(ObjNode *theNode, OGLPoint3D *where, OGLVector3D *aim);
 static void MoveStunPulseRipple(ObjNode *theNode);
 static Boolean DoWeaponCollisionDetect(ObjNode *theNode);
 static void	WeaponAutoTarget(OGLPoint3D *where, OGLVector3D *aim);
@@ -567,7 +570,7 @@ Boolean	wasHoldingGun = gPlayerInfo.holdingGun;
 
 /***************** SHOOT STUN PULSE ************************/
 
-static void ShootStunPulse(ObjNode *theNode, OGLPoint3D *where, OGLVector3D *aim)
+static ObjNode *ShootStunPulse(ObjNode *theNode, OGLPoint3D *where, OGLVector3D *aim)
 {
 ObjNode	*newObj;
 int				i;
@@ -647,6 +650,7 @@ int				i;
 			/* SET THE ALIGNMENT MATRIX */
 
 	SetAlignmentMatrix(&newObj->AlignmentMatrix, aim);
+	return newObj;
 }
 
 
@@ -923,6 +927,29 @@ float		x,y,z, ex,ey,ez;
 
 
 
+static Boolean OttoScript_ApplyWeaponHit(ObjNode *weapon, ObjNode *target)
+{
+	float damage = weapon->Damage;
+	float nativeDamage = weapon->Damage;
+	Boolean destroyTarget = false;
+	Boolean applyDamage = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	applyDamage = OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget);
+	if (destroyTarget)
+	{
+		DeleteObject(target);
+		return true;
+	}
+#endif
+	if (!applyDamage)
+		return false;
+	weapon->Damage = damage;
+	Boolean handlerConsumedWeapon = (target->HitByWeaponHandler[weapon->Kind])(weapon, target, &gCoord, &gDelta);
+	if (weapon->CType != INVALID_NODE_FLAG)
+		weapon->Damage = nativeDamage;
+	return handlerConsumedWeapon;
+}
+
 /**************** DO WEAPON COLLISION DETECT *************************/
 //
 // returns true if weapon is destroyed
@@ -958,10 +985,9 @@ CollisionBoxType	*baseBoxList = theNode->CollisionBoxes;
 			{
 				if (hitObj->HitByWeaponHandler[weaponType])					// see if there is a handler for this weapon
 				{
-					if ((hitObj->HitByWeaponHandler[weaponType])(theNode, hitObj, &gCoord, &gDelta))	// call the handler
+					if (OttoScript_ApplyWeaponHit(theNode, hitObj))
 						goto explode_weapon;
-					else
-						return(false);										// dont blow up bullet after collision handler
+					return(false);										// dont blow up bullet after collision handler
 				}
 			}
 		}
@@ -998,6 +1024,162 @@ explode_weapon:
 	}
 
 	return(false);
+}
+
+int OttoScript_ProbeWeaponHitJS(void)
+{
+	ObjNode *target = NULL;
+	ObjNode *weapon;
+	OGLPoint3D where;
+	OGLVector3D aim = {0, 0, 1};
+
+	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node != gPlayerInfo.objNode && node->ScriptObjectID > 0 &&
+			node->HitByWeaponHandler[WEAPON_TYPE_STUNPULSE])
+		{
+			target = node;
+			break;
+		}
+	}
+	if (!target || !gPlayerInfo.objNode)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+
+	where = target->Coord;
+	weapon = ShootStunPulse(gPlayerInfo.objNode, &where, &aim);
+	if (!weapon)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	GetObjectInfo(weapon);
+	{
+		float damage = weapon->Damage;
+		Boolean destroyTarget = false;
+		(void) OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget);
+	}
+	if (weapon->CType != INVALID_NODE_FLAG)
+		DeleteObject(weapon);
+
+	return OttoScript_GetLastWeaponHitScoreDelta();
+}
+
+static ObjNode *FindScriptWeapon(int weaponType)
+{
+	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node != gPlayerInfo.objNode && node->CType == CTYPE_WEAPON && node->Kind == weaponType)
+			return node;
+	}
+	return NULL;
+}
+
+static Boolean ProbeScriptProjectileWeapon(ObjNode *target, int weaponType, OGLPoint3D *where, OGLVector3D *aim)
+{
+	ObjNode *weapon = NULL;
+	float damage;
+	Boolean destroyTarget = false;
+	if (!target || !target->HitByWeaponHandler[weaponType]) return false;
+	if (weaponType == WEAPON_TYPE_STUNPULSE)
+		weapon = ShootStunPulse(gPlayerInfo.objNode, where, aim);
+	else if (weaponType == WEAPON_TYPE_FREEZE)
+		ShootFreezeGun(gPlayerInfo.objNode, where, aim);
+	else if (weaponType == WEAPON_TYPE_FLAME)
+		ShootFlameGun(gPlayerInfo.objNode, where, aim);
+	else if (weaponType == WEAPON_TYPE_FLARE)
+		ShootFlareGun(gPlayerInfo.objNode, where, aim);
+	if (!weapon) weapon = FindScriptWeapon(weaponType);
+	if (!weapon) return false;
+	damage = weapon->Damage;
+	if (!OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget))
+		return false;
+	if (weapon->CType != INVALID_NODE_FLAG)
+		DeleteObject(weapon);
+	return true;
+}
+
+int OttoScript_ProbeProjectileWeaponFamiliesJS(void)
+{
+	static const int projectileTypes[] = {WEAPON_TYPE_STUNPULSE, WEAPON_TYPE_FREEZE, WEAPON_TYPE_FLAME, WEAPON_TYPE_FLARE};
+	ObjNode *target = NULL;
+	OGLPoint3D where;
+	OGLVector3D aim = {0, 0, 1};
+	int completed = 0;
+	if (!gPlayerInfo.objNode) return 0;
+	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		Boolean supportsProjectile = true;
+		for (int index = 0; index < (int)(sizeof(projectileTypes) / sizeof(projectileTypes[0])); index++)
+			if (!node->HitByWeaponHandler[projectileTypes[index]]) supportsProjectile = false;
+		if (node != gPlayerInfo.objNode && supportsProjectile)
+		{
+			target = node;
+			break;
+		}
+	}
+	if (!target) return 0;
+	where = target->Coord;
+	for (int index = 0; index < (int)(sizeof(projectileTypes) / sizeof(projectileTypes[0])); index++)
+		if (ProbeScriptProjectileWeapon(target, projectileTypes[index], &where, &aim)) completed++;
+	return completed;
+}
+
+int OttoScript_ProbeDartWeaponJS(void)
+{
+	ObjNode *target = NULL;
+	ObjNode *weapon;
+	OGLPoint3D where;
+	float damage;
+	Boolean destroyTarget = false;
+	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node != gPlayerInfo.objNode && node->HitByWeaponHandler[WEAPON_TYPE_DART])
+		{
+			target = node;
+			break;
+		}
+	}
+	if (!target || !gPlayerInfo.objNode) return 0;
+	where = target->Coord;
+	gPlayerInfo.objNode->Rot.y = atan2f(-where.x + gPlayerInfo.coord.x, -where.z + gPlayerInfo.coord.z);
+	ThrowDart(gPlayerInfo.objNode);
+	weapon = FindScriptWeapon(WEAPON_TYPE_DART);
+	if (!weapon) return 0;
+	damage = weapon->Damage;
+	if (!OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget))
+		return 0;
+	if (weapon->CType != INVALID_NODE_FLAG)
+		DeleteObject(weapon);
+	return 1;
+}
+
+int OttoScript_ProbeSuperNovaWeaponJS(void)
+{
+	ObjNode *target = NULL;
+	OGLPoint3D originalCoord;
+	OGLPoint3D probeCoord;
+	Boolean dischargeAborted;
+	if (!gPlayerInfo.objNode) return 0;
+	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node != gPlayerInfo.objNode && node->HitByWeaponHandler[WEAPON_TYPE_SUPERNOVA])
+		{
+			target = node;
+			break;
+		}
+	}
+	if (!target) return 0;
+	originalCoord = target->Coord;
+	probeCoord = gPlayerInfo.coord;
+	probeCoord.x += 100.0f;
+	target->Coord = probeCoord;
+	UpdateObjectTransforms(target);
+	gPlayerInfo.superNovaCharge = 1.0f;
+	StartSuperNovaCharge(gPlayerInfo.objNode);
+	dischargeAborted = DischargeSuperNova();
+	if (target->CType != INVALID_NODE_FLAG)
+	{
+		target->Coord = originalCoord;
+		UpdateObjectTransforms(target);
+	}
+	return dischargeAborted ? 0 : 1;
 }
 
 
@@ -2617,20 +2799,6 @@ static void ExplodeDart(ObjNode *theNode)
 
 	DeleteObject(theNode);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -103,6 +103,9 @@ int					gIndicesScannedThisFrame = 0;
 
 Boolean				gPlayingFromSavedGame = false;
 Boolean				gGameOver = false;
+#ifdef __EMSCRIPTEN__
+Boolean				gEmscriptenQuitRequested = false;
+#endif
 Boolean				gLevelCompleted = false;
 float				gLevelCompletedCoolDownTimer = 0;
 
@@ -259,6 +262,10 @@ static void PlayGame(void)
 
 		if (gGameOver)									// bail out if game has ended
 		{
+		#ifdef __EMSCRIPTEN__
+			if (gEmscriptenQuitRequested)
+				break;
+		#endif
 			DoLoseScreen();
 			break;
 		}

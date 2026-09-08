@@ -18,6 +18,7 @@
 	X("onObjectFrame") \
 	X("onPickupCollected") \
 	X("onTriggerEnter") \
+	X("onWeaponHit") \
 	X("onDamage") \
 	X("onDamageApplied") \
 	X("onPlayerSpawn") \
@@ -45,6 +46,7 @@
 	X("onDamageApplied") \
 	X("onPlayerSpawn") \
 	X("onCheckpointReached") \
+	X("onObjectiveComplete") \
 	X("onPlayerRespawn") \
 	X("onDeath") \
 	X("onSave") \
@@ -69,6 +71,7 @@
 	X("onDeath") \
 	X("onPlayerSpawn") \
 	X("onCheckpointReached") \
+	X("onObjectiveComplete") \
 	X("onPlayerRespawn") \
 	X("onSave") \
 	X("onLoad")
@@ -179,28 +182,35 @@
 	X("onSave") \
 	X("onLoad")
 
-#define PANGEA_SCRIPT_OTTO_MATIC_CAPABILITIES { true, true, false, false, true }
+#define PANGEA_SCRIPT_OTTO_MATIC_CAPABILITIES { true, true, false, true, true, true, true, true, true, false }
 
-#define PANGEA_SCRIPT_BUGDOM_CAPABILITIES { true, true, false, false, true }
+#define PANGEA_SCRIPT_BUGDOM_CAPABILITIES { true, true, false, true, true, true, true, true, true, true }
 
-#define PANGEA_SCRIPT_BUGDOM2_CAPABILITIES { true, true, false, false, true }
+#define PANGEA_SCRIPT_BUGDOM2_CAPABILITIES { true, true, false, true, true, true, true, true, true, false }
 
-#define PANGEA_SCRIPT_NANOSAUR_CAPABILITIES { true, false, false, false, true }
+#define PANGEA_SCRIPT_NANOSAUR_CAPABILITIES { true, false, false, true, true, true, true, true, true, false }
 
-#define PANGEA_SCRIPT_NANOSAUR2_CAPABILITIES { true, true, false, false, true }
+#define PANGEA_SCRIPT_NANOSAUR2_CAPABILITIES { true, true, false, false, true, false, true, true, false, false }
 
-#define PANGEA_SCRIPT_CRO_MAG_RALLY_CAPABILITIES { true, false, false, false, true }
+#define PANGEA_SCRIPT_CRO_MAG_RALLY_CAPABILITIES { true, true, false, false, true, false, false, true, false, false }
 
-#define PANGEA_SCRIPT_BILLY_FRONTIER_CAPABILITIES { true, true, false, true, true }
+#define PANGEA_SCRIPT_BILLY_FRONTIER_CAPABILITIES { true, true, false, true, true, true, true, true, true, false }
 
-#define PANGEA_SCRIPT_MIGHTY_MIKE_CAPABILITIES { false, false, true, false, false }
+#define PANGEA_SCRIPT_MIGHTY_MIKE_CAPABILITIES { false, false, true, true, true, true, true, true, true, false }
 
 #define PANGEA_SCRIPT_COMMAND_DESCRIPTOR_LIST(X) \
 	X("pangea.player.setHealth", "player-health", "disabled-network", "callback", "integer player index; finite health in range 0..1; adapter health mutation support") \
+	X("pangea.player.setLives", "player-lives", "disabled-network", "callback", "integer player index; non-negative integer lives count; adapter lives mutation support") \
+	X("pangea.player.setScore", "player-score", "disabled-network", "callback", "integer player index; non-negative integer score in range 0..UINT32_MAX; adapter score mutation support") \
+	X("pangea.player.setWeaponQuantity", "player-inventory", "disabled-network", "callback", "integer player index; valid adapter weapon type; non-negative quantity in range 0..999; adapter inventory mutation support") \
+	X("pangea.player.setKey", "player-keys", "disabled-network", "callback", "integer player index; valid adapter key identifier; boolean enabled state; adapter key inventory mutation support") \
+	X("pangea.player.setCloverCount", "player-collectibles", "disabled-network", "callback", "integer player index; named clover color green, blue, or gold; non-negative count in range 0..999; adapter collectible mutation support") \
+	X("pangea.player.setShieldActive", "player-shield", "disabled-network", "callback", "integer player index; boolean active state; adapter-native shield activation/deactivation support") \
 	X("pangea.player.heal", "player-heal", "disabled-network", "callback", "integer player index; finite non-negative health amount in range 0..1; adapter health read and mutation support") \
 	X("pangea.player.setInvulnerable", "player-invulnerability", "disabled-network", "callback", "integer player index; finite duration in range 0..3600 seconds; adapter invulnerability timer support") \
 	X("pangea.player.setPosition", "player-position", "disabled-network", "callback", "integer player index; finite Vector3; adapter player-position mutation support") \
 	X("pangea.player.setVelocity", "player-velocity", "disabled-network", "callback", "integer player index; finite Vector3; adapter player-velocity mutation support") \
+	X("pangea.player.setForm", "player-form", "disabled-network", "callback", "player index; supported native form identifier such as bug or ball") \
 	X("pangea.object.setPosition", "object-position", "disabled-network", "callback", "generation-checked handle; finite Vector3") \
 	X("pangea.object.setPositionOffset", "object-position-offset", "disabled-network", "callback", "generation-checked handle; finite Vector3; only during onObjectFrame") \
 	X("pangea.object.setVelocity", "object-velocity", "disabled-network", "callback", "generation-checked handle; finite Vector3") \
@@ -217,13 +227,13 @@
 	X("onWeaponHit", "next-engine-phase", "weapon:ObjectHandle|nil;target:ObjectHandle|nil;damage:number", "WeaponHitResult|nil") \
 	X("onDamage", "callback", "target:ObjectHandle;source:ObjectHandle|nil;damage:number;cause:integer", "DamageResult|nil") \
 	X("onDamageApplied", "callback", "target:ObjectHandle;source:ObjectHandle|nil;damage:number;cause:integer", "nil") \
-	X("onDeath", "callback", "player:ObjectHandle;eventValue:integer", "nil") \
-	X("onPlayerSpawn", "callback", "player:ObjectHandle;position:Vector3", "nil") \
-	X("onPlayerRespawn", "callback", "player:ObjectHandle;position:Vector3", "nil") \
-	X("onCheckpointReached", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
-	X("onLapComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
-	X("onRaceFinish", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
-	X("onObjectiveComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
+	X("onDeath", "callback", "player:ObjectHandle;eventValue:integer;velocity:Vector3|nil", "nil") \
+	X("onPlayerSpawn", "callback", "player:ObjectHandle;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
+	X("onPlayerRespawn", "callback", "player:ObjectHandle;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
+	X("onCheckpointReached", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
+	X("onLapComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
+	X("onRaceFinish", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
+	X("onObjectiveComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
 	X("animationComplete", "callback", "object:ObjectHandle", "nil") \
 	X("destroy", "callback", "object:ObjectHandle", "nil")
 
