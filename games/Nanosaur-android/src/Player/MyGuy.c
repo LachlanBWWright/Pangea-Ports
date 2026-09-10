@@ -1096,6 +1096,7 @@ void StartMyShield(ObjNode *theNode)
 		gMyShield = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (gMyShield)
 		{
+			NanosaurScript_RegisterObject(gMyShield, "nanosaur.playerShield", "child-object");
 			MakeObjectTransparent(gMyShield,.3);
 		}
 	}

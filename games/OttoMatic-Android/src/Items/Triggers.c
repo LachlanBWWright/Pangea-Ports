@@ -223,6 +223,7 @@ int		i;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.woodenGate", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"trigger", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -461,6 +462,7 @@ int		i;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.metalGate", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"trigger", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -706,6 +708,7 @@ float	y;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 5.0;
 	base = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(base, "ottomatic.checkpoint", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"objective", "trigger"}, 2);
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -738,6 +741,7 @@ float	y;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	dish = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(dish, "ottomatic.checkpointDish", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"child-object"}, 1);
 
 	base->ChainNode = dish;
 
@@ -969,6 +973,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveBumperBubble;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.bumperBubble", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"hazard", "trigger"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1120,6 +1125,7 @@ int		i;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= s = 2.0f;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.fallingSlimePlatform", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"platform", "hazard"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1375,6 +1381,7 @@ static const OGLPoint3D xLights[8] =
 	gNewObjectDefinition.rot 		= gSpinningPlatformRot;
 	gNewObjectDefinition.scale 	= s = 2.0f;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.spinningPlatform", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"platform", "trigger"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1754,4 +1761,3 @@ OGLPoint2D		origin,pt,p[12];
 
 	return(true);
 }
-

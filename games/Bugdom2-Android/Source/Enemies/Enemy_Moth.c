@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -109,6 +113,8 @@ int		i,j;
 	gNewObjectDefinition.scale 		= MOTH_SCALE;
 
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.moth", "enemy");
 
 	newObj->TerrainItemPtr = itemPtr;
 
@@ -630,7 +636,6 @@ SplinePointType	*points;
 
 	return((float)bestIndex / (float)numPointsInSpline);				// return the placement 0.0 -> 1.0 value
 }
-
 
 
 

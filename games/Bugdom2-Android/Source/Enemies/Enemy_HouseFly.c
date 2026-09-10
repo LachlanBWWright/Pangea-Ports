@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -127,6 +131,8 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_HOUSEFLY,animNum, x,z, HOUSEFLY_SCALE, 0, MoveHouseFly);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.houseFly", "enemy");
 
 
 
@@ -665,6 +671,5 @@ static void SeeIfHouseFlyAttack(ObjNode *theNode)
 
 	}
 }
-
 
 

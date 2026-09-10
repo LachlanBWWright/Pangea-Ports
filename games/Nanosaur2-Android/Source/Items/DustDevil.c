@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -369,6 +373,9 @@ int	devilNum;
 	};
 
 	newObj = MakeNewObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.dustDevil", "hazard");
+	#endif
 
 	newObj->Mode = devilNum;
 
@@ -772,7 +779,6 @@ short	p = player->PlayerNum;
 	gPlayerInfo[p].ejectedFromDustDevil = false;
 
 }
-
 
 
 

@@ -20,6 +20,9 @@
 #include "enemy5.h"
 #include "sound2.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -61,6 +64,10 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,MoveRobot,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.robot", "enemy");
+#endif
 
 	CalcEnemyScatterOffset(newObj);
 
@@ -218,4 +225,3 @@ register	ObjNode *newObj;
 
 	gLastRobotDangerTime = gFrames;						// remember when it occurred
 }
-

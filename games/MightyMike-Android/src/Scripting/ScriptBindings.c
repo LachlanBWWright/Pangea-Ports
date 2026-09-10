@@ -254,6 +254,23 @@ static bool MikeScript_GetObjectAnimation(void* nativeObject, int* outAnimation)
 	return true;
 }
 
+static bool MikeScript_GetObjectAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outSpeed || obj->CType == INVALID_NODE_FLAG) return false;
+	*outSpeed = (float)obj->AnimSpeed / 256.0f;
+	return true;
+}
+
+static bool MikeScript_GetObjectAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*)nativeObject;
+	if (!obj || !outFrame || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outFrame = (int)obj->CurrentFrame;
+	return true;
+}
+
 static bool MikeScript_SetObjectAnimationNamed(void* nativeObject, const char* animation, float speed, float blendSeconds)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
@@ -335,6 +352,15 @@ static bool MikeScript_GetObjectActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool MikeScript_GetObjectHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outHealth = obj->Health;
+	return true;
+}
+
 static bool MikeScript_DeletePlayerObject(void* nativeObject)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -365,7 +391,10 @@ static const PangeaScriptObjectOps kMikePlayerObjectOps =
 	.setRotation = MikeScript_SetObjectRotation,
 	.setScale = MikeScript_SetObjectScale,
 	.getAnimation = MikeScript_GetObjectAnimation,
+	.getAnimationSpeed = MikeScript_GetObjectAnimationSpeed,
+	.getAnimationFrame = MikeScript_GetObjectAnimationFrame,
 	.getActive = MikeScript_GetObjectActive,
+	.getHealth = MikeScript_GetObjectHealth,
 	.getCollisionEnabled = MikeScript_GetObjectCollisionEnabled,
 	.setAnimation = MikeScript_SetObjectAnimation,
 	.setAnimationNamed = MikeScript_SetObjectAnimationNamed,
@@ -418,6 +447,210 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.nativeType = 19,
 		.category = "pickup",
 		.dependencySummary = "key pickup assets, inventory state, and object manager",
+	},
+	{
+		.id = "mightymike.caveman",
+		.nativeType = 0,
+		.category = "enemy",
+		.dependencySummary = "Caveman assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.triceratops",
+		.nativeType = 4,
+		.category = "enemy",
+		.dependencySummary = "Triceratops assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.turtle",
+		.nativeType = 5,
+		.category = "enemy",
+		.dependencySummary = "Turtle assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.babyDino",
+		.nativeType = 8,
+		.category = "enemy",
+		.dependencySummary = "Baby-dino assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.rex",
+		.nativeType = 9,
+		.category = "enemy",
+		.dependencySummary = "Rex assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.manEatingPlant",
+		.nativeType = 6,
+		.category = "enemy",
+		.dependencySummary = "man-eating plant assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.clownCar",
+		.nativeType = 11,
+		.category = "enemy",
+		.dependencySummary = "clown-car assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.jackInTheBox",
+		.nativeType = 12,
+		.category = "enemy",
+		.dependencySummary = "jack-in-the-box assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.flowerClown",
+		.nativeType = 16,
+		.category = "enemy",
+		.dependencySummary = "flower-clown assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.chocBunny",
+		.nativeType = 24,
+		.category = "enemy",
+		.dependencySummary = "chocolate-bunny assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.gingerBread",
+		.nativeType = 25,
+		.category = "enemy",
+		.dependencySummary = "gingerbread assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.mint",
+		.nativeType = 26,
+		.category = "enemy",
+		.dependencySummary = "mint assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.gummyBear",
+		.nativeType = 28,
+		.category = "enemy",
+		.dependencySummary = "gummy-bear assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.caramel",
+		.nativeType = 32,
+		.category = "enemy",
+		.dependencySummary = "caramel assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.lemonDrop",
+		.nativeType = 36,
+		.category = "enemy",
+		.dependencySummary = "lemon-drop assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.giant",
+		.nativeType = 37,
+		.category = "enemy",
+		.dependencySummary = "giant assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.dragon",
+		.nativeType = 38,
+		.category = "enemy",
+		.dependencySummary = "dragon assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.witch",
+		.nativeType = 39,
+		.category = "enemy",
+		.dependencySummary = "witch assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.blackBearWolf",
+		.nativeType = 40,
+		.category = "enemy",
+		.dependencySummary = "black-bear-wolf assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.soldier",
+		.nativeType = 41,
+		.category = "enemy",
+		.dependencySummary = "soldier assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.muffit",
+		.nativeType = 42,
+		.category = "enemy",
+		.dependencySummary = "Muffit assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.spider",
+		.nativeType = 43,
+		.category = "enemy",
+		.dependencySummary = "spider assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.battery",
+		.nativeType = 45,
+		.category = "enemy",
+		.dependencySummary = "battery assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.poisonApple",
+		.nativeType = 46,
+		.category = "enemy",
+		.dependencySummary = "poison-apple assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.slinky",
+		.nativeType = 47,
+		.category = "enemy",
+		.dependencySummary = "slinky assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.eightBall",
+		.nativeType = 48,
+		.category = "enemy",
+		.dependencySummary = "eight-ball assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.robot",
+		.nativeType = 50,
+		.category = "enemy",
+		.dependencySummary = "robot assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.doggy",
+		.nativeType = 51,
+		.category = "enemy",
+		.dependencySummary = "doggy assets, playfield, and native enemy AI",
+	},
+	{
+		.id = "mightymike.weaponPowerup",
+		.nativeType = 33,
+		.category = "pickup",
+		.dependencySummary = "weapon powerup assets, player inventory, and playfield",
+	},
+	{
+		.id = "mightymike.miscPowerup",
+		.nativeType = 34,
+		.category = "pickup",
+		.dependencySummary = "miscellaneous powerup assets, player state, and playfield",
+	},
+	{
+		.id = "mightymike.shipPowerup",
+		.nativeType = 49,
+		.category = "pickup",
+		.dependencySummary = "ship powerup assets, player state, and playfield",
+	},
+	{
+		.id = "mightymike.jurassicDoor",
+		.nativeType = 31,
+		.category = "trigger",
+		.dependencySummary = "Jurassic door assets, area transition, and playfield",
+	},
+	{
+		.id = "mightymike.fairyDoor",
+		.nativeType = 44,
+		.category = "trigger",
+		.dependencySummary = "fairy door assets, area transition, and playfield",
+	},
+	{
+		.id = "mightymike.bargainDoor",
+		.nativeType = 52,
+		.category = "trigger",
+		.dependencySummary = "bargain door assets, area transition, and playfield",
 	},
 #define MIGHTY_MIKE_MAP_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "map", .dependencySummary = "current map assets, object manager, and the native map initializer" },
 	MIGHTY_MIKE_MAP_NATIVE_ITEM(0) MIGHTY_MIKE_MAP_NATIVE_ITEM(1) MIGHTY_MIKE_MAP_NATIVE_ITEM(2) MIGHTY_MIKE_MAP_NATIVE_ITEM(3) MIGHTY_MIKE_MAP_NATIVE_ITEM(4) MIGHTY_MIKE_MAP_NATIVE_ITEM(5) MIGHTY_MIKE_MAP_NATIVE_ITEM(6) MIGHTY_MIKE_MAP_NATIVE_ITEM(7) MIGHTY_MIKE_MAP_NATIVE_ITEM(8) MIGHTY_MIKE_MAP_NATIVE_ITEM(9) MIGHTY_MIKE_MAP_NATIVE_ITEM(10)
@@ -480,6 +713,7 @@ void MikeScript_ResetObjectRegistry(void)
 	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	MikeScript_ReleaseCustomShapes();
 	gScriptFrameContext = (PangeaScriptFrameContext){0};
+	gScriptInvulnerableFrames = 0;
 	memset(gScriptItemOccupied, 0, sizeof(gScriptItemOccupied));
 	memset(gScriptItemReclaimable, 0, sizeof(gScriptItemReclaimable));
 	PangeaScript_ResetObjects();
@@ -1050,6 +1284,16 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
+	static const PangeaScriptVector3 aimDirections[] = {
+		{0.0f, -1.0f, 0.0f},
+		{0.70710678f, -0.70710678f, 0.0f},
+		{1.0f, 0.0f, 0.0f},
+		{0.70710678f, 0.70710678f, 0.0f},
+		{0.0f, 1.0f, 0.0f},
+		{-0.70710678f, 0.70710678f, 0.0f},
+		{-1.0f, 0.0f, 0.0f},
+		{-0.70710678f, -0.70710678f, 0.0f},
+	};
 	float health;
 	if (playerNum != 0 || !outPlayer || !gMyNodePtr) return false;
 	health = gMyMaxHealth > 0 ? (float)gMyHealth / (float)gMyMaxHealth : 0.0f;
@@ -1067,12 +1311,16 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.hasScore = true,
 		.coinCount = gNumCoins,
 		.hasCoinState = true,
+		.bunnyCount = gNumBunnies,
+		.hasBunnyState = true,
 		.lives = gNumLives,
 		.hasLives = true,
 		.sceneNum = gSceneNum,
 		.areaNum = gAreaNum,
 		.areaComplete = gFinishedArea,
 		.hasLevelFlowState = true,
+		.levelComplete = gFinishedArea,
+		.hasLevelCompletionState = true,
 		.camera = {(float)gScrollX, (float)gScrollY, 0.0f},
 		.hasCameraState = true,
 		.activeWeapon = gCurrentWeaponType,
@@ -1080,8 +1328,27 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.weaponCount = gNumWeaponsIHave < PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY ? gNumWeaponsIHave : PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY,
 		.shieldActive = gShieldTimer > 0,
 		.hasShieldState = true,
+		.shieldTimeRemaining = (float)gShieldTimer / (float)GAME_FPS,
+		.hasShieldTimerState = true,
+		.invulnerable = gScriptInvulnerableFrames > 0,
+		.hasInvulnerabilityState = true,
+		.invulnerabilityTimeRemaining = (float)gScriptInvulnerableFrames / (float)GAME_FPS,
+		.hasInvulnerabilityTimerState = true,
+		.animation = gMyNodePtr->SubType,
+		.hasAnimationState = true,
+		.animationSpeed = (float)gMyNodePtr->AnimSpeed / 256.0f,
+		.hasAnimationSpeedState = true,
+		.animationFrame = (int)gMyNodePtr->CurrentFrame,
+		.hasAnimationFrameState = true,
 		.active = true,
 	};
+	if (gMyDirection >= AIM_UP && gMyDirection <= AIM_UP_LEFT)
+	{
+		outPlayer->aim = aimDirections[gMyDirection];
+		outPlayer->hasAimState = true;
+	}
+	outPlayer->dead = gMyHealth < 0;
+	outPlayer->hasDeathState = true;
 	for (int weaponIndex = 0; weaponIndex < outPlayer->weaponCount; weaponIndex++)
 		outPlayer->weapons[weaponIndex] = (PangeaScriptPlayerInventoryEntry){gMyWeapons[weaponIndex].type, gMyWeapons[weaponIndex].life};
 	return true;
@@ -1192,6 +1459,7 @@ void MikeScript_OnAreaUnload(int sceneNum, int areaNum)
 {
 	CallAreaHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, sceneNum, areaNum, "onAreaUnload");
 	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+	MikeScript_ReleaseCustomShapes();
 	PangeaScript_ResetObjects();
 }
 

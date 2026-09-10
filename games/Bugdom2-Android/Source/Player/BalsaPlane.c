@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -77,6 +78,8 @@ ObjNode	*prop, *band;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .8f;
 	gPlane = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (gPlane != nil)
+		Bugdom2Script_RegisterObject(gPlane, "bugdom2.balsaPlane", "vehicle");
 
 
 			/* MAKE SHADOW */
@@ -96,6 +99,8 @@ ObjNode	*prop, *band;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.scale 		= gPlane->Scale.x;
 	prop = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (prop != nil)
+		Bugdom2Script_RegisterObject(prop, "bugdom2.balsaPropeller", "child-object");
 
 	gPlane->ChainNode = prop;
 
@@ -108,6 +113,8 @@ ObjNode	*prop, *band;
 	gNewObjectDefinition.flags 		= STATUS_BIT_DONTCULL | STATUS_BIT_NOTEXTUREWRAP;
 	gNewObjectDefinition.slot++;
 	band = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (band != nil)
+		Bugdom2Script_RegisterObject(band, "bugdom2.balsaRubberBand", "child-object");
 
 	prop->ChainNode = band;
 
@@ -437,6 +444,7 @@ float	r;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 2.0f;
 	bullet = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(bullet, "bugdom2.balsaBullet", "projectile/effect");
 
 	bullet->Delta.x = -sin(r) * BULLET_SPEED;
 	bullet->Delta.z = -cos(r) * BULLET_SPEED;
@@ -505,6 +513,7 @@ ObjNode	*bomb;
 	gNewObjectDefinition.rot 		= plane->Rot.y;
 	gNewObjectDefinition.scale 		= 5.0f;
 	bomb = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(bomb, "bugdom2.balsaBomb", "projectile/effect");
 
 	bomb->Delta.x = plane->Delta.x * .9f;
 	bomb->Delta.z = plane->Delta.z * .9f;
@@ -716,7 +725,9 @@ float	x,z;
 	gNewObjectDefinition.moveCall 	= MoveShockwave;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .5;
-	MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	ObjNode* shockwave = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (shockwave != nil)
+		Bugdom2Script_RegisterObject(shockwave, "bugdom2.antHillShockwave", "projectile/effect");
 
 
 			/* SEE IF THAT'S ALL */
@@ -797,6 +808,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.antHillCloud", "child-object");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -946,8 +959,6 @@ float				x,y,z;
 		}
 	}
 }
-
-
 
 
 

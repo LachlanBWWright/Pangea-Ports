@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -107,6 +111,10 @@ long	id				= -1;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.firecracker", "hazard");
+#endif
 
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
@@ -300,6 +308,10 @@ Byte	rot,color;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.hiveDoor", "transition");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
 	newObj->DoorAim = rot;										// remember rot/aim
@@ -350,6 +362,10 @@ float	z = coord->z;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(nil);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.hiveDoorOpen", "transition");
+#endif
 
 			/* SET COLLISION */
 			
@@ -472,6 +488,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.dock", "platform");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType = CTYPE_MISC|CTYPE_BLOCKSHADOW|CTYPE_BLOCKCAMERA;
@@ -554,6 +574,10 @@ float	scaleFactor = itemPtr->parm[2];
 	if (newObj == nil)
 		DoFatalAlert("AddRootSwing: MakeNewSkeletonObject failed!");
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.rootSwing", "platform");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 	
 			/* CREATE INVISIBLE HOPPABLE TARGET */
@@ -563,6 +587,9 @@ float	scaleFactor = itemPtr->parm[2];
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	h = MakeNewObject(&gNewObjectDefinition);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(h, "bugdom.rootSwingTarget", "child-object");
+#endif
 	if (h)
 	{		
 		newObj->CType 			= 0;
@@ -716,6 +743,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.rock", "item");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;									// keep ptr to item list
 
 
@@ -794,6 +825,10 @@ int		n;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.honeyTube", "obstacle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -899,6 +934,10 @@ Boolean			zigzag = itemPtr->parm[3] & (1<<2);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.honeycombPlatform", "platform");
+#endif
 		
 	DetachObject(newObj);									// detach this object from the linked list
 			
@@ -1015,6 +1054,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.faucet", "interactive");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType = CTYPE_MISC|CTYPE_BLOCKCAMERA;
@@ -1024,5 +1067,3 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
-

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -67,6 +71,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/8.0f);			// use given rot
 	gNewObjectDefinition.scale 		= LAVA_PILLAR_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"hazard", "obstacle"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.lavaPillar", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
@@ -255,6 +263,7 @@ int		i;
 		gNewObjectDefinition.coord.z 	= z;
 		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z);
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.lavaPillarChunk", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"hazard", "projectile/effect"}, 2);
 
 		newObj->Rot.x = PI/2;
 
@@ -350,6 +359,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB-10;
 	gNewObjectDefinition.moveCall 	= MoveVolcanoGenerator;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"trigger", "hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.volcanoGenerator", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -397,6 +410,7 @@ int	i;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB+60;
 	gNewObjectDefinition.moveCall 	= MoveLavaSpewer;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.lavaSpewer", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"hazard", "effect"}, 2);
 
 	newObj->SpewDelay = 10;
 
@@ -434,6 +448,10 @@ int			i;
 	else
 		gNewObjectDefinition.scale 		= 2.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect", "hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.lavaBoulder", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 			/* SET COLLISION STUFF */
 
@@ -755,6 +773,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	gNewObjectDefinition.scale 		= 4.2f;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"hazard", "platform"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.lavaPlatform", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -927,8 +949,6 @@ float	oldX, oldZ;
 	}
 
 }
-
-
 
 
 

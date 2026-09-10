@@ -499,6 +499,8 @@ float	h;
 	if (newObj == nil)
 		return(false);
 
+	BugdomScript_RegisterObject(newObj, "bugdom.honeycombPlatform", "platform");
+
 	newObj->TerrainItemPtr = itemPtr;						// keep ptr to item list
 		
 	newObj->ResurfacePlatform = itemPtr->parm[3] & 1;		// see if resurface
@@ -654,6 +656,8 @@ u_long			isPlunged;
 	boxObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (boxObj == nil)
 		return false;
+
+	BugdomScript_RegisterObject(boxObj, "bugdom.detonator", "trigger");
 	
 	boxObj->CType 			= CTYPE_MISC|CTYPE_BLOCKCAMERA;
 	boxObj->CBits			= CBITS_ALLSOLID;
@@ -679,6 +683,8 @@ u_long			isPlunged;
 	plungerObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (plungerObj == nil)
 		return false;
+
+	BugdomScript_RegisterObject(plungerObj, "bugdom.detonatorPlunger", "child-object");
 
 	plungerObj->TerrainItemPtr = itemPtr;					// keep ptr to item list
 	
@@ -806,6 +812,8 @@ Boolean	isOpen;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+	BugdomScript_RegisterObject(newObj, "bugdom.lawnDoor", "transition");
 
 	newObj->TerrainItemPtr 	= itemPtr;						// keep ptr to item list		
 	newObj->KeyNum 			= keyID;						// keep key ID#
@@ -1096,6 +1104,8 @@ static const Byte	keyTypes[NUM_LEVEL_TYPES] =
 	if (newObj == nil)
 		return;
 
+	BugdomScript_RegisterObject(newObj, "bugdom.nutPowerup", "powerup");
+
 			/* SET TRIGGER STUFF */
 
 	newObj->CType 			= CTYPE_TRIGGER|CTYPE_PLAYERTRIGGERONLY|CTYPE_BLOCKCAMERA;
@@ -1376,6 +1386,8 @@ u_long			isOpen;
 	if (newObj == nil)
 		return false;
 
+	BugdomScript_RegisterObject(newObj, "bugdom.waterValve", "trigger");
+
 	newObj->TerrainItemPtr = itemPtr;					// keep ptr to item list
 	
 
@@ -1407,6 +1419,7 @@ u_long			isOpen;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	handle = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BugdomScript_RegisterObject(handle, "bugdom.waterValveHandle", "child-object");
 	if (handle)
 	{
 		newObj->ChainNode = handle;	
@@ -1478,8 +1491,6 @@ ObjNode *handle;
 	
 	return(true);
 }
-
-
 
 
 

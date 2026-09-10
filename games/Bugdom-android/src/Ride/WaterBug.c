@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /*******************/
 /*   PROTOTYPES    */
@@ -82,6 +86,10 @@ Boolean		isPaidFor;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/16.0);
 	gNewObjectDefinition.scale 		= WATERBUG_SCALE;
 	newObj 							= MakeNewSkeletonObject(&gNewObjectDefinition);	
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.waterBug", "vehicle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;					// keep ptr to item list
 	newObj->InitCoord = gNewObjectDefinition.coord;		// remember where started
@@ -572,4 +580,3 @@ static const TQ3Vector3D up = {0,1,0};
 
 	SetLookAtMatrixAndTranslate(&theNode->BaseTransformMatrix, &up, &theNode->Coord, &gGameViewInfoPtr->currentCameraCoords);
 }
-

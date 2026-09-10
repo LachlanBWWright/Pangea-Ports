@@ -32,6 +32,8 @@ Boolean OttoScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splin
 Boolean OttoScript_TryReplaceSplineItem(SplineItemType* itemPtr, int splineNum, int itemIndex);
 int OttoScript_ProbeSplineReplacementJS(int splineNum, int itemIndex, int nativeType, float placement);
 int OttoScript_ProbeCheckpointResetJS(void);
+int OttoScript_ProbeDeathJS(void);
+int OttoScript_ProbeLevelCompleteJS(void);
 void OttoScript_RegisterHuman(ObjNode* human);
 void OttoScript_UnregisterHuman(ObjNode* human);
 void OttoScript_RegisterPlayerObject(ObjNode* player);

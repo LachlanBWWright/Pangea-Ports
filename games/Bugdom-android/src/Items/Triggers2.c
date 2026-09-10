@@ -118,6 +118,8 @@ int		checkpointNum = itemPtr->parm[0];
 		droplet = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (droplet == nil)
 			return(false);
+
+		BugdomScript_RegisterObject(droplet, "bugdom.checkpointDroplet", "child-object");
 			
 		MakeObjectTransparent(droplet, .6);						// make xparent
 			
@@ -279,6 +281,8 @@ float		y;
 	if (logObj == nil)
 		return(false);
 
+	BugdomScript_RegisterObject(logObj, "bugdom.exitLog", "objective");
+
 
 	logObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 	logObj->CType = CTYPE_MISC|CTYPE_BLOCKCAMERA|CTYPE_IMPENETRABLE;
@@ -387,6 +391,8 @@ float		y;
 	if (end == nil)
 		return(false);
 
+	BugdomScript_RegisterObject(end, "bugdom.exitLogTrigger", "trigger");
+
 	end->CType 			= CTYPE_TRIGGER|CTYPE_PLAYERTRIGGERONLY;
 	end->CBits 			= CBITS_ALLSOLID;
 	end->TriggerSides 	= ALL_SOLID_SIDES;					// side(s) to activate it
@@ -473,6 +479,8 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+	BugdomScript_RegisterObject(newObj, "bugdom.kingWaterPipe", "objective");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -668,6 +676,7 @@ float	y;
 		gNewObjectDefinition.scale 		= LADYBUG_CAGE_SCALE;
 		post[i] = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		GAME_ASSERT(post[i]);
+		BugdomScript_RegisterObject(post[i], "bugdom.ladyBugCagePost", "child-object");
 
 		if (i == 0)
 			post[0]->TerrainItemPtr = itemPtr;			// keep ptr to item list
@@ -688,6 +697,7 @@ float	y;
 	gNewObjectDefinition.rot 		= 0;
 	cage = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	GAME_ASSERT(cage);
+	BugdomScript_RegisterObject(cage, "bugdom.ladyBugCage", "objective");
 
 	cage->CType 			= CTYPE_MISC|CTYPE_KICKABLE|CTYPE_BLOCKCAMERA|CTYPE_TRIGGER;
 	cage->CBits 			= CBITS_ALLSOLID;
@@ -713,6 +723,7 @@ float	y;
 	gNewObjectDefinition.scale 		= LADYBUG_SCALE;
 	bug = MakeNewSkeletonObject(&gNewObjectDefinition);
 	GAME_ASSERT(bug);
+	BugdomScript_RegisterObject(bug, "bugdom.cagedLadyBug", "enemy");
 
 	cage->ChainNode = bug;
 
@@ -851,7 +862,6 @@ Boolean DoTrig_Cage(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	
 	return(true);
 }
-
 
 
 

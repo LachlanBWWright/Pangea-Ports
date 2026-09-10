@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -111,6 +114,8 @@ int				carNum;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= 0;
 	car = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (car != nil)
+		Bugdom2Script_RegisterObject(car, "bugdom2.slotCar", "vehicle");
 
 
 				/* SET BETTER INFO */
@@ -155,6 +160,8 @@ int				carNum;
 	gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 	gNewObjectDefinition.slot++;
 	frontWheels = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (frontWheels != nil)
+		Bugdom2Script_RegisterObject(frontWheels, "bugdom2.slotCarFrontWheels", "child-object");
 
 	car->ChainNode = frontWheels;
 	frontWheels->ChainHead = car;
@@ -167,6 +174,8 @@ int				carNum;
 	gNewObjectDefinition.type 		= PLAYROOM_ObjType_RearWheels;
 	gNewObjectDefinition.slot++;
 	rearWheels = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (rearWheels != nil)
+		Bugdom2Script_RegisterObject(rearWheels, "bugdom2.slotCarRearWheels", "child-object");
 
 	frontWheels->ChainNode = rearWheels;
 	rearWheels->ChainHead = frontWheels;
@@ -882,7 +891,6 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
 
 
 

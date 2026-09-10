@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -146,6 +147,7 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_RAPTOR,animNum, x,z, RAPTOR_SCALE, 0, MoveRaptor);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.raptor", "enemy");
 
 	newObj->Mode = RAPTOR_MODE_WALKINFRONT;
 
@@ -890,7 +892,6 @@ Boolean			killed;
 
 	return(false);						// raptor not killed
 }
-
 
 
 

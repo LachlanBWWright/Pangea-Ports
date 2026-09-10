@@ -11,6 +11,8 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
 #endif
 
 #define PANGEA_SCRIPT_ERROR_CAPACITY 512
@@ -461,6 +463,14 @@ static bool ScriptedGetAnimation(void* nativeObject, int* outAnimation)
 	return true;
 }
 
+static bool ScriptedGetAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ScriptedObjectState* state = (ScriptedObjectState*) nativeObject;
+	if (!state || !outSpeed) return false;
+	*outSpeed = state->animationSpeed;
+	return true;
+}
+
 static bool ScriptedGetActive(void* nativeObject, bool* outActive)
 {
 	ScriptedObjectState* state = (ScriptedObjectState*) nativeObject;
@@ -516,6 +526,7 @@ static const PangeaScriptObjectOps kScriptedOps = {
 	.getRotation = ScriptedGetRotation,
 	.getScale = ScriptedGetScale,
 	.getAnimation = ScriptedGetAnimation,
+	.getAnimationSpeed = ScriptedGetAnimationSpeed,
 	.getActive = ScriptedGetActive,
 	.getCollisionEnabled = ScriptedGetCollisionEnabled,
 	.setPosition = ScriptedSetPosition,
@@ -2009,7 +2020,11 @@ PangeaScriptStatus PangeaScript_ApplyObjectLifecycleToAll(const PangeaScriptFram
 	return firstFailure;
 }
 
-static PangeaScriptStatus prepare_gameplay_hook(const void* context, const void* result)
+static PangeaScriptStatus prepare_gameplay_hook(
+	const void* context,
+	const void* result,
+	const char* lifecycleEvent,
+	PangeaScriptObjectHandle target)
 {
 	if (!context || !result)
 	{
@@ -2039,7 +2054,7 @@ PangeaScriptStatus PangeaScript_CallTriggerHook(const PangeaScriptTriggerContext
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
 	memset(outResult, 0, sizeof(*outResult));
-	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult);
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult, "trigger", context ? context->self : (PangeaScriptObjectHandle){0});
 	if (ready != PANGEA_SCRIPT_OK) return ready;
 	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
 	const bool previousFrameValid = gHasCurrentCallbackFrame;
@@ -2083,7 +2098,7 @@ PangeaScriptStatus PangeaScript_CallPickupHook(const PangeaScriptPickupContext* 
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
 	memset(outResult, 0, sizeof(*outResult));
-	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult);
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult, "pickup", context ? context->pickup : (PangeaScriptObjectHandle){0});
 	if (ready != PANGEA_SCRIPT_OK) return ready;
 	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
 	const bool previousFrameValid = gHasCurrentCallbackFrame;
@@ -2127,7 +2142,7 @@ PangeaScriptStatus PangeaScript_CallWeaponHitHook(const PangeaScriptWeaponHitCon
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
 	memset(outResult, 0, sizeof(*outResult));
-	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult);
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult, "weaponHit", context ? context->target : (PangeaScriptObjectHandle){0});
 	if (ready != PANGEA_SCRIPT_OK) return ready;
 	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
 	const bool previousFrameValid = gHasCurrentCallbackFrame;
@@ -2158,7 +2173,7 @@ PangeaScriptStatus PangeaScript_CallDamageHook(const PangeaScriptDamageContext* 
 	memset(outResult, 0, sizeof(*outResult));
 	if (context)
 		outResult->damage = context->damage;
-	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult);
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, outResult, "damage", context ? context->target : (PangeaScriptObjectHandle){0});
 	if (ready != PANGEA_SCRIPT_OK) return ready;
 	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
 	const bool previousFrameValid = gHasCurrentCallbackFrame;
@@ -2186,7 +2201,7 @@ PangeaScriptStatus PangeaScript_CallDamageAppliedHook(const PangeaScriptDamageCo
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Damage-applied hook context is required");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
-	PangeaScriptStatus ready = prepare_gameplay_hook(context, context);
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, context, "damageApplied", context ? context->target : (PangeaScriptObjectHandle){0});
 	if (ready != PANGEA_SCRIPT_OK) return ready;
 	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
 	const bool previousFrameValid = gHasCurrentCallbackFrame;
@@ -2221,7 +2236,7 @@ PangeaScriptStatus PangeaScript_CallPlayerEvent(const PangeaScriptPlayerEventCon
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Objective outcome must be 0 (win), 1 (loss), or 2 (draw)");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
-	PangeaScriptStatus ready = prepare_gameplay_hook(context, context);
+	PangeaScriptStatus ready = prepare_gameplay_hook(context, context, event, context ? context->player : (PangeaScriptObjectHandle){0});
 	if (ready != PANGEA_SCRIPT_OK) return ready;
 	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
 	const bool previousFrameValid = gHasCurrentCallbackFrame;
@@ -2731,6 +2746,38 @@ const char* PangeaScript_GetObjectTag(PangeaScriptObjectHandle handle, int index
 	return object && index >= 0 && index < object->tagCount ? object->tags[index] : NULL;
 }
 
+const char* PangeaScript_GetObjectType(PangeaScriptObjectHandle handle)
+{
+	RegisteredObject* object = resolve_object(handle);
+	return object ? object->objectType : NULL;
+}
+
+const char* PangeaScript_GetObjectCategory(PangeaScriptObjectHandle handle)
+{
+	RegisteredObject* object = resolve_object(handle);
+	const char* fallback = NULL;
+
+	if (!object)
+		return NULL;
+	if (object->source.kind != PANGEA_SCRIPT_SOURCE_NONE)
+	{
+		for (int i = 0; i < gNativeItemCount; i++)
+		{
+			const PangeaScriptNativeItem* item = &gNativeItems[i];
+			if (item->nativeType != object->source.nativeType || !item->category)
+				continue;
+			if (strcmp(item->category, "terrain") != 0 && strcmp(item->category, "map") != 0)
+				return item->category;
+			fallback = item->category;
+		}
+	}
+	if (object->tagCount > 0 && object->tags[0])
+		return strcmp(object->tags[0], "customObject") == 0 ? "scripted" : object->tags[0];
+	if (fallback)
+		return fallback;
+	return object->objectType ? "scripted" : NULL;
+}
+
 static bool finish_object_command(
 	const char* commandId,
 	PangeaScriptObjectHandle handle,
@@ -2821,6 +2868,32 @@ bool PangeaScript_GetObjectAnimation(PangeaScriptObjectHandle handle, int* outAn
 	return object->ops->getAnimation(object->nativeObject, outAnimation);
 }
 
+bool PangeaScript_GetObjectAnimationSpeed(PangeaScriptObjectHandle handle, float* outSpeed)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !outSpeed || !object->ops || !object->ops->getAnimationSpeed)
+		return false;
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_READ_ONLY)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks read capability level");
+		return false;
+	}
+	return object->ops->getAnimationSpeed(object->nativeObject, outSpeed);
+}
+
+bool PangeaScript_GetObjectAnimationFrame(PangeaScriptObjectHandle handle, int* outFrame)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !outFrame || !object->ops || !object->ops->getAnimationFrame)
+		return false;
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_READ_ONLY)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks read capability level");
+		return false;
+	}
+	return object->ops->getAnimationFrame(object->nativeObject, outFrame);
+}
+
 bool PangeaScript_GetObjectActive(PangeaScriptObjectHandle handle, bool* outActive)
 {
 	RegisteredObject* object = resolve_object(handle);
@@ -2832,6 +2905,34 @@ bool PangeaScript_GetObjectActive(PangeaScriptObjectHandle handle, bool* outActi
 		return false;
 	}
 	return object->ops->getActive(object->nativeObject, outActive);
+}
+
+bool PangeaScript_GetObjectHealth(PangeaScriptObjectHandle handle, float* outHealth)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !outHealth || !object->ops || !object->ops->getHealth)
+		return false;
+
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_READ_ONLY)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks read capability level");
+		return false;
+	}
+	return object->ops->getHealth(object->nativeObject, outHealth);
+}
+
+bool PangeaScript_GetObjectDamage(PangeaScriptObjectHandle handle, float* outDamage)
+{
+	RegisteredObject* object = resolve_object(handle);
+	if (!object || !outDamage || !object->ops || !object->ops->getDamage)
+		return false;
+
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_READ_ONLY)
+	{
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks read capability level");
+		return false;
+	}
+	return object->ops->getDamage(object->nativeObject, outDamage);
 }
 
 bool PangeaScript_GetObjectCollisionEnabled(PangeaScriptObjectHandle handle, bool* outEnabled)
@@ -3541,6 +3642,38 @@ bool PangeaScript_GetStatusScriptsDisabled(void) { return gScriptsDisabled; }
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
+const char* PangeaScript_GetStatusLifecycleTraceJSON(void)
+{
+	static char json[PANGEA_SCRIPT_LIFECYCLE_TRACE_CAPACITY * 256];
+	int offset = 0;
+	int written;
+	json[0] = '\0';
+	written = snprintf(json, sizeof(json), "{\"eventCount\":%u,\"entryCount\":%u,\"overflow\":%s,\"entries\":[",
+		gLifecycleTrace.eventCount, gLifecycleTrace.entryCount, gLifecycleTrace.overflow ? "true" : "false");
+	if (written < 0 || (size_t)written >= sizeof(json))
+		return "{\"eventCount\":0,\"entryCount\":0,\"overflow\":true,\"entries\":[]}";
+	offset = written;
+	for (uint32_t index = 0; index < gLifecycleTrace.entryCount; index++)
+	{
+		const PangeaScriptLifecycleTraceEntry* entry = &gLifecycleTraceEntries[index];
+		written = snprintf(json + offset, sizeof(json) - (size_t)offset,
+			"%s{\"eventId\":\"%s\",\"applicationPhase\":\"%s\",\"order\":%u,\"targetId\":%d,\"targetGeneration\":%u,\"status\":%d}",
+			index == 0 ? "" : ",", entry->eventId, entry->applicationPhase, entry->order,
+			entry->target.id, entry->target.generation, entry->status);
+		if (written < 0 || (size_t)written >= sizeof(json) - (size_t)offset)
+		{
+			json[0] = '\0';
+			return "{\"eventCount\":0,\"entryCount\":0,\"overflow\":true,\"entries\":[]}";
+		}
+		offset += written;
+	}
+	(void) snprintf(json + offset, sizeof(json) - (size_t)offset, "]}");
+	return json;
+}
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
 uint32_t PangeaScript_GetRuntimeFingerprint(void) { return gRuntimeFingerprint; }
 
 #ifdef __EMSCRIPTEN__
@@ -3680,6 +3813,7 @@ void* gPangeaScriptPreserveStatus[] = {
 	(void*)PangeaScript_GetStatusBudgetExceededCount,
 	(void*)PangeaScript_GetStatusHooksCalledCount,
 	(void*)PangeaScript_GetStatusScriptsDisabled,
+	(void*)PangeaScript_GetStatusLifecycleTraceJSON,
 	(void*)PangeaScript_GetRuntimeFingerprint,
 	(void*)PangeaScript_LogJS,
 	(void*)PangeaScript_GetObjectPositionJS,

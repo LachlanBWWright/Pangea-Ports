@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -148,6 +151,8 @@ int		i;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_OTTO, animNum, x,z, OTTO_SCALE, 0, MoveOtto);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.otto", "enemy");
 
 
 
@@ -194,6 +199,8 @@ int		i;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	gNewObjectDefinition.scale 		= OTTO_SCALE;
 	key = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (key != nil)
+		Bugdom2Script_RegisterObject(key, "bugdom2.ottoKey", "child-object");
 
 	key->Rot.y = PI;
 
@@ -744,6 +751,8 @@ const OGLVector3D	muzzleTipAim = {0, -1, -.3};
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .7;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.ottoStunPulse", "projectile/effect");
 
 	newObj->ColorFilter.a = .99;			// do this just to turn on transparency so it'll glow
 
@@ -944,5 +953,3 @@ float			fps = gFramesPerSecondFrac;
 
 
 }
-
-

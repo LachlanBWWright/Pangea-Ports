@@ -15,6 +15,10 @@
 #include "ScriptBindings.h"
 #endif
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -196,6 +200,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= HUMAN_SCALE;
 
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"objective", "interactive"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.human", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 
 				/* SET BETTER INFO */
@@ -289,6 +297,10 @@ float			x,z,placement;
 	gNewObjectDefinition.moveCall 	= MoveHuman;
 
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"objective", "interactive"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.human", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 
 	newObj->Skeleton->AnimSpeed = 1.5;
@@ -361,6 +373,10 @@ int		i;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .3;
 	ring1 = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(ring1, "ottomatic.humanRescueRing", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 	ring1->RingOffset = 0;
 	ring1->ColorFilter.a = .99;
 	ring1->Rot.x = RandomFloat2() * .3f;
@@ -372,6 +388,10 @@ int		i;
 
 	gNewObjectDefinition.scale 		= .7;
 	ring2 = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(ring2, "ottomatic.humanRescueRing", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 	ring2->RingOffset = 0;
 	ring2->ColorFilter.a = .99;
 	ring2->Rot.x = RandomFloat2() * .3f;
@@ -619,6 +639,10 @@ float	scaleX,scaleZ,scaleY;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= human->Rot.y;
 	ice = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object", "hazard"};
+		OttoScript_RegisterObjectNode(ice, "ottomatic.humanIce", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	ice->ColorFilter.a = .99;
 
@@ -1142,6 +1166,10 @@ short	numHumans = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 2.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"objective", "obstacle"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.peopleHut", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 

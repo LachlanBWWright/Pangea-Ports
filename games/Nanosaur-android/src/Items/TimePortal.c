@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -82,6 +83,7 @@ ObjNode	*newObj;
 
 	newObj = MakeTimePortal(PORTAL_TYPE_EGG,x,z);
 	newObj->TerrainItemPtr = itemPtr;					// keep ptr to item list
+	NanosaurScript_RegisterObject(newObj, "nanosaur.timePortal", "trigger");
 	return(true);
 }
 
@@ -196,6 +198,7 @@ float	y;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj)
 		{
+			NanosaurScript_RegisterObject(newObj, "nanosaur.timePortalRing", "child-object");
 			newObj->SpecialF[4] = theNode->Coord.y;				// remember floor y
 			newObj->Kind = theNode->Kind;
 		
@@ -363,8 +366,6 @@ short	close = -1;
 
 	return(close);
 }
-
-
 
 
 

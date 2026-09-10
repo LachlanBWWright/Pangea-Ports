@@ -183,6 +183,13 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= 1.0;
 	newObj = MakeNewObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"powerup"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.atom", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	newObj->AtomDelayToActive = .8f;				// set delay before player can get it
 
 	newObj->AtomOnWater = false;					// assume not
@@ -624,6 +631,13 @@ float	y;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"powerup"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.powerupPod", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;					// keep ptr to item list
 
@@ -1138,7 +1152,7 @@ float	r;
 	if (newObj)
 	{
 		static const char* tags[] = {"powerup"};
-		OttoScript_RegisterObjectNode(newObj, "ottomatic.powerupPod", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.powerupItem", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
 	}
 #endif
 
@@ -1183,6 +1197,13 @@ float	r;
 		gNewObjectDefinition.scale 		= POD_SCALE;
 		top = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		{
+			static const char* tags[] = {"child-object"};
+			OttoScript_RegisterObjectNode(top, "ottomatic.powerupOrbTop", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		}
+#endif
+
 		top->Health = 3.0f;
 		top->Delta.x = -sin(r) * 300.0f;
 		top->Delta.y = 400.0f;
@@ -1198,6 +1219,13 @@ float	r;
 		gNewObjectDefinition.type 		= GLOBAL_ObjType_PowerupOrb_Bottom;
 		gNewObjectDefinition.coord.y 	= pod->Coord.y + 30.0f;
 		bot = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		{
+			static const char* tags[] = {"child-object"};
+			OttoScript_RegisterObjectNode(bot, "ottomatic.powerupOrbBottom", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		}
+#endif
 
 		bot->Health = 3.0f;
 		bot->Delta.x = -sin(r) * 300.0f;
@@ -1666,6 +1694,13 @@ int		i;
 	gNewObjectDefinition.scale 		= BALLOON_SCALE;
 	string = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(string, "ottomatic.powerupBalloonString", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	string->TerrainItemPtr = itemPtr;					// keep ptr to item list
 
 	string->BalloonWobble = RandomFloat2() * PI2;
@@ -1679,6 +1714,13 @@ int		i;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	balloon = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"powerup"};
+		OttoScript_RegisterObjectNode(balloon, "ottomatic.powerupBalloon", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 
 	string->ChainNode = balloon;
@@ -1806,5 +1848,3 @@ float			speed;
 
 
 #pragma mark -
-
-

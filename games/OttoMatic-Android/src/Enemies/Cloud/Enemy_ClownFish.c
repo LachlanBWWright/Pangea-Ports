@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -84,6 +85,12 @@ float			x,z,placement;
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_CLOWNFISH,x,z, CLOWNFISH_SCALE, 0, nil);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.clownFish", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
 
 	newObj->SplineItemPtr = itemPtr;
 	newObj->SplineNum = splineNum;
@@ -281,6 +288,10 @@ ObjNode *bomb;
 	gNewObjectDefinition.rot 		= fish->Rot.y;
 	gNewObjectDefinition.scale 		= fish->Scale.x;
 	bomb = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(bomb, "ottomatic.clownFishBomb", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	fish->ChainNode = bomb;
 
@@ -423,6 +434,10 @@ DeformationType		defData;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.clownFishShockwave", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 	newObj->ColorFilter.a = .99;
 
 	newObj->Damage = .2f;
@@ -442,6 +457,10 @@ DeformationType		defData;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .3;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.clownFishConeBlast", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 	newObj->ColorFilter.a = .99;
 
 
@@ -529,9 +548,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObjectTransforms(theNode);
 }
-
-
-
 
 
 

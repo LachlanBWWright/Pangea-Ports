@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -824,6 +825,10 @@ float	f;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 1.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.cornKernel", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 			/* SET COLLISION STUFF */
 
@@ -1094,7 +1099,6 @@ nuke:
 
 	UpdateObject(theNode);
 }
-
 
 
 

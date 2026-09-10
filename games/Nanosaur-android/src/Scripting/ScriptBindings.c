@@ -11,6 +11,7 @@
 
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 
 static TerrainItemEntryType gScriptTerrainItems[256];
 static bool gScriptTerrainItemOccupied[256];
@@ -318,6 +319,24 @@ static bool NanosaurScript_GetObjectActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool NanosaurScript_GetObjectHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outHealth = obj->Health;
+	return true;
+}
+
+static bool NanosaurScript_GetObjectDamage(void* nativeObject, float* outDamage)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outDamage || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outDamage = obj->Damage;
+	return true;
+}
+
 static bool NanosaurScript_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -352,6 +371,22 @@ static bool NanosaurScript_GetObjectAnimation(void* nativeObject, int* outAnimat
 	if (!obj || !outAnimation || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG)
 		return false;
 	*outAnimation = obj->Skeleton->AnimNum;
+	return true;
+}
+
+static bool NanosaurScript_GetObjectAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outSpeed || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outSpeed = obj->Skeleton->AnimSpeed;
+	return true;
+}
+
+static bool NanosaurScript_GetObjectAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outFrame || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outFrame = GetScriptSkeletonFrame(obj->Skeleton);
 	return true;
 }
 
@@ -406,7 +441,11 @@ static const PangeaScriptObjectOps kNanosaurPlayerObjectOps =
 	.getRotation = NanosaurScript_GetObjectRotation,
 	.getScale = NanosaurScript_GetObjectScale,
 	.getAnimation = NanosaurScript_GetObjectAnimation,
+	.getAnimationSpeed = NanosaurScript_GetObjectAnimationSpeed,
+	.getAnimationFrame = NanosaurScript_GetObjectAnimationFrame,
 	.getActive = NanosaurScript_GetObjectActive,
+	.getHealth = NanosaurScript_GetObjectHealth,
+	.getDamage = NanosaurScript_GetObjectDamage,
 	.setPosition = NanosaurScript_SetObjectPosition,
 	.setVelocity = NanosaurScript_SetObjectVelocity,
 	.setRotation = NanosaurScript_SetObjectRotation,
@@ -1297,6 +1336,41 @@ int NanosaurScript_ProbeWeaponPowerPickupJS(void)
 	}
 }
 
+int NanosaurScript_ProbeEnemyWeaponHitJS(void)
+{
+	ObjNode* enemy;
+	Boolean destroyed;
+
+	if (!gPlayerObj)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	enemy = MakeTriceratops(NULL, (long)gPlayerObj->Coord.x + 100, (long)gPlayerObj->Coord.z);
+	if (!enemy)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+
+	destroyed = EnemyGotHurt(enemy, gPlayerObj, 1.0f);
+	if (!destroyed)
+	{
+		DeleteEnemy(enemy);
+		return 0;
+	}
+	return 1;
+}
+
+int NanosaurScript_ProbeLevelCompleteJS(void)
+{
+	ObjNode* portal;
+
+	if (!gPlayerObj)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	portal = MakeTimePortal(PORTAL_TYPE_EXIT, gPlayerObj->Coord.x, gPlayerObj->Coord.z);
+	if (!portal)
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+
+	portal->SpecialF[1] = 5.1f;
+	portal->MoveCall(portal);
+	return gWonGameFlag ? 1 : 0;
+}
+
 static const PangeaScriptNativeItem kNativeItems[] =
 {
 	{
@@ -1316,6 +1390,72 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.nativeType = 15,
 		.category = "pickup",
 		.dependencySummary = "crystal pickup assets and terrain systems",
+	},
+	{
+		.id = "nanosaur.lavaPatch",
+		.nativeType = 4,
+		.category = "hazard",
+		.dependencySummary = "lava-patch assets, terrain, and native hazard collision",
+	},
+	{
+		.id = "nanosaur.triceratops",
+		.nativeType = 2,
+		.category = "enemy",
+		.dependencySummary = "Triceratops assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "nanosaur.rex",
+		.nativeType = 3,
+		.category = "enemy",
+		.dependencySummary = "Rex assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "nanosaur.pteranodon",
+		.nativeType = 7,
+		.category = "enemy",
+		.dependencySummary = "Pteranodon assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "nanosaur.stegosaurus",
+		.nativeType = 8,
+		.category = "enemy",
+		.dependencySummary = "Stegosaurus assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "nanosaur.spitter",
+		.nativeType = 16,
+		.category = "enemy",
+		.dependencySummary = "Spitter assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "nanosaur.waterPatch",
+		.nativeType = 14,
+		.category = "hazard",
+		.dependencySummary = "water-patch assets, terrain, and native water behavior",
+	},
+	{
+		.id = "nanosaur.gasVent",
+		.nativeType = 6,
+		.category = "hazard",
+		.dependencySummary = "gas-vent assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "nanosaur.timePortal",
+		.nativeType = 9,
+		.category = "trigger",
+		.dependencySummary = "time-portal assets, terrain, and native level-flow behavior",
+	},
+	{
+		.id = "nanosaur.rollingBoulder",
+		.nativeType = 18,
+		.category = "hazard",
+		.dependencySummary = "rolling-boulder assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "nanosaur.sporePod",
+		.nativeType = 19,
+		.category = "hazard",
+		.dependencySummary = "spore-pod assets, terrain, and native hazard behavior",
 	},
 #define NANOSAUR_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current level assets, terrain systems, and the native item initializer" },
 	NANOSAUR_TERRAIN_NATIVE_ITEM(1) NANOSAUR_TERRAIN_NATIVE_ITEM(2) NANOSAUR_TERRAIN_NATIVE_ITEM(3) NANOSAUR_TERRAIN_NATIVE_ITEM(4) NANOSAUR_TERRAIN_NATIVE_ITEM(5) NANOSAUR_TERRAIN_NATIVE_ITEM(6) NANOSAUR_TERRAIN_NATIVE_ITEM(7) NANOSAUR_TERRAIN_NATIVE_ITEM(8) NANOSAUR_TERRAIN_NATIVE_ITEM(9) NANOSAUR_TERRAIN_NATIVE_ITEM(10)
@@ -1341,10 +1481,40 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 
 static int GetScriptPlayerCount(void) { return gPlayerObj ? 1 : 0; }
 
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton)
+{
+	const JointKeyFrameHeader* header;
+	int frame;
+	int frameCount;
+
+	if (!skeleton || !skeleton->skeletonDefinition || skeleton->AnimNum >= MAX_ANIMS)
+		return 0;
+	header = &skeleton->skeletonDefinition->JointKeyframes[0];
+	frameCount = header->numKeyFrames[skeleton->AnimNum];
+	if (frameCount <= 0 || !header->keyFrames || !header->keyFrames[skeleton->AnimNum])
+		return 0;
+	frame = 0;
+	while (frame + 1 < frameCount && skeleton->CurrentAnimTime >= header->keyFrames[skeleton->AnimNum][frame + 1].tick)
+		frame++;
+	return frame;
+}
+
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerObj) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .velocity = {gPlayerObj->Delta.x, gPlayerObj->Delta.y, gPlayerObj->Delta.z}, .hasVelocity = true, .collisionEnabled = gPlayerObj->CType != 0 && (gPlayerObj->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gMyHealth, .hasHealth = true, .fuel = gFuel, .hasFuelState = true, .score = (int64_t) gScore, .hasScore = true, .lives = gNumLives, .hasLives = true, .activeWeapon = gCurrentAttackMode, .hasWeaponState = true, .weaponCount = NUM_ATTACK_MODES, .shieldActive = gShieldTimer > 0.0f, .hasShieldState = true, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .velocity = {gPlayerObj->Delta.x, gPlayerObj->Delta.y, gPlayerObj->Delta.z}, .hasVelocity = true, .collisionEnabled = gPlayerObj->CType != 0 && (gPlayerObj->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gMyHealth, .hasHealth = true, .fuel = gFuel, .hasFuelState = true, .score = (int64_t) gScore, .hasScore = true, .lives = gNumLives, .hasLives = true, .activeWeapon = gCurrentAttackMode, .hasWeaponState = true, .weaponCount = NUM_ATTACK_MODES, .shieldActive = gShieldTimer > 0.0f, .hasShieldState = true, .invulnerable = gPlayerObj->InvincibleTimer > 0.0f, .hasInvulnerabilityState = true, .dead = gPlayerGotKilledFlag, .hasDeathState = true, .levelComplete = gWonGameFlag, .hasLevelCompletionState = true, .invulnerabilityTimeRemaining = gPlayerObj->InvincibleTimer, .hasInvulnerabilityTimerState = true, .active = true};
+	outPlayer->jetThrust = gPlayerObj->JetThrust;
+	outPlayer->hasFlightState = true;
+	outPlayer->grounded = (gPlayerObj->StatusBits & STATUS_BIT_ONGROUND) != 0;
+	outPlayer->hasGroundedState = true;
+	outPlayer->heightOffGround = gMyHeightOffGround;
+	outPlayer->hasTerrainHeightState = true;
+	outPlayer->onWater = (gMyLatestTileAttribs & TILE_ATTRIB_WATER) != 0;
+	outPlayer->hasWaterState = true;
+	outPlayer->onLava = (gMyLatestTileAttribs & TILE_ATTRIB_LAVA) != 0;
+	outPlayer->hasLavaState = true;
+	outPlayer->shieldTimeRemaining = gShieldTimer;
+	outPlayer->hasShieldTimerState = true;
 	if (gGameViewInfoPtr)
 	{
 		outPlayer->camera = (PangeaScriptVector3){gGameViewInfoPtr->cameraPlacement.cameraLocation.x, gGameViewInfoPtr->cameraPlacement.cameraLocation.y, gGameViewInfoPtr->cameraPlacement.cameraLocation.z};
@@ -1354,6 +1524,15 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 	outPlayer->hasRotation = true;
 	outPlayer->aim = (PangeaScriptVector3){-sinf(gPlayerObj->Rot.y), 0.0f, -cosf(gPlayerObj->Rot.y)};
 	outPlayer->hasAimState = true;
+	if (gPlayerObj->Skeleton)
+	{
+		outPlayer->animation = gPlayerObj->Skeleton->AnimNum;
+		outPlayer->hasAnimationState = true;
+		outPlayer->animationSpeed = gPlayerObj->Skeleton->AnimSpeed;
+		outPlayer->hasAnimationSpeedState = true;
+		outPlayer->animationFrame = GetScriptSkeletonFrame(gPlayerObj->Skeleton);
+		outPlayer->hasAnimationFrameState = true;
+	}
 	for (int weaponType = 0; weaponType < NUM_ATTACK_MODES && weaponType < PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY; weaponType++)
 		outPlayer->weapons[weaponType] = (PangeaScriptPlayerInventoryEntry){weaponType, gWeaponInventory[weaponType]};
 	outPlayer->eggCount = NUM_EGG_SPECIES < PANGEA_SCRIPT_PLAYER_EGG_CAPACITY ? NUM_EGG_SPECIES : PANGEA_SCRIPT_PLAYER_EGG_CAPACITY;

@@ -21,6 +21,9 @@
 #include "enemy4.h"
 #include "weapon.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -59,6 +62,9 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveGiant,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.giant", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -247,6 +253,10 @@ static	float	cosTbl[16] =	{-1,-0.92387,-0.7071,-0.38268,
 		if (newNode == nil)
 			return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_RegisterObject(newNode, "mightymike.giantDeathRing", "projectile/effect");
+#endif
+
 		newNode->CType = CTYPE_ENEMYC;
 		newNode->CBits = CBITS_TOUCHABLE;
 
@@ -288,5 +298,3 @@ void MoveGiantDeathRing(void)
 	CalcObjectBox();
 	UpdateObject();
 }
-
-

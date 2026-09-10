@@ -107,6 +107,75 @@ class MonorepoMetadataTests(unittest.TestCase):
                 self.assertIn("embedded-shell", shell)
                 self.assertIn("embed') === '1'", shell)
 
+    def test_bugdom_embedded_shell_starts_after_runtime_initialization(self):
+        shell = ports.ROOT / "games" / "Bugdom-android" / "docs" / "shell.html"
+        shell_text = shell.read_text(encoding="utf-8")
+        self.assertIn(
+            "var _gameStarted = false;",
+            shell_text,
+            "Bugdom shell should guard startup against duplicate clicks",
+        )
+        self.assertIn(
+            "if (_isEmbedded) startGame();",
+            shell_text,
+            "Bugdom embedded shell should start without a manual overlay click",
+        )
+
+    def test_bugdom_scripting_keeps_native_interaction_and_cleanup_ownership(self):
+        bugdom_root = ports.ROOT / "games" / "Bugdom-android"
+        bindings = (bugdom_root / "src" / "Scripting" / "ScriptBindings.c").read_text(encoding="utf-8")
+        main = (bugdom_root / "src" / "System" / "Main.c").read_text(encoding="utf-8")
+        player = (bugdom_root / "src" / "Player" / "MyGuy.c").read_text(encoding="utf-8")
+        triggers = (bugdom_root / "src" / "Items" / "Triggers.c").read_text(encoding="utf-8")
+        self.assertIn("BugdomScript_OnCustomTrigger(theNode, whoNode, sideBits);", triggers)
+        self.assertIn("BugdomScript_OnPickupCollected(theNode, whoNode", triggers)
+        self.assertIn("BugdomScript_OnDamage(what, damage, 0, &damage)", player)
+        self.assertIn("BugdomScript_OnObjectiveComplete(0, 0);", main)
+        self.assertIn("BugdomScript_OnLevelUnload(gRealLevel);", main)
+        self.assertIn("CleanupLevel();", main)
+        self.assertIn("BugdomScript_OnLevelCleanup();", main)
+        self.assertIn("BugdomScript_ReleaseCustomAssets();", bindings)
+        self.assertIn("PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);", bindings)
+
+    def test_bugdom_production_interaction_families_and_fixtures_are_source_backed(self):
+        bugdom_root = ports.ROOT / "games" / "Bugdom-android"
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (bugdom_root / "src").rglob("*.c")
+        )
+        representative_ids = [
+            "bugdom.spider",
+            "bugdom.queenBee",
+            "bugdom.cosmo",
+            "bugdom.poppy",
+            "bugdom.lawnDoor",
+            "bugdom.hiveDoor",
+            "bugdom.honeycombPlatform",
+            "bugdom.webProjectile",
+            "bugdom.queenBeeHoneySpit",
+            "bugdom.staffProjectile",
+            "bugdom.nut",
+            "bugdom.clover",
+            "bugdom.checkpoint",
+            "bugdom.exitLog",
+        ]
+        for native_id in representative_ids:
+            with self.subTest(native_id=native_id):
+                self.assertIn(f'"{native_id}"', source)
+
+        launch_spec = ports.ROOT.parent.parent / "frontend" / "tests" / "e2e" / "scriptingRuntimeLaunch.spec.ts"
+        launch_text = launch_spec.read_text(encoding="utf-8")
+        for level_number, fixture_name, level_id in [
+            (1, "Lawn", "lawn"),
+            (2, "Pond", "pond"),
+            (6, "QueenBee", "queenbee"),
+            (9, "AntKing", "antking"),
+        ]:
+            with self.subTest(fixture_name=fixture_name):
+                self.assertIn(f'[{level_number}, "{level_id}", "{fixture_name}"]', launch_text)
+        self.assertIn("${terrainName}.ter.rsrc", launch_text)
+        self.assertNotIn("Snow.ter", launch_text)
+
     def test_bugdom2_gles3_compat_reuses_webgl_buffers(self):
         compat = (
             ports.ROOT

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -99,6 +103,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_BOXERFLY,x,z,BOXERFLY_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.boxerFly", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, BOXERFLY_ANIM_FLY);
@@ -411,6 +419,10 @@ float			x,z,placement;
 		
 	DetachObject(newObj);									// detach this object from the linked list
 		
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.boxerFly", "enemy");
+#endif
+
 	newObj->SplineItemPtr = itemPtr;
 	newObj->SplineNum = splineNum;
 	
@@ -588,7 +600,6 @@ Boolean KillBoxerFly(ObjNode *theNode, float dx, float dy, float dz)
 	
 	return(false);
 }
-
 
 
 

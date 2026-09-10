@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -374,6 +378,10 @@ static const float	yTable2[] = {-540,-540,-540,-540,-370,-540,-540,-540};
 		
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.waterPatch", "hazard");
+#endif
 
 			/* SET OBJECT INFO */
 			
@@ -872,6 +880,13 @@ float				width,depth;
 
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	const char* objectId = kind == LIQUID_HONEY
+		? "bugdom.honeyPatch"
+		: kind == LIQUID_SLIME ? "bugdom.slimePatch" : "bugdom.lavaPatch";
+	BugdomScript_RegisterObject(newObj, objectId, "hazard");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 

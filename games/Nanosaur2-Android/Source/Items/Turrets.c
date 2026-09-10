@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -101,6 +102,7 @@ short	typeB, typeT, typeW, typeG;
 	};
 	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale);
 	base = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(base, "nanosaur2.turretBase", "child-object");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -121,6 +123,7 @@ short	typeB, typeT, typeW, typeG;
 	def.slot++;
 	def.moveCall 	= nil;
 	turret = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(turret, "nanosaur2.turret", "hazard");
 
 	turret->CType 			= CTYPE_WEAPONTEST | CTYPE_PLAYERTEST | CTYPE_AUTOTARGETWEAPON;
 	turret->CBits			= CBITS_ALLSOLID;
@@ -146,6 +149,7 @@ short	typeB, typeT, typeW, typeG;
 	def.slot++;
 	def.flags 		|= STATUS_BIT_ROTZXY;
 	wheel = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(wheel, "nanosaur2.turretWheel", "child-object");
 
 	wheel->CType 			= CTYPE_WEAPONTEST | CTYPE_PLAYERTEST | CTYPE_AUTOTARGETWEAPON;
 
@@ -161,6 +165,7 @@ short	typeB, typeT, typeW, typeG;
 	def.flags 		= gAutoFadeStatusBits;
 	def.slot++;
 	gun = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(gun, "nanosaur2.turretGun", "child-object");
 
 	gun->CType 			= CTYPE_WEAPONTEST | CTYPE_PLAYERTEST | CTYPE_AUTOTARGETWEAPON;
 
@@ -177,6 +182,7 @@ short	typeB, typeT, typeW, typeG;
 	def.slot 		= SLOT_OF_DUMB;
 	def.flags 		|= STATUS_BIT_GLOW;
 	lens = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(lens, "nanosaur2.turretLens", "child-object");
 
 	gun->ChainNode = lens;
 	lens->ChainHead = gun;
@@ -527,6 +533,7 @@ OGLVector3D	muzzleVector;
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.turretBullet", "projectile/effect");
 
 
 	newObj->Kind = WEAPON_TYPE_BLASTER;
@@ -790,8 +797,6 @@ OGLVector3D				delta,v;
 
 	PlayEffect3D(EFFECT_IMPACTSIZZLE, &gCoord);
 }
-
-
 
 
 

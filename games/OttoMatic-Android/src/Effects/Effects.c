@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -1586,6 +1590,9 @@ ObjNode	*newObj;
 		gNewObjectDefinition.rot 		= 0;
 		gNewObjectDefinition.scale 		= .4f + RandomFloat();
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.blobDroplet", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"projectile", "effect"}, 2);
+		#endif
 
 		newObj->Special[0] = 0;						// init counter
 
@@ -1682,6 +1689,9 @@ ObjNode	*newObj;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB+10;
 	gNewObjectDefinition.moveCall 	= MoveSmoker;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.smoker", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"effect", "terrain-item"}, 2);
+	#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 

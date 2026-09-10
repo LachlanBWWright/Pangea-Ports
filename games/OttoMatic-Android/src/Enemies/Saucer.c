@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -180,6 +184,13 @@ DeformationType		defData;
 	gNewObjectDefinition.scale 		= SAUCER_SCALE;
 	gAlienSaucer = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(gAlienSaucer, "ottomatic.alienSaucer", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
+
 	gAlienSaucer->Mode = SAUCER_MODE_TOTARGET;
 	gAlienSaucer->SpecialSaucerFade = 0.0f;
 	gAlienSaucer->SpecialSaucerAge = 0.0f;
@@ -192,6 +203,13 @@ DeformationType		defData;
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_EnemySaucer_Bottom;
 	gNewObjectDefinition.moveCall 	= nil;
 	bottom = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(bottom, "ottomatic.alienSaucerBottom", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	gAlienSaucer->ChainNode = bottom;
 
@@ -650,6 +668,13 @@ int		i;
 	gNewObjectDefinition.scale 		= 1.1;
 	beam = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"projectile", "effect"};
+		OttoScript_RegisterObjectNode(beam, "ottomatic.alienSaucerBeam", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
+
 	bottom->ChainNode = beam;
 
 	beam->ColorFilter = *color;
@@ -659,6 +684,13 @@ int		i;
 
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_BlueSpiral;
 	spiral = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object", "effect"};
+		OttoScript_RegisterObjectNode(spiral, "ottomatic.alienSaucerSpiral", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
 
 	beam->ChainNode = spiral;
 
@@ -875,7 +907,6 @@ static void SaucerReachedTarget(ObjNode *saucer)
 	}
 
 }
-
 
 
 

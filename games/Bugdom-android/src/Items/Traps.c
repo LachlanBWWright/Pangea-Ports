@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -143,6 +144,8 @@ float	x,z,placement;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+	BugdomScript_RegisterObject(newObj, "bugdom.foot", "enemy");
 				
 	DetachObject(newObj);									// detach this object from the linked list
 		
@@ -407,6 +410,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= BAT_SCALE;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
 	GAME_ASSERT(newObj);
+	BugdomScript_RegisterObject(newObj, "bugdom.bat", "enemy");
 				
 
 	newObj->CType		= CTYPE_BLOCKCAMERA;					// no collision
@@ -547,6 +551,8 @@ int		rot;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+	BugdomScript_RegisterObject(newObj, "bugdom.thorn", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -760,6 +766,8 @@ Byte	r;
 	if (newObj == nil)
 		return(false);
 
+	BugdomScript_RegisterObject(newObj, "bugdom.fireWall", "hazard");
+
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 
 	newObj->PTimer = 0;
@@ -906,6 +914,8 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return;
 
+	BugdomScript_RegisterObject(newObj, "bugdom.shockwave", "projectile/effect");
+
 	newObj->CType = CTYPE_HURTME|CTYPE_HURTENEMY;
 	newObj->CBits = CBITS_TOUCHABLE;
 	newObj->Damage = .25;
@@ -979,6 +989,8 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+	BugdomScript_RegisterObject(newObj, "bugdom.rollingBoulder", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 
@@ -1164,6 +1176,8 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+	BugdomScript_RegisterObject(newObj, "bugdom.floorSpike", "hazard");
+
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 
 	newObj->Mode = SPIKE_MODE_WAIT;
@@ -1229,8 +1243,6 @@ float	y,fps = gFramesPerSecondFrac;
 				break;
 	}
 }
-
-
 
 
 

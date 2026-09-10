@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #if PANGEA_SAFE_ITEM_LOADING
 #define BRAIN_BOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_BRAINBOSS)
 #define BRAIN_BOSS_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_BRAINBOSS)
@@ -192,6 +196,10 @@ DeformationType		defData;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= BRAINBOSS_SCALE;
 	gBrainBoss = core = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"enemy", "ai", "objective"};
+		OttoScript_RegisterObjectNode(core, "ottomatic.brainBoss", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 3);
+	}
 
 	core->Health 		= 	BRAINBOSS_HEALTH;
 	core->Mode			=	BRAIN_MODE_HOVER;
@@ -1227,7 +1235,6 @@ float	damage;
 
 	return(true);			// stop weapon
 }
-
 
 
 

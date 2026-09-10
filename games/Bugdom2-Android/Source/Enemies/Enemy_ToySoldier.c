@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -138,6 +139,8 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_TOYSOLDIER, animNum, x,z, TOYSOLDIER_SCALE, 0, MoveToySoldier);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.toySoldier", "enemy");
 
 
 
@@ -678,6 +681,7 @@ ObjNode	*grenade;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= TOYSOLDIER_SCALE;
 	grenade = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(grenade, "bugdom2.toySoldierGrenade", "projectile/effect");
 
 
 	CreateCollisionBoxFromBoundingBox(grenade,.5,.5);
@@ -924,5 +928,3 @@ static Boolean SeeIfToySoldierAttack(ObjNode *theNode, float angleToTarget, floa
 	}
 	return(false);
 }
-
-

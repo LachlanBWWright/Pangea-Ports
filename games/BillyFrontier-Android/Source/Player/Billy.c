@@ -103,24 +103,33 @@ ObjNode	*player, *leftGun, *rightGun, *hat;
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_BillyGun;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
-	leftGun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-	leftGun->Side = SIDE_LEFT;
+		leftGun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_RegisterObject(leftGun, "billy.playerLeftGun", "child-object");
+	#endif
+		leftGun->Side = SIDE_LEFT;
 	BillyPutLeftGunInHolster(leftGun);
 	
 
 		/* RIGHT GUN */
 			
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_BillyGun;
-	rightGun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-	rightGun->Side = SIDE_RIGHT;
+		rightGun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_RegisterObject(rightGun, "billy.playerRightGun", "child-object");
+	#endif
+		rightGun->Side = SIDE_RIGHT;
 	BillyPutRightGunInHolster(rightGun);
 	
 
 			/* HAT */
 			
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_BillyHat;
-	hat = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-	PutHatOnHead(hat);
+		hat = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_RegisterObject(hat, "billy.playerHat", "child-object");
+	#endif
+		PutHatOnHead(hat);
 	
 
 
@@ -542,7 +551,6 @@ ObjNode 		*leftGun, *rightGun;
 	leftGun->HoldRot.y = 0;
 	leftGun->HoldRot.z = -.4;
 }
-
 
 
 

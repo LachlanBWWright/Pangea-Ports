@@ -17,6 +17,7 @@
 
 extern bool PangeaScript_LoadCustomBG3D(FSSpec* spec, int group);
 extern bool PangeaScript_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
@@ -25,6 +26,14 @@ static PangeaScriptFrameContext gScriptFrameContext;
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE int CroMagScript_ProbeRaceCompletionJS(void)
 {
+	PlayerCompletedRace(0);
+	return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int CroMagScript_ProbeRaceProgressJS(void)
+{
+	CroMagScript_OnCheckpointReached(0, 1);
+	CroMagScript_OnLapComplete(0, 1);
 	PlayerCompletedRace(0);
 	return 0;
 }
@@ -327,6 +336,15 @@ static bool CroMagScript_GetObjectActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool CroMagScript_GetObjectHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outHealth = obj->Health;
+	return true;
+}
+
 static bool CroMagScript_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
@@ -356,6 +374,22 @@ static bool CroMagScript_GetObjectAnimation(void* nativeObject, int* outAnimatio
 	if (!obj || !outAnimation || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG)
 		return false;
 	*outAnimation = obj->Skeleton->AnimNum;
+	return true;
+}
+
+static bool CroMagScript_GetObjectAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outSpeed || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outSpeed = obj->Skeleton->AnimSpeed;
+	return true;
+}
+
+static bool CroMagScript_GetObjectAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outFrame || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outFrame = GetScriptSkeletonFrame(obj->Skeleton);
 	return true;
 }
 
@@ -404,7 +438,10 @@ static const PangeaScriptObjectOps kCroMagPlayerObjectOps =
 	.getRotation = CroMagScript_GetObjectRotation,
 	.getScale = CroMagScript_GetObjectScale,
 	.getAnimation = CroMagScript_GetObjectAnimation,
+	.getAnimationSpeed = CroMagScript_GetObjectAnimationSpeed,
+	.getAnimationFrame = CroMagScript_GetObjectAnimationFrame,
 	.getActive = CroMagScript_GetObjectActive,
+	.getHealth = CroMagScript_GetObjectHealth,
 	.setPosition = CroMagScript_SetObjectPosition,
 	.setVelocity = CroMagScript_SetObjectVelocity,
 	.setRotation = CroMagScript_SetObjectRotation,
@@ -912,6 +949,24 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "pickup",
 		.dependencySummary = "invisibility pickup assets, player visibility state, and terrain systems",
 	},
+	{
+		.id = "cromag.waterPatch",
+		.nativeType = 2,
+		.category = "hazard",
+		.dependencySummary = "water-patch assets, track, and native vehicle water behavior",
+	},
+	{
+		.id = "cromag.campFire",
+		.nativeType = 17,
+		.category = "hazard",
+		.dependencySummary = "campfire assets, track, and native hazard behavior",
+	},
+	{
+		.id = "cromag.seaMine",
+		.nativeType = 57,
+		.category = "hazard",
+		.dependencySummary = "sea-mine assets, track, and native hazard collision",
+	},
 #define CROMAG_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current track assets, terrain systems, and the native item initializer" },
 	CROMAG_TERRAIN_NATIVE_ITEM(1) CROMAG_TERRAIN_NATIVE_ITEM(2) CROMAG_TERRAIN_NATIVE_ITEM(3) CROMAG_TERRAIN_NATIVE_ITEM(4) CROMAG_TERRAIN_NATIVE_ITEM(5) CROMAG_TERRAIN_NATIVE_ITEM(6) CROMAG_TERRAIN_NATIVE_ITEM(7) CROMAG_TERRAIN_NATIVE_ITEM(8) CROMAG_TERRAIN_NATIVE_ITEM(9) CROMAG_TERRAIN_NATIVE_ITEM(10)
 	CROMAG_TERRAIN_NATIVE_ITEM(11) CROMAG_TERRAIN_NATIVE_ITEM(12) CROMAG_TERRAIN_NATIVE_ITEM(13) CROMAG_TERRAIN_NATIVE_ITEM(14) CROMAG_TERRAIN_NATIVE_ITEM(15) CROMAG_TERRAIN_NATIVE_ITEM(16) CROMAG_TERRAIN_NATIVE_ITEM(17) CROMAG_TERRAIN_NATIVE_ITEM(18) CROMAG_TERRAIN_NATIVE_ITEM(19) CROMAG_TERRAIN_NATIVE_ITEM(20)
@@ -938,6 +993,24 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 
 static int GetScriptPlayerCount(void) { return gNumTotalPlayers; }
 
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton)
+{
+	const JointKeyFrameHeader* header;
+	int frame;
+	int frameCount;
+
+	if (!skeleton || !skeleton->skeletonDefinition || skeleton->AnimNum >= MAX_ANIMS)
+		return 0;
+	header = &skeleton->skeletonDefinition->JointKeyframes[0];
+	frameCount = header->numKeyFrames[skeleton->AnimNum];
+	if (frameCount <= 0 || !header->keyFrames || !header->keyFrames[skeleton->AnimNum])
+		return 0;
+	frame = 0;
+	while (frame + 1 < frameCount && skeleton->CurrentAnimTime >= header->keyFrames[skeleton->AnimNum][frame + 1].tick)
+		frame++;
+	return frame;
+}
+
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (!outPlayer || playerNum < 0 || playerNum >= gNumTotalPlayers || !gPlayerInfo[playerNum].objNode) return false;
@@ -945,31 +1018,72 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.position = {gPlayerInfo[playerNum].coord.x, gPlayerInfo[playerNum].coord.y, gPlayerInfo[playerNum].coord.z},
 		.velocity = {gPlayerInfo[playerNum].objNode->Delta.x, gPlayerInfo[playerNum].objNode->Delta.y, gPlayerInfo[playerNum].objNode->Delta.z},
 		.hasVelocity = true,
+		.grounded = (gPlayerInfo[playerNum].objNode->StatusBits & STATUS_BIT_ONGROUND) != 0,
+		.hasGroundedState = true,
+		.heightOffGround = gPlayerInfo[playerNum].distToFloor,
+		.hasTerrainHeightState = true,
+		.onWater = gPlayerInfo[playerNum].onWater,
+		.hasWaterState = true,
 		.collisionEnabled = gPlayerInfo[playerNum].objNode->CType != 0 && (gPlayerInfo[playerNum].objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0,
 		.hasCollisionEnabled = true,
 		.health = gPlayerInfo[playerNum].health,
 		.hasHealth = true,
+		.dead = gPlayerInfo[playerNum].isEliminated,
+		.hasDeathState = true,
 		.lapNum = gPlayerInfo[playerNum].lapNum,
 		.checkpointNum = gPlayerInfo[playerNum].checkpointNum,
 		.placement = gPlayerInfo[playerNum].place,
 		.raceComplete = gPlayerInfo[playerNum].raceComplete,
 		.hasRaceState = IsRaceMode(),
+		.levelComplete = gPlayerInfo[playerNum].raceComplete,
+		.hasLevelCompletionState = IsRaceMode(),
 		.vehicleType = gPlayerInfo[playerNum].vehicleType,
 		.vehicleMaxSpeed = gPlayerInfo[playerNum].carStats.maxSpeed,
 		.vehicleAcceleration = gPlayerInfo[playerNum].carStats.acceleration,
 		.vehicleTraction = gPlayerInfo[playerNum].carStats.tireTraction,
 		.vehicleSuspension = gPlayerInfo[playerNum].carStats.suspension,
+		.groundTraction = gPlayerInfo[playerNum].groundTraction,
+		.groundFriction = gPlayerInfo[playerNum].groundFriction,
+		.groundSteering = gPlayerInfo[playerNum].groundSteering,
+		.groundAcceleration = gPlayerInfo[playerNum].groundAcceleration,
 		.hasVehicleState = true,
+		.hasGroundPhysicsState = true,
+		.hasGroundSteeringState = true,
+		.nitroActive = gPlayerInfo[playerNum].nitroTimer > 0.0f,
+		.nitroTimeRemaining = gPlayerInfo[playerNum].nitroTimer,
+		.greasedTiresActive = gPlayerInfo[playerNum].greasedTiresTimer > 0.0f,
+		.greasedTiresTimeRemaining = gPlayerInfo[playerNum].greasedTiresTimer,
+		.stickyTiresActive = gPlayerInfo[playerNum].stickyTiresTimer > 0.0f,
+		.stickyTiresTimeRemaining = gPlayerInfo[playerNum].stickyTiresTimer,
+		.superSuspensionActive = gPlayerInfo[playerNum].superSuspensionTimer > 0.0f,
+		.superSuspensionTimeRemaining = gPlayerInfo[playerNum].superSuspensionTimer,
+		.invisibilityActive = gPlayerInfo[playerNum].invisibilityTimer > 0.0f,
+		.invisibilityTimeRemaining = gPlayerInfo[playerNum].invisibilityTimer,
+		.frozen = gPlayerInfo[playerNum].frozenTimer > 0.0f,
+		.frozenTimeRemaining = gPlayerInfo[playerNum].frozenTimer,
+		.flaming = gPlayerInfo[playerNum].flamingTimer > 0.0f,
+		.flamingTimeRemaining = gPlayerInfo[playerNum].flamingTimer,
+		.submarineImmobilized = gPlayerInfo[playerNum].submarineImmobilized > 0.0f,
+		.submarineImmobilizedTimeRemaining = gPlayerInfo[playerNum].submarineImmobilized,
+		.planing = gPlayerInfo[playerNum].isPlaning,
+		.hasVehicleModifierState = true,
 		.team = gPlayerInfo[playerNum].team,
 		.hasTeamState = gGameMode == GAME_MODE_CAPTUREFLAG,
 		.carryingFlag = gPlayerInfo[playerNum].objNode->CapturedFlag != NULL,
 		.captureScore = gCapturedFlagCount[gPlayerInfo[playerNum].team & 1],
 		.hasCaptureState = gGameMode == GAME_MODE_CAPTUREFLAG,
+		.tagged = gPlayerInfo[playerNum].isIt,
+		.tagTimeRemaining = gPlayerInfo[playerNum].tagTimer,
+		.hasTagState = gGameMode == GAME_MODE_TAG1 || gGameMode == GAME_MODE_TAG2,
 		.camera = {gPlayerInfo[playerNum].camera.cameraLocation.x, gPlayerInfo[playerNum].camera.cameraLocation.y, gPlayerInfo[playerNum].camera.cameraLocation.z},
 		.hasCameraState = true,
 		.activeWeapon = gPlayerInfo[playerNum].powType,
 		.hasWeaponState = true,
 		.weaponCount = gPlayerInfo[playerNum].powType >= 0 && gPlayerInfo[playerNum].powQuantity > 0 ? 1 : 0,
+		.invulnerable = gPlayerInfo[playerNum].objNode->InvincibleTimer > 0.0f,
+		.hasInvulnerabilityState = true,
+		.invulnerabilityTimeRemaining = gPlayerInfo[playerNum].objNode->InvincibleTimer,
+		.hasInvulnerabilityTimerState = true,
 		.tokenCount = gPlayerInfo[playerNum].numTokens,
 		.hasTokenState = true,
 		.active = true,
@@ -978,6 +1092,15 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 	outPlayer->hasRotation = true;
 	outPlayer->aim = (PangeaScriptVector3){-sinf(gPlayerInfo[playerNum].objNode->Rot.y), 0.0f, -cosf(gPlayerInfo[playerNum].objNode->Rot.y)};
 	outPlayer->hasAimState = true;
+	if (gPlayerInfo[playerNum].objNode->Skeleton)
+	{
+		outPlayer->animation = gPlayerInfo[playerNum].objNode->Skeleton->AnimNum;
+		outPlayer->hasAnimationState = true;
+		outPlayer->animationSpeed = gPlayerInfo[playerNum].objNode->Skeleton->AnimSpeed;
+		outPlayer->hasAnimationSpeedState = true;
+		outPlayer->animationFrame = GetScriptSkeletonFrame(gPlayerInfo[playerNum].objNode->Skeleton);
+		outPlayer->hasAnimationFrameState = true;
+	}
 	if (outPlayer->weaponCount > 0)
 		outPlayer->weapons[0] = (PangeaScriptPlayerInventoryEntry){gPlayerInfo[playerNum].powType, gPlayerInfo[playerNum].powQuantity};
 	return true;
@@ -1083,6 +1206,10 @@ static const char* CroMagScript_ModeName(void)
 {
 	if (gGameMode == GAME_MODE_PRACTICE) return "practice";
 	if (gGameMode == GAME_MODE_MULTIPLAYERRACE || gNetGameInProgress) return "network";
+	if (gGameMode == GAME_MODE_TAG1) return "tag1";
+	if (gGameMode == GAME_MODE_TAG2) return "tag2";
+	if (gGameMode == GAME_MODE_SURVIVAL) return "survival";
+	if (gGameMode == GAME_MODE_CAPTUREFLAG) return "capture";
 	return "local";
 }
 

@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -103,6 +104,7 @@ ObjNode	*newObj,*glow;
 	gNewObjectDefinition.scale 		= FIREFLY_SCALE;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
 	GAME_ASSERT(newObj);
+	BugdomScript_RegisterObject(newObj, "bugdom.firefly", "enemy");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 	
@@ -145,6 +147,8 @@ ObjNode	*newObj,*glow;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.scale 		= FLARE_SCALE;
 	glow = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (glow != nil)
+		BugdomScript_RegisterObject(glow, "bugdom.fireflyGlow", "child-object");
 
 	newObj->ChainNode = glow;
 	
@@ -597,4 +601,3 @@ Boolean KillFireFly(ObjNode *theNode)
 	DeleteEnemy(theNode);
 	return(true);
 }
-

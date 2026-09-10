@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #if PANGEA_SAFE_ITEM_LOADING
 #define SPACEPOD_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_APOCALYPSE)
 #else
@@ -142,6 +146,10 @@ OGLVector3D	aim;
 			gNewObjectDefinition.rot 		= 0;
 			gNewObjectDefinition.scale 		= 2.0;
 			newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+			{
+				static const char* tags[] = {"hazard", "projectile/effect"};
+				OttoScript_RegisterObjectNode(newObj, "ottomatic.spacePod", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+			}
 
 			newObj->Delta.y = -7000.0f;
 			newObj->Delta.x = RandomFloat2() * 5000.0f;
@@ -395,6 +403,10 @@ got_slot:
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 1.5;
 	worm = MakeNewSkeletonObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(worm, "ottomatic.podWorm", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	worm->SplinePlacement = 0;
 	worm->Kind = i;												// remember which worm slot we're in
@@ -690,7 +702,6 @@ const int	numNubs = NUM_SPLINE_NUBS;
 	gPodWorms[wormNum].numPoints = numPoints;
 	Free_2d_array(space);
 }
-
 
 
 

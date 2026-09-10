@@ -55,6 +55,8 @@ short		gShipSoundChannelNum;
 
 void TurnMeIntoFrog(void)
 {
+	ObjNode *poof;
+
 				/* HIDE REAL ME */
 
 	gMyNodePtr->DrawFlag = false;			// stop drawing & moving the "real" me
@@ -94,9 +96,13 @@ void TurnMeIntoFrog(void)
 
 	PlaySound(gSoundNum_Frog);					// make frog sound
 
-	MakeNewShape(GroupNum_FrogPoof,ObjType_FrogPoof,0,
+	poof = MakeNewShape(GroupNum_FrogPoof,ObjType_FrogPoof,0,
 				gRealMePtr->X.Int,gRealMePtr->Y.Int,gRealMePtr->Z,nil,
 				PLAYFIELD_RELATIVE);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (poof)
+		MikeScript_RegisterObject(poof, "mightymike.frogPoof", "child-object");
+	#endif
 }
 
 
@@ -372,7 +378,6 @@ void MoveMeSpaceShip(void)
 update:
 	UpdateMeFrog();										// call frog update which sets some important stuff
 }
-
 
 
 

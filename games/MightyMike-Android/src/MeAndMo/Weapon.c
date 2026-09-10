@@ -22,6 +22,9 @@
 #include "misc.h"
 #include "weapon.h"
 #include "bonus.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include "collision.h"
 #include "input.h"
 #include "externs.h"
@@ -159,6 +162,10 @@ ObjNode		*newObj;
 						50,MovePOW,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.weaponPowerup", "pickup");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -639,6 +646,10 @@ short		z,y,x;
 	if (newNode == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.suctionCup", "projectile/effect");
+#endif
+
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
 
@@ -704,6 +715,10 @@ short		z,y,x;
 	newNode = MakeNewShape(GroupNum_Cake,ObjType_Cake,0,x,y,z,MoveCake,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.cake", "projectile/effect");
+#endif
 
 	newNode->CBits = CBITS_TOUCHABLE;
 	newNode->TopOff = -60;					// set collision box (not activated yet)
@@ -825,6 +840,10 @@ short		z,y,x;
 	if (newNode == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.oozie", "projectile/effect");
+#endif
+
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
 
@@ -893,6 +912,10 @@ short		z,y,x;
 	newNode = MakeNewShape(GroupNum_RBand,ObjType_RBand,0,x,y,z,MoveBasicRico,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.rubberBand", "projectile/effect");
+#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -975,6 +998,10 @@ Byte	animNum;
 	if (newNode == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.toothpaste", "projectile/effect");
+#endif
+
 	InitYOffset(newNode, -39);
 
 	newNode->CType = CTYPE_MYBULLET;
@@ -1047,4 +1074,3 @@ void MoveToothpaste(void)
 	CalcObjectBox();
 	UpdateObject();
 }
-

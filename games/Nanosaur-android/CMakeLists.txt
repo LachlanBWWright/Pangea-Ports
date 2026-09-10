@@ -427,6 +427,7 @@ if(EMSCRIPTEN)
 			"_PangeaScript_GetStatusBudgetExceededCount"
 			"_PangeaScript_GetStatusHooksCalledCount"
 			"_PangeaScript_GetStatusScriptsDisabled"
+			"_PangeaScript_GetStatusLifecycleTraceJSON"
 			"_PangeaScript_ProbeTerrainReplacementJS"
 			"_NanosaurScript_ProbeTerrainReplacementJS"
 			"_NanosaurScript_ProbeCheckpointResetJS"
@@ -436,6 +437,8 @@ if(EMSCRIPTEN)
 			"_NanosaurScript_ProbeEggRecoveryJS"
 			"_NanosaurScript_ProbeShieldPickupJS"
 			"_NanosaurScript_ProbeWeaponPowerPickupJS"
+			"_NanosaurScript_ProbeEnemyWeaponHitJS"
+			"_NanosaurScript_ProbeLevelCompleteJS"
 		)
 	endif()
 	list(JOIN WASM_EXPORTED_FUNCTIONS "," WASM_EXPORTED_FUNCTIONS_STR)

@@ -451,6 +451,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveMothBall;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.mothBall", "pickup");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -701,6 +703,8 @@ Boolean	part = itemPtr->parm[0];
 	gNewObjectDefinition.moveCall 	= MoveSiliconPart;
 	gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.siliconPart", "pickup");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -790,9 +794,6 @@ float	fps = gFramesPerSecondFrac;
 	UpdateObject(theNode);
 
 }
-
-
-
 
 
 

@@ -15,6 +15,7 @@ void BugdomScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSecond
 void BugdomScript_OnLevelComplete(int levelNum);
 void BugdomScript_OnObjectiveComplete(int playerNum, int outcome);
 void BugdomScript_OnLevelUnload(int levelNum);
+void BugdomScript_OnLevelCleanup(void);
 int BugdomScript_RemapTerrainItemType(int levelNum, int itemType);
 Boolean BugdomScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
 Boolean BugdomScript_OnSplineItem(SplineItemType* itemPtr, int levelNum, int splineNum);

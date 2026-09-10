@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -139,6 +143,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= itemPtr->parm[0] * (PI/2);
 	gNewObjectDefinition.scale 		= 1.5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.barn", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -170,6 +175,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 2.5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.silo", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -203,6 +209,7 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.phonePole", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -241,6 +248,7 @@ int		type = itemPtr->parm[0];			// get sprout type
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.sprout", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery"}, 1);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -335,6 +343,7 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.cornStalk", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -366,6 +375,7 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.bigLeafPlant", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -454,6 +464,7 @@ uint32_t flags = gAutoFadeStatusBits;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.basicPlant", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -509,6 +520,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= 0;;
 	gNewObjectDefinition.scale 		= 5.0f;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.metalTub", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -539,6 +551,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI/2);
 	gNewObjectDefinition.scale 		= 2.3f;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.outHouse", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -570,6 +583,7 @@ int		type = itemPtr->parm[0];			// get sprout type
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	gNewObjectDefinition.scale 		= 2.0 + sin(gNewObjectDefinition.coord.x);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.rock", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -600,6 +614,7 @@ int		type = itemPtr->parm[0];			// get sprout type
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[1] * (PI/2);
 	gNewObjectDefinition.scale 		= 1.3;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.hay", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -664,6 +679,7 @@ static const short types[] =
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.fencePost", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -702,6 +718,7 @@ float	r;
 	gNewObjectDefinition.rot 		= r = (float)itemPtr->parm[0] * (PI/2);
 	gNewObjectDefinition.scale 		= WINDMILL_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.windmill", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -723,6 +740,7 @@ float	r;
 	gNewObjectDefinition.coord.y 	+= 372.0f * WINDMILL_SCALE;
 	gNewObjectDefinition.moveCall 	= nil;
 	prop = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(prop, "ottomatic.windmillPropeller", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"child-object"}, 1);
 
 	newObj->ChainNode = prop;
 
@@ -775,6 +793,7 @@ int		type = itemPtr->parm[0];
 	gNewObjectDefinition.moveCall 	= MoveSlimePipe;
 	gNewObjectDefinition.rot 		= r = (float)itemPtr->parm[1] * (PI2/8);
 	pipe = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(pipe, "ottomatic.slimePipe", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	pipe->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1154,6 +1173,7 @@ float	s;
 				gNewObjectDefinition.rot 		= 0;
 				gNewObjectDefinition.scale 		= s = 2.5f;
 				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+				OttoScript_RegisterObjectNode(newObj, "ottomatic.slimeMechPole", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"hazard", "obstacle"}, 2);
 
 				newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1171,6 +1191,7 @@ float	s;
 				gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 				gNewObjectDefinition.scale 		= s = 2.5f;
 				top = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+				OttoScript_RegisterObjectNode(top, "ottomatic.slimeMechTop", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"child-object", "hazard"}, 2);
 				newObj->ChainNode = top;
 				break;
 
@@ -1191,6 +1212,7 @@ float	s;
 				gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 				gNewObjectDefinition.scale 		= s = 2.5f;
 				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+				OttoScript_RegisterObjectNode(newObj, "ottomatic.slimeMechBoiler", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"hazard", "obstacle"}, 2);
 
 				newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1338,6 +1360,7 @@ int		type = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/8.0f);
 	gNewObjectDefinition.scale 		= s = 3.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.basicCrystal", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"pickup", "scenery"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1393,6 +1416,7 @@ ObjNode	*newObj;
 				gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 				gNewObjectDefinition.scale 		= SLIME_TREE_SCALE;
 				newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+				OttoScript_RegisterObjectNode(newObj, "ottomatic.slimeTreeAnimated", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 				newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1422,6 +1446,7 @@ ObjNode	*newObj;
 				gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 				gNewObjectDefinition.scale 		= SLIME_TREE_SCALE;
 				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+				OttoScript_RegisterObjectNode(newObj, "ottomatic.slimeTreeBig", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 				newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1447,6 +1472,7 @@ ObjNode	*newObj;
 				gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 				gNewObjectDefinition.scale 		= SLIME_TREE_SCALE;
 				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+				OttoScript_RegisterObjectNode(newObj, "ottomatic.slimeTreeSmall", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 				newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1676,6 +1702,7 @@ float	s;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[1] * PI/2;
 	gNewObjectDefinition.scale 		= s = 3.0;
 	pipe = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(pipe, "ottomatic.blobBossTube", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"obstacle", "hazard"}, 2);
 
 	pipe->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1711,6 +1738,7 @@ short	type = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 10.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.scaffoldingPost", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1771,6 +1799,7 @@ ObjNode	*frame,*tube;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI/2);
 	gNewObjectDefinition.scale 		= 8.0;
 	frame = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(frame, "ottomatic.cloudTunnelFrame", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"obstacle", "child-object"}, 2);
 
 	frame->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1783,6 +1812,7 @@ ObjNode	*frame,*tube;
 	gNewObjectDefinition.moveCall 	= MoveCloudTunnel;
 	gNewObjectDefinition.flags 		|= STATUS_BIT_KEEPBACKFACES | STATUS_BIT_GLOW | STATUS_BIT_NOZWRITES | STATUS_BIT_NOLIGHTING | STATUS_BIT_ROTZXY;
 	tube = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(tube, "ottomatic.cloudTunnelTube", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"obstacle", "child-object"}, 2);
 
 	tube->ColorFilter.a = .7;
 
@@ -1826,6 +1856,7 @@ int		type = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4.0f);
 	gNewObjectDefinition.scale 		= .8;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.lampPost", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1866,6 +1897,7 @@ int		type = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4.0f);
 	gNewObjectDefinition.scale 		= 1.4;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.crashedShip", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1912,6 +1944,7 @@ int		type = itemPtr->parm[0];
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[1] * (PI2/4.0f);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.rubble", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1948,6 +1981,7 @@ int		type = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[1] * (PI2/4.0f);
 	gNewObjectDefinition.scale 		= 2.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.teleporterMap", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"objective", "scenery"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -2103,6 +2137,7 @@ int		type = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[1] * (PI2/4.0f);
 	gNewObjectDefinition.scale 		= .6;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.graveStone", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -2134,8 +2169,3 @@ static void RadiateGrave(ObjNode *theNode)
 {
 	GrowMutant(theNode->Coord.x, theNode->Coord.z);
 }
-
-
-
-
-

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -116,6 +120,13 @@ float	q;
 	gNewObjectDefinition.scale 		= JAWSBOT_SCALE;
 	body = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(body, "ottomatic.jawsBot", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
+
 	body->Mode 			= JAWSBOT_MODE_WAIT;
 	body->Damage 		= JAWSBOT_DAMAGE;
 
@@ -153,6 +164,14 @@ float	q;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	jaw = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(jaw, "ottomatic.jawsBotJaw", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	body->ChainNode = jaw;
 
 
@@ -167,6 +186,14 @@ float	q;
 	for (i = 0; i < 3; i++)
 	{
 		wheels = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		{
+			static const char* tags[] = {"child-object"};
+			OttoScript_RegisterObjectNode(wheels, "ottomatic.jawsBotWheels", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		}
+#endif
+
 		prev->ChainNode = wheels;
 		prev = wheels;
 	}
@@ -761,7 +788,6 @@ float			throwFactor;
 		MakeSparkExplosion(jawPt.x, jawPt.y, jawPt.z, 300.0f, .8, PARTICLE_SObjType_WhiteSpark3, 0);
 	}
 }
-
 
 
 

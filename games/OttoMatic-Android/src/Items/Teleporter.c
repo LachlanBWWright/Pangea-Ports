@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #if PANGEA_SAFE_ITEM_LOADING
 #define TELEPORTER_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_APOCALYPSE)
 #else
@@ -122,6 +126,10 @@ ObjNode	*newObj,*console;
 	gNewObjectDefinition.moveCall 	= MoveTeleporter;
 	gNewObjectDefinition.rot 		= rotation;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"portal", "trigger"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.teleporter", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -143,6 +151,10 @@ ObjNode	*newObj,*console;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	console = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(console, "ottomatic.teleporterConsole", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	if (!consoleModelExists)
 		console->StatusBits |= STATUS_BIT_HIDDEN;

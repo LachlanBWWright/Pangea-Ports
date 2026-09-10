@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -122,6 +123,7 @@ ObjNode *snail;
 	gNewObjectDefinition.scale 		= SNAIL_SCALE;
 
 	snail = MakeNewSkeletonObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(snail, "bugdom2.snail", "enemy");
 
 	snail->Kind 		= snailKind;								// remember the snail kind
 	snail->KeyColor 	= keyColor;									// remember key color
@@ -157,6 +159,7 @@ ObjNode *snail;
 		gNewObjectDefinition.moveCall 	= nil;
 		gNewObjectDefinition.scale 		= SNAIL_SCALE;
 		shell = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(shell, "bugdom2.snailShellChild", "child-object");
 
 		snail->ChainNode = shell;
 
@@ -681,6 +684,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveDefaultPickup;
 	gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.snailShell", "pickup");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -824,6 +828,7 @@ int		taskCompleted = itemPtr->flags & ITEM_FLAGS_USER1;
 		gNewObjectDefinition.moveCall 	= MoveStaticObject;
 		gNewObjectDefinition.rot 		= 0;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.scarecrow", "objective");
 
 		newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -843,6 +848,7 @@ int		taskCompleted = itemPtr->flags & ITEM_FLAGS_USER1;
 		gNewObjectDefinition.moveCall 	= nil;
 		gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 		newObj->ChainNode = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(newObj->ChainNode, "bugdom2.scarecrowShirt", "child-object");
 
 
 			/* SEE IF ATTACH HEAD TOO */
@@ -854,6 +860,7 @@ int		taskCompleted = itemPtr->flags & ITEM_FLAGS_USER1;
 			gNewObjectDefinition.flags 		= gAutoFadeStatusBits;
 			gNewObjectDefinition.slot++;
 			newObj->ChainNode->ChainNode = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+			Bugdom2Script_RegisterObject(newObj->ChainNode->ChainNode, "bugdom2.scarecrowHead", "child-object");
 		}
 		else
 		{
@@ -878,6 +885,7 @@ int		taskCompleted = itemPtr->flags & ITEM_FLAGS_USER1;
 		gNewObjectDefinition.moveCall 	= MoveScarecrowHead;
 		gNewObjectDefinition.rot 		= 0;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.scarecrowHead", "pickup");
 
 		newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1113,6 +1121,7 @@ ObjNode	*guts,*sphere;
 	gNewObjectDefinition.moveCall 	= MoveBowlingMarble;
 	gNewObjectDefinition.rot 		= 0;
 	guts = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(guts, "bugdom2.bowlingMarble", "pickup");
 
 	guts->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1148,6 +1157,7 @@ ObjNode	*guts,*sphere;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= 0;
 	sphere = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(sphere, "bugdom2.bowlingMarbleSphere", "child-object");
 
 	sphere->ColorFilter.a = .6;
 
@@ -1354,6 +1364,7 @@ OGLMatrix3x3	m;
 		gNewObjectDefinition.coord.y 	= GetTerrainY(x,z) - gObjectGroupBBoxList[gActiveItemModelGroup][gNewObjectDefinition.type].min.y * gNewObjectDefinition.scale;
 		gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 		pin = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(pin, "bugdom2.bowlingPin", "child-object");
 
 		pin->Mode			= PIN_MODE_STANDING;
 
@@ -1626,6 +1637,7 @@ ObjNode	*newObj;
 		gNewObjectDefinition.moveCall 	= MoveSquishedBerry;
 		gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.squishedBerry", "pickup");
 
 		newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1648,6 +1660,7 @@ ObjNode	*newObj;
 		gNewObjectDefinition.moveCall 	= MoveSquishBerry;
 		gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.squishBerry", "pickup");
 
 		newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1785,6 +1798,3 @@ static void MoveSquishedBerry(ObjNode *theNode)
 	SetObjectTransformMatrix(theNode);
 
 }
-
-
-

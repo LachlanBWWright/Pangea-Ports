@@ -21,6 +21,9 @@
 #include "io.h"
 #include "infobar.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -466,6 +469,10 @@ const TileAttribType	*newTile;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.raceCar", "enemy");
+#endif
+
 	newObj->ItemIndex = itemPtr;							// remember where this came from
 
 	newObj->CType = CTYPE_ENEMYC;
@@ -604,7 +611,6 @@ no_reverse:
 	CalcObjectBox();
 	UpdateObject();
 }
-
 
 
 

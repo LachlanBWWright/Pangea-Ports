@@ -19,6 +19,9 @@
 #include "objecttypes.h"
 #include "shape.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -57,6 +60,9 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveBabyDino,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.babyDino", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -223,7 +229,6 @@ void MoveBaby_Land(void)
 
 	UpdateEnemy();
 }
-
 
 
 

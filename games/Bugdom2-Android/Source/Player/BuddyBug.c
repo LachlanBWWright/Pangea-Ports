@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -82,6 +83,7 @@ ObjNode *newObj;
 	newObj->TargetOff.z = RandomFloat2() * 50.0f;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, .5, .5, true);
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.buddyBug", "child-object");
 
 	gPlayerInfo.buddyBugs[gPlayerInfo.numBuddyBugs++] = newObj;
 }
@@ -379,4 +381,3 @@ static void SplatterBuddy(ObjNode *theNode)
 
 
 }
-

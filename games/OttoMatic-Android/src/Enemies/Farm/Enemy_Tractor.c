@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -77,6 +81,10 @@ ObjNode	*newObj,*frontLeftWheel, *backLeftWheel,*frontRightWheel,*backRightWheel
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= TRACTOR_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.tractor", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 

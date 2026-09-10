@@ -558,6 +558,9 @@ ObjNode	*door, *rocket;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/8.0f);
 	gNewObjectDefinition.scale 		= ROCKET_SCALE * gRocketScaleAdjust;
 	rocket = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(rocket, "ottomatic.exitRocket", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"transition", "objective"}, 2);
+	#endif
 
 	rocket->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -582,6 +585,9 @@ ObjNode	*door, *rocket;
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_RocketDoor;
 	gNewObjectDefinition.moveCall 	= nil;
 	door = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(door, "ottomatic.exitRocketDoor", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"transition", "child-object"}, 2);
+	#endif
 
 	rocket->ChainNode = door;
 	door->ChainHead = rocket;
@@ -632,6 +638,9 @@ ObjNode	*door, *rocket;
 	gNewObjectDefinition.rot 		= rot + PI;
 	gNewObjectDefinition.scale 		= ROCKET_SCALE;
 	rocket = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(rocket, "ottomatic.entryRocket", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"transition", "vehicle"}, 2);
+	#endif
 
 	BG3D_SphereMapGeomteryMaterial(gNewObjectDefinition.group,gNewObjectDefinition.type,
 									-1, MULTI_TEXTURE_COMBINE_ADD, SPHEREMAP_SObjType_Blue);	// set this model to be sphere mapped
@@ -654,6 +663,9 @@ ObjNode	*door, *rocket;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.slot++;
 	door = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(door, "ottomatic.entryRocketDoor", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"transition", "child-object"}, 2);
+	#endif
 
 	rocket->ChainNode = door;
 	door->ChainHead = rocket;
@@ -693,6 +705,9 @@ int		i;
 	};
 
 	newObj = MakeNewObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.rocketFlame", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"effect", "child-object"}, 2);
+	#endif
 
 	newObj->CustomDrawFunction = DrawRocketFlame;
 

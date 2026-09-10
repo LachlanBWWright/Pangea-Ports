@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -55,6 +59,10 @@ ObjNode	*newObj,*step;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2 / 4.0f);
 	gNewObjectDefinition.scale 		= CANNON_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.humanCannon", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
@@ -76,6 +84,10 @@ ObjNode	*newObj,*step;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	step = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(step, "ottomatic.humanCannonStep", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	newObj->ChainNode = step;
 
@@ -198,7 +210,6 @@ void StartCannonFuse(ObjNode *theNode)
 
 
 }
-
 
 
 

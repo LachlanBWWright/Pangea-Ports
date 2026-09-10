@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -133,6 +134,8 @@ int		j,i;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_TICK,animNum, x,z, TICK_SCALE, 0, MoveTick);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.tick", "enemy");
 
 
 
@@ -863,6 +866,7 @@ OGLMatrix4x4	m;
 		gNewObjectDefinition.rot 		= 0;
 		gNewObjectDefinition.scale 		= TICK_SCALE * .7f;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.tickSpit", "projectile/effect");
 
 		newObj->Damage 			= .2;
 
@@ -918,8 +922,6 @@ OGLVector3D	aim;
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

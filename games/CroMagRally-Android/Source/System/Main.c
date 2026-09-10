@@ -1867,6 +1867,8 @@ void GameMain_InitEmscripten(void)
 
 	int track = GetURLParamInt("track", 1);		// 1-based track number
 	int car   = GetURLParamInt("car", 0);		// 1-based car (0 = default)
+	char modeBuf[32];
+	Boolean hasMode = GetURLParamString("mode", modeBuf, sizeof(modeBuf));
 
 	// Fence collision disable param
 	int noFence = GetURLParamInt("noFenceCollision", 0);
@@ -1888,9 +1890,19 @@ void GameMain_InitEmscripten(void)
 	gTrackNum = (track - 1);
 	if (gTrackNum < 0 || gTrackNum >= NUM_TRACKS)
 		gTrackNum = 0;
-	if (!gNetGameInProgress)
+	if (!gNetGameInProgress && !hasMode)
 	{
 		gGameMode = GAME_MODE_PRACTICE;
+	}
+	else if (!gNetGameInProgress && hasMode)
+	{
+		if (strcmp(modeBuf, "practice") == 0) gGameMode = GAME_MODE_PRACTICE;
+		else if (strcmp(modeBuf, "race") == 0) gGameMode = GAME_MODE_MULTIPLAYERRACE;
+		else if (strcmp(modeBuf, "tag1") == 0) gGameMode = GAME_MODE_TAG1;
+		else if (strcmp(modeBuf, "tag2") == 0) gGameMode = GAME_MODE_TAG2;
+		else if (strcmp(modeBuf, "survival") == 0) gGameMode = GAME_MODE_SURVIVAL;
+		else if (strcmp(modeBuf, "capture") == 0) gGameMode = GAME_MODE_CAPTUREFLAG;
+		else gGameMode = GAME_MODE_PRACTICE;
 	}
 #if __EMSCRIPTEN__
 	else

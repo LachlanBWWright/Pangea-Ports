@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #if PANGEA_SAFE_ITEM_LOADING
 #define BUMPERCAR_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_CLOUD)
 #define BUMPERCAR_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_CLOUD)
@@ -199,6 +203,10 @@ int		playerCar = itemPtr->parm[3] & 1;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	gNewObjectDefinition.scale 		= BUMPERCAR_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"vehicle", "enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.bumperCar", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 3);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
@@ -943,6 +951,10 @@ short	id = itemPtr->parm[0];
 
 	gNewObjectDefinition.scale 		= 1.1;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"trigger", "hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.bumperCarPowerPost", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1247,6 +1259,10 @@ static const OGLPoint3D	sparkles[10] =
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 3.5;
 	post = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"obstacle", "trigger"};
+		OttoScript_RegisterObjectNode(post, "ottomatic.bumperCarGatePost", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	post->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1301,6 +1317,10 @@ static const OGLPoint3D	sparkles[10] =
 		gNewObjectDefinition.slot++;
 		gNewObjectDefinition.moveCall 	= nil;
 		beam = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		{
+			static const char* tags[] = {"child-object"};
+			OttoScript_RegisterObjectNode(beam, "ottomatic.bumperCarGateBeam", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		}
 
 		post->ChainNode = beam;
 
@@ -1364,7 +1384,6 @@ int		j,i;
 
 
 }
-
 
 
 

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -123,6 +127,13 @@ float	q;
 	gNewObjectDefinition.scale 		= SWINGERBOT_SCALE;
 	body = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(body, "ottomatic.swingerBot", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
+
 	body->Mode 			= SWINGERBOT_MODE_WAIT;
 	body->WaitDelay 	= 0;
 	body->Damage 		= SWINGERBOT_DAMAGE;
@@ -157,6 +168,14 @@ float	q;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	treads = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(treads, "ottomatic.swingerBotTreads", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	body->ChainNode = treads;
 	treads->StatusBits |= STATUS_BIT_UVTRANSFORM;					// treads do uv animation
 
@@ -166,6 +185,14 @@ float	q;
 
 	gNewObjectDefinition.type 		= FIREICE_ObjType_SwingerBot_SmallGear;
 	smallGear = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(smallGear, "ottomatic.swingerBotSmallGear", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	treads->ChainNode = smallGear;
 
 
@@ -175,6 +202,14 @@ float	q;
 
 	gNewObjectDefinition.type 		= FIREICE_ObjType_SwingerBot_Pivot;
 	pivot = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(pivot, "ottomatic.swingerBotPivot", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	smallGear->ChainNode = pivot;
 
 
@@ -184,9 +219,25 @@ float	q;
 
 	gNewObjectDefinition.type 		= FIREICE_ObjType_SwingerBot_Mace;
 	mace1 = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(mace1, "ottomatic.swingerBotMace", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	pivot->ChainNode = mace1;
 
 	mace2 = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(mace2, "ottomatic.swingerBotMace", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	mace1->ChainNode = mace2;
 
 

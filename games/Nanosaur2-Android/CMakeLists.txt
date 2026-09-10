@@ -397,6 +397,7 @@ if(EMSCRIPTEN)
 		"_Nanosaur2_DebugGetGameplayState"
 		"_Nanosaur2_SetTerrainOverridePath"
 		"_Nanosaur2_RequestQuit"
+		"_PangeaScript_GetStatusLifecycleTraceJSON"
 		"_PangeaGame_SetNetworkMatchConfig"
 		"_PangeaGame_StartNetworkMatch"
 		"_PangeaNet_IsEnabled"
@@ -432,10 +433,14 @@ if(EMSCRIPTEN)
 	if(PANGEA_ENABLE_SCRIPTING)
 		list(APPEND WASM_EXPORTED_FUNCTIONS
 			"_Nanosaur2Script_ProbeRaceCompletionJS"
+			"_Nanosaur2Script_ProbeLevelCompleteJS"
 			"_Nanosaur2Script_ProbeTerrainReplacementJS"
 			"_Nanosaur2Script_ProbeSplineReplacementJS"
 			"_Nanosaur2Script_ProbeFirstSplineJS"
 			"_Nanosaur2Script_ProbeFirstSplineReplacementJS"
+			"_Nanosaur2Script_SelectFirstSplineItemForReplacementJS"
+			"_Nanosaur2Script_GetSelectedSplineItemFieldJS"
+			"_Nanosaur2Script_GetSelectedSplinePlacementJS"
 			"_Nanosaur2Script_ProbeCheckpointResetJS"
 			"_Nanosaur2Script_ProbeDeathRespawnJS"
 			"_Nanosaur2Script_ProbeObjectiveCompletionJS"
@@ -458,7 +463,7 @@ if(EMSCRIPTEN)
 			"_PangeaScript_GetStatusBudgetExceededCount"
 			"_PangeaScript_GetStatusHooksCalledCount"
 			"_PangeaScript_GetStatusScriptsDisabled"
-		)
+	)
 	endif()
 	list(JOIN WASM_EXPORTED_FUNCTIONS "," WASM_EXPORTED_FUNCTIONS_STR)
 

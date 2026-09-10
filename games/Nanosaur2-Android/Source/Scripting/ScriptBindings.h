@@ -13,6 +13,7 @@ void Nanosaur2Script_OnLevelStart(int levelNum);
 void Nanosaur2Script_OnCheckpointReset(void);
 void Nanosaur2Script_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds);
 void Nanosaur2Script_OnLevelComplete(int levelNum);
+int Nanosaur2Script_ProbeLevelCompleteJS(void);
 void Nanosaur2Script_OnLevelUnload(int levelNum);
 int Nanosaur2Script_RemapTerrainItemType(int levelNum, int itemType);
 Boolean Nanosaur2Script_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNum, int originalType, int remappedType, float x, float z);
@@ -35,6 +36,9 @@ int Nanosaur2Script_ProbeTerrainReplacementJS(int itemIndex, int nativeType, flo
 int Nanosaur2Script_ProbeSplineReplacementJS(int splineNum, int itemIndex, int nativeType, float placement);
 int Nanosaur2Script_ProbeFirstSplineJS(void);
 int Nanosaur2Script_ProbeFirstSplineReplacementJS(void);
+int Nanosaur2Script_SelectFirstSplineItemForReplacementJS(void);
+int Nanosaur2Script_GetSelectedSplineItemFieldJS(int field);
+float Nanosaur2Script_GetSelectedSplinePlacementJS(void);
 int Nanosaur2Script_ProbeCheckpointResetJS(void);
 int Nanosaur2Script_ProbeDeathRespawnJS(void);
 int Nanosaur2Script_ProbeObjectiveCompletionJS(void);

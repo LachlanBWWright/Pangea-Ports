@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -112,6 +113,7 @@ long	h = itemPtr->parm[0];
 	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, def.scale);
 
 	base = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(base, "nanosaur2.airMineBase", "child-object");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -133,6 +135,7 @@ long	h = itemPtr->parm[0];
 	def.rot 		= RandomFloat() * PI2;
 	def.flags 		= gAutoFadeStatusBits | STATUS_BIT_CLIPALPHA6 | STATUS_BIT_DOUBLESIDED;
 	chain = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(chain, "nanosaur2.airMineChain", "child-object");
 
 	chain->WobbleX = RandomFloat() * PI2;
 
@@ -149,6 +152,7 @@ long	h = itemPtr->parm[0];
 	def.slot++;
 	def.flags 		= gAutoFadeStatusBits;
 	mine = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(mine, "nanosaur2.airMine", "hazard");
 
 			/* SET COLLISION STUFF */
 
@@ -422,6 +426,7 @@ ObjNode *base = chain->ChainHead;
 		};
 
 		flare = MakeNewObject(&def);
+		Nanosaur2Script_RegisterObject(flare, "nanosaur2.airMineFlare", "projectile/effect");
 
 				/* SET RANDOM TRAJECTORY */
 
@@ -596,8 +601,6 @@ short	i;
 
 
 }
-
-
 
 
 

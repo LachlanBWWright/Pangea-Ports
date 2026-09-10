@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /*******************/
 /*   PROTOTYPES    */
 /*******************/
@@ -76,6 +80,7 @@ int		i;
 
 	gNewObjectDefinition.scale 		= JUNGLEGATE_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.jungleGate", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"trigger", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -265,6 +270,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/8.0f);
 	gNewObjectDefinition.scale 		= 2.5;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.turtlePlatform", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"platform", "trigger"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -365,6 +371,7 @@ short	type = itemPtr->parm[0];
 
 	gNewObjectDefinition.scale 		= 3.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.smashable", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"trigger", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -430,6 +437,7 @@ ObjNode	*newObj,*shadowObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[1] * (PI2 / 4.0f);
 	gNewObjectDefinition.scale 		= 4.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.leafPlatform", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"platform", "trigger"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -598,6 +606,7 @@ short	type = itemPtr->parm[0];		// 0=open, 1=blocked with debris
 
 	gNewObjectDefinition.scale 		= DEBRISGATE_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.debrisGate", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"trigger", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -772,6 +781,7 @@ int		i;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject3;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.chainReactingMine", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"hazard", "trigger"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
@@ -1073,6 +1083,7 @@ float	x2,z2;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= TERRAIN_POLYGON_SIZE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.trapDoor", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"hazard", "trigger"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1154,8 +1165,6 @@ Boolean DoTrig_TrapDoor(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	return(true);
 }
-
-
 
 
 

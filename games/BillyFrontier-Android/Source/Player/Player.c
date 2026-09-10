@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -221,6 +224,9 @@ ObjNode	*player = gPlayerInfo.objNode;
 			
 	gPlayerIsDead = true;
 	player->Health = 0;					// make sure this is set correctly
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_OnDeath(player, deathType);
+#endif
 
 	switch(deathType)
 	{
@@ -344,6 +350,9 @@ ObjNode *newObj;
 			gNewObjectDefinition.moveCall 	= MoveShieldSphere;
 			gNewObjectDefinition.rot 		= 0;	
 			newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			BillyScript_RegisterObject(newObj, i == 0 ? "billy.shieldInner" : "billy.shieldOuter", "effect");
+		#endif
 			
 			gPlayerInfo.shieldObj[i] = newObj;
 			
@@ -437,9 +446,6 @@ void PingShield(float damage)
 		gPlayerInfo.shieldPower = 0.0f;
 
 }
-
-
-
 
 
 

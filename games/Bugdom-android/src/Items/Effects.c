@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -95,6 +96,8 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(nil);
+
+	BugdomScript_RegisterObject(newObj, "bugdom.waterRipple", "projectile/effect");
 
 	newObj->RenderModifiers.drawOrder = kDrawOrder_Ripples;				// draw ripples after water
 

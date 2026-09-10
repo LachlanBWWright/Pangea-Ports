@@ -247,6 +247,10 @@ register	ObjNode		*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.clownDoor", "trigger");
+#endif
+
 	newObj->ItemIndex = itemPtr;							// remember where this came from
 
 	newObj->CType = CTYPE_TRIGGER|CTYPE_MISC;				// set collision info
@@ -286,6 +290,10 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,SimpleObjectMove,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.candyDoor", "trigger");
+#endif
 
 	newObj->ItemIndex = itemPtr;							// remember where this came from
 
@@ -327,6 +335,10 @@ register	ObjNode		*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.jurassicDoor", "trigger");
+#endif
+
 	newObj->ItemIndex = itemPtr;							// remember where this came from
 
 	newObj->CType = CTYPE_TRIGGER|CTYPE_MISC;				// set collision info
@@ -365,6 +377,10 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,MoveBargainDoor,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.bargainDoor", "trigger");
+#endif
 
 	newObj->ItemIndex = itemPtr;							// remember where this came from
 
@@ -443,6 +459,10 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,MoveFairyDoor,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.fairyDoor", "trigger");
+#endif
 
 	newObj->ItemIndex = itemPtr;							// remember where this came from
 

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -128,6 +132,13 @@ float	q;
 	gNewObjectDefinition.scale 		= DRILLBOT_SCALE;
 	body = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(body, "ottomatic.drillBot", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
+
 	body->Mode 			= DRILLBOT_MODE_WAIT;
 	body->WaitDelay 	= 0;
 	body->Damage 		= DRILLBOT_DAMAGE;
@@ -164,6 +175,14 @@ float	q;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	drill = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(drill, "ottomatic.drillBotDrill", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	body->ChainNode = drill;
 
 
@@ -178,6 +197,14 @@ float	q;
 	for (i = 0; i < 2; i++)
 	{
 		wheels = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		{
+			static const char* tags[] = {"child-object"};
+			OttoScript_RegisterObjectNode(wheels, "ottomatic.drillBotWheels", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		}
+#endif
+
 		prev->ChainNode = wheels;
 		prev = wheels;
 	}
@@ -947,7 +974,6 @@ OGLMatrix3x3	m;
 	player->StatusBits &= ~STATUS_BIT_ROTZXY;
 	player->Rot.z = 0;
 }
-
 
 
 

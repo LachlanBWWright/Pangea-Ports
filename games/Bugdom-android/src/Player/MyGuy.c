@@ -562,6 +562,9 @@ ObjNode *newObj;
 	gNewObjectDefinition.scale 		= .3;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
 	GAME_ASSERT(newObj);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.buddy", "child-object");
+	#endif
 
 	newObj->Mode = BUDDY_MODE_LIKESME;
 

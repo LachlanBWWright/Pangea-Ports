@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 #if PANGEA_SAFE_ITEM_LOADING
 #define JUNGLE_BOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_JUNGLEBOSS)
@@ -201,6 +202,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB+7;
 	gNewObjectDefinition.moveCall 	= UpdateTentacles;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"enemy", "effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.pitcherPlantTentacles", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->CustomDrawFunction = DrawTentacles;
 }
@@ -225,6 +230,10 @@ uint32_t	burned = itemPtr->flags & ITEM_FLAGS_USER1;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 5.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"hazard", "enemy"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.pitcherPlantTentacleGenerator", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -694,6 +703,10 @@ ObjNode	*newObj,*grass;
 	gNewObjectDefinition.scale 		= PITCHER_PLANT_SCALE;
 
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.pitcherPlant", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->Coord.y -= newObj->BBox.min.y;						// offset so bottom touches ground
 	UpdateObjectTransforms(newObj);
@@ -728,6 +741,10 @@ ObjNode	*newObj,*grass;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	grass = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object", "scenery"};
+		OttoScript_RegisterObjectNode(grass, "ottomatic.pitcherPlantGrass", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->ChainNode = grass;
 
@@ -799,6 +816,10 @@ static void  MovePitcherPlant_Attack(ObjNode *theNode)
 			gNewObjectDefinition.rot 		= 0;
 			gNewObjectDefinition.scale 		= .3f;
 			spore = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+			{
+				static const char* tags[] = {"projectile/effect"};
+				OttoScript_RegisterObjectNode(spore, "ottomatic.pitcherPlantSpore", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+			}
 
 			spore->Delta.x = RandomFloat2() * 100.0f;
 			spore->Delta.z = RandomFloat2() * 100.0f;
@@ -942,6 +963,10 @@ uint32_t	podDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 2.5f + RandomFloat() * .5f;
 	stem = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object", "scenery"};
+		OttoScript_RegisterObjectNode(stem, "ottomatic.pitcherPlantPodStem", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	stem->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -959,6 +984,10 @@ uint32_t	podDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	pod = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object", "hazard"};
+		OttoScript_RegisterObjectNode(pod, podDestroyed ? "ottomatic.pitcherPlantDeadPod" : "ottomatic.pitcherPlantPod", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	stem->ChainNode = pod;
 	pod->ChainHead = stem;
@@ -1117,6 +1146,10 @@ int		i;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .25f;
 	spore = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(spore, "ottomatic.pitcherPlantSpore", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	spore->Delta.x = spore->Delta.z = 0;
 	spore->Delta.y = 400.0f;
@@ -1373,8 +1406,5 @@ int	i;
 
 	return(true);													// item was added
 }
-
-
-
 
 

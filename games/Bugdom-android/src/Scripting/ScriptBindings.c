@@ -18,6 +18,7 @@
 
 
 #define SCRIPT_TERRAIN_ITEM_CAPACITY 256
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 static TerrainItemEntryType gScriptTerrainItems[SCRIPT_TERRAIN_ITEM_CAPACITY];
 static bool gScriptTerrainItemOccupied[SCRIPT_TERRAIN_ITEM_CAPACITY];
 static bool gScriptTerrainItemReclaimable[SCRIPT_TERRAIN_ITEM_CAPACITY];
@@ -370,6 +371,24 @@ static bool BugdomScript_GetObjectActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool BugdomScript_GetObjectHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outHealth = obj->Health;
+	return true;
+}
+
+static bool BugdomScript_GetObjectDamage(void* nativeObject, float* outDamage)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outDamage || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outDamage = obj->Damage;
+	return true;
+}
+
 static bool BugdomScript_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -405,6 +424,22 @@ static bool BugdomScript_GetObjectAnimation(void* nativeObject, int* outAnimatio
 	if (!obj || !outAnimation || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG)
 		return false;
 	*outAnimation = obj->Skeleton->AnimNum;
+	return true;
+}
+
+static bool BugdomScript_GetObjectAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outSpeed || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outSpeed = obj->Skeleton->AnimSpeed;
+	return true;
+}
+
+static bool BugdomScript_GetObjectAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outFrame || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outFrame = GetScriptSkeletonFrame(obj->Skeleton);
 	return true;
 }
 
@@ -460,7 +495,11 @@ static const PangeaScriptObjectOps kBugdomPlayerObjectOps =
 	.getRotation = BugdomScript_GetObjectRotation,
 	.getScale = BugdomScript_GetObjectScale,
 	.getAnimation = BugdomScript_GetObjectAnimation,
+	.getAnimationSpeed = BugdomScript_GetObjectAnimationSpeed,
+	.getAnimationFrame = BugdomScript_GetObjectAnimationFrame,
 	.getActive = BugdomScript_GetObjectActive,
+	.getHealth = BugdomScript_GetObjectHealth,
+	.getDamage = BugdomScript_GetObjectDamage,
 	.getCollisionEnabled = BugdomScript_GetObjectCollisionEnabled,
 	.setPosition = BugdomScript_SetObjectPosition,
 	.setVelocity = BugdomScript_SetObjectVelocity,
@@ -1060,6 +1099,126 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "trigger",
 		.dependencySummary = "checkpoint state and terrain systems",
 	},
+	{
+		.id = "bugdom.waterPatch",
+		.nativeType = 14,
+		.category = "hazard",
+		.dependencySummary = "water-patch assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "bugdom.firecracker",
+		.nativeType = 28,
+		.category = "hazard",
+		.dependencySummary = "firecracker assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "bugdom.fireWall",
+		.nativeType = 43,
+		.category = "hazard",
+		.dependencySummary = "fire-wall assets, terrain, and native hazard collision",
+	},
+	{
+		.id = "bugdom.waterValve",
+		.nativeType = 44,
+		.category = "hazard",
+		.dependencySummary = "water-valve assets, triggers, and native hazard behavior",
+	},
+	{
+		.id = "bugdom.fireAnt",
+		.nativeType = 15,
+		.category = "enemy",
+		.dependencySummary = "fire-ant assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.mosquito",
+		.nativeType = 31,
+		.category = "enemy",
+		.dependencySummary = "mosquito assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.spider",
+		.nativeType = 36,
+		.category = "enemy",
+		.dependencySummary = "spider assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.larva",
+		.nativeType = 46,
+		.category = "enemy",
+		.dependencySummary = "larva assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.flyingBee",
+		.nativeType = 47,
+		.category = "enemy",
+		.dependencySummary = "flying-bee assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.boxerFly",
+		.nativeType = 3,
+		.category = "enemy",
+		.dependencySummary = "boxer-fly assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.ant",
+		.nativeType = 9,
+		.category = "enemy",
+		.dependencySummary = "ant assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.pondFish",
+		.nativeType = 25,
+		.category = "enemy",
+		.dependencySummary = "pond-fish assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.workerBee",
+		.nativeType = 48,
+		.category = "enemy",
+		.dependencySummary = "worker-bee assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.queenBee",
+		.nativeType = 49,
+		.category = "enemy",
+		.dependencySummary = "queen-bee assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.roach",
+		.nativeType = 53,
+		.category = "enemy",
+		.dependencySummary = "roach assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.skippy",
+		.nativeType = 54,
+		.category = "enemy",
+		.dependencySummary = "Skippy assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.kingAnt",
+		.nativeType = 59,
+		.category = "enemy",
+		.dependencySummary = "king-ant assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom.rollingBoulder",
+		.nativeType = 52,
+		.category = "hazard",
+		.dependencySummary = "rolling-boulder assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "bugdom.slimePatch",
+		.nativeType = 55,
+		.category = "hazard",
+		.dependencySummary = "slime-patch assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "bugdom.lavaPatch",
+		.nativeType = 56,
+		.category = "hazard",
+		.dependencySummary = "lava-patch assets, terrain, and native hazard behavior",
+	},
 #define BUGDOM_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current level assets, terrain systems, and the native item initializer" },
 	BUGDOM_TERRAIN_NATIVE_ITEM(1) BUGDOM_TERRAIN_NATIVE_ITEM(2) BUGDOM_TERRAIN_NATIVE_ITEM(3) BUGDOM_TERRAIN_NATIVE_ITEM(4) BUGDOM_TERRAIN_NATIVE_ITEM(5) BUGDOM_TERRAIN_NATIVE_ITEM(6) BUGDOM_TERRAIN_NATIVE_ITEM(7) BUGDOM_TERRAIN_NATIVE_ITEM(8) BUGDOM_TERRAIN_NATIVE_ITEM(9) BUGDOM_TERRAIN_NATIVE_ITEM(10)
 	BUGDOM_TERRAIN_NATIVE_ITEM(11) BUGDOM_TERRAIN_NATIVE_ITEM(12) BUGDOM_TERRAIN_NATIVE_ITEM(13) BUGDOM_TERRAIN_NATIVE_ITEM(14) BUGDOM_TERRAIN_NATIVE_ITEM(15) BUGDOM_TERRAIN_NATIVE_ITEM(16) BUGDOM_TERRAIN_NATIVE_ITEM(17) BUGDOM_TERRAIN_NATIVE_ITEM(18) BUGDOM_TERRAIN_NATIVE_ITEM(19) BUGDOM_TERRAIN_NATIVE_ITEM(20)
@@ -1097,17 +1256,62 @@ static void BugdomScript_UpdateObjectCollisionBox(ObjNode* obj)
 
 static int GetScriptPlayerCount(void) { return gPlayerObj ? 1 : 0; }
 
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton)
+{
+	const JointKeyFrameHeader* header;
+	int frame;
+	int frameCount;
+
+	if (!skeleton || !skeleton->skeletonDefinition || skeleton->AnimNum >= MAX_ANIMS)
+		return 0;
+	header = &skeleton->skeletonDefinition->JointKeyframes[0];
+	frameCount = header->numKeyFrames[skeleton->AnimNum];
+	if (frameCount <= 0 || !header->keyFrames || !header->keyFrames[skeleton->AnimNum])
+		return 0;
+	frame = 0;
+	while (frame + 1 < frameCount && skeleton->CurrentAnimTime >= header->keyFrames[skeleton->AnimNum][frame + 1].tick)
+		frame++;
+	return frame;
+}
+
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerObj) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .velocity = {gPlayerObj->Delta.x, gPlayerObj->Delta.y, gPlayerObj->Delta.z}, .hasVelocity = true, .collisionEnabled = gPlayerObj->CType != 0 && (gPlayerObj->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gMyHealth, .hasHealth = true, .score = (int64_t) gScore, .hasScore = true, .lives = gNumLives, .hasLives = true, .keyCount = 0, .hasKeyState = true, .greenCloverCount = gNumGreenClovers, .blueCloverCount = gNumBlueClovers, .goldCloverCount = gNumGoldClovers, .hasCollectibleState = true, .shieldActive = gShieldTimer > 0.0f, .hasShieldState = true, .form = gPlayerMode == PLAYER_MODE_BALL ? PANGEA_SCRIPT_PLAYER_FORM_BALL : PANGEA_SCRIPT_PLAYER_FORM_BUG, .hasForm = true, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerObj->Coord.x, gPlayerObj->Coord.y, gPlayerObj->Coord.z}, .velocity = {gPlayerObj->Delta.x, gPlayerObj->Delta.y, gPlayerObj->Delta.z}, .hasVelocity = true, .collisionEnabled = gPlayerObj->CType != 0 && (gPlayerObj->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gMyHealth, .hasHealth = true, .score = (int64_t) gScore, .hasScore = true, .lives = gNumLives, .hasLives = true, .keyCount = 0, .hasKeyState = true, .greenCloverCount = gNumGreenClovers, .blueCloverCount = gNumBlueClovers, .goldCloverCount = gNumGoldClovers, .hasCollectibleState = true, .shieldActive = gShieldTimer > 0.0f, .hasShieldState = true, .invulnerable = gPlayerObj->InvincibleTimer > 0.0f, .hasInvulnerabilityState = true, .form = gPlayerMode == PLAYER_MODE_BALL ? PANGEA_SCRIPT_PLAYER_FORM_BALL : PANGEA_SCRIPT_PLAYER_FORM_BUG, .hasForm = true, .active = true};
+	outPlayer->dead = gPlayerGotKilledFlag;
+	outPlayer->hasDeathState = true;
+	outPlayer->levelComplete = gAreaCompleted;
+	outPlayer->hasLevelCompletionState = true;
+	outPlayer->formTimeRemaining = gPlayerMode == PLAYER_MODE_BALL ? gBallTimer : 0.0f;
+	outPlayer->hasFormTimerState = true;
+	outPlayer->grounded = (gPlayerObj->StatusBits & STATUS_BIT_ONGROUND) != 0;
+	outPlayer->hasGroundedState = true;
+	outPlayer->heightOffGround = gMyDistToFloor;
+	outPlayer->hasTerrainHeightState = true;
+	outPlayer->onWater = (gPlayerObj->StatusBits & STATUS_BIT_UNDERWATER) != 0;
+	outPlayer->hasWaterState = true;
+	outPlayer->invulnerabilityTimeRemaining = gPlayerObj->InvincibleTimer;
+	outPlayer->hasInvulnerabilityTimerState = true;
+	outPlayer->shieldTimeRemaining = gShieldTimer;
+	outPlayer->hasShieldTimerState = true;
 	if (gGameViewInfoPtr)
 	{
-		outPlayer->camera = (PangeaScriptVector3){gGameViewInfoPtr->cameraPlacement.cameraLocation.x, gGameViewInfoPtr->cameraPlacement.cameraLocation.y, gGameViewInfoPtr->cameraPlacement.cameraLocation.z};
+		outPlayer->camera = (PangeaScriptVector3){gGameViewInfoPtr->currentCameraCoords.x, gGameViewInfoPtr->currentCameraCoords.y, gGameViewInfoPtr->currentCameraCoords.z};
 		outPlayer->hasCameraState = true;
 	}
 	outPlayer->rotation = (PangeaScriptVector3){gPlayerObj->Rot.x, gPlayerObj->Rot.y, gPlayerObj->Rot.z};
 	outPlayer->hasRotation = true;
+	outPlayer->aim = (PangeaScriptVector3){-sinf(gPlayerObj->Rot.y), 0.0f, -cosf(gPlayerObj->Rot.y)};
+	outPlayer->hasAimState = true;
+	if (gPlayerObj->Skeleton)
+	{
+		outPlayer->animation = gPlayerObj->Skeleton->AnimNum;
+		outPlayer->hasAnimationState = true;
+		outPlayer->animationSpeed = gPlayerObj->Skeleton->AnimSpeed;
+		outPlayer->hasAnimationSpeedState = true;
+		outPlayer->animationFrame = GetScriptSkeletonFrame(gPlayerObj->Skeleton);
+		outPlayer->hasAnimationFrameState = true;
+	}
 	for (int keyID = 0; keyID < PANGEA_SCRIPT_PLAYER_KEY_CAPACITY; keyID++)
 		if (BugdomScript_GetKey(keyID)) outPlayer->keys[outPlayer->keyCount++] = keyID;
 	return true;
@@ -1118,7 +1322,9 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 	if (playerNum != 0 || !position || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerObj->Coord = (TQ3Point3D){position->x, position->y, position->z};
+	gMyCoord = gPlayerObj->Coord;
 	UpdateObjectTransforms(gPlayerObj);
+	CalcObjectBoxFromNode(gPlayerObj);
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -1138,6 +1344,8 @@ static PangeaScriptStatus SetScriptPlayerForm(int playerNum, PangeaScriptPlayerF
 	{
 		if (gPlayerMode == PLAYER_MODE_BALL)
 			return PANGEA_SCRIPT_OK;
+		if (gBallTimer <= 0.0f)
+			return PANGEA_SCRIPT_RUNTIME_ERROR;
 		position = gPlayerObj->Coord;
 		InitPlayer_Ball(gPlayerObj, &position);
 		return PANGEA_SCRIPT_OK;
@@ -1348,6 +1556,13 @@ void BugdomScript_OnLevelUnload(int levelNum)
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, levelNum, "onLevelUnload");
 	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	PangeaScript_ResetObjects();
+}
+
+void BugdomScript_OnLevelCleanup(void)
+{
+	BugdomScript_ReleaseCustomAssets();
+	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
+	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
 }
 
 int BugdomScript_RemapTerrainItemType(int levelNum, int itemType)

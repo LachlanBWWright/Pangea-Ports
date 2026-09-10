@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -114,6 +117,10 @@ int		i;
 	if (baseObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(baseObj, "cromag.dustDevil", "hazard");
+#endif
+
 	baseObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 	baseObj->BendFactor = 0;										// init bending factor
 	baseObj->ParticleGroup = -1;										// no particle group yet
@@ -131,6 +138,10 @@ int		i;
 		newObj = MakeNewDisplayGroupObject(&def);
 		if (newObj == nil)
 			return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		CroMagScript_RegisterObject(newObj, "cromag.dustDevilSegment", "child-object");
+#endif
 
 		baseObj->ChainNode = newObj;								// chain to previous segment
 
@@ -344,6 +355,9 @@ float			x,z,placement;
 	newObj->SplineItemPtr 	= itemPtr;
 	newObj->SplineNum 		= splineNum;
 	newObj->SplinePlacement = placement;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.yeti", "enemy");
+#endif
 	newObj->SplineMoveCall 	= MoveYeti;						// set move call
 	newObj->CType			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
@@ -439,6 +453,9 @@ float			x,z,placement;
 	newObj->SplineItemPtr 	= itemPtr;
 	newObj->SplineNum 		= splineNum;
 	newObj->SplinePlacement = placement;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.beetle", "enemy");
+#endif
 	newObj->SplineMoveCall 	= MoveBeetle;						// set move call
 	newObj->CType			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
@@ -535,6 +552,9 @@ float			x,z,placement;
 	newObj->SplineItemPtr 	= itemPtr;
 	newObj->SplineNum 		= splineNum;
 	newObj->SplinePlacement = placement;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.camel", "enemy");
+#endif
 	newObj->SplineMoveCall 	= MoveCamel;						// set move call
 	newObj->CType			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
@@ -618,6 +638,10 @@ ObjNode	*newObj;
 	newObj = MakeNewSkeletonObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.catapult", "hazard");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -714,6 +738,10 @@ float			speed;
 		if (newObj == nil)
 			return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		CroMagScript_RegisterObject(newObj, "cromag.catapultRock", "projectile/effect");
+#endif
+
 
 				/* MAKE SHADOW */
 
@@ -804,6 +832,9 @@ ObjNode	*newObj;
 
 	newObj->CType 			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.goddess", "objective");
+#endif
 	SetObjectCollisionBounds(newObj, 2000, -10, -250, 250, 250, -250);
 
 	newObj->TimeSinceBolt= 0;
@@ -1086,6 +1117,9 @@ ObjNode	*newObj;
 
 	newObj->CType 			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.cannon", "hazard");
+#endif
 	CreateCollisionBoxFromBoundingBox(newObj,1,1);
 
 
@@ -1172,6 +1206,10 @@ NewParticleDefType		newParticleDef;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.cannonBall", "projectile/effect");
+#endif
 
 
 			/* MAKE SHADOW */
@@ -1336,6 +1374,10 @@ float			x,z,placement;
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 15, 25, false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.shark", "enemy");
+#endif
+
 
 			/* ADD SPLINE OBJECT TO SPLINE OBJECT LIST */
 
@@ -1414,6 +1456,10 @@ ObjNode	*newObj;
 	newObj->CType 			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
 	SetObjectCollisionBounds(newObj, 200, -200, -150, 150, 150, -150);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.capsule", "hazard");
+#endif
 
 	newObj->TimeSinceBolt = 0;
 	newObj->CapsuleBob = RandomFloat();
@@ -1679,6 +1725,9 @@ float			x,z,placement;
 	newObj->SplineItemPtr 	= itemPtr;
 	newObj->SplineNum 		= splineNum;
 	newObj->SplinePlacement = placement;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.pterodactyl", "enemy");
+#endif
 	newObj->SplineMoveCall 	= MovePteradactyl;						// set move call
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 30, 20, false);
@@ -1779,6 +1828,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.pterodactylBomb", "projectile/effect");
+#endif
+
 	newObj->Delta.x = theNode->Delta.x * .2f;			// give some momentum
 	newObj->Delta.z = theNode->Delta.z * .2f;
 	newObj->Delta.y = 0;
@@ -1853,6 +1906,10 @@ ObjNode	*newObj;
 		return(false);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.dragon", "enemy");
+#endif
 
 	newObj->Flag[0] = false;										// not breathing fire
 
@@ -1997,6 +2054,9 @@ float			x,z,placement;
 	newObj->SplineItemPtr 	= itemPtr;
 	newObj->SplineNum 		= splineNum;
 	newObj->SplinePlacement = placement;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.mummy", "enemy");
+#endif
 	newObj->SplineMoveCall 	= MoveMummy;						// set move call
 	newObj->CType			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
@@ -2080,6 +2140,10 @@ ObjNode	*newObj;
 	newObj->CType 			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
 	CreateCollisionBoxFromBoundingBox(newObj,1,1);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.totemPole", "hazard");
+#endif
 
 	newObj->ShootTimer = 0;
 
@@ -2167,6 +2231,10 @@ float		targetX,targetY,targetZ;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.totemDart", "projectile/effect");
+#endif
 
 
 			/* MAKE SHADOW */
@@ -2268,6 +2336,9 @@ float			x,z,placement;
 	newObj->SplineItemPtr 	= itemPtr;
 	newObj->SplineNum 		= splineNum;
 	newObj->SplinePlacement = placement;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.troll", "enemy");
+#endif
 	newObj->SplineMoveCall 	= MoveTroll;						// set move call
 	newObj->CType			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
@@ -2318,12 +2389,4 @@ Boolean isVisible;
 		UpdateShadow(theNode);
 	}
 }
-
-
-
-
-
-
-
-
 

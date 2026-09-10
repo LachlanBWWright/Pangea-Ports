@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /*******************/
@@ -95,6 +96,7 @@ TQ3Point3D	where;
 	gNewObjectDefinition.rot 		= itemPtr->parm[0] * (PI2/16);
 	gNewObjectDefinition.scale 		= DRAGONFLY_SCALE;
 	newObj 							= MakeNewSkeletonObject(&gNewObjectDefinition);	
+	BugdomScript_RegisterObject(newObj, "bugdom.dragonfly", "vehicle");
 
 	newObj->TerrainItemPtr = itemPtr;					// keep ptr to item list
 	newObj->InitCoord = gNewObjectDefinition.coord;		// remember where started
@@ -437,6 +439,8 @@ TQ3Vector3D		delta;
 	newObj = MakeNewObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return;
+
+	BugdomScript_RegisterObject(newObj, "bugdom.dragonflyFireball", "projectile/effect");
 		
 			/* SET COLLISION INFO */
 			
@@ -638,8 +642,6 @@ TQ3Vector3D		delta;
 
 	DeleteObject(theNode);
 }
-
-
 
 
 

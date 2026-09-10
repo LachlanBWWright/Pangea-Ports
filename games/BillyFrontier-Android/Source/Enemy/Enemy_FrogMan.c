@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -94,6 +95,7 @@ ObjNode	*newObj;
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FROGMAN,animNum, x,z, FROGMAN_SCALE, rot, moveCall,
 								gAutoFadeStatusBits);
+	BillyScript_RegisterObject(newObj, "billy.frogman", "enemy");
 	
 
 
@@ -324,6 +326,7 @@ ObjNode 		*barrel;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= 0;	
 	barrel = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(barrel, "billy.frogmanBarrel", "projectile/effect");
 				
 
 	CreateCollisionBoxFromBoundingBox(barrel, .7, .7);
@@ -481,8 +484,6 @@ static void BarrelHitByBulletCallback(ObjNode *bullet, ObjNode *barrel, const OG
 
 	DeleteObject(barrel);
 }
-
-
 
 
 

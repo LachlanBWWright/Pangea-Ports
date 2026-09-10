@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -882,6 +883,10 @@ OGLMatrix4x4	m;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .6;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.mutantRobotBullet", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 
 	newObj->Kind = WEAPON_TYPE_STUNPULSE;
@@ -956,7 +961,6 @@ explode_weapon:
 
 	UpdateObject(theNode);
 }
-
 
 
 

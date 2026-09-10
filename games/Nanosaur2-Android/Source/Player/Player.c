@@ -1020,6 +1020,11 @@ ObjNode	*shield, *player = gPlayerInfo[playerNum].objNode;
 
 		shield = MakeNewDisplayGroupObject(&def);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (shield != nil)
+			Nanosaur2Script_RegisterObject(shield, "nanosaur2.playerShield", "child-object");
+#endif
+
 		shield->PlayerNum = playerNum;
 		shield->CType = CTYPE_WEAPONTEST | CTYPE_MISC | CTYPE_PLAYERSHIELD;
 		shield->HitByWeaponHandler 	= PlayerShieldHitByWeaponCallback;

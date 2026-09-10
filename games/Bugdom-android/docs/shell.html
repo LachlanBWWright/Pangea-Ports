@@ -408,6 +408,7 @@
     var _fenceEnabled = true;
     var _muted = false;
     var _isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+    var _gameStarted = false;
 
     if (_isEmbedded) {
       document.body.classList.add('embedded-shell');
@@ -466,6 +467,8 @@
 
         // Click handler: hide card, show toolbar, resume audio
         function startGame() {
+          if (_gameStarted) return;
+          _gameStarted = true;
           if (card) card.style.display = 'none';
           var tb = document.getElementById('toolbar');
           if (tb) tb.style.display = 'flex';
@@ -535,6 +538,11 @@
           },
         };
         console.log('[Bugdom] PangeaGame API ready. Use PangeaGame.skipToLevel(N) to jump to a level.');
+
+        // Editor and automation embeds have no user gesture available. The
+        // normal shell keeps the audio-unlock click requirement, while an
+        // explicit embed starts once Emscripten has finished initialization.
+        if (_isEmbedded) startGame();
       },
 
       setStatus: function (text) {

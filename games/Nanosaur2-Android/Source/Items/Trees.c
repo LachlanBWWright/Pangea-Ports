@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -59,6 +60,7 @@ Boolean AddBirchTree(TerrainItemEntryType *itemPtr, float  x, float z)
 		.rot 		= RandomFloat()*PI2,
 	};
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.birchTree", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -101,6 +103,7 @@ Boolean AddPineTree(TerrainItemEntryType *itemPtr, float  x, float z)
 		.rot 		= RandomFloat()*PI2,
 	};
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.pineTree", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -145,6 +148,7 @@ Boolean AddFallenTree(TerrainItemEntryType *itemPtr, float  x, float z)
 	def.coord.y 	= GetMinTerrainY(x,z, def.group, def.type, 1.0);
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.fallenTree", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -182,6 +186,7 @@ ObjNode	*newObj;
 	};
 
 	newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.treeStump", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -266,6 +271,7 @@ Boolean AddSmallTree(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.smallTree", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -557,6 +563,7 @@ float	rot = (float)itemPtr->parm[1] * (PI2/8.0);
 	};
 
 	trunk = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(trunk, "nanosaur2.bentPineTree", "scenery");
 
 	trunk->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -577,6 +584,7 @@ float	rot = (float)itemPtr->parm[1] * (PI2/8.0);
 	def.slot 		= SLOT_OF_DUMB;
 	def.moveCall 	= nil;
 	leaves = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(leaves, "nanosaur2.bentPineLeaves", "child-object");
 
 	trunk->ChainNode = leaves;
 
@@ -617,6 +625,7 @@ long	rot = itemPtr->parm[1];
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.desertTree", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -639,6 +648,7 @@ long	rot = itemPtr->parm[1];
 	def.slot++;
 	def.moveCall 	= nil;
 	ObjNode* canopy = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(canopy, "nanosaur2.desertTreeCanopy", "child-object");
 
 			/* SET COLLISION STUFF */
 
@@ -680,6 +690,7 @@ long	rot = itemPtr->parm[1];
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.palmTree", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -702,6 +713,7 @@ long	rot = itemPtr->parm[1];
 	def.slot++;
 	def.moveCall 	= nil;
 	ObjNode* canopy = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(canopy, "nanosaur2.palmTreeCanopy", "child-object");
 
 			/* SET COLLISION STUFF */
 
@@ -739,6 +751,7 @@ short	type = itemPtr->parm[0];
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.burntDesertTree", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -777,6 +790,7 @@ short	type = itemPtr->parm[0];
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.hydraTree", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -814,6 +828,7 @@ short	type = itemPtr->parm[0];
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.oddTree", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -856,6 +871,7 @@ ObjNode	*trunk;
 		def.rot 		= RandomFloat() * PI2;
 
 	trunk = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(trunk, "nanosaur2.swampFallenTree", "hazard");
 
 	trunk->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -921,6 +937,7 @@ Boolean AddSwampStump(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.swampStump", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -935,4 +952,3 @@ Boolean AddSwampStump(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	return(true);													// item was added
 }
-

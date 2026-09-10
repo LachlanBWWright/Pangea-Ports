@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 
@@ -244,6 +245,7 @@ OGLPoint3D  nubs[5];
 		.rot 		= 0,
 	};
 	worm = MakeNewSkeletonObject(&def);
+	Nanosaur2Script_RegisterObject(worm, "nanosaur2.holeWorm", "child-object");
 
 	worm->Skeleton->JointsAreGlobal = true;
 
@@ -490,5 +492,4 @@ OGLPoint3D			p;
 		}
 	}
 }
-
 

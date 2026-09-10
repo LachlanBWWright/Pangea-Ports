@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -129,6 +130,7 @@ ObjNode	*pole, *topbot, *middle;
 
 	pole->TriggerCallback = DoTrig_Electrode;
 	pole->HitByWeaponHandler = ElectrodeHitByWeaponCallback;
+	Nanosaur2Script_RegisterObject(pole, "nanosaur2.electrode", "hazard");
 
 	pole->Timer = RandomFloat() * 1.0f;
 
@@ -534,6 +536,7 @@ short		i;
 	};
 
 	newObj = MakeNewObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.electrodeZap", "projectile/effect");
 	newObj->VertexArrayMode = VERTEX_ARRAY_RANGE_TYPE_ZAPS1;
 	newObj->Damage = 1.0f;
 }
@@ -801,11 +804,6 @@ static void FreeZap(short zapNum)
 
 	gZaps[zapNum].isUsed = false;
 }
-
-
-
-
-
 
 
 

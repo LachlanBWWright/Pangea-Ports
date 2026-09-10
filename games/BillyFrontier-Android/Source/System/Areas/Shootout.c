@@ -707,6 +707,7 @@ int		i, numBulletsInClip;
 	newObj->Health = 3.0f;										// time that bullet can live
 
 	newObj->What = WHAT_PLAYERBULLET;
+	BillyScript_RegisterObject(newObj, "billy.projectile", "projectile/effect");
 
 				/* SET SPEED OF BULLET */
 					
@@ -1085,6 +1086,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4);	
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.shootoutSaloon", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType = CTYPE_PICKABLE|CTYPE_HITENEMYBULLET;
@@ -1148,6 +1153,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= 0;	
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.shootoutAlley", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 

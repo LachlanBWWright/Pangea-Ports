@@ -18,6 +18,9 @@
 #include "objecttypes.h"
 #include "cinema.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -41,6 +44,10 @@ register ObjNode *newObj;
 				parentObj->X.Int,parentObj->Y.Int,FARTHEST_Z,MoveShadow,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(nil);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.shadow", "child-object");
+#endif
 
 	newObj->ShadowIndex = parentObj;			// remember ptr to parent of shadow
 
@@ -119,6 +126,10 @@ static	short	messageSounds[] = {
 	if (newObj == nil)
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.message", "child-object");
+#endif
+
 	newObj->MessageTimer = messageDurations[messageNum];			// set sprite timer
 	newObj->TileMaskFlag = false;								// wont be tile masked
 	newObj->MessageToOwnerNode = gMyNodePtr;					// point to Mike
@@ -179,6 +190,10 @@ register	ObjNode			*newObj;
 		if (newObj == nil)
 			return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_RegisterObject(newObj, "mightymike.playerSignal", "child-object");
+#endif
+
 		newObj->TileMaskFlag = false;						// doesnt use tile masks
 		newObj->Special1 = GAME_FPS*3;
 	}
@@ -186,6 +201,12 @@ register	ObjNode			*newObj;
 	{
 		newObj = MakeNewShape(GroupNum_OHMPlayerSignal,ObjType_OHMPlayerSignal,gCurrentPlayer,
 					320,240,NEAREST_Z,MovePlayerSignalOHM,SCREEN_RELATIVE);
+		if (newObj != nil)
+		{
+#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.playerSignal", "child-object");
+#endif
+		}
 	}
 }
 
@@ -229,7 +250,11 @@ void MovePlayerSignalOHM(void)
 
 void MakeSplash(short x,short y,short z)
 {
-	MakeNewShape(GroupNum_Splash,ObjType_Splash,0,x,y,z,nil,PLAYFIELD_RELATIVE);
+	ObjNode *newObj = MakeNewShape(GroupNum_Splash,ObjType_Splash,0,x,y,z,nil,PLAYFIELD_RELATIVE);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newObj != nil)
+		MikeScript_RegisterObject(newObj, "mightymike.splash", "projectile/effect");
+#endif
 	PlaySound(SOUND_SPLASH);
 }
 
@@ -253,4 +278,3 @@ register	ObjNode		*newObj;
 
 	return(true);									// was added
 }
-

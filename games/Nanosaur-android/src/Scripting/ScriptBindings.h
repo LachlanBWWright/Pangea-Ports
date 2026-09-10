@@ -38,6 +38,8 @@ int NanosaurScript_ProbeCrystalPickupJS(void);
 int NanosaurScript_ProbeEggRecoveryJS(void);
 int NanosaurScript_ProbeShieldPickupJS(void);
 int NanosaurScript_ProbeWeaponPowerPickupJS(void);
+int NanosaurScript_ProbeEnemyWeaponHitJS(void);
+int NanosaurScript_ProbeLevelCompleteJS(void);
 Boolean NanosaurScript_OnDamage(ObjNode* source, float damage, int cause, float* outDamage);
 Boolean NanosaurScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);
 Boolean NanosaurScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);

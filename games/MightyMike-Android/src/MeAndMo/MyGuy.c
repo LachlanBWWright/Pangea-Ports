@@ -518,6 +518,8 @@ void MoveMe_Die(void)
 
 void MoveMe_Liftoff(void)
 {
+	ObjNode *flame;
+
 	gMyNodePtr->DrawFlag = true;
 
 	StopScrollingPlayfield();
@@ -530,9 +532,13 @@ void MoveMe_Liftoff(void)
 
 						/* ATTACK FLAME */
 
-			MakeNewShape(GroupNum_MyGuy,ObjType_MyGuy,MY_ANIMBASE_FLAME,
+			flame = MakeNewShape(GroupNum_MyGuy,ObjType_MyGuy,MY_ANIMBASE_FLAME,
 								gMyNodePtr->X.Int,gMyNodePtr->Y.Int,
 								gMyNodePtr->Z-1,MoveMyFlame,PLAYFIELD_RELATIVE);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+			if (flame)
+				MikeScript_RegisterObject(flame, "mightymike.liftoffFlame", "child-object");
+	#endif
 
 						/* PUT SHADOW UNDER ME */
 
@@ -1589,6 +1595,9 @@ register ObjNode	*newObj;
 							gMyNodePtr->Z,nil,PLAYFIELD_RELATIVE);
 		if (newObj != nil)
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.footSmoke", "projectile/effect");
+		#endif
 			newObj->AnimSpeed += MyRandomLong()&0xff;	// random anim speed
 			InitYOffset(newObj, 24);					// move down to feet
 		}

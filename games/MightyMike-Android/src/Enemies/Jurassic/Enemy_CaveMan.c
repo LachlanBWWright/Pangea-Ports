@@ -20,6 +20,9 @@
 #include "objecttypes.h"
 #include "collision.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -82,6 +85,9 @@ Byte		animNum;
 								itemPtr->y,50,MoveCaveman_Walker,PLAYFIELD_RELATIVE);
 			if (newObj == nil)
 				return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.caveman", "enemy");
+#endif
 
 			CalcEnemyScatterOffset(newObj);
 
@@ -100,6 +106,9 @@ Byte		animNum;
 								itemPtr->y,50,MoveCaveman_Thrower,PLAYFIELD_RELATIVE);
 			if (newObj == nil)
 				return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.cavemanThrower", "enemy");
+	#endif
 
 			CalcEnemyScatterOffset(newObj);
 			newObj->ThrowFlag = false;
@@ -120,6 +129,9 @@ Byte		animNum;
 								itemPtr->y,50,MoveCaveman_Roller,PLAYFIELD_RELATIVE);
 			if (newObj == nil)
 				return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.cavemanRoller", "enemy");
+	#endif
 
 			newObj->RollFlag = false;
 			newObj->AimFlag = itemPtr->parm[1];
@@ -399,6 +411,10 @@ long		dx;
 	if (newObj == nil)
 		return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.stoneWheel", "projectile/effect");
+#endif
+
 	newObj->DX = dx + ((RandomRange(0,10000) << 3) - 40000L);
 
 	newObj->CType = CTYPE_ENEMYC;				// set collision info
@@ -483,6 +499,10 @@ unsigned short	bits;
 						gThisNodePtr->Y.Int,gThisNodePtr->Z,MoveBone,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.bone", "projectile/effect");
+#endif
 
 	fudgeX = (MyRandomLong()&0x7f) - 0x40;		// fudge factor for inaccurate throws - make it easier
 	newObj->DX = dx + ((MyRandomLong()&0x7f) - 0x40);
@@ -577,4 +597,3 @@ register	ObjNode *newObj;
 
 	gLastUngaTime = gFrames;							// remember when it occurred
 }
-

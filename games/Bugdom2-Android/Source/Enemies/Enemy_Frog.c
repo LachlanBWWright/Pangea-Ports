@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -100,6 +104,8 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FROG,animNum, x,z, FROG_SCALE, 0, MoveFrog);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.frog", "enemy");
 
 
 
@@ -344,7 +350,6 @@ static void UpdateFrog(ObjNode *theNode)
 	UpdateEnemy(theNode);
 
 }
-
 
 
 

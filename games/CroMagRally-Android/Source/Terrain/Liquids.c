@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -148,6 +152,7 @@ float				y;
 			/* SET OBJECT INFO */
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	CroMagScript_RegisterObject(newObj, "cromag.waterPatch", "hazard");
 
 	newObj->Kind = LIQUID_WATER;
 
@@ -354,6 +359,7 @@ float				y;
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 	newObj->Kind = LIQUID_TAR;
+	CroMagScript_RegisterObject(newObj, "cromag.tarPatch", "hazard");
 
 
 			/* SET COLLISION */
@@ -376,5 +382,4 @@ float				y;
 
 	return(true);													// item was added
 }
-
 

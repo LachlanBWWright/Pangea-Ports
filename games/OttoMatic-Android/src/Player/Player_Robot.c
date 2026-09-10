@@ -242,6 +242,7 @@ int		i;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	gPlayerInfo.leftHandObj 		= MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(gPlayerInfo.leftHandObj, "ottomatic.playerLeftHand", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"player", "child-object"}, 2);
 
 
 
@@ -249,6 +250,7 @@ int		i;
 
 	gNewObjectDefinition.type 	= GLOBAL_ObjType_OttoRightHand;
 	gPlayerInfo.rightHandObj 	= MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(gPlayerInfo.rightHandObj, "ottomatic.playerRightHand", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"player", "child-object"}, 2);
 
 	gPlayerInfo.rightHandObj->Kind = WEAPON_TYPE_FIST;			// set weapon type since this gets passed to weapon handlers
 

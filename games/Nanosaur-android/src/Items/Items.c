@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -121,6 +122,7 @@ float	y;
 		return(false);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	NanosaurScript_RegisterObject(newObj, "nanosaur.lavaPatch", "hazard");
 
 	newObj->StatusBits |= STATUS_BIT_HIGHFILTER|STATUS_BIT_HIGHFILTER2;	// make it look nice
 
@@ -212,6 +214,7 @@ float	d;
 				newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 				if (newObj)
 				{
+					NanosaurScript_RegisterObject(newObj, "nanosaur.fireball", "projectile/effect");
 					newObj->Delta.y = 300 + (RandomFloat()*400.0f);
 					newObj->Delta.x = (RandomFloat()-.5f) * 300.0f;
 					newObj->Delta.z = (RandomFloat()-.5f) * 300.0f;
@@ -335,6 +338,7 @@ float	y;
 	newObj->RenderModifiers.sortPriority = +5000;			// draw water before most other transparent meshes (but not shadows)
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	NanosaurScript_RegisterObject(newObj, "nanosaur.waterPatch", "hazard");
 
 	MakeObjectTransparent(newObj, .8);
 
@@ -424,6 +428,7 @@ static const float scales[] =
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.tree", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 
@@ -488,6 +493,7 @@ float	scale;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.mushroom", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 
@@ -528,6 +534,7 @@ float	scale;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.boulder", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 
@@ -568,6 +575,7 @@ TQ3BoundingBox *bbox;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.bush", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 
@@ -642,6 +650,7 @@ ObjNode	*newObj;
 		return(false);
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
+	NanosaurScript_RegisterObject(newObj, "nanosaur.gasVent", "hazard");
 
 	MakeObjectTransparent(newObj,.7);
 
@@ -729,6 +738,3 @@ float	d;
 		gMinSteamDist = d;
 
 }
-
-
-

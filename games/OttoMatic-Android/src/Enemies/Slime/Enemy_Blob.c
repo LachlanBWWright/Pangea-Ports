@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -120,6 +124,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= BLOB_SCALE;
 
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.blob", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 
 
@@ -437,6 +445,10 @@ float	dx,dy,dz;
 		gNewObjectDefinition.rot 		= 0;
 		gNewObjectDefinition.scale 		= .8;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		{
+			static const char* tags[] = {"pickup", "effect"};
+			OttoScript_RegisterObjectNode(newObj, "ottomatic.blobChunk", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+		}
 
 		switch(enemy->BlobColorType)					// set powerup type based on blob color
 		{
@@ -604,8 +616,6 @@ float	fps = gFramesPerSecondFrac;
 
 
 #pragma mark -
-
-
 
 
 

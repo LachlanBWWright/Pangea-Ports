@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -330,6 +331,7 @@ ObjNode *newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj)
 	{
+		NanosaurScript_RegisterObject(newObj, "nanosaur.weaponExplosion", "projectile/effect");
 		newObj->Health = .9;
 		MakeObjectTransparent(newObj, newObj->Health);					// make transparent
 	}	
@@ -386,9 +388,10 @@ float	r,fps;
 		gNewObjectDefinition.moveCall = MoveSonicScream;
 		gNewObjectDefinition.rot = r = theNode->Rot.y;
 		gNewObjectDefinition.scale = .05 + sin(gSonicScreamWave) * .02;
-		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj == nil)
 			return;
+		NanosaurScript_RegisterObject(newObj, "nanosaur.sonicScream", "projectile/effect");
 
 		gSonicScreamWave += fps*25;
 
@@ -502,6 +505,7 @@ float	r;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj == nil)
 			return;
+		NanosaurScript_RegisterObject(newObj, "nanosaur.blaster", "projectile/effect");
 
 		newObj->Health = 1.0;											
 		
@@ -608,6 +612,7 @@ float	r;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj == nil)
 			return;
+		NanosaurScript_RegisterObject(newObj, "nanosaur.heatSeek", "projectile/effect");
 
 		newObj->Health = 1.0;											
 		
@@ -751,6 +756,7 @@ static void MoveHeatSeek(ObjNode *theNode)
 			ObjNode* newObj = MakeNewDisplayGroupObject(&newObjDef);
 			if (newObj)
 			{
+				NanosaurScript_RegisterObject(newObj, "nanosaur.heatSeekEcho", "projectile/effect");
 				newObj->Health = .7 + RandomFloat()*.3;							// transparency value
 				MakeObjectTransparent(newObj, newObj->Health);					// make transparent
 			}
@@ -817,6 +823,7 @@ float	r;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj == nil)
 			return;
+		NanosaurScript_RegisterObject(newObj, "nanosaur.triBlast", "projectile/effect");
 
 		newObj->Health = 1.0;											
 		
@@ -839,6 +846,7 @@ float	r;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj == nil)
 			return;
+		NanosaurScript_RegisterObject(newObj, "nanosaur.triBlast", "projectile/effect");
 
 		newObj->Health = 1.0;													
 		newObj->Delta.x = (-sin(r) * TRIBLAST_SPEED) + gDelta.x;			// calc deltas
@@ -858,6 +866,7 @@ float	r;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj == nil)
 			return;
+		NanosaurScript_RegisterObject(newObj, "nanosaur.triBlast", "projectile/effect");
 
 		newObj->Health = 1.0;													
 		newObj->Delta.x = (-sin(r) * TRIBLAST_SPEED) + gDelta.x;			// calc deltas
@@ -968,6 +977,7 @@ float	r;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj == nil)
 			return;
+		NanosaurScript_RegisterObject(newObj, "nanosaur.nuke", "projectile/effect");
 
 		newObj->Health = 1.0;											
 		
@@ -1067,6 +1077,7 @@ ObjNode *newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj)
 	{
+		NanosaurScript_RegisterObject(newObj, "nanosaur.nukeShockwave", "projectile/effect");
 		newObj->Health = .9;
 		newObj->Damage = newObj->Health * 3;
 		MakeObjectTransparent(newObj, newObj->Health);					// make transparent

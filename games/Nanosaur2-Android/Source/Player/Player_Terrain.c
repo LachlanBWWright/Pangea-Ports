@@ -171,6 +171,9 @@ short	j,i;
 	def.moveCall 	= MovePlayerJetpack;
 	def.drawCall 	= nil;
 	jetpack = MakeNewDisplayGroupObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(jetpack, "nanosaur2.jetpack", "child-object");
+	#endif
 
 	newObj->ChainNode = jetpack;
 	jetpack->ChainHead = newObj;
@@ -182,6 +185,9 @@ short	j,i;
 	def.slot++;
 	def.moveCall 	= nil;
 	blue = MakeNewDisplayGroupObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	Nanosaur2Script_RegisterObject(blue, "nanosaur2.jetpackShell", "child-object");
+	#endif
 
 	blue->ColorFilter.a = .99;
 	jetpack->ChainNode = blue;
@@ -1472,7 +1478,8 @@ OGLVector3D			aim, deltaVec;
 Boolean				killed = false;
 float				f, oneMinusF;
 short				playerNum = theNode->PlayerNum;
-float				speed;
+	float				speed;
+	gPlayerInfo[playerNum].onLava = false;
 
 			/*****************************/
 			/* ACCEL IN DIRECTION OF AIM */
@@ -1789,6 +1796,7 @@ kaboom:
 
 			waterType = gWaterList[patchNum].type;
 			isLava = (waterType >= WATER_TYPE_LAVA) && (waterType <= WATER_TYPE_LAVA_DIR7);		// see if this is lava
+			gPlayerInfo[playerNum].onLava = isLava;
 
 
 					/* SEE IF HIT WATER HARD */
@@ -2113,8 +2121,6 @@ float	x,z;
 
 	gBestCheckpointAim[playerNum] = player->Rot.y;
 }
-
-
 
 
 

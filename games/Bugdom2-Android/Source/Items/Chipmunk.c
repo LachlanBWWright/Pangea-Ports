@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -127,6 +131,10 @@ int		anim;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * PI2/8;
 	gNewObjectDefinition.scale 		= 3.0;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.chipmunk", "objective");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -510,7 +518,6 @@ const OGLPoint3D	zero = {0,0,0};
 
 
 }
-
 
 
 

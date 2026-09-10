@@ -79,6 +79,8 @@ ObjNode	*newObj, *cap, *tab;
 	gNewObjectDefinition.moveCall 	= MoveSodaCan;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.sodaCan", "item");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -100,6 +102,8 @@ ObjNode	*newObj, *cap, *tab;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	tab = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (tab != nil)
+		Bugdom2Script_RegisterObject(tab, "bugdom2.sodaCanTab", "pickup");
 
 			/* SET COLLISION STUFF */
 
@@ -122,6 +126,8 @@ ObjNode	*newObj, *cap, *tab;
 	gNewObjectDefinition.moveCall 	= nil;
 //	gNewObjectDefinition.flags 		|= STATUS_BIT_DOUBLESIDED;		// note:  this was causing OS X to crash with 10.1.3
 	cap = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (cap != nil)
+		Bugdom2Script_RegisterObject(cap, "bugdom2.sodaCanCap", "child-object");
 
 	tab->ChainNode = cap;
 
@@ -380,6 +386,8 @@ float	offset;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.veggie", "pickup");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -427,6 +435,8 @@ float	offset;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.jar", "item");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -479,6 +489,8 @@ float	offset;
 		gNewObjectDefinition.rot 		= (float)itemPtr->parm[1] * (PI2/4);
 
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.tinCan", "item");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -530,6 +542,8 @@ float	offset;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.detergent", "item");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -573,6 +587,8 @@ float	offset;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.boxWall", "obstacle");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -620,6 +636,8 @@ int		part = itemPtr->parm[0];
 	gNewObjectDefinition.moveCall 	= MoveDefaultPickup;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.garbageGliderPart", "pickup");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -640,6 +658,8 @@ int		part = itemPtr->parm[0];
 				gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 				gNewObjectDefinition.moveCall 	= nil;
 				rubber = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+				if (rubber != nil)
+					Bugdom2Script_RegisterObject(rubber, "bugdom2.garbageGliderRubber", "child-object");
 
 				newObj->ChainNode = rubber;
 				break;
@@ -647,6 +667,7 @@ int		part = itemPtr->parm[0];
 					/* WHEEL */
 
 		case	1:
+				Bugdom2Script_RegisterObject(newObj, "bugdom2.garbageGliderWheel", "pickup");
 
 				newObj->GotKickedCallback = DefaultGotKickedCallback;			// set callback for being kicked
 				newObj->Kind = PICKUP_KIND_WHEEL;								// remember what kind of pickup this is
@@ -669,6 +690,7 @@ int		part = itemPtr->parm[0];
 					/* PROPELLER */
 
 		case	2:
+				Bugdom2Script_RegisterObject(newObj, "bugdom2.garbageGliderPropeller", "pickup");
 
 				newObj->Kind = PICKUP_KIND_PROPELLER;							// remember what kind of pickup this is
 				newObj->DropCallback = DefaultDropObject;						// set drop callback
@@ -921,8 +943,6 @@ float			d;
 	}
 
 }
-
-
 
 
 

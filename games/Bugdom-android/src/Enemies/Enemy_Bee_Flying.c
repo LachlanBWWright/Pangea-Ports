@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -106,6 +110,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FLYINGBEE,x,z,FLYINGBEE_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.flyingBee", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 
 	if (LevelMetadataProfileIs("level.flyingBeeSetup", "hive", gLevelType == LEVEL_TYPE_HIVE))
@@ -164,8 +172,12 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FLYINGBEE,where->x,where->z,FLYINGBEE_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.flyingBee", "enemy");
+#endif
 			
-	newObj->Coord.y = where->y;		
+	newObj->Coord.y = where->y;
 	
 	SetSkeletonAnim(newObj->Skeleton, FLYINGBEE_ANIM_FLY);
 	
@@ -595,7 +607,6 @@ Boolean BallHitFlyingBee(ObjNode *me, ObjNode *enemy)
 	
 	return(false);
 }
-
 
 
 

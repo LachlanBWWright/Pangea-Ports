@@ -2820,6 +2820,7 @@ ObjNode			*wheel,*link;
 		wheel = MakeNewDisplayGroupObject(&def);
 		if (wheel == nil)
 			DoFatalAlert("CreateCarWheelsAndHead: MakeNewDisplayGroupObject failed!");
+		CroMagScript_RegisterObject(wheel, "cromag.vehicleWheel", "child-object");
 
 		wheel->WheelSpinRot = 0;
 
@@ -2848,6 +2849,7 @@ ObjNode			*wheel,*link;
 	wheel = MakeNewSkeletonObject(&def);
 	if (wheel == nil)
 		DoFatalAlert("CreateCarWheelsAndHead: MakeNewSkeletonObject failed!");
+	CroMagScript_RegisterObject(wheel, "cromag.vehicleDriver", "child-object");
 
 
 	link->ChainNode = wheel;							// add to chain link
@@ -3727,4 +3729,3 @@ new_group:
 
 
 }
-

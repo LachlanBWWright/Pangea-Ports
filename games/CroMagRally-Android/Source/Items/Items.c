@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -144,6 +148,10 @@ static const float diameter[] =
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.finishLine", "objective");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 	ApplyStartLineMovement(newObj);
@@ -359,6 +367,10 @@ Boolean	isSolid = itemPtr->parm[3] & 1;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.tree", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	if (isSolid)
@@ -399,6 +411,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.vine", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	return(true);													// item was added
@@ -428,6 +444,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.easterHead", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -562,6 +582,10 @@ short	type = itemPtr->parm[0];
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.pillar", "obstacle");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -600,6 +624,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.pylon", "obstacle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -664,6 +692,10 @@ Boolean	collision = true;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.boat", "vehicle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -736,6 +768,10 @@ static const short types[NUM_TRACKS][2] =
 	newObj->CType 			= CTYPE_MISC|CTYPE_AVOID;
 	newObj->CBits			= CBITS_ALLSOLID;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.statue", "scenery");
+#endif
+
 	if (gTrackNum == TRACK_NUM_CRETE)
 		CreateCollisionBoxFromBoundingBox_Rotated(newObj, 1, 1);
 	else
@@ -767,6 +803,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.sphinx", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -806,6 +846,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.sign", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -847,6 +891,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.stump", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -882,6 +930,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.vikingFlag", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -916,6 +968,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.weaponsRack", "item");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -949,6 +1005,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.barricade", "obstacle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -987,6 +1047,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.rock", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1023,6 +1087,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.brontoNeck", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 
@@ -1034,6 +1102,9 @@ ObjNode	*newObj;
 	def.coord.y	= GetTerrainY(x,z) + 50.0f;
 	def.scale	= 1.5f;
 	newObj = MakeNewDisplayGroupObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.brontoBaseRock", "child-object");
+	#endif
 	newObj->Scale.x = 3;
 	newObj->Scale.z = 3;
 	UpdateObjectTransforms(newObj);
@@ -1080,6 +1151,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.rockOverhang", "obstacle");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 
@@ -1110,6 +1185,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.rickshaw", "vehicle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1145,6 +1224,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.aztecHead", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1192,6 +1275,10 @@ Boolean	isSolid = itemPtr->parm[3] & 1;						// see if solid or not
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.castleTower", "obstacle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1308,6 +1395,10 @@ short	type = itemPtr->parm[0];
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.house", "obstacle");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1346,6 +1437,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.well", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 
@@ -1381,6 +1476,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.clock", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1419,6 +1518,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.clam", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 
@@ -1455,6 +1558,10 @@ ObjNode	*newObj;
 	newObj = MakeNewSkeletonObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.flagPole", "objective");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1497,6 +1604,10 @@ short	type = itemPtr->parm[0];
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.stonehenge", "obstacle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1593,6 +1704,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.coliseum", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 
@@ -1628,6 +1743,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.volcano", "hazard");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1750,6 +1869,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.torchPot", "hazard");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1811,6 +1934,10 @@ float			x,z,placement;
 	newObj = MakeNewSkeletonObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.polarBear", "enemy");
+#endif
 
 	DetachObject(newObj);									// detach this object from the linked list
 
@@ -1900,6 +2027,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.flower", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->Skeleton->AnimSpeed = 1.0f + RandomFloat() * .5f;
@@ -1948,6 +2079,10 @@ float			x,z,placement;
 	newObj = MakeNewSkeletonObject(&def);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.viking", "enemy");
+#endif
 
 	DetachObject(newObj);									// detach this object from the linked list
 

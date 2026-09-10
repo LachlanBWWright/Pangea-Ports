@@ -24,6 +24,9 @@
 #include "collision.h"
 #include "input.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -111,6 +114,9 @@ short		z,y,x;
 	newNode = MakeNewShape(GroupNum_Rock,ObjType_Rock,0,x,y,z,MoveRock,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.rock", "projectile/effect");
+	#endif
 
 	newNode->CBits = CBITS_TOUCHABLE;
 	newNode->TopOff = -60;					// set collision box (not activated yet)
@@ -222,6 +228,9 @@ short		z,y,x;
 	newNode = MakeNewShape(GroupNum_Tracer,ObjType_Tracer,RandomRange(0,2),x,y,z,MoveBasicRico,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.tracer", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -293,6 +302,9 @@ short		z,y,x;
 	newNode = MakeNewShape(GroupNum_Flamethrower,ObjType_Flamethrower,0,x,y,z,MoveFlamethrower,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.flamethrower", "projectile/effect");
+	#endif
 
 	InitYOffset(newNode, -32);
 
@@ -411,6 +423,9 @@ short		z,y,x;
 						MoveBasicBullet,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.elephantGun", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -479,6 +494,9 @@ short		z,y,x;
 	newNode = MakeNewShape(GroupNum_Pie,ObjType_Pie,gMyDirection,x,y,z,MovePie,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.pie", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;		// activate collision
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -618,6 +636,9 @@ Byte 	sub;
 						MoveBasicBullet,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.doubleShot", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -715,6 +736,9 @@ static	unsigned long lastShotFrame = 0;
 						MoveBasicBullet,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.tripleShot", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -788,6 +812,9 @@ short		z,y,x;
 						MoveRocketGun,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.rocket", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -853,6 +880,9 @@ register	ObjNode *newObj;
 					gThisNodePtr->Z,nil,PLAYFIELD_RELATIVE);
 		if (newObj != nil)
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.rocketSmoke", "projectile/effect");
+		#endif
 			newObj->AnimSpeed += MyRandomLong()&0xff;		// random anim speed
 		}
 	}
@@ -901,6 +931,9 @@ short		z,y,x;
 						MoveHeatSeek,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.heatSeeker", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -1085,6 +1118,9 @@ short		z,y,x;
 						MovePixieDust,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.pixieDust", "projectile/effect");
+	#endif
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -1153,6 +1189,9 @@ register	ObjNode *newObj;
 					gThisNodePtr->Z,nil,PLAYFIELD_RELATIVE);
 		if (newObj != nil)
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.pixieDustTrail", "projectile/effect");
+		#endif
 			newObj->AnimSpeed += MyRandomLong()&0x1ff;		// random anim speed
 			InitYOffset(newObj, gThisNodePtr->YOffset.Int);	// same dist off ground
 		}
@@ -1161,8 +1200,6 @@ register	ObjNode *newObj;
 	CalcObjectBox();
 	UpdateObject();
 }
-
-
 
 
 

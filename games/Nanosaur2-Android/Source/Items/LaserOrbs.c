@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -97,6 +98,7 @@ static ObjNode *MakeLaserOrb(float  x, float z)
 		.rot 		= RandomFloat() * PI2,
 	};
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.laserOrb", "enemy");
 
 	newObj->Health 	= .4f;
 	newObj->Mode	= ORB_MODE_SEEKING;
@@ -122,6 +124,7 @@ static ObjNode *MakeLaserOrb(float  x, float z)
 	def.flags 		= gAutoFadeStatusBits | STATUS_BIT_UVTRANSFORM;
 	def.slot++;
 	ObjNode* green = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(green, "nanosaur2.laserOrbShell", "child-object");
 
 	green->CType 				= CTYPE_MISC | CTYPE_WEAPONTEST | CTYPE_PLAYERTEST | CTYPE_AUTOTARGETWEAPON;
 	green->CBits				= CBITS_ALLSOLID;
@@ -147,6 +150,7 @@ static ObjNode *MakeLaserOrb(float  x, float z)
 	def.flags		= STATUS_BIT_DOUBLESIDED|STATUS_BIT_DONTCULL|STATUS_BIT_GLOW|STATUS_BIT_NOLIGHTING|STATUS_BIT_NOFOG|STATUS_BIT_NOZWRITES;
 
 	ObjNode* laser = MakeNewObject(&def);
+	Nanosaur2Script_RegisterObject(laser, "nanosaur2.laserBeam", "projectile/effect");
 	def.drawCall = NULL;
 
 	newObj->ChainNode = green;
@@ -809,7 +813,6 @@ static void MoveLaserOrbOnSpline(ObjNode *theNode)
 		MoveLaserOrb(theNode);
 	}
 }
-
 
 
 

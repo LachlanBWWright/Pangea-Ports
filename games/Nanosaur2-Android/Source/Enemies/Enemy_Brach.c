@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -122,6 +123,7 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_BRACH,animNum, x,z, BRACH_SCALE, 0, MoveBrach);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.brachiosaurus", "enemy");
 
 
 
@@ -507,4 +509,3 @@ static void KillBrach(ObjNode *enemy)
 	enemy->CType &= ~CTYPE_AUTOTARGETWEAPON;
 
 }
-

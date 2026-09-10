@@ -564,6 +564,7 @@ float	speed;
 	newObj->Health = 1.5f;										// time that bullet can live
 
 	newObj->What = WHAT_PLAYERBULLET;
+	BillyScript_RegisterObject(newObj, "billy.projectile", "projectile/effect");
 
 				/* SET SPEED OF BULLET */
 					
@@ -938,6 +939,27 @@ const Byte	swampTable[32] =
 	newObj->CType = CTYPE_PICKABLE;
 	newObj->HitByBulletCallback = OrbHitByBulletCallback;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	const char* nativeId = "billy.targetPractice.object";
+	switch (newObj->What)
+	{
+		case WHAT_COINORB: nativeId = "billy.targetPractice.coinOrb"; break;
+		case WHAT_TIMEORB: nativeId = "billy.targetPractice.timeOrb"; break;
+		case WHAT_TNT: nativeId = "billy.targetPractice.tntOrb"; break;
+		case WHAT_SKULL: nativeId = "billy.targetPractice.deathSkull"; break;
+		case WHAT_RAPIDFIRE: nativeId = "billy.targetPractice.rapidFire"; break;
+		case WHAT_BOTTLE: nativeId = "billy.targetPractice.bottle"; break;
+		case WHAT_PEPPER: nativeId = "billy.targetPractice.pepper"; break;
+		case WHAT_KANGACOW: nativeId = "billy.targetPractice.kangaCow"; break;
+		case WHAT_SHORTY: nativeId = "billy.targetPractice.shorty"; break;
+		case WHAT_AMMOBOX: nativeId = "billy.targetPractice.ammoBox"; break;
+		case WHAT_FROGMAN: nativeId = "billy.targetPractice.frogman"; break;
+		case WHAT_TREMORGHOST: nativeId = "billy.targetPractice.tremorGhost"; break;
+		default: break;
+	}
+	BillyScript_RegisterObject(newObj, nativeId, "target");
+#endif
+
 }
 
 
@@ -1046,8 +1068,20 @@ static void OrbHitByBulletCallback(ObjNode *bullet, ObjNode *orb, const OGLPoint
 OGLVector3D		splatVec;
 OGLMatrix4x4	m;
 int				i;
+	Boolean		applyDamage = true;
+	Boolean		destroyTarget = false;
+	float			damage = 1.0f;
 
-	(void) bullet;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	applyDamage = BillyScript_OnWeaponHit(bullet, orb, damage, &damage, &destroyTarget);
+#endif
+	if (!applyDamage)
+		return;
+	if (destroyTarget)
+	{
+		DeleteObject(orb);
+		return;
+	}
 
 	switch(orb->What)
 	{
@@ -1075,7 +1109,11 @@ int				i;
 					gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 					gNewObjectDefinition.moveCall 	= MoveBonusCoin;
 					newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
-				
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+					BillyScript_RegisterObject(newObj, "billy.targetPractice.bonusCoin", "pickup");
+#endif
+
 					newObj->Rot.x = RandomFloat() * PI2;
 					newObj->Rot.z = RandomFloat() * PI2;
 				
@@ -1120,6 +1158,9 @@ int				i;
 				DeleteObject(orb);
 				gPlayerInfo.shieldPower = 0;
 				gPlayerIsDead = true;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+				BillyScript_OnDeath(gPlayerInfo.objNode, 0);
+	#endif
 				StartLevelCompletion(3.0);
 				break;
 
@@ -1133,6 +1174,9 @@ int				i;
 				if (gPlayerInfo.shieldPower <= 0.0f)
 				{
 					gPlayerIsDead = true;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+					BillyScript_OnDeath(gPlayerInfo.objNode, 0);
+				#endif
 					StartLevelCompletion(3.0);		
 					PlayEffect(EFFECT_YELP);			
 				}				

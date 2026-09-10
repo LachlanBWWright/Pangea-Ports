@@ -20,6 +20,9 @@
 #include "shape.h"
 #include "enemy3.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -60,6 +63,10 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveChocBunny,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.chocBunny", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -223,4 +230,3 @@ void MoveChoc_Land(void)
 
 	UpdateEnemy();
 }
-

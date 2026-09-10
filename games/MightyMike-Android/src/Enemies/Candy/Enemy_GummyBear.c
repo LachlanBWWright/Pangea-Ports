@@ -20,6 +20,9 @@
 #include "enemy3.h"
 #include "objecttypes.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -63,6 +66,10 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,MoveGBear,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.gummyBear", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;				// remember where this came from
 	newObj->CType = CTYPE_ENEMYA;				// set collision info
@@ -315,4 +322,3 @@ register	ObjNode *newObj;
 
 	gLastGummyHahaTime = gFrames;						// remember when it occurred
 }
-

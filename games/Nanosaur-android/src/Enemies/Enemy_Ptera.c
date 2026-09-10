@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -88,6 +89,7 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_PTERA,x,z);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.pteranodon", "enemy");
 
 	newObj->TerrainItemPtr = itemPtr;
 
@@ -152,6 +154,7 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj)
 	{
+		NanosaurScript_RegisterObject(newObj, "nanosaur.pteraRock", "projectile/effect");
 		theEnemy->ChainNode = newObj;					// setup chain links
 		newObj->ChainHead = theEnemy;
 	
@@ -419,8 +422,6 @@ float	occ,y;
 
 	UpdateEnemy(theNode);		
 }
-
-
 
 
 

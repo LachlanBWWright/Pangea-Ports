@@ -535,6 +535,10 @@ ObjNode		*newObj;
 							
 	newObj->CType = CTYPE_PICKABLE;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.shieldPow", "pickup");
+#endif
+
 
 }
 
@@ -627,6 +631,10 @@ ObjNode		*newObj;
 
 	newObj->CType = CTYPE_PICKABLE;			
 	newObj->HitByBulletCallback = BulletHitAmmoPOW;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.ammoPow", "pickup");
+#endif
 	
 	newObj->NumBullets = numBullets;
 						
@@ -1551,4 +1559,3 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-

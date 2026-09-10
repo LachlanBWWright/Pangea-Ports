@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -109,6 +113,8 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FROG,animNum, x,z, FROG2_SCALE, 0, MoveFrog2);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.frog2", "enemy");
 
 
 
@@ -563,7 +569,6 @@ static void KillFrog(ObjNode *enemy)
 	enemy->TerrainItemPtr = nil;			// dont ever come back
 
 }
-
 
 
 

@@ -20,6 +20,9 @@
 #include "enemy4.h"
 #include "sound2.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -60,6 +63,9 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,MoveWitch,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.witch", "enemy");
+#endif
 
 	CalcEnemyScatterOffset(newObj);
 
@@ -230,5 +236,4 @@ register	ObjNode *newObj;
 
 	gLastWitchHahaTime = gFrames;						// remember when it occurred
 }
-
 

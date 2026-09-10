@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -53,6 +54,7 @@ ObjNode	*newObj, *gun, *hat;
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_SHORTY,animNum, x,z, SHORTY_SCALE, rot, moveCall,
 								gAutoFadeStatusBits);
+	BillyScript_RegisterObject(newObj, "billy.shorty", "enemy");
 	
 
 
@@ -80,6 +82,7 @@ ObjNode	*newObj, *gun, *hat;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	gun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(gun, "billy.shortyGun", "child-object");
 	gun->Side = SIDE_RIGHT;
 	ShortyPutgunInHolster(gun);
 	
@@ -88,6 +91,7 @@ ObjNode	*newObj, *gun, *hat;
 			
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_ShortyHat;
 	hat = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(hat, "billy.shortyHat", "child-object");
 	ShortyPutHatOnHead(hat);
 	
 			/* CHAIN THEM */
@@ -488,8 +492,6 @@ const OGLPoint3D	headOff = {0,15,0};
 	gTimeSinceLastEnemyShot = 0;
 
 }
-
-
 
 
 

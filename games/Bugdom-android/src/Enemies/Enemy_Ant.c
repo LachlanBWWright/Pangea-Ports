@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -210,6 +211,10 @@ ObjNode	*newObj;
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_ANT,x,z, ANT_SCALE);
 	GAME_ASSERT(newObj);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.ant", "enemy");
+#endif
 
 	newObj->HasSpear = false;									// assume no spear
 	
@@ -816,6 +821,10 @@ float			x,z,placement;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_ANT,x,z, ANT_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.ant", "enemy");
+#endif
 		
 		
 	newObj->SplineItemPtr = itemPtr;
@@ -957,6 +966,7 @@ ObjNode	*spearObj;
 	spearObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (spearObj == nil)
 		return;
+	BugdomScript_RegisterObject(spearObj, "bugdom.antThrownSpear", "projectile/effect");
 
 			/* ATTACH SPEAR TO ENEMY */
 	
@@ -1263,6 +1273,8 @@ ObjNode	*spearObj;
 	if (spearObj == nil)
 		return;
 
+	BugdomScript_RegisterObject(spearObj, "bugdom.antHeldRock", "child-object");
+
 			/* ATTACH SPEAR TO ENEMY */
 	
 	theNode->ChainNode = spearObj;
@@ -1392,6 +1404,3 @@ float	groundY;
 
 	UpdateObject(theNode);
 }
-
-
-

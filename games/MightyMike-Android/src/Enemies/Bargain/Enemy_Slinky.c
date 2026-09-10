@@ -19,6 +19,9 @@
 #include "objecttypes.h"
 #include "collision.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -58,6 +61,10 @@ short			animNum;
 			itemPtr->x,itemPtr->y,50,MoveSlinky,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.slinky", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -270,5 +277,4 @@ void CalcSlinkyBox(void)
 
 	}
 }
-
 

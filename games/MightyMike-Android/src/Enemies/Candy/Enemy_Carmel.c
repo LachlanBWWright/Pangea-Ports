@@ -20,6 +20,9 @@
 #include "enemy3.h"
 #include "objecttypes.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -80,6 +83,10 @@ short		anim;
 							itemPtr->y,50,MoveCarmel,PLAYFIELD_RELATIVE);
 		if (newObj == nil)
 			return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_RegisterObject(newObj, "mightymike.caramel", "enemy");
+#endif
 
 		newObj->ItemIndex = itemPtr;				// remember where this came from
 		newObj->CType = 0;							// set collision info
@@ -330,5 +337,4 @@ register	ObjNode		*theNode;
 
 	CalcObjectBox2(theNode);
 }
-
 

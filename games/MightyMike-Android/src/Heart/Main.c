@@ -440,7 +440,8 @@ void PlayArea(void)
 	gIsInGame = false;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	MikeScript_OnAreaUnload(gSceneNum, gAreaNum);
+	if (gAbortGameFlag || gAbortDemoFlag)
+		MikeScript_OnAreaUnload(gSceneNum, gAreaNum);
 #endif
 }
 
@@ -1078,6 +1079,10 @@ short	maxScenes;
 			{
 							/* HANDLE DEATH */
 
+				#ifdef PANGEA_ENABLE_SCRIPTING
+				if (gNumLives <= 1)
+					MikeScript_OnAreaUnload(gSceneNum, gAreaNum);
+				#endif
 				if (--gNumLives)								// see if got another life
 				{
 					SetScreenOffsetForArea();
@@ -1092,6 +1097,7 @@ short	maxScenes;
 
 				#ifdef PANGEA_ENABLE_SCRIPTING
 				MikeScript_OnAreaComplete(gSceneNum, gAreaNum);
+				MikeScript_OnAreaUnload(gSceneNum, gAreaNum);
 				#endif
 				FadeOutGameCLUT();
 			ShowBonusScreen();

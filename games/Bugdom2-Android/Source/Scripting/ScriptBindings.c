@@ -17,6 +17,7 @@
 
 extern bool PangeaScript_LoadCustomBG3D(FSSpec* spec, int group);
 extern bool PangeaScript_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 static TerrainItemEntryType gScriptTerrainItems[256];
@@ -330,6 +331,24 @@ static bool Bugdom2Script_GetObjectActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool Bugdom2Script_GetObjectHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outHealth = obj->Health;
+	return true;
+}
+
+static bool Bugdom2Script_GetObjectDamage(void* nativeObject, float* outDamage)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outDamage || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outDamage = obj->Damage;
+	return true;
+}
+
 static bool Bugdom2Script_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -362,6 +381,22 @@ static bool Bugdom2Script_GetObjectAnimation(void* nativeObject, int* outAnimati
 	if (!obj || !outAnimation || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG)
 		return false;
 	*outAnimation = obj->Skeleton->AnimNum;
+	return true;
+}
+
+static bool Bugdom2Script_GetObjectAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outSpeed || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outSpeed = obj->Skeleton->AnimSpeed;
+	return true;
+}
+
+static bool Bugdom2Script_GetObjectAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outFrame || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outFrame = GetScriptSkeletonFrame(obj->Skeleton);
 	return true;
 }
 
@@ -417,7 +452,11 @@ static const PangeaScriptObjectOps kBugdom2PlayerObjectOps =
 	.getRotation = Bugdom2Script_GetObjectRotation,
 	.getScale = Bugdom2Script_GetObjectScale,
 	.getAnimation = Bugdom2Script_GetObjectAnimation,
+	.getAnimationSpeed = Bugdom2Script_GetObjectAnimationSpeed,
+	.getAnimationFrame = Bugdom2Script_GetObjectAnimationFrame,
 	.getActive = Bugdom2Script_GetObjectActive,
+	.getHealth = Bugdom2Script_GetObjectHealth,
+	.getDamage = Bugdom2Script_GetObjectDamage,
 	.getCollisionEnabled = Bugdom2Script_GetObjectCollisionEnabled,
 	.setPosition = Bugdom2Script_SetObjectPosition,
 	.setVelocity = Bugdom2Script_SetObjectVelocity,
@@ -1051,6 +1090,120 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "pickup",
 		.dependencySummary = "level-specific glider part models and terrain/collision systems",
 	},
+	{
+		.id = "bugdom2.sprinkler",
+		.nativeType = 2,
+		.category = "hazard",
+		.dependencySummary = "sprinkler assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "bugdom2.snakeGenerator",
+		.nativeType = 22,
+		.category = "hazard",
+		.dependencySummary = "snake-generator assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "bugdom2.firecracker",
+		.nativeType = 36,
+		.category = "hazard",
+		.dependencySummary = "firecracker assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "bugdom2.mouseTrap",
+		.nativeType = 42,
+		.category = "hazard",
+		.dependencySummary = "mouse-trap assets, terrain, and native hazard collision",
+	},
+	{
+		.id = "bugdom2.gnome",
+		.nativeType = 5,
+		.category = "enemy",
+		.dependencySummary = "gnome assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.houseFly",
+		.nativeType = 10,
+		.category = "enemy",
+		.dependencySummary = "house-fly assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.evilPlant",
+		.nativeType = 12,
+		.category = "enemy",
+		.dependencySummary = "evil-plant assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.chipmunk",
+		.nativeType = 19,
+		.category = "enemy",
+		.dependencySummary = "chipmunk assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.flea",
+		.nativeType = 38,
+		.category = "enemy",
+		.dependencySummary = "flea assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.tick",
+		.nativeType = 39,
+		.category = "enemy",
+		.dependencySummary = "tick assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.toySoldier",
+		.nativeType = 43,
+		.category = "enemy",
+		.dependencySummary = "toy-soldier assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.otto",
+		.nativeType = 45,
+		.category = "enemy",
+		.dependencySummary = "Otto assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.dragonfly",
+		.nativeType = 52,
+		.category = "enemy",
+		.dependencySummary = "dragonfly assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.frog",
+		.nativeType = 54,
+		.category = "enemy",
+		.dependencySummary = "frog assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.moth",
+		.nativeType = 60,
+		.category = "enemy",
+		.dependencySummary = "moth assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.computerBug",
+		.nativeType = 61,
+		.category = "enemy",
+		.dependencySummary = "computer-bug assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.roach",
+		.nativeType = 65,
+		.category = "enemy",
+		.dependencySummary = "roach assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.ant",
+		.nativeType = 68,
+		.category = "enemy",
+		.dependencySummary = "ant assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "bugdom2.pondFish",
+		.nativeType = 69,
+		.category = "enemy",
+		.dependencySummary = "pond-fish assets, terrain, and native enemy AI",
+	},
 #define BUGDOM2_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current level assets, terrain systems, and the native item initializer" },
 	BUGDOM2_TERRAIN_NATIVE_ITEM(1) BUGDOM2_TERRAIN_NATIVE_ITEM(2) BUGDOM2_TERRAIN_NATIVE_ITEM(3) BUGDOM2_TERRAIN_NATIVE_ITEM(4) BUGDOM2_TERRAIN_NATIVE_ITEM(5) BUGDOM2_TERRAIN_NATIVE_ITEM(6) BUGDOM2_TERRAIN_NATIVE_ITEM(7) BUGDOM2_TERRAIN_NATIVE_ITEM(8) BUGDOM2_TERRAIN_NATIVE_ITEM(9) BUGDOM2_TERRAIN_NATIVE_ITEM(10)
 	BUGDOM2_TERRAIN_NATIVE_ITEM(11) BUGDOM2_TERRAIN_NATIVE_ITEM(12) BUGDOM2_TERRAIN_NATIVE_ITEM(13) BUGDOM2_TERRAIN_NATIVE_ITEM(14) BUGDOM2_TERRAIN_NATIVE_ITEM(15) BUGDOM2_TERRAIN_NATIVE_ITEM(16) BUGDOM2_TERRAIN_NATIVE_ITEM(17) BUGDOM2_TERRAIN_NATIVE_ITEM(18) BUGDOM2_TERRAIN_NATIVE_ITEM(19) BUGDOM2_TERRAIN_NATIVE_ITEM(20)
@@ -1224,18 +1377,99 @@ EMSCRIPTEN_KEEPALIVE int Bugdom2Script_ProbeBuddyLaunchJS(void)
 	CreateMyBuddy(&where);
 	return gPlayerInfo.numBuddyBugs > previousCount ? 1 : 0;
 }
+
+EMSCRIPTEN_KEEPALIVE int Bugdom2Script_ProbeResourceCleanupJS(void)
+{
+	Bugdom2Script_ResetObjectRegistry();
+	for (int i = 0; i < SKELETON_TYPE_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		if (IsSkeletonTypeLoaded((Byte)(SKELETON_TYPE_SCRIPT_CUSTOM_BASE + i)))
+			return 0;
+	}
+	for (int i = 0; i < MODEL_GROUP_SCRIPT_CUSTOM_COUNT; i++)
+	{
+		int group = MODEL_GROUP_SCRIPT_CUSTOM_BASE + i;
+		if (gBG3DContainerList[group] || gNumObjectsInBG3DGroupList[group] != 0)
+			return 0;
+	}
+	return 1;
+}
 #endif
+
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton)
+{
+	const JointKeyFrameHeader* header;
+	int frame;
+	int frameCount;
+
+	if (!skeleton || !skeleton->skeletonDefinition || skeleton->AnimNum >= MAX_ANIMS)
+		return 0;
+	header = &skeleton->skeletonDefinition->JointKeyframes[0];
+	frameCount = header->numKeyFrames[skeleton->AnimNum];
+	if (frameCount <= 0 || !header->keyFrames || !header->keyFrames[skeleton->AnimNum])
+		return 0;
+	frame = 0;
+	while (frame + 1 < frameCount && skeleton->CurrentAnimTime >= header->keyFrames[skeleton->AnimNum][frame + 1].tick)
+		frame++;
+	return frame;
+}
 
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
+	PangeaScriptPlayerForm form;
 	if (playerNum != 0 || !outPlayer || !gPlayerInfo.objNode) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .collisionEnabled = gPlayerInfo.objNode->CType != 0 && (gPlayerInfo.objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gPlayerInfo.health, .hasHealth = true, .score = (int64_t) gScore, .hasScore = true, .lives = gPlayerInfo.lives, .hasLives = true, .keyCount = 0, .hasKeyState = true, .greenCloverCount = gPlayerInfo.numGreenClovers, .blueCloverCount = gPlayerInfo.numBlueClovers, .goldCloverCount = gPlayerInfo.numGoldClovers, .hasCollectibleState = true, .shieldActive = gPlayerInfo.shieldTimer > 0.0f, .hasShieldState = true, .miceRescued = gPlayerInfo.numMiceRescued, .miceTotal = gNumMice, .drowningMiceRescued = gNumDrowningMiceRescued, .drowningMiceRequired = gNumDrowingMiceToRescue, .hasMiceState = true, .childObjectCount = gPlayerInfo.numBuddyBugs, .hasChildObjectState = true, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .velocity = {gPlayerInfo.objNode->Delta.x, gPlayerInfo.objNode->Delta.y, gPlayerInfo.objNode->Delta.z}, .hasVelocity = true, .collisionEnabled = gPlayerInfo.objNode->CType != 0 && (gPlayerInfo.objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gPlayerInfo.health, .hasHealth = true, .score = (int64_t) gScore, .hasScore = true, .lives = gPlayerInfo.lives, .hasLives = true, .keyCount = 0, .hasKeyState = true, .greenCloverCount = gPlayerInfo.numGreenClovers, .blueCloverCount = gPlayerInfo.numBlueClovers, .goldCloverCount = gPlayerInfo.numGoldClovers, .hasCollectibleState = true, .shieldActive = gPlayerInfo.shieldTimer > 0.0f, .hasShieldState = true, .invulnerable = gPlayerInfo.invincibilityTimer > 0.0f, .hasInvulnerabilityState = true, .ridingBall = gPlayerInfo.ridingBall != NULL, .hasRidingBallState = true, .miceRescued = gPlayerInfo.numMiceRescued, .miceTotal = gNumMice, .drowningMiceRescued = gNumDrowningMiceRescued, .drowningMiceRequired = gNumDrowingMiceToRescue, .hasMiceState = true, .childObjectCount = gPlayerInfo.numBuddyBugs, .hasChildObjectState = true, .active = true};
+	outPlayer->dead = gPlayerIsDead;
+	outPlayer->hasDeathState = true;
+	outPlayer->levelComplete = gLevelCompleted;
+	outPlayer->hasLevelCompletionState = true;
+	form = gPlayerInfo.ridingBall ? PANGEA_SCRIPT_PLAYER_FORM_BALL : PANGEA_SCRIPT_PLAYER_FORM_BUG;
+	outPlayer->form = form;
+	outPlayer->hasForm = true;
+	outPlayer->grounded = (gPlayerInfo.objNode->StatusBits & STATUS_BIT_ONGROUND) != 0;
+	outPlayer->hasGroundedState = true;
+	outPlayer->heightOffGround = gPlayerInfo.distToFloor;
+	outPlayer->hasTerrainHeightState = true;
+	outPlayer->glidePower = gPlayerInfo.glidePower;
+	outPlayer->hasGlideState = true;
+	outPlayer->onWater = (gPlayerInfo.objNode->StatusBits & STATUS_BIT_UNDERWATER) != 0;
+	outPlayer->hasWaterState = true;
+	outPlayer->groundTraction = gPlayerInfo.groundTraction;
+	outPlayer->groundFriction = gPlayerInfo.groundFriction;
+	outPlayer->groundAcceleration = gPlayerInfo.groundAcceleration;
+	outPlayer->hasGroundPhysicsState = true;
+	outPlayer->shieldTimeRemaining = gPlayerInfo.shieldTimer;
+	outPlayer->hasShieldTimerState = true;
+	outPlayer->invulnerabilityTimeRemaining = gPlayerInfo.invincibilityTimer;
+	outPlayer->hasInvulnerabilityTimerState = true;
+	outPlayer->knockedDown = gPlayerInfo.knockDownTimer > 0.0f;
+	outPlayer->knockdownTimeRemaining = gPlayerInfo.knockDownTimer;
+	outPlayer->hasKnockdownState = true;
+	outPlayer->ramming = gPlayerInfo.rammingTimer > 0.0f;
+	outPlayer->rammingTimeRemaining = gPlayerInfo.rammingTimer;
+	outPlayer->hasRammingState = true;
+	outPlayer->tunnelSpeed = gPlayerInfo.tunnelSpeed;
+	outPlayer->tunnelAngle = gPlayerInfo.tunnelAngle;
+	outPlayer->tunnelBanking = gPlayerInfo.tunnelBanking;
+	outPlayer->hasTunnelState = IsTunnelLevel();
 	outPlayer->camera = (PangeaScriptVector3){gGameView.cameraPlacement.cameraLocation.x, gGameView.cameraPlacement.cameraLocation.y, gGameView.cameraPlacement.cameraLocation.z};
 	outPlayer->hasCameraState = true;
 	outPlayer->rotation = (PangeaScriptVector3){gPlayerInfo.objNode->Rot.x, gPlayerInfo.objNode->Rot.y, gPlayerInfo.objNode->Rot.z};
 	outPlayer->hasRotation = true;
-	outPlayer->aim = (PangeaScriptVector3){-sinf(gPlayerInfo.objNode->Rot.y), 0.0f, -cosf(gPlayerInfo.objNode->Rot.y)};
+	if (IsTunnelLevel())
+		outPlayer->aim = (PangeaScriptVector3){gPlayerInfo.tunnelAim.x, gPlayerInfo.tunnelAim.y, gPlayerInfo.tunnelAim.z};
+	else
+		outPlayer->aim = (PangeaScriptVector3){-sinf(gPlayerInfo.objNode->Rot.y), 0.0f, -cosf(gPlayerInfo.objNode->Rot.y)};
 	outPlayer->hasAimState = true;
+	if (gPlayerInfo.objNode->Skeleton)
+	{
+		outPlayer->animation = gPlayerInfo.objNode->Skeleton->AnimNum;
+		outPlayer->hasAnimationState = true;
+		outPlayer->animationSpeed = gPlayerInfo.objNode->Skeleton->AnimSpeed;
+		outPlayer->hasAnimationSpeedState = true;
+		outPlayer->animationFrame = GetScriptSkeletonFrame(gPlayerInfo.objNode->Skeleton);
+		outPlayer->hasAnimationFrameState = true;
+	}
 	outPlayer->velocity = (PangeaScriptVector3){gPlayerInfo.objNode->Delta.x, gPlayerInfo.objNode->Delta.y, gPlayerInfo.objNode->Delta.z};
 	outPlayer->hasVelocity = true;
 	for (int keyID = 0; keyID < NUM_KEY_TYPES && keyID < PANGEA_SCRIPT_PLAYER_KEY_CAPACITY; keyID++)
@@ -1301,6 +1535,13 @@ static PangeaScriptStatus SetScriptPlayerInvulnerable(int playerNum, float durat
 	return PANGEA_SCRIPT_OK;
 }
 
+static PangeaScriptStatus SetScriptPlayerForm(int playerNum, PangeaScriptPlayerForm form)
+{
+	if (playerNum != 0 || !gPlayerInfo.objNode || (form != PANGEA_SCRIPT_PLAYER_FORM_BUG && form != PANGEA_SCRIPT_PLAYER_FORM_BALL))
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	return Bugdom2Script_SetPlayerForm(form == PANGEA_SCRIPT_PLAYER_FORM_BALL) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+}
+
 static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScriptVector3* position)
 {
 	if (playerNum != 0 || !position || !gPlayerInfo.objNode)
@@ -1335,6 +1576,7 @@ void Bugdom2Script_Init(void)
 		.setPlayerCloverCount = SetScriptPlayerCloverCount,
 		.setPlayerShieldActive = SetScriptPlayerShieldActive,
 		.setPlayerInvulnerable = SetScriptPlayerInvulnerable,
+		.setPlayerForm = SetScriptPlayerForm,
 		.setPlayerPosition = SetScriptPlayerPosition,
 		.setPlayerVelocity = SetScriptPlayerVelocity,
 		.capabilities = PANGEA_SCRIPT_BUGDOM2_CAPABILITIES,
@@ -1486,8 +1728,9 @@ void Bugdom2Script_OnLevelComplete(int levelNum)
 void Bugdom2Script_OnLevelUnload(int levelNum)
 {
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, levelNum, "onLevelUnload");
-	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
-	PangeaScript_ResetObjects();
+	/* Use the complete registry reset here so level reloads release custom model
+	 * groups and skeleton slots as well as their script object handles. */
+	Bugdom2Script_ResetObjectRegistry();
 }
 
 int Bugdom2Script_RemapTerrainItemType(int levelNum, int itemType)

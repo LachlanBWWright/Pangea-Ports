@@ -10,10 +10,18 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
+
+static void RegisterProjectileEffect(ObjNode* object, const char* objectID);
+
+static void RegisterProjectileEffect(ObjNode* object, const char* objectID)
+{
+	CroMagScript_RegisterObject(object, objectID, "projectile/effect");
+}
 
 static void VehicleActivatePOW(ObjNode *theVehicle, Boolean forwardThrow);
 static void MoveOilBullet(ObjNode *theNode);
@@ -306,6 +314,7 @@ ObjNode						*newObj,*head,*car;
 	};
 	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
 	newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.boneProjectile");
 	if (newObj == nil)
 		return;
 
@@ -387,6 +396,7 @@ ObjNode						*newObj,*head,*car;
 	};
 	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
 	newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.freezeProjectile");
 	if (newObj == nil)
 		return;
 
@@ -559,6 +569,7 @@ ObjNode						*newObj,*head,*car;
 	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
 
 	newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.oilProjectile");
 	if (newObj == nil)
 		return;
 
@@ -632,6 +643,7 @@ ObjNode	*newObj;
 		.scale		= 3.0f + RandomFloat() * 2.0f
 	};
 	newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.oilSpill");
 
 	newObj->CType = CTYPE_AVOID;
 
@@ -739,6 +751,7 @@ short		p,bestP;
 	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
 
 	newObj = MakeNewSkeletonObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.birdBomb");
 	if (newObj == nil)
 		DoFatalAlert("ThrowBirdBomb: MakeNewSkeletonObject failed!");
 
@@ -907,6 +920,7 @@ ObjNode		*newObj, *car;
 		.scale		= 1,
 	};
 	newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.romanCandle");
 	if (newObj == nil)
 		return;
 
@@ -1227,6 +1241,7 @@ short		targetP;
 		.scale		= 1,
 	};
 	newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.bottleRocket");
 	if (newObj == nil)
 		return;
 
@@ -1542,6 +1557,7 @@ static const OGLPoint3D	nose = {0,0,-100};
 	};
 	OGLPoint3D_Transform(&nose, &car->BaseTransformMatrix, &def.coord);
 	newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj, "cromag.torpedo");
 	if (newObj == nil)
 		return;
 
@@ -1806,6 +1822,7 @@ ObjNode						*newObj;
 		.scale		= 1.0,
 	};
 	newObj = MakeNewDisplayGroupObject(&def);
+	CroMagScript_RegisterObject(newObj, "cromag.landMine", "hazard");
 
 	newObj->CType 			= CTYPE_TRIGGER|CTYPE_AVOID;
 	newObj->Kind		 	= TRIGTYPE_LANDMINE;
@@ -1883,9 +1900,6 @@ Boolean DoTrig_LandMine(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	return(false);
 }
-
-
-
 
 
 

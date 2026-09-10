@@ -9,6 +9,17 @@
 
 
 /************************************************************/
+/* COOPERATIVE PREVIEW QUIT                                  */
+/************************************************************/
+
+// Lets the editor unwind the active level before replacing the WASM runtime.
+EMSCRIPTEN_KEEPALIVE void Nanosaur_RequestQuit(void)
+{
+	gEmscriptenQuitRequested = true;
+}
+
+
+/************************************************************/
 /* FENCE COLLISION CONTROL                                  */
 /************************************************************/
 //

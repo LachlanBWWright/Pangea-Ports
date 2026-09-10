@@ -24,6 +24,9 @@
 #include "miscanims.h"
 #include "sound2.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -63,6 +66,10 @@ register	ObjNode		*newObj;
 
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.appearZone", "trigger");
+#endif
 
 	newObj->ItemIndex = itemPtr;			// remember where this came from
 
@@ -134,6 +141,10 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveManEatingPlant,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.manEatingPlant", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -209,6 +220,9 @@ ObjNode	*newObj;
 							MovePlantPod,PLAYFIELD_RELATIVE);
 		if (newObj != nil)
 		{
+		#ifdef PANGEA_ENABLE_SCRIPTING
+			MikeScript_RegisterObject(newObj, "mightymike.manEatingPlantPod", "projectile/effect");
+		#endif
 			newObj->CType = CTYPE_ENEMYB;				// set collision info
 			newObj->CBits = CBITS_TOUCHABLE;
 			newObj->TopOff = -8;						// set box
@@ -275,6 +289,10 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveJackInTheBox,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.jackInTheBox", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -347,6 +365,10 @@ register	ObjNode		*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.candyMovingPlatform", "platform");
+#endif
+
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
 	newObj->CType = CTYPE_MPLATFORM;				// set collision info
@@ -397,6 +419,10 @@ register	ObjNode		*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.star", "enemy");
+#endif
+
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
 	newObj->CType = CTYPE_ENEMYB;					// set collision info
@@ -424,6 +450,10 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,100,MoveGumBall,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.gumball", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -475,6 +505,10 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveMuffit,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.muffit", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -550,6 +584,10 @@ register	ObjNode		*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.poisonApple", "enemy");
+#endif
+
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
 	newObj->CType = CTYPE_ENEMYB;					// set collision info
@@ -575,6 +613,10 @@ register	ObjNode		*newObj;
 	newObj = MakeNewObject(BG_GENRE,itemPtr->x,itemPtr->y,NEAREST_Z,MoveHydrantBase);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.hydrant", "trigger");
+#endif
 
 	newObj->ItemIndex = itemPtr;			// remember where this came from
 
@@ -615,6 +657,10 @@ static	long hydrantDX[2] = {-0x90000L,0x90000L};
 							MoveHydrantWater,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		return;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newNode, "mightymike.hydrantWater", "projectile/effect");
+#endif
 
 	InitYOffset(newNode, -39);
 
@@ -659,9 +705,3 @@ void MoveHydrantWater(void)
 		UpdateObject();
 	}
 }
-
-
-
-
-
-

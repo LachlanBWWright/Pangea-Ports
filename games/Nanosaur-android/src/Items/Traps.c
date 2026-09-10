@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -67,6 +68,7 @@ float	scale;
 		return(false);
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
+	NanosaurScript_RegisterObject(newObj, "nanosaur.rollingBoulder", "hazard");
 
 
 			/* SET COLLISION INFO */
@@ -242,6 +244,7 @@ ObjNode	*newObj;
 		return(false);
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
+	NanosaurScript_RegisterObject(newObj, "nanosaur.sporePod", "hazard");
 
 	newObj->PodUndulation = RandomFloat()*PI2;
 	newObj->PodBaseScale = newObj->Scale.y;
@@ -325,6 +328,7 @@ short	i;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 		if (newObj)
 		{
+			NanosaurScript_RegisterObject(newObj, "nanosaur.spore", "projectile/effect");
 			newObj->Delta.y = 300.0f + (RandomFloat()*200.0f);
 			newObj->Delta.x = (RandomFloat()-.5f) * 350.0f;
 			newObj->Delta.z = (RandomFloat()-.5f) * 350.0f;
@@ -393,8 +397,6 @@ ObjNode	*puff;
 		UpdateObject(theNode);
 	}
 }
-
-
 
 
 

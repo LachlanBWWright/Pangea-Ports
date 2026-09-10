@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -133,6 +134,7 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_RAMPHOR, animNum, x,z, RAMPHOR_SCALE, 0, nil);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.ramphor", "enemy");
 
 	newObj->Wobble = RandomFloat() * PI2;
 	newObj->FlightHeight	= GetTerrainY(x,z) + (RAMPHOR_WOBBLE_DIFF + 150.0f) + (height * 190.0f);

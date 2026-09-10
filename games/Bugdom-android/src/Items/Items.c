@@ -183,6 +183,10 @@ float	s;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.grass", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType = CTYPE_MISC; //|CTYPE_BLOCKCAMERA;
@@ -248,6 +252,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.weed", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType = CTYPE_MISC|CTYPE_BLOCKCAMERA;
@@ -283,6 +291,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.sunflower", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType = CTYPE_MISC; //|CTYPE_BLOCKCAMERA;
@@ -317,6 +329,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.cosmo", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType = CTYPE_MISC; //|CTYPE_BLOCKCAMERA;
@@ -350,6 +366,10 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.cosmo", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->Damage = .05;											// these do minimal damage
@@ -381,6 +401,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.poppy", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -419,6 +443,10 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.wallEnd", "obstacle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -464,6 +492,10 @@ CollisionBoxType *boxPtr;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.tree", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -575,6 +607,10 @@ float				y;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.stump", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 
@@ -614,6 +650,10 @@ float				y;
 	gHiveObj = hive = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (hive)
 	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_RegisterObject(hive, "bugdom.hive", "interactive");
+#endif
+
 		x = gNewObjectDefinition.coord.x;
 		y = gNewObjectDefinition.coord.y;
 		
@@ -1270,10 +1310,6 @@ ObjNode	*newObj;
 
 	return(true);													// item was added
 }
-
-
-
-
 
 
 

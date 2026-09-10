@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -105,6 +109,9 @@ float	rotY;
 	gNewObjectDefinition.moveCall 	= MovePlayer_Ball;
 	gNewObjectDefinition.rot 		= rotY;
 	newObj							= MakeNewObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.playerBall", "player");
+	#endif
 	
 			/* MAKE BASE GROUP */
 	
@@ -491,7 +498,6 @@ new_pgroup:
 			goto new_pgroup;
 	}
 }
-
 
 
 

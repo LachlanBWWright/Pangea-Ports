@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -72,6 +76,13 @@ short	i;
 	gNewObjectDefinition.scale 		= BEEMER_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.beemer", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -116,6 +127,13 @@ short	i;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.scale 		= BEEMER_SCALE;
 	beam = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(beam, "ottomatic.beemerBeam", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	newObj->ChainNode = beam;
 
@@ -204,6 +222,13 @@ int				i;
 	gNewObjectDefinition.scale 		= RAIL_GUN_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.railGun", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	newObj->SplineItemPtr = itemPtr;
 	newObj->SplineNum = splineNum;
 
@@ -253,6 +278,13 @@ int				i;
 	gNewObjectDefinition.slot 		= SPRITE_SLOT - 1;
 	gNewObjectDefinition.moveCall 	= nil;
 	beam = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(beam, "ottomatic.railGunBeam", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	newObj->ChainNode = beam;
 
@@ -360,6 +392,13 @@ ObjNode	*base,*turret;
 	gNewObjectDefinition.scale 		= TURRET_SCALE;
 	base = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(base, "ottomatic.turretBase", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	base->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -380,6 +419,13 @@ ObjNode	*base,*turret;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	turret = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(turret, "ottomatic.turret", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	base->ChainNode = turret;
 
@@ -507,6 +553,13 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= 1.5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.turretBullet", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 
 	newObj->Kind = WEAPON_TYPE_STUNPULSE;
 
@@ -613,7 +666,6 @@ static Boolean HurtTurret(ObjNode *base, float unused)
 
 	return(false);										// return value doesn't mean anything
 }
-
 
 
 

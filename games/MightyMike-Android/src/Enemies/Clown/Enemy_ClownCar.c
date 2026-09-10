@@ -20,6 +20,9 @@
 #include "objecttypes.h"
 #include "sound2.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -76,6 +79,9 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveClownCar_Driving,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.clownCar", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -337,5 +343,4 @@ void UpdateCarClown(void)
 
 	UpdateEnemy();
 }
-
 

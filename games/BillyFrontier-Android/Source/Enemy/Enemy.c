@@ -424,6 +424,7 @@ int		i;
 	newObj->Damage = .5;
 
 	newObj->What = WHAT_ENEMYBULLET;
+	BillyScript_RegisterObject(newObj, "billy.projectile", "projectile/effect");
 	
 				/* SET SPEED OF BULLET */
 					
@@ -563,6 +564,5 @@ void DecEnemiesAtStopPoint(void)
 		gShootoutCanProceedToNextStopPoint = true;
 	}
 }
-
 
 

@@ -21,6 +21,11 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 static PangeaScriptFrameContext gScriptFrameContext;
 extern bool Nanosaur2Script_LoadCustomBG3D(FSSpec* spec, int group);
 extern bool Nanosaur2Script_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
+static int gSelectedSplineNum = -1;
+static int gSelectedSplineItemIndex = -1;
+static int gSelectedSplineNativeType = -1;
+static float gSelectedSplinePlacement = 0.0f;
 
 static bool CompleteScriptReplacement(PangeaScriptObjectHandle handle, const char* action)
 {
@@ -329,6 +334,24 @@ static bool Nanosaur2Script_GetObjectActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool Nanosaur2Script_GetObjectHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outHealth = obj->Health;
+	return true;
+}
+
+static bool Nanosaur2Script_GetObjectDamage(void* nativeObject, float* outDamage)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outDamage || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outDamage = obj->Damage;
+	return true;
+}
+
 static bool Nanosaur2Script_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -361,6 +384,22 @@ static bool Nanosaur2Script_GetObjectAnimation(void* nativeObject, int* outAnima
 	if (!obj || !outAnimation || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG)
 		return false;
 	*outAnimation = obj->Skeleton->AnimNum;
+	return true;
+}
+
+static bool Nanosaur2Script_GetObjectAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outSpeed || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outSpeed = obj->Skeleton->AnimSpeed;
+	return true;
+}
+
+static bool Nanosaur2Script_GetObjectAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outFrame || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outFrame = GetScriptSkeletonFrame(obj->Skeleton);
 	return true;
 }
 
@@ -416,7 +455,11 @@ static const PangeaScriptObjectOps kNanosaur2PlayerObjectOps =
 	.getRotation = Nanosaur2Script_GetObjectRotation,
 	.getScale = Nanosaur2Script_GetObjectScale,
 	.getAnimation = Nanosaur2Script_GetObjectAnimation,
+	.getAnimationSpeed = Nanosaur2Script_GetObjectAnimationSpeed,
+	.getAnimationFrame = Nanosaur2Script_GetObjectAnimationFrame,
 	.getActive = Nanosaur2Script_GetObjectActive,
+	.getHealth = Nanosaur2Script_GetObjectHealth,
+	.getDamage = Nanosaur2Script_GetObjectDamage,
 	.setPosition = Nanosaur2Script_SetObjectPosition,
 	.setVelocity = Nanosaur2Script_SetObjectVelocity,
 	.setRotation = Nanosaur2Script_SetObjectRotation,
@@ -855,6 +898,14 @@ int Nanosaur2Script_ProbeObjectiveCompletionJS(void)
 	return 1;
 }
 
+EMSCRIPTEN_KEEPALIVE int Nanosaur2Script_ProbeLevelCompleteJS(void)
+{
+	if (!gIsInGame || gLevelCompleted)
+		return gLevelCompleted ? 1 : 0;
+	StartLevelCompletion(0.05f);
+	return gLevelCompleted ? 1 : 0;
+}
+
 EMSCRIPTEN_KEEPALIVE int Nanosaur2Script_ProbeSaveLoadJS(int saveSlot)
 {
 	SaveGameType saveData;
@@ -1251,6 +1302,30 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "pickup",
 		.dependencySummary = "free-life pickup assets, player lives, and terrain systems",
 	},
+	{
+		.id = "nanosaur2.dustDevil",
+		.nativeType = 16,
+		.category = "hazard",
+		.dependencySummary = "dust-devil assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "nanosaur2.airMine",
+		.nativeType = 17,
+		.category = "hazard",
+		.dependencySummary = "air-mine assets, terrain, and native hazard collision",
+	},
+	{
+		.id = "nanosaur2.eggWormhole",
+		.nativeType = 4,
+		.category = "trigger",
+		.dependencySummary = "egg-wormhole assets, capture state, and native portal behavior",
+	},
+	{
+		.id = "nanosaur2.electrode",
+		.nativeType = 20,
+		.category = "hazard",
+		.dependencySummary = "electrode assets, terrain, and native hazard collision",
+	},
 #define NANOSAUR2_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current level assets, terrain systems, and the native item initializer" },
 	NANOSAUR2_TERRAIN_NATIVE_ITEM(1) NANOSAUR2_TERRAIN_NATIVE_ITEM(2) NANOSAUR2_TERRAIN_NATIVE_ITEM(3) NANOSAUR2_TERRAIN_NATIVE_ITEM(4) NANOSAUR2_TERRAIN_NATIVE_ITEM(5) NANOSAUR2_TERRAIN_NATIVE_ITEM(6) NANOSAUR2_TERRAIN_NATIVE_ITEM(7) NANOSAUR2_TERRAIN_NATIVE_ITEM(8) NANOSAUR2_TERRAIN_NATIVE_ITEM(9) NANOSAUR2_TERRAIN_NATIVE_ITEM(10)
 	NANOSAUR2_TERRAIN_NATIVE_ITEM(11) NANOSAUR2_TERRAIN_NATIVE_ITEM(12) NANOSAUR2_TERRAIN_NATIVE_ITEM(13) NANOSAUR2_TERRAIN_NATIVE_ITEM(14) NANOSAUR2_TERRAIN_NATIVE_ITEM(15) NANOSAUR2_TERRAIN_NATIVE_ITEM(16) NANOSAUR2_TERRAIN_NATIVE_ITEM(17) NANOSAUR2_TERRAIN_NATIVE_ITEM(18) NANOSAUR2_TERRAIN_NATIVE_ITEM(19) NANOSAUR2_TERRAIN_NATIVE_ITEM(20)
@@ -1278,6 +1353,24 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 
 static int GetScriptPlayerCount(void) { return gNumPlayers; }
 
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton)
+{
+	const JointKeyFrameHeader* header;
+	int frame;
+	int frameCount;
+
+	if (!skeleton || !skeleton->skeletonDefinition || skeleton->AnimNum >= MAX_ANIMS)
+		return 0;
+	header = &skeleton->skeletonDefinition->JointKeyframes[0];
+	frameCount = header->numKeyFrames[skeleton->AnimNum];
+	if (frameCount <= 0 || !header->keyFrames || !header->keyFrames[skeleton->AnimNum])
+		return 0;
+	frame = 0;
+	while (frame + 1 < frameCount && skeleton->CurrentAnimTime >= header->keyFrames[skeleton->AnimNum][frame + 1].tick)
+		frame++;
+	return frame;
+}
+
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (!outPlayer || playerNum < 0 || playerNum >= gNumPlayers || !gPlayerInfo[playerNum].objNode) return false;
@@ -1303,6 +1396,27 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.hasRaceState = gVSMode == VS_MODE_RACE,
 		.shieldActive = gPlayerInfo[playerNum].shieldPower > 0.0f,
 		.hasShieldState = true,
+		.invulnerable = gPlayerInfo[playerNum].invincibilityTimer > 0.0f,
+		.hasInvulnerabilityState = true,
+		.dead = gPlayerIsDead[playerNum],
+		.hasDeathState = true,
+		.levelComplete = gLevelCompleted,
+		.hasLevelCompletionState = true,
+		.invulnerabilityTimeRemaining = gPlayerInfo[playerNum].invincibilityTimer,
+		.hasInvulnerabilityTimerState = true,
+		.knockedDown = gPlayerInfo[playerNum].knockDownTimer > 0.0f,
+		.knockdownTimeRemaining = gPlayerInfo[playerNum].knockDownTimer,
+		.hasKnockdownState = true,
+		.jetpackActive = gPlayerInfo[playerNum].jetpackActive,
+		.hasJetpackState = true,
+		.grounded = (gPlayerInfo[playerNum].objNode->StatusBits & STATUS_BIT_ONGROUND) != 0,
+		.hasGroundedState = true,
+		.heightOffGround = gPlayerInfo[playerNum].distToFloor,
+		.hasTerrainHeightState = true,
+		.onWater = (gPlayerInfo[playerNum].objNode->StatusBits & STATUS_BIT_UNDERWATER) != 0,
+		.hasWaterState = true,
+		.onLava = gPlayerInfo[playerNum].onLava,
+		.hasLavaState = true,
 		.eggCount = NUM_EGG_TYPES < PANGEA_SCRIPT_PLAYER_EGG_CAPACITY ? NUM_EGG_TYPES : PANGEA_SCRIPT_PLAYER_EGG_CAPACITY,
 		.hasEggState = true,
 		.team = playerNum & 1,
@@ -1321,6 +1435,15 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 	outPlayer->hasRotation = true;
 	outPlayer->aim = (PangeaScriptVector3){-sinf(gPlayerInfo[playerNum].objNode->Rot.y), 0.0f, -cosf(gPlayerInfo[playerNum].objNode->Rot.y)};
 	outPlayer->hasAimState = true;
+	if (gPlayerInfo[playerNum].objNode->Skeleton)
+	{
+		outPlayer->animation = gPlayerInfo[playerNum].objNode->Skeleton->AnimNum;
+		outPlayer->hasAnimationState = true;
+		outPlayer->animationSpeed = gPlayerInfo[playerNum].objNode->Skeleton->AnimSpeed;
+		outPlayer->hasAnimationSpeedState = true;
+		outPlayer->animationFrame = GetScriptSkeletonFrame(gPlayerInfo[playerNum].objNode->Skeleton);
+		outPlayer->hasAnimationFrameState = true;
+	}
 	for (int weaponType = 0; weaponType < NUM_WEAPON_TYPES && weaponType < PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY; weaponType++)
 	{
 		outPlayer->weapons[weaponType] = (PangeaScriptPlayerInventoryEntry){weaponType, gPlayerInfo[playerNum].weaponQuantity[weaponType]};
@@ -1799,12 +1922,54 @@ EMSCRIPTEN_KEEPALIVE int Nanosaur2Script_ProbeFirstSplineReplacementJS(void)
 	return -1;
 }
 
+EMSCRIPTEN_KEEPALIVE int Nanosaur2Script_SelectFirstSplineItemForReplacementJS(void)
+{
+	if (!gSplineList)
+		return 0;
+	for (int splineNum = 0; splineNum < gNumSplines; splineNum++)
+	{
+		SplineDefType* spline = &gSplineList[splineNum];
+		if (!spline->itemList || spline->numItems <= 0)
+			continue;
+		gSelectedSplineNum = splineNum;
+		gSelectedSplineItemIndex = 0;
+		gSelectedSplineNativeType = spline->itemList[0].type;
+		gSelectedSplinePlacement = spline->itemList[0].placement;
+		return 1;
+	}
+	gSelectedSplineNum = -1;
+	gSelectedSplineItemIndex = -1;
+	gSelectedSplineNativeType = -1;
+	return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int Nanosaur2Script_GetSelectedSplineItemFieldJS(int field)
+{
+	if (gSelectedSplineNum < 0)
+		return -1;
+	if (field == 0)
+		return gSelectedSplineNum;
+	if (field == 1)
+		return gSelectedSplineItemIndex;
+	if (field == 2)
+		return gSelectedSplineNativeType;
+	return -1;
+}
+
+EMSCRIPTEN_KEEPALIVE float Nanosaur2Script_GetSelectedSplinePlacementJS(void)
+{
+	return gSelectedSplineNum < 0 ? -1.0f : gSelectedSplinePlacement;
+}
+
 int Nanosaur2Script_ProbeCheckpointResetJS(void)
 {
 	PangeaScriptObjectHandle handle = {0};
 	PangeaScriptObjectHandle playerHandle;
 	PangeaScriptStatus status;
 	ObjNode* player;
+	short savedLives;
+	Boolean savedGameOver;
+	Boolean resetSucceeded;
 
 	if (!gIsInGame || !gPlayerInfo[0].objNode)
 		return 0;
@@ -1828,12 +1993,19 @@ int Nanosaur2Script_ProbeCheckpointResetJS(void)
 		&handle);
 	if (status != PANGEA_SCRIPT_OK)
 		return (int)status;
-	if (gPlayerInfo[0].numFreeLives <= 0)
+	savedLives = gPlayerInfo[0].numFreeLives;
+	savedGameOver = gGameOver;
+	if (gVSMode != VS_MODE_RACE && gVSMode != VS_MODE_CAPTURETHEFLAG)
+		gPlayerInfo[0].numFreeLives = 1;
+	else if (gPlayerInfo[0].numFreeLives <= 0)
 		gPlayerInfo[0].numFreeLives = 1;
 	ResetPlayerAtBestCheckpoint(0);
+	resetSucceeded = !gPlayerIsDead[0] && !gGameOver;
+	gPlayerInfo[0].numFreeLives = savedLives;
+	gGameOver = savedGameOver;
 	if (!PangeaScript_DeleteObject(handle))
 		return (int)PANGEA_SCRIPT_RUNTIME_ERROR;
-	return 1;
+	return resetSucceeded ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE int Nanosaur2Script_ProbeDeathRespawnJS(void)

@@ -297,6 +297,10 @@ register	short		x,y,z;
 		if (newObj == nil)
 			return;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		MikeScript_RegisterObject(newObj, "mightymike.enemySplat", "projectile/effect");
+#endif
+
 		newObj->SplatTimer = (MyRandomLong() & 0b11111) + SPLAT_TIME;	// set life of splat
 
 		InitYOffset(newObj, -15);
@@ -415,7 +419,6 @@ void MoveFrozenEnemy(void)
 
 	UpdateObject();
 }
-
 
 
 

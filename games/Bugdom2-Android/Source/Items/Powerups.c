@@ -85,6 +85,8 @@ int		powKind = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 	gNewObjectDefinition.scale 		= .6f;
 	body = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (body != nil)
+		Bugdom2Script_RegisterObject(body, "bugdom2.butterflyPowerup", "powerup");
 
 	body->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -118,6 +120,8 @@ int		powKind = itemPtr->parm[0];
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	left = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (left != nil)
+		Bugdom2Script_RegisterObject(left, "bugdom2.butterflyLeftWing", "child-object");
 	left->ColorFilter.a = .9;
 	body->ChainNode = left;
 
@@ -125,6 +129,8 @@ int		powKind = itemPtr->parm[0];
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_ButterflyRightWing;
 	gNewObjectDefinition.slot++;
 	right = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (right != nil)
+		Bugdom2Script_RegisterObject(right, "bugdom2.butterflyRightWing", "child-object");
 	right->ColorFilter.a = .9;
 	left->ChainNode = right;
 
@@ -623,6 +629,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 2.5f;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.checkpoint", "objective");
 
 	newObj->What = WHAT_CHECKPOINT;
 	newObj->Special[0] = checkpointNum;
@@ -698,8 +706,6 @@ float	y;
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

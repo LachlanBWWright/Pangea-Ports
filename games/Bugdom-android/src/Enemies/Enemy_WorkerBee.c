@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -114,6 +115,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_WORKERBEE,x,z, WORKERBEE_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.workerBee", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, WORKERBEE_ANIM_STAND);
@@ -479,6 +484,10 @@ float			x,z,placement;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_WORKERBEE,x,z, WORKERBEE_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.workerBee", "enemy");
+#endif
 		
 		
 	newObj->SplineItemPtr = itemPtr;
@@ -663,6 +672,8 @@ ObjNode	*stinger;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= WORKERBEE_SCALE-(WORKERBEE_SCALE*STINGER_SCALE);
 	stinger = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (stinger != nil)
+		BugdomScript_RegisterObject(stinger, "bugdom.workerBeeStinger", "child-object");
 
 	theNode->ChainNode = stinger;
 }
@@ -796,8 +807,6 @@ adios:
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

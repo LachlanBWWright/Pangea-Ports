@@ -123,6 +123,8 @@ int	headType;
 	gNewObjectDefinition.moveCall 	= MoveSprinklerHead;
 	gNewObjectDefinition.rot 		= itemPtr->parm[0] * (PI/2);
 	base = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (base != nil)
+		Bugdom2Script_RegisterObject(base, "bugdom2.sprinklerBase", "hazard");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -140,6 +142,8 @@ int	headType;
 	gNewObjectDefinition.type 		= headType;
 	gNewObjectDefinition.moveCall 	= nil;
 	head = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (head != nil)
+		Bugdom2Script_RegisterObject(head, "bugdom2.sprinklerHead", "child-object");
 
 	base->ChainNode = head;
 
@@ -211,6 +215,8 @@ ObjNode	*spray = head->ChainNode;
 			gNewObjectDefinition.rot 		= 0;
 			gNewObjectDefinition.scale 		= head->Scale.x;
 			spray = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+			if (spray != nil)
+				Bugdom2Script_RegisterObject(spray, "bugdom2.sprinklerSpray", "projectile/effect");
 
 			head->ChainNode = spray;
 		}
@@ -319,6 +325,8 @@ OGLMatrix4x4	m;
 	gNewObjectDefinition.moveCall 	= MoveWindmill;
 	gNewObjectDefinition.rot 		= r;
 	base = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (base != nil)
+		Bugdom2Script_RegisterObject(base, "bugdom2.windmillBase", "hazard");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -361,6 +369,8 @@ OGLMatrix4x4	m;
 	gNewObjectDefinition.type 		= SIDEWALK_ObjType_WindmillBlades;
 	gNewObjectDefinition.moveCall 	= nil;
 	blades = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (blades != nil)
+		Bugdom2Script_RegisterObject(blades, "bugdom2.windmillBlades", "child-object");
 
 	base->ChainNode = blades;
 
@@ -532,6 +542,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveFirecracker;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.firecracker", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -747,6 +759,8 @@ float	r,y;
 	gNewObjectDefinition.scale 		= MOUSETRAP_SCALE;
 
 	trap = MakeNewSkeletonObject(&gNewObjectDefinition);
+	if (trap != nil)
+		Bugdom2Script_RegisterObject(trap, "bugdom2.mouseTrap", "hazard");
 	trap->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	trap->What = WHAT_MOUSETRAP;
@@ -818,6 +832,8 @@ float	r,y;
 		gNewObjectDefinition.scale 		= 2.0;
 
 		mouse = MakeNewSkeletonObject(&gNewObjectDefinition);
+		if (mouse != nil)
+			Bugdom2Script_RegisterObject(mouse, "bugdom2.mouseTrapMouse", "child-object");
 
 		mouse->Coord.y -= mouse->BBox.min.y;						// offset so bottom touches ground
 		UpdateObjectTransforms(mouse);
@@ -1106,6 +1122,8 @@ float	y;
 	gNewObjectDefinition.moveCall 	= MoveTrampoline;
 	gNewObjectDefinition.rot 		= 0;
 	base = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (base != nil)
+		Bugdom2Script_RegisterObject(base, "bugdom2.trampolineBase", "hazard");
 
 
 						/************/
@@ -1118,6 +1136,8 @@ float	y;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	web = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (web != nil)
+		Bugdom2Script_RegisterObject(web, "bugdom2.trampolineWeb", "child-object");
 
 	web->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1265,6 +1285,8 @@ float			x,z,placement;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.vacuum", "hazard");
 
 
 				/* SET BETTER INFO */
@@ -1294,6 +1316,8 @@ float			x,z,placement;
 	gNewObjectDefinition.flags 		= STATUS_BIT_NOLIGHTING;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
 	light = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (light != nil)
+		Bugdom2Script_RegisterObject(light, "bugdom2.vacuumLight", "child-object");
 
 	newObj->ChainNode = light;
 
@@ -1407,10 +1431,5 @@ float	x,z,r;
 	gPlayerInfo.suckSpeed = 50;
 
 }
-
-
-
-
-
 
 

@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -51,6 +52,7 @@ ObjNode	*newObj, *gun, *hat;
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_BANDITO,animNum, x,z, BANDITO_SCALE, rot, moveCall,
 								gAutoFadeStatusBits);
+	BillyScript_RegisterObject(newObj, "billy.bandito", "enemy");
 	
 
 
@@ -78,6 +80,7 @@ ObjNode	*newObj, *gun, *hat;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	gun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(gun, "billy.banditoGun", "child-object");
 	gun->Side = SIDE_RIGHT;
 	BanditoPutgunInHolster(gun);
 	
@@ -86,6 +89,7 @@ ObjNode	*newObj, *gun, *hat;
 			
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_BanditoHat;
 	hat = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(hat, "billy.banditoHat", "child-object");
 	BanditoPutHatOnBack(hat);
 	
 			/* CHAIN THEM */
@@ -468,8 +472,6 @@ const OGLPoint3D	headOff = {0,15,0};
 	
 	gTimeSinceLastEnemyShot = 0;
 }
-
-
 
 
 

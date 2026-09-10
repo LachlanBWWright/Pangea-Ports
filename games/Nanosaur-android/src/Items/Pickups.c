@@ -213,6 +213,7 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return;
+	NanosaurScript_RegisterObject(newObj, "nanosaur.eggNest", "trigger");
 
 
 			/* SET COLLISION INFO */
@@ -488,7 +489,6 @@ int	i;
 
 	SeeIfAllEggSpeciesRecovered();
 }
-
 
 
 

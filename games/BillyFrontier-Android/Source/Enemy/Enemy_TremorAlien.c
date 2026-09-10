@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -79,6 +80,7 @@ ObjNode	*newObj;
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_TREMORALIEN,animNum, x,z, TREMORALIEN_SCALE, rot, moveCall,
 								gAutoFadeStatusBits);
+	BillyScript_RegisterObject(newObj, "billy.tremorAlien", "enemy");
 	
 
 
@@ -615,6 +617,10 @@ ObjNode 		*toma;
 				
 	toma->GunLocation = GUN_LOCATION_HAND;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(toma, "billy.tremorAlienTomahawk", "child-object");
+#endif
+
 	toma->Damage = 1.0f;
 
 
@@ -852,8 +858,6 @@ int					i;
 	}
 
 }
-
-
 
 
 

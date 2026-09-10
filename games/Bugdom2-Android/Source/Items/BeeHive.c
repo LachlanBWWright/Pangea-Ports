@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -67,6 +70,8 @@ const float	s = 2.0;
 	gNewObjectDefinition.moveCall 	= MoveBeeHive;
 	gNewObjectDefinition.rot 		= 0; //(float)itemPtr->parm[0] * (PI2/4);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.beeHive", "enemy");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -91,6 +96,8 @@ const float	s = 2.0;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	door = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (door != nil)
+		Bugdom2Script_RegisterObject(door, "bugdom2.beeHiveDoor", "child-object");
 
 	door->DoorOpenAngle = 0;
 	door->InitRotY= door->Rot.y;
@@ -249,6 +256,8 @@ Boolean	part = itemPtr->parm[0];
 	gNewObjectDefinition.moveCall 	= MoveKindling;
 	gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.kindling", "pickup");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -590,7 +599,6 @@ float	r,d;
 		Update3DSoundChannel(EFFECT_BUMBLERUMBLE, &bee->EffectChannel, &bee->Coord);
 
 }
-
 
 
 

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -118,6 +122,8 @@ ObjNode	*newObj;
 				/*******************************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_GNOME, GNOME_ANIM_STAND, x,z, GNOME_SCALE, 0, MoveGnome);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.gnome", "enemy");
 
 
 				/*******************/
@@ -524,7 +530,6 @@ static void GnomeGotKickedCallback(ObjNode *player, ObjNode *enemy)
 	PlayEffect3D(EFFECT_GNOMEGOTKICKED, &enemy->Coord);
 	PlayRumbleEffect(EFFECT_GNOMEGOTKICKED);
 }
-
 
 
 

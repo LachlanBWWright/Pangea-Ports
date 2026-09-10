@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -170,6 +171,8 @@ short	i,j;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FLEA,animNum, x,z, FLEA_SCALE, 0, MoveFlea);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.flea", "enemy");
 
 
 
@@ -934,6 +937,7 @@ ObjNode	*cap;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= enemy->Scale.x * .9f;
 	cap = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(cap, "bugdom2.fleaBottleCap", "projectile/effect");
 
 			/* ATTACH CAP TO ENEMY */
 
@@ -1148,8 +1152,6 @@ void CountFleas(void)
 
 	gNumKilledFleas = 0;
 }
-
-
 
 
 

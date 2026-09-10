@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -102,6 +103,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_ROACH,x,z, ROACH_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.roach", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, ROACH_ANIM_STAND);
@@ -347,6 +352,10 @@ float			x,z,placement;
 		
 	DetachObject(newObj);										// detach this object from the linked list
 		
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.roach", "enemy");
+	#endif
+
 	newObj->SplineItemPtr = itemPtr;
 	newObj->SplineNum = splineNum;
 	
@@ -581,6 +590,7 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return;
+	BugdomScript_RegisterObject(newObj, "bugdom.roachGasTrail", "projectile/effect");
 
 			/* SET COLLISION */
 			

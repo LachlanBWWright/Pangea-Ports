@@ -533,6 +533,8 @@ OGLPoint3D		where;
 	if (newObj == nil)
 		return false;
 
+	CroMagScript_RegisterObject(newObj, "cromag.stickyTiresPowerup", "powerup");
+
 	newObj->TerrainItemPtr = itemPtr;						// keep ptr to item list
 
 
@@ -630,6 +632,8 @@ OGLPoint3D		where;
 	if (newObj == nil)
 		return false;
 
+	CroMagScript_RegisterObject(newObj, "cromag.suspensionPowerup", "powerup");
+
 	newObj->TerrainItemPtr = itemPtr;						// keep ptr to item list
 
 
@@ -725,6 +729,8 @@ OGLPoint3D		where;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return false;
+
+	CroMagScript_RegisterObject(newObj, "cromag.invisibilityPowerup", "powerup");
 
 	newObj->TerrainItemPtr = itemPtr;						// keep ptr to item list
 
@@ -824,6 +830,8 @@ short	cactusType = itemPtr->parm[0];			// get cactus type
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+	CroMagScript_RegisterObject(newObj, "cromag.cactus", "hazard");
 
 	if (!notSolid)
 	{
@@ -962,6 +970,8 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+	CroMagScript_RegisterObject(newObj, "cromag.snowman", "hazard");
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1089,6 +1099,8 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+	CroMagScript_RegisterObject(newObj, "cromag.campfire", "hazard");
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->CType 			= CTYPE_TRIGGER|CTYPE_AVOID;
@@ -1200,6 +1212,8 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+	CroMagScript_RegisterObject(newObj, "cromag.teamTorch", "objective");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1390,6 +1404,8 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+	CroMagScript_RegisterObject(newObj, "cromag.teamBase", "objective");
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1500,6 +1516,8 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+	CroMagScript_RegisterObject(newObj, "cromag.vase", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1630,6 +1648,8 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+	CroMagScript_RegisterObject(newObj, "cromag.cauldron", "hazard");
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1721,6 +1741,8 @@ OGLMatrix3x3	m;
 	if (frame == nil)
 		return(false);
 
+	CroMagScript_RegisterObject(frame, "cromag.gongFrame", "obstacle");
+
 	frame->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1769,6 +1791,10 @@ OGLMatrix3x3	m;
 	gong = MakeNewDisplayGroupObject(&def);
 	if (gong == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(gong, "cromag.gong", "trigger");
+#endif
 
 
 			/* SET COLLISION STUFF */
@@ -1896,6 +1922,8 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&def);
 	if (newObj == nil)
 		return(false);
+
+	CroMagScript_RegisterObject(newObj, "cromag.seaMine", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -2032,6 +2060,8 @@ ObjNode	*newObj;
 	if (newObj == nil)
 		return(false);
 
+	CroMagScript_RegisterObject(newObj, "cromag.druid", "objective");
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET TRIGGER STUFF */
@@ -2076,5 +2106,3 @@ short	p;
 
 	return(true);
 }
-
-

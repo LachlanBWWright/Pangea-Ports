@@ -20,6 +20,9 @@
 #include "enemy4.h"
 #include "weapon.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -53,6 +56,9 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveSpider,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.spider", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -150,4 +156,3 @@ short	dist,anim;
 
 	UpdateEnemy();
 }
-

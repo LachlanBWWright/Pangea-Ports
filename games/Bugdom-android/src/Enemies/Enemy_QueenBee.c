@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -129,6 +130,11 @@ ObjNode	*newObj;
 	gTheQueen = newObj = MakeEnemySkeleton(SKELETON_TYPE_QUEENBEE,x,z, QUEENBEE_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.queenBee", "enemy");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, QUEENBEE_ANIM_WAIT);
@@ -730,6 +736,7 @@ static const TQ3Point3D off = {0,-25,-55};
 	spit = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (spit == nil)
 		return;
+	BugdomScript_RegisterObject(spit, "bugdom.queenBeeHoneySpit", "projectile/effect");
 			
 	spit->WobbleBase = spit->Scale.x;
 				
@@ -853,8 +860,6 @@ float	base;
 
 	UpdateObject(theNode);	
 }
-
-
 
 
 

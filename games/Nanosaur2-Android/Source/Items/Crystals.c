@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -62,6 +66,7 @@ ObjNode	*base, *crystal;
 	};
 
 	base = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(base, "nanosaur2.crystalBase", "child-object");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -80,6 +85,7 @@ ObjNode	*base, *crystal;
 		def.slot 		= SLOT_OF_DUMB-3;
 		def.moveCall 	= nil;
 		crystal = MakeNewDisplayGroupObject(&def);
+		Nanosaur2Script_RegisterObject(crystal, "nanosaur2.crystal", "hazard");
 
 
 				/* SET COLLISION STUFF */
@@ -197,6 +203,11 @@ NewParticleDefType		newParticleDef;
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (newObj != nil)
+		Nanosaur2Script_RegisterObject(newObj, "nanosaur2.crystalShockwave", "projectile/effect");
+#endif
+
 	newObj->ColorFilter.a = .8;
 
 	newObj->Damage = .8f;
@@ -240,8 +251,6 @@ float fps = gFramesPerSecondFrac;
 
 	CauseBombShockwaveDamage(theNode, CTYPE_PLAYER1 | CTYPE_PLAYER2 | CTYPE_ENEMY | CTYPE_WEAPONTEST);
 }
-
-
 
 
 

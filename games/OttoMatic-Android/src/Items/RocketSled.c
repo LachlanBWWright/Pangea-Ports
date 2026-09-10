@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -67,6 +71,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/8);
 	gNewObjectDefinition.scale 		= ROCKETSLED_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"vehicle", "hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.rocketSled", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
@@ -556,4 +564,3 @@ static const OGLPoint3D zero = {0,0,0};
 
 	player->Rot.y = gPlayerRocketSled->Rot.y;
 }
-

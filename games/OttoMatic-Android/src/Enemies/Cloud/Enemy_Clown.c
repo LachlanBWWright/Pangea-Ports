@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -139,6 +140,13 @@ ObjNode	*newObj;
 				/*******************************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_CLOWN,x,z, CLOWN_SCALE, 0, MoveClown);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.clown", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
 
 	SetSkeletonAnim(newObj->Skeleton, CLOWN_ANIM_STAND);
 
@@ -421,6 +429,13 @@ float			x,z,placement;
 				/* MAKE DEFAULT SKELETON ENEMY */
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_CLOWN,x,z, CLOWN_SCALE, 0, nil);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.clown", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
 
 
 	newObj->SplineItemPtr = itemPtr;
@@ -749,6 +764,10 @@ Boolean			detach;
 		gNewObjectDefinition.rot 		= 0;
 		gNewObjectDefinition.scale 		= 1;
 		bubble = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		{
+			static const char* tags[] = {"projectile/effect"};
+			OttoScript_RegisterObjectNode(bubble, "ottomatic.clownBubble", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		}
 
 		clown->ChainNode = bubble;
 
@@ -954,8 +973,6 @@ static Boolean BubbleHitByDart(ObjNode *weapon, ObjNode *bubble, OGLPoint3D *wea
 
 	return(true);			// stop weapon
 }
-
-
 
 
 

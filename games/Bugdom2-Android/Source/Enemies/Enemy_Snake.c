@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -151,6 +154,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.slot 		= SNAKE_SLOT;
 	gNewObjectDefinition.moveCall 	= UpdateSnakes;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.snake", "enemy");
 
 	newObj->CustomDrawFunction = DrawSnakes;
 }
@@ -172,6 +177,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= MoveSnakeGenerator;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.snakeGenerator", "trigger");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -274,6 +281,8 @@ got_it:
 	gNewObjectDefinition.scale 		= 1.5f;
 	gNewObjectDefinition.rot 		= 0;
 	head = MakeNewSkeletonObject(&gNewObjectDefinition);
+	if (head != nil)
+		Bugdom2Script_RegisterObject(head, "bugdom2.snakeHead", "child-object");
 
 
 	gSnakes[i].head	= head;
@@ -661,8 +670,6 @@ void MovePlayer_EatenBySnake(ObjNode *player)
 		}
 	}
 }
-
-
 
 
 

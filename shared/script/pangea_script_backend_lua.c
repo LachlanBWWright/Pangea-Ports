@@ -579,12 +579,58 @@ static int lua_object_animation(lua_State* lua)
 	return 1;
 }
 
+static int lua_object_animation_speed(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	float speed;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectAnimationSpeed(handle, &speed))
+		lua_pushnumber(lua, speed);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_animation_frame(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	int frame;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectAnimationFrame(handle, &frame))
+	{
+		lua_pushinteger(lua, frame);
+		return 1;
+	}
+	lua_pushnil(lua);
+	return 1;
+}
+
 static int lua_object_active(lua_State* lua)
 {
 	PangeaScriptObjectHandle handle;
 	bool active;
 	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectActive(handle, &active))
 		lua_pushboolean(lua, active);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_health(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	float health;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectHealth(handle, &health))
+		lua_pushnumber(lua, health);
+	else
+		lua_pushnil(lua);
+	return 1;
+}
+
+static int lua_object_damage(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	float damage;
+	if (read_handle(lua, 1, &handle) && PangeaScript_GetObjectDamage(handle, &damage))
+		lua_pushnumber(lua, damage);
 	else
 		lua_pushnil(lua);
 	return 1;
@@ -796,6 +842,32 @@ static int lua_object_has_tag(lua_State* lua)
 	PangeaScriptObjectHandle handle; const char* expected = luaL_checkstring(lua, 2); bool found = false;
 	if (read_handle(lua, 1, &handle)) for (int i = 0; i < PangeaScript_GetObjectTagCount(handle); i++) found |= strcmp(PangeaScript_GetObjectTag(handle, i), expected) == 0;
 	lua_pushboolean(lua, found); return 1;
+}
+
+static int lua_object_type(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	const char* objectType;
+	if (!read_handle(lua, 1, &handle) || (objectType = PangeaScript_GetObjectType(handle)) == NULL)
+	{
+		lua_pushnil(lua);
+		return 1;
+	}
+	lua_pushstring(lua, objectType);
+	return 1;
+}
+
+static int lua_object_category(lua_State* lua)
+{
+	PangeaScriptObjectHandle handle;
+	const char* category;
+	if (!read_handle(lua, 1, &handle) || (category = PangeaScript_GetObjectCategory(handle)) == NULL)
+	{
+		lua_pushnil(lua);
+		return 1;
+	}
+	lua_pushstring(lua, category);
+	return 1;
 }
 
 static bool object_has_tag(PangeaScriptObjectHandle handle, const char* expected)
@@ -1530,6 +1602,11 @@ static int lua_player_get(lua_State* lua)
 		lua_pushinteger(lua, player.coinCount);
 		lua_setfield(lua, -2, "coinCount");
 	}
+	if (player.hasBunnyState)
+	{
+		lua_pushinteger(lua, player.bunnyCount);
+		lua_setfield(lua, -2, "bunnyCount");
+	}
 	if (player.hasPesoState)
 	{
 		lua_pushinteger(lua, player.pesoCount);
@@ -1555,6 +1632,18 @@ static int lua_player_get(lua_State* lua)
 			lua_rawseti(lua, -2, i + 1);
 		}
 		lua_setfield(lua, -2, "weapons");
+	}
+	if (player.hasWeaponChargeState)
+	{
+		lua_pushnumber(lua, player.weaponCharge);
+		lua_setfield(lua, -2, "weaponCharge");
+	}
+	if (player.hasGiantState)
+	{
+		lua_pushboolean(lua, player.giant);
+		lua_setfield(lua, -2, "giant");
+		lua_pushnumber(lua, player.giantTimeRemaining);
+		lua_setfield(lua, -2, "giantTimeRemaining");
 	}
 	if (player.hasKeyState)
 	{
@@ -1585,10 +1674,145 @@ static int lua_player_get(lua_State* lua)
 		lua_pushboolean(lua, player.shieldActive);
 		lua_setfield(lua, -2, "shieldActive");
 	}
+	if (player.hasShieldTimerState)
+	{
+		lua_pushnumber(lua, player.shieldTimeRemaining);
+		lua_setfield(lua, -2, "shieldTimeRemaining");
+	}
+	if (player.hasInvulnerabilityState)
+	{
+		lua_pushboolean(lua, player.invulnerable);
+		lua_setfield(lua, -2, "invulnerable");
+	}
+	if (player.hasDeathState)
+	{
+		lua_pushboolean(lua, player.dead);
+		lua_setfield(lua, -2, "dead");
+	}
+	if (player.hasInvulnerabilityTimerState)
+	{
+		lua_pushnumber(lua, player.invulnerabilityTimeRemaining);
+		lua_setfield(lua, -2, "invulnerabilityTimeRemaining");
+	}
+	if (player.hasKnockdownState)
+	{
+		lua_pushboolean(lua, player.knockedDown);
+		lua_setfield(lua, -2, "knockedDown");
+		lua_pushnumber(lua, player.knockdownTimeRemaining);
+		lua_setfield(lua, -2, "knockdownTimeRemaining");
+	}
+	if (player.hasBurnState)
+	{
+		lua_pushboolean(lua, player.burning);
+		lua_setfield(lua, -2, "burning");
+		lua_pushnumber(lua, player.burnTimeRemaining);
+		lua_setfield(lua, -2, "burnTimeRemaining");
+	}
 	if (player.hasForm)
 	{
 		lua_pushstring(lua, player.form == PANGEA_SCRIPT_PLAYER_FORM_BALL ? "ball" : "bug");
 		lua_setfield(lua, -2, "form");
+	}
+	if (player.hasFormTimerState)
+	{
+		lua_pushnumber(lua, player.formTimeRemaining);
+		lua_setfield(lua, -2, "formTimeRemaining");
+	}
+	if (player.hasGroundPhysicsState)
+	{
+		lua_pushnumber(lua, player.groundTraction); lua_setfield(lua, -2, "groundTraction");
+		lua_pushnumber(lua, player.groundFriction); lua_setfield(lua, -2, "groundFriction");
+		lua_pushnumber(lua, player.groundAcceleration); lua_setfield(lua, -2, "groundAcceleration");
+		if (player.hasGroundSteeringState)
+		{
+			lua_pushnumber(lua, player.groundSteering); lua_setfield(lua, -2, "groundSteering");
+		}
+	}
+	if (player.hasVehicleModifierState)
+	{
+		lua_pushboolean(lua, player.nitroActive); lua_setfield(lua, -2, "nitroActive");
+		lua_pushnumber(lua, player.nitroTimeRemaining); lua_setfield(lua, -2, "nitroTimeRemaining");
+		lua_pushboolean(lua, player.greasedTiresActive); lua_setfield(lua, -2, "greasedTiresActive");
+		lua_pushnumber(lua, player.greasedTiresTimeRemaining); lua_setfield(lua, -2, "greasedTiresTimeRemaining");
+		lua_pushboolean(lua, player.stickyTiresActive); lua_setfield(lua, -2, "stickyTiresActive");
+		lua_pushnumber(lua, player.stickyTiresTimeRemaining); lua_setfield(lua, -2, "stickyTiresTimeRemaining");
+		lua_pushboolean(lua, player.superSuspensionActive); lua_setfield(lua, -2, "superSuspensionActive");
+		lua_pushnumber(lua, player.superSuspensionTimeRemaining); lua_setfield(lua, -2, "superSuspensionTimeRemaining");
+		lua_pushboolean(lua, player.invisibilityActive); lua_setfield(lua, -2, "invisibilityActive");
+		lua_pushnumber(lua, player.invisibilityTimeRemaining); lua_setfield(lua, -2, "invisibilityTimeRemaining");
+		lua_pushboolean(lua, player.frozen); lua_setfield(lua, -2, "frozen");
+		lua_pushnumber(lua, player.frozenTimeRemaining); lua_setfield(lua, -2, "frozenTimeRemaining");
+		lua_pushboolean(lua, player.flaming); lua_setfield(lua, -2, "flaming");
+		lua_pushnumber(lua, player.flamingTimeRemaining); lua_setfield(lua, -2, "flamingTimeRemaining");
+		lua_pushboolean(lua, player.submarineImmobilized); lua_setfield(lua, -2, "submarineImmobilized");
+		lua_pushnumber(lua, player.submarineImmobilizedTimeRemaining); lua_setfield(lua, -2, "submarineImmobilizedTimeRemaining");
+		lua_pushboolean(lua, player.planing); lua_setfield(lua, -2, "planing");
+	}
+	if (player.hasRammingState)
+	{
+		lua_pushboolean(lua, player.ramming); lua_setfield(lua, -2, "ramming");
+		lua_pushnumber(lua, player.rammingTimeRemaining); lua_setfield(lua, -2, "rammingTimeRemaining");
+	}
+	if (player.hasRidingBallState)
+	{
+		lua_pushboolean(lua, player.ridingBall);
+		lua_setfield(lua, -2, "ridingBall");
+	}
+	if (player.hasTunnelState)
+	{
+		lua_pushnumber(lua, player.tunnelSpeed); lua_setfield(lua, -2, "tunnelSpeed");
+		lua_pushnumber(lua, player.tunnelAngle); lua_setfield(lua, -2, "tunnelAngle");
+		lua_pushnumber(lua, player.tunnelBanking); lua_setfield(lua, -2, "tunnelBanking");
+	}
+	if (player.hasFlightState)
+	{
+		lua_pushnumber(lua, player.jetThrust);
+		lua_setfield(lua, -2, "jetThrust");
+	}
+	if (player.hasGlideState)
+	{
+		lua_pushnumber(lua, player.glidePower);
+		lua_setfield(lua, -2, "glidePower");
+	}
+	if (player.hasGroundedState)
+	{
+		lua_pushboolean(lua, player.grounded);
+		lua_setfield(lua, -2, "grounded");
+	}
+	if (player.hasTerrainHeightState)
+	{
+		lua_pushnumber(lua, player.heightOffGround);
+		lua_setfield(lua, -2, "heightOffGround");
+	}
+	if (player.hasWaterState)
+	{
+		lua_pushboolean(lua, player.onWater);
+		lua_setfield(lua, -2, "onWater");
+	}
+	if (player.hasLavaState)
+	{
+		lua_pushboolean(lua, player.onLava);
+		lua_setfield(lua, -2, "onLava");
+	}
+	if (player.hasJetpackState)
+	{
+		lua_pushboolean(lua, player.jetpackActive);
+		lua_setfield(lua, -2, "jetpackActive");
+	}
+	if (player.hasAnimationState)
+	{
+		lua_pushinteger(lua, player.animation);
+		lua_setfield(lua, -2, "animation");
+	}
+	if (player.hasAnimationSpeedState)
+	{
+		lua_pushnumber(lua, player.animationSpeed);
+		lua_setfield(lua, -2, "animationSpeed");
+	}
+	if (player.hasAnimationFrameState)
+	{
+		lua_pushinteger(lua, player.animationFrame);
+		lua_setfield(lua, -2, "animationFrame");
 	}
 	if (player.hasMiceState)
 	{
@@ -1645,11 +1869,21 @@ static int lua_player_get(lua_State* lua)
 		lua_pushboolean(lua, player.carryingFlag); lua_setfield(lua, -2, "carryingFlag");
 		lua_pushinteger(lua, player.captureScore); lua_setfield(lua, -2, "captureScore");
 	}
+	if (player.hasTagState)
+	{
+		lua_pushboolean(lua, player.tagged); lua_setfield(lua, -2, "tagged");
+		lua_pushnumber(lua, player.tagTimeRemaining); lua_setfield(lua, -2, "tagTimeRemaining");
+	}
 	if (player.hasLevelFlowState)
 	{
 		lua_pushinteger(lua, player.sceneNum); lua_setfield(lua, -2, "sceneNum");
 		lua_pushinteger(lua, player.areaNum); lua_setfield(lua, -2, "areaNum");
 		lua_pushboolean(lua, player.areaComplete); lua_setfield(lua, -2, "areaComplete");
+	}
+	if (player.hasLevelCompletionState)
+	{
+		lua_pushboolean(lua, player.levelComplete);
+		lua_setfield(lua, -2, "levelComplete");
 	}
 	if (player.hasCameraState)
 	{
@@ -2849,7 +3083,9 @@ static void install_pangea(PangeaScriptBackend* backend)
 	}
 	lua_setfield(lua, -2, "log");
 	lua_createtable(lua, 0, 3); set_function(lua, "native", lua_spawn_native); set_function(lua, "nativeResult", lua_spawn_native_result); set_function(lua, "scripted", lua_spawn_scripted); lua_setfield(lua, -2, "spawn");
-	lua_createtable(lua, 0, 37); set_function(lua, "exists", lua_object_exists); set_function(lua, "all", lua_object_all); set_function(lua, "findByTag", lua_object_find_by_tag); set_function(lua, "nearest", lua_object_nearest); set_function(lua, "position", lua_object_position); set_function(lua, "velocity", lua_object_velocity); set_function(lua, "rotation", lua_object_rotation); set_function(lua, "scale", lua_object_scale); set_function(lua, "animation", lua_object_animation); set_function(lua, "active", lua_object_active); set_function(lua, "collisionEnabled", lua_object_collision_enabled); set_function(lua, "source", lua_object_source); set_function(lua, "setPosition", lua_object_set_position); set_function(lua, "setPositionResult", lua_object_set_position_result); set_function(lua, "setPositionOffset", lua_object_set_position_offset); set_function(lua, "setPositionOffsetResult", lua_object_set_position_offset_result); set_function(lua, "setVelocity", lua_object_set_velocity); set_function(lua, "setVelocityResult", lua_object_set_velocity_result); set_function(lua, "setRotation", lua_object_set_rotation); set_function(lua, "setRotationResult", lua_object_set_rotation_result); set_function(lua, "setScale", lua_object_set_scale); set_function(lua, "setScaleResult", lua_object_set_scale_result); set_function(lua, "setAnimation", lua_object_set_animation); set_function(lua, "setAnimationResult", lua_object_set_animation_result); set_function(lua, "setCollisionEnabled", lua_object_set_collision_enabled); set_function(lua, "setCollisionEnabledResult", lua_object_set_collision_enabled_result); set_function(lua, "setActive", lua_object_set_active); set_function(lua, "setActiveResult", lua_object_set_active_result); set_function(lua, "tags", lua_object_tags); set_function(lua, "hasTag", lua_object_has_tag); set_function(lua, "state", lua_object_state); set_backend_function(lua, "captureCheckpoint", lua_object_capture_checkpoint, backend); set_backend_function(lua, "restoreCheckpoint", lua_object_restore_checkpoint, backend); set_function(lua, "delete", lua_object_delete); set_function(lua, "deleteResult", lua_object_delete_result); lua_setfield(lua, -2, "object");
+	lua_createtable(lua, 0, 40); set_function(lua, "exists", lua_object_exists); set_function(lua, "all", lua_object_all); set_function(lua, "findByTag", lua_object_find_by_tag); set_function(lua, "nearest", lua_object_nearest); set_function(lua, "position", lua_object_position); set_function(lua, "velocity", lua_object_velocity); set_function(lua, "rotation", lua_object_rotation); set_function(lua, "scale", lua_object_scale); set_function(lua, "animation", lua_object_animation); set_function(lua, "animationSpeed", lua_object_animation_speed); set_function(lua, "active", lua_object_active); set_function(lua, "health", lua_object_health); set_function(lua, "collisionEnabled", lua_object_collision_enabled); set_function(lua, "source", lua_object_source); set_function(lua, "setPosition", lua_object_set_position); set_function(lua, "setPositionResult", lua_object_set_position_result); set_function(lua, "setPositionOffset", lua_object_set_position_offset); set_function(lua, "setPositionOffsetResult", lua_object_set_position_offset_result); set_function(lua, "setVelocity", lua_object_set_velocity); set_function(lua, "setVelocityResult", lua_object_set_velocity_result); set_function(lua, "setRotation", lua_object_set_rotation); set_function(lua, "setRotationResult", lua_object_set_rotation_result); set_function(lua, "setScale", lua_object_set_scale); set_function(lua, "setScaleResult", lua_object_set_scale_result); set_function(lua, "setAnimation", lua_object_set_animation); set_function(lua, "setAnimationResult", lua_object_set_animation_result); set_function(lua, "setCollisionEnabled", lua_object_set_collision_enabled); set_function(lua, "setCollisionEnabledResult", lua_object_set_collision_enabled_result); set_function(lua, "setActive", lua_object_set_active); set_function(lua, "setActiveResult", lua_object_set_active_result); set_function(lua, "type", lua_object_type); set_function(lua, "category", lua_object_category); set_function(lua, "tags", lua_object_tags); set_function(lua, "hasTag", lua_object_has_tag); set_function(lua, "state", lua_object_state); set_backend_function(lua, "captureCheckpoint", lua_object_capture_checkpoint, backend); set_backend_function(lua, "restoreCheckpoint", lua_object_restore_checkpoint, backend); set_function(lua, "delete", lua_object_delete); set_function(lua, "deleteResult", lua_object_delete_result); lua_setfield(lua, -2, "object");
+	lua_getfield(lua, -1, "object"); set_function(lua, "damage", lua_object_damage); lua_setfield(lua, -2, "object");
+	lua_getfield(lua, -1, "object"); set_function(lua, "animationFrame", lua_object_animation_frame); lua_setfield(lua, -2, "object");
 	lua_createtable(lua, 0, 2); set_function(lua, "setting", lua_level_setting); set_backend_function(lua, "current", lua_level_current, backend); lua_setfield(lua, -2, "level");
 	lua_createtable(lua, 0, 7); set_backend_function(lua, "frame", lua_time_frame, backend); set_backend_function(lua, "delta", lua_time_delta, backend); set_backend_function(lua, "level", lua_time_level, backend); set_backend_function(lua, "after", lua_time_after, backend); set_backend_function(lua, "every", lua_time_every, backend); set_backend_function(lua, "cancel", lua_time_cancel, backend); set_backend_function(lua, "isActive", lua_time_is_active, backend); lua_setfield(lua, -2, "time");
 	lua_createtable(lua, 0, 4); set_backend_function(lua, "start", lua_task_start, backend); set_function(lua, "wait", lua_task_wait); set_backend_function(lua, "cancel", lua_task_cancel, backend); set_backend_function(lua, "isActive", lua_task_is_active, backend); lua_setfield(lua, -2, "task");
@@ -3049,7 +3285,7 @@ PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backen
 		backend->currentLevelTimeSeconds = 0.0f;
 	}
 	if (!push_hook(backend, hook_name(backend, hook))) return PANGEA_SCRIPT_OK;
-	push_base_context(backend, context->levelNum); lua_pushstring(backend->lua, context->levelName ? context->levelName : ""); lua_setfield(backend->lua, -2, "levelName"); push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } if (context->hasModeState) { lua_pushinteger(backend->lua, context->modePhase); lua_setfield(backend->lua, -2, "modePhase"); lua_pushinteger(backend->lua, context->modeWave); lua_setfield(backend->lua, -2, "modeWave"); lua_pushnumber(backend->lua, context->modeTimer); lua_setfield(backend->lua, -2, "modeTimer"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
+	push_base_context(backend, context->levelNum); lua_pushstring(backend->lua, context->levelName ? context->levelName : ""); lua_setfield(backend->lua, -2, "levelName"); push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } if (context->hasModeState) { lua_pushinteger(backend->lua, context->modePhase); lua_setfield(backend->lua, -2, "modePhase"); lua_pushinteger(backend->lua, context->modeWave); lua_setfield(backend->lua, -2, "modeWave"); lua_pushnumber(backend->lua, context->modeTimer); lua_setfield(backend->lua, -2, "modeTimer"); } if (context->hasModeDetails) { lua_pushinteger(backend->lua, context->modeSequenceIndex); lua_setfield(backend->lua, -2, "modeSequenceIndex"); lua_pushinteger(backend->lua, context->modeSequenceLength); lua_setfield(backend->lua, -2, "modeSequenceLength"); lua_pushinteger(backend->lua, context->modeEnemyCount); lua_setfield(backend->lua, -2, "modeEnemyCount"); lua_pushinteger(backend->lua, context->modeReflex); lua_setfield(backend->lua, -2, "modeReflex"); lua_pushboolean(backend->lua, context->modeCanAdvance); lua_setfield(backend->lua, -2, "modeCanAdvance"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity);
 
 }
 
@@ -3115,7 +3351,7 @@ PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backen
 	PangeaScriptStatus taskStatus = call_due_tasks(backend, error, errorCapacity);
 	if (taskStatus != PANGEA_SCRIPT_OK) return taskStatus;
 	if (!push_hook(backend, hook_name(backend, PANGEA_SCRIPT_HOOK_FRAME))) return PANGEA_SCRIPT_OK;
-	push_base_context(backend, context->levelNum); if (context->levelName) { lua_pushstring(backend->lua, context->levelName); lua_setfield(backend->lua, -2, "levelName"); } if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); lua_pushinteger(backend->lua, context->frameNum); lua_setfield(backend->lua, -2, "frameNum"); lua_pushnumber(backend->lua, context->deltaSeconds); lua_setfield(backend->lua, -2, "deltaSeconds"); lua_pushnumber(backend->lua, context->levelTimeSeconds); lua_setfield(backend->lua, -2, "levelTimeSeconds"); if (context->hasModeState) { lua_pushinteger(backend->lua, context->modePhase); lua_setfield(backend->lua, -2, "modePhase"); lua_pushinteger(backend->lua, context->modeWave); lua_setfield(backend->lua, -2, "modeWave"); lua_pushnumber(backend->lua, context->modeTimer); lua_setfield(backend->lua, -2, "modeTimer"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity);
+	push_base_context(backend, context->levelNum); if (context->levelName) { lua_pushstring(backend->lua, context->levelName); lua_setfield(backend->lua, -2, "levelName"); } if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); lua_pushinteger(backend->lua, context->frameNum); lua_setfield(backend->lua, -2, "frameNum"); lua_pushnumber(backend->lua, context->deltaSeconds); lua_setfield(backend->lua, -2, "deltaSeconds"); lua_pushnumber(backend->lua, context->levelTimeSeconds); lua_setfield(backend->lua, -2, "levelTimeSeconds"); if (context->hasModeState) { lua_pushinteger(backend->lua, context->modePhase); lua_setfield(backend->lua, -2, "modePhase"); lua_pushinteger(backend->lua, context->modeWave); lua_setfield(backend->lua, -2, "modeWave"); lua_pushnumber(backend->lua, context->modeTimer); lua_setfield(backend->lua, -2, "modeTimer"); } if (context->hasModeDetails) { lua_pushinteger(backend->lua, context->modeSequenceIndex); lua_setfield(backend->lua, -2, "modeSequenceIndex"); lua_pushinteger(backend->lua, context->modeSequenceLength); lua_setfield(backend->lua, -2, "modeSequenceLength"); lua_pushinteger(backend->lua, context->modeEnemyCount); lua_setfield(backend->lua, -2, "modeEnemyCount"); lua_pushinteger(backend->lua, context->modeReflex); lua_setfield(backend->lua, -2, "modeReflex"); lua_pushboolean(backend->lua, context->modeCanAdvance); lua_setfield(backend->lua, -2, "modeCanAdvance"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity);
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallTerrainItemHook(PangeaScriptBackend* backend, PangeaScriptTerrainItemContext* context, char* error, int errorCapacity)

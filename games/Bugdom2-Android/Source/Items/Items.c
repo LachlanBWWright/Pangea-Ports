@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -188,6 +192,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.daisy", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->WaveXIndex = x * .003f;
@@ -242,6 +250,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.tulip", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->WaveXIndex = x * .003f;
@@ -273,6 +285,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveWavingFlower;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.rose", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -307,6 +323,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.grass", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->WaveXIndex = x * .003f;
@@ -338,6 +358,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.shrubRoot", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -421,6 +445,10 @@ int		doorColor = itemPtr->parm[1];
 	else
 		gNewObjectDefinition.rot 	= itemPtr->parm[0] * PI/2;
 	door = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(door, "bugdom2.door", "transition");
+#endif
 
 	door->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -537,6 +565,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * PI/2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.brick", "obstacle");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -601,6 +633,10 @@ int	type = itemPtr->parm[0];
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.post", "obstacle");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -646,6 +682,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.pebble", "scenery");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -681,6 +721,10 @@ Boolean	isCorner = itemPtr->parm[3] & 1;							// see if it's a corner piece
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4.0f);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.poolCoping", "obstacle");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -754,6 +798,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MovePoolLeaf;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.poolLeaf", "scenery");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -896,6 +944,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= PI + ((float)itemPtr->parm[0] * (PI2/4));
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.dogHouse", "obstacle");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -948,6 +1000,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.tulipPot", "item");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 
@@ -996,6 +1052,10 @@ ObjNode	*newObj;
 		gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.beachBall", "item");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1072,6 +1132,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.chlorineFloat", "item");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1140,6 +1204,10 @@ float	s;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.poolRingFloat", "item");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1204,6 +1272,10 @@ ObjNode	*newObj, *grate;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.drainPipe", "obstacle");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 			/* SET COLLISION STUFF */
@@ -1222,6 +1294,10 @@ ObjNode	*newObj, *grate;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	grate = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(grate, "bugdom2.drainGrate", "child-object");
+#endif
 
 			/* SET COLLISION STUFF */
 
@@ -1258,6 +1334,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveGlassBottle;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.glassBottle", "item");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1318,9 +1398,6 @@ static Boolean HurtGlassBottle(ObjNode *bottle, float damage)
 	PlayEffect3D(EFFECT_BOTTLECRACK, &bottle->Coord);
 	return(false);
 }
-
-
-
 
 
 

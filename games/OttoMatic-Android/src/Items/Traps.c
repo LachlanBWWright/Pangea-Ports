@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -124,6 +128,13 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 	= (float)itemPtr->parm[0] * (PI2/8.0f);			// use given rot
 	gNewObjectDefinition.scale 		= FALLING_CRYSTAL_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.fallingCrystal", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;												// keep ptr to item list
 
@@ -377,6 +388,13 @@ Boolean	onWater;
 	gNewObjectDefinition.scale 		= .5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.inertSoapBubble", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->ColorFilter.a = .9;
@@ -440,6 +458,13 @@ float	r = (float)itemPtr->parm[0] * (PI2/4.0f);
 	gNewObjectDefinition.scale 		= 2.0;
 	pump = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"trigger"};
+		OttoScript_RegisterObjectNode(pump, "ottomatic.bubblePump", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	pump->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	pump->CType = CTYPE_MISC;
@@ -454,6 +479,13 @@ float	r = (float)itemPtr->parm[0] * (PI2/4.0f);
 	gNewObjectDefinition.type 		= SLIME_ObjType_BubblePumpPlunger;
 	gNewObjectDefinition.moveCall 	= nil;
 	plunger = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(plunger, "ottomatic.bubblePumpPlunger", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	plunger->Mode = PLUNGER_MODE_WAIT;
 
@@ -601,6 +633,13 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= SOAP_BUBBLE_SCALE * .1f;
 	gNewObjectDefinition.rot 		= 0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.soapBubble", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	newObj->ColorFilter.a = .9;
 
@@ -864,6 +903,10 @@ float			x,z,placement;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 4.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"enemy", "spline"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.magnetMonster", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->SplineItemPtr = itemPtr;
 	newObj->SplineNum = splineNum;
@@ -907,6 +950,10 @@ float			x,z,placement;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 4.0;
 	prop = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object", "effect"};
+		OttoScript_RegisterObjectNode(prop, "ottomatic.magnetMonsterProp", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	prop->CustomDrawFunction = DrawMagnetMonsterProp;				// override and use custom draw function
 
@@ -1204,6 +1251,13 @@ ObjNode	*bottom,*top;
 	gNewObjectDefinition.scale 		= 5.0;
 	bottom = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"transition"};
+		OttoScript_RegisterObjectNode(bottom, "ottomatic.crunchDoor", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	bottom->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
 	bottom->CType 			= CTYPE_MISC|CTYPE_LIGHTNINGROD|CTYPE_BLOCKRAYS;
@@ -1222,6 +1276,13 @@ ObjNode	*bottom,*top;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= MoveCrunchDoorTop;
 	top = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(top, "ottomatic.crunchDoorTop", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	top->Mode = CRUNCH_DOOR_MODE_CLOSED;						// init mode
 	top->Timer = 2.0;
@@ -1506,6 +1567,13 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= .5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.manhole", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
 	newObj->Rot.x += PI/2;										// rot flat
@@ -1787,6 +1855,13 @@ int		i;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.proximityMine", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
 
@@ -1966,6 +2041,13 @@ DeformationType		defData;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.manholeShockwave", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 	newObj->ColorFilter.a = .99;
 
 	newObj->Damage = .2f;
@@ -1985,6 +2067,13 @@ DeformationType		defData;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .3;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.manholeConeBlast", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 	newObj->ColorFilter.a = .99;
 
 
@@ -2090,6 +2179,13 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= SNOWBALL_SCALE_START;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"hazard"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.snowball", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;												// keep ptr to item list
 
@@ -2257,9 +2353,3 @@ OGLPoint3D			p;
 
 
 }
-
-
-
-
-
-

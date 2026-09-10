@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -124,6 +128,13 @@ float	q;
 	gNewObjectDefinition.scale 		= HAMMERBOT_SCALE;
 	body = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(body, "ottomatic.hammerBot", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
+
 	body->Mode 			= HAMMERBOT_MODE_WAIT;
 	body->WaitDelay 	= 0;
 	body->Damage 		= HAMMERBOT_DAMAGE;
@@ -160,6 +171,14 @@ float	q;
 	gNewObjectDefinition.slot		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	hammer = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(hammer, "ottomatic.hammerBotHammer", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	body->ChainNode = hammer;
 
 
@@ -170,6 +189,14 @@ float	q;
 	gNewObjectDefinition.type 		= FIREICE_ObjType_HammerBot_Wheels;
 
 	wheels = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(wheels, "ottomatic.hammerBotWheels", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
+#endif
+
 	hammer->ChainNode = wheels;
 
 
@@ -877,7 +904,6 @@ static const OGLPoint3D	bodyOff = {0, 17, -39};
 	DeleteEnemy(enemy);
 
 }
-
 
 
 

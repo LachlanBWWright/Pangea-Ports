@@ -24,6 +24,7 @@
 
 extern bool PangeaScript_LoadCustomBG3D(FSSpec* spec, int group);
 extern bool PangeaScript_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
@@ -345,6 +346,22 @@ static bool BillyScript_GetObjectAnimation(void* nativeObject, int* outAnimation
 	return true;
 }
 
+static bool BillyScript_GetObjectAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outSpeed || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outSpeed = obj->Skeleton->AnimSpeed;
+	return true;
+}
+
+static bool BillyScript_GetObjectAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outFrame || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outFrame = GetScriptSkeletonFrame(obj->Skeleton);
+	return true;
+}
+
 static bool BillyScript_SetObjectAnimation(void* nativeObject, int animation, float speed, float blendSeconds)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
@@ -392,6 +409,24 @@ static bool BillyScript_GetObjectActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool BillyScript_GetObjectHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outHealth = obj->Health;
+	return true;
+}
+
+static bool BillyScript_GetObjectDamage(void* nativeObject, float* outDamage)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outDamage || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	*outDamage = obj->Damage;
+	return true;
+}
+
 static bool BillyScript_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -427,7 +462,11 @@ static const PangeaScriptObjectOps kBillyPlayerObjectOps =
 	.getRotation = BillyScript_GetObjectRotation,
 	.getScale = BillyScript_GetObjectScale,
 	.getAnimation = BillyScript_GetObjectAnimation,
+	.getAnimationSpeed = BillyScript_GetObjectAnimationSpeed,
+	.getAnimationFrame = BillyScript_GetObjectAnimationFrame,
 	.getActive = BillyScript_GetObjectActive,
+	.getHealth = BillyScript_GetObjectHealth,
+	.getDamage = BillyScript_GetObjectDamage,
 	.setPosition = BillyScript_SetObjectPosition,
 	.setVelocity = BillyScript_SetObjectVelocity,
 	.setRotation = BillyScript_SetObjectRotation,
@@ -923,6 +962,60 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.category = "pickup",
 		.dependencySummary = "stampede boost assets, stampede speed state, and terrain systems",
 	},
+	{
+		.id = "billy.flame",
+		.nativeType = 15,
+		.category = "hazard",
+		.dependencySummary = "flame assets, mode terrain, and native hazard behavior",
+	},
+	{
+		.id = "billy.electricFence",
+		.nativeType = 26,
+		.category = "hazard",
+		.dependencySummary = "electric-fence assets, mode terrain, and native hazard collision",
+	},
+	{
+		.id = "billy.tremorGrave",
+		.nativeType = 28,
+		.category = "hazard",
+		.dependencySummary = "tremor-grave assets, mode terrain, and native hazard behavior",
+	},
+	{
+		.id = "billy.spearSkull",
+		.nativeType = 33,
+		.category = "hazard",
+		.dependencySummary = "spear-skull assets, mode terrain, and native hazard collision",
+	},
+	{
+		.id = "billy.dueler",
+		.nativeType = 1,
+		.category = "enemy",
+		.dependencySummary = "dueler assets, duel mode, and native enemy behavior",
+	},
+	{
+		.id = "billy.frogman",
+		.nativeType = 7,
+		.category = "enemy",
+		.dependencySummary = "frogman assets, shootout mode, and native enemy behavior",
+	},
+	{
+		.id = "billy.bandito",
+		.nativeType = 8,
+		.category = "enemy",
+		.dependencySummary = "bandito assets, shootout mode, and native enemy behavior",
+	},
+	{
+		.id = "billy.tremorAlien",
+		.nativeType = 31,
+		.category = "enemy",
+		.dependencySummary = "tremor-alien assets, shootout mode, and native enemy behavior",
+	},
+	{
+		.id = "billy.shorty",
+		.nativeType = 35,
+		.category = "enemy",
+		.dependencySummary = "Shorty assets, shootout mode, and native enemy behavior",
+	},
 #define BILLY_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current area assets, terrain systems, and the native item initializer" },
 	BILLY_TERRAIN_NATIVE_ITEM(1) BILLY_TERRAIN_NATIVE_ITEM(2) BILLY_TERRAIN_NATIVE_ITEM(3) BILLY_TERRAIN_NATIVE_ITEM(4) BILLY_TERRAIN_NATIVE_ITEM(5) BILLY_TERRAIN_NATIVE_ITEM(6) BILLY_TERRAIN_NATIVE_ITEM(7) BILLY_TERRAIN_NATIVE_ITEM(8) BILLY_TERRAIN_NATIVE_ITEM(9) BILLY_TERRAIN_NATIVE_ITEM(10)
 	BILLY_TERRAIN_NATIVE_ITEM(11) BILLY_TERRAIN_NATIVE_ITEM(12) BILLY_TERRAIN_NATIVE_ITEM(13) BILLY_TERRAIN_NATIVE_ITEM(14) BILLY_TERRAIN_NATIVE_ITEM(15) BILLY_TERRAIN_NATIVE_ITEM(16) BILLY_TERRAIN_NATIVE_ITEM(17) BILLY_TERRAIN_NATIVE_ITEM(18) BILLY_TERRAIN_NATIVE_ITEM(19) BILLY_TERRAIN_NATIVE_ITEM(20)
@@ -949,6 +1042,24 @@ static void LogScriptStatus(const char* action, PangeaScriptStatus status)
 
 static int GetScriptPlayerCount(void) { return gPlayerInfo.objNode ? 1 : 0; }
 
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton)
+{
+	const JointKeyFrameHeader* header;
+	int frame;
+	int frameCount;
+
+	if (!skeleton || !skeleton->skeletonDefinition || skeleton->AnimNum >= MAX_ANIMS)
+		return 0;
+	header = &skeleton->skeletonDefinition->JointKeyframes[0];
+	frameCount = header->numKeyFrames[skeleton->AnimNum];
+	if (frameCount <= 0 || !header->keyFrames || !header->keyFrames[skeleton->AnimNum])
+		return 0;
+	frame = 0;
+	while (frame + 1 < frameCount && skeleton->CurrentAnimTime >= header->keyFrames[skeleton->AnimNum][frame + 1].tick)
+		frame++;
+	return frame;
+}
+
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerInfo.objNode) return false;
@@ -956,6 +1067,10 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z},
 		.velocity = {gPlayerInfo.objNode->Delta.x, gPlayerInfo.objNode->Delta.y, gPlayerInfo.objNode->Delta.z},
 		.hasVelocity = true,
+		.grounded = (gPlayerInfo.objNode->StatusBits & STATUS_BIT_ONGROUND) != 0,
+		.hasGroundedState = true,
+		.heightOffGround = gPlayerInfo.distToFloor,
+		.hasTerrainHeightState = true,
 		.collisionEnabled = gPlayerInfo.objNode->CType != 0 && (gPlayerInfo.objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0,
 		.hasCollisionEnabled = true,
 		.health = gPlayerInfo.objNode->Health,
@@ -972,6 +1087,17 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.weapons = {{0, 999}},
 		.shieldActive = gPlayerInfo.shieldPower > 0.0f,
 		.hasShieldState = true,
+		.invulnerable = gPlayerInfo.invincibilityTimer > 0.0f,
+		.hasInvulnerabilityState = true,
+		.dead = gPlayerIsDead,
+		.hasDeathState = true,
+		.levelComplete = gLevelCompleted,
+		.hasLevelCompletionState = true,
+		.invulnerabilityTimeRemaining = gPlayerInfo.invincibilityTimer,
+		.hasInvulnerabilityTimerState = true,
+		.knockedDown = gPlayerInfo.knockDownTimer > 0.0f,
+		.knockdownTimeRemaining = gPlayerInfo.knockDownTimer,
+		.hasKnockdownState = true,
 		.active = true,
 	};
 	if (gGameViewInfoPtr)
@@ -988,6 +1114,15 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		-cosf(gPlayerInfo.objNode->Rot.y),
 	};
 	outPlayer->hasAimState = true;
+	if (gPlayerInfo.objNode->Skeleton)
+	{
+		outPlayer->animation = gPlayerInfo.objNode->Skeleton->AnimNum;
+		outPlayer->hasAnimationState = true;
+		outPlayer->animationSpeed = gPlayerInfo.objNode->Skeleton->AnimSpeed;
+		outPlayer->hasAnimationSpeedState = true;
+		outPlayer->animationFrame = GetScriptSkeletonFrame(gPlayerInfo.objNode->Skeleton);
+		outPlayer->hasAnimationFrameState = true;
+	}
 	return true;
 }
 
@@ -1127,12 +1262,17 @@ static const char* BillyScript_AreaMode(int areaNum)
 	}
 }
 
-static void BillyScript_ModeState(int areaNum, int* phase, int* wave, float* timer)
+static void BillyScript_ModeState(int areaNum, int* phase, int* wave, float* timer, int* sequenceIndex, int* sequenceLength, int* enemyCount, int* reflex, bool* canAdvance)
 {
 	const char* mode = BillyScript_AreaMode(areaNum);
 	*phase = 0;
 	*wave = 0;
 	*timer = 0.0f;
+	*sequenceIndex = 0;
+	*sequenceLength = 0;
+	*enemyCount = 0;
+	*reflex = 0;
+	*canAdvance = false;
 	if (strcmp(mode, "targetPractice") == 0)
 	{
 		*timer = gTargetPracticeTimer;
@@ -1141,17 +1281,24 @@ static void BillyScript_ModeState(int areaNum, int* phase, int* wave, float* tim
 	if (strcmp(mode, "duel") == 0)
 	{
 		*phase = gDuelKeySequenceMode;
+		*sequenceIndex = gDuelKeyBufferIndex;
+		*sequenceLength = gDuelKeySequenceLength;
+		*reflex = gDuelReflex;
 		return;
 	}
 	*phase = gShootoutMode;
 	*wave = gStopPointNum;
+	if (gStopPointNum >= 0 && gStopPointNum < 20)
+		*enemyCount = gNumEnemiesThisStopPoint[gStopPointNum];
+	*canAdvance = gShootoutCanProceedToNextStopPoint;
 }
 
 static void CallAreaHook(PangeaScriptHook hook, int areaNum, const char* action)
 {
-	int modePhase, modeWave;
+	int modePhase, modeWave, modeSequenceIndex, modeSequenceLength, modeEnemyCount, modeReflex;
 	float modeTimer;
-	BillyScript_ModeState(areaNum, &modePhase, &modeWave, &modeTimer);
+	bool modeCanAdvance;
+	BillyScript_ModeState(areaNum, &modePhase, &modeWave, &modeTimer, &modeSequenceIndex, &modeSequenceLength, &modeEnemyCount, &modeReflex, &modeCanAdvance);
 	const PangeaScriptLevelContext context =
 	{
 		.levelNum = areaNum,
@@ -1162,6 +1309,12 @@ static void CallAreaHook(PangeaScriptHook hook, int areaNum, const char* action)
 		.modeWave = modeWave,
 		.modeTimer = modeTimer,
 		.hasModeState = true,
+		.modeSequenceIndex = modeSequenceIndex,
+		.modeSequenceLength = modeSequenceLength,
+		.modeEnemyCount = modeEnemyCount,
+		.modeReflex = modeReflex,
+		.modeCanAdvance = modeCanAdvance,
+		.hasModeDetails = true,
 	};
 
 	PangeaScriptStatus status = PangeaScript_CallLevelHook(hook, &context);
@@ -1180,9 +1333,10 @@ void BillyScript_OnAreaStart(int areaNum)
 
 void BillyScript_OnAreaFrame(int areaNum, unsigned int frameNum, float deltaSeconds, float areaTimeSeconds)
 {
-	int modePhase, modeWave;
+	int modePhase, modeWave, modeSequenceIndex, modeSequenceLength, modeEnemyCount, modeReflex;
 	float modeTimer;
-	BillyScript_ModeState(areaNum, &modePhase, &modeWave, &modeTimer);
+	bool modeCanAdvance;
+	BillyScript_ModeState(areaNum, &modePhase, &modeWave, &modeTimer, &modeSequenceIndex, &modeSequenceLength, &modeEnemyCount, &modeReflex, &modeCanAdvance);
 	const PangeaScriptFrameContext context =
 	{
 		.levelNum = areaNum,
@@ -1195,6 +1349,12 @@ void BillyScript_OnAreaFrame(int areaNum, unsigned int frameNum, float deltaSeco
 		.modeWave = modeWave,
 		.modeTimer = modeTimer,
 		.hasModeState = true,
+		.modeSequenceIndex = modeSequenceIndex,
+		.modeSequenceLength = modeSequenceLength,
+		.modeEnemyCount = modeEnemyCount,
+		.modeReflex = modeReflex,
+		.modeCanAdvance = modeCanAdvance,
+		.hasModeDetails = true,
 	};
 	BillyScript_CacheFrameContext(&context);
 	PangeaScript_ExpireTriggerContacts(&context);

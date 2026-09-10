@@ -18,6 +18,9 @@
 #include "miscanims.h"
 #include "objecttypes.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -54,6 +57,9 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,FARTHEST_Z,MoveTurtle,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.turtle", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -124,6 +130,5 @@ void MoveTurtle(void)
 
 	UpdateEnemy();
 }
-
 
 

@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -71,6 +74,10 @@ short	stopPoint 	= itemPtr->parm[1];
 	gNewObjectDefinition.moveCall 	= MoveTremorGrave;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/8);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BillyScript_RegisterObject(newObj, "billy.tremorGrave", "hazard");
+#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 	newObj->StopPoint 		= stopPoint;
@@ -333,7 +340,6 @@ OGLVector3D	splatVec;
 	}
 	
 }
-
 
 
 

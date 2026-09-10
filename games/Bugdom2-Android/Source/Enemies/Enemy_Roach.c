@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -158,6 +159,8 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_ROACH,animNum, x,z, ROACH_SCALE, 0, MoveRoach);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.roach", "enemy");
 
 
 
@@ -841,6 +844,7 @@ ObjNode	*spear;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= enemy->Scale.x * .9f;
 	spear = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(spear, "bugdom2.roachSpear", "projectile/effect");
 
 			/* ATTACH SPEAR TO ENEMY */
 
@@ -1050,8 +1054,6 @@ static Boolean SeeIfRoachAttack(ObjNode *theNode, float angleToTarget, float dis
 	}
 	return(false);
 }
-
-
 
 
 

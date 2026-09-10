@@ -19,6 +19,9 @@
 #include "objecttypes.h"
 #include "enemy4.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -56,6 +59,9 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,MoveBBWolf,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.bbWolf", "enemy");
+#endif
 
 	CalcEnemyScatterOffset(newObj);
 
@@ -178,6 +184,5 @@ long	xAcc,yAcc;
 	gY.L += gDY;
 
 }
-
 
 

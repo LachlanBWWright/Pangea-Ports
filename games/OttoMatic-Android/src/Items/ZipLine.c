@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #if PANGEA_SAFE_ITEM_LOADING
 #define ZIPLINE_MODEL_GROUP GetOttoLevelModelGroup(gLevelNum)
 #define ZIPLINE_SPRITE_GROUP GetOttoLevelSpriteGroup(gLevelNum)
@@ -216,6 +220,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 1.5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"obstacle", "trigger"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.zipLinePost", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -582,6 +590,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= CalcYAngleFromPointToPoint(0, gZipLines[zipNum].start.x, gZipLines[zipNum].start.z, gZipLines[zipNum].end.x, gZipLines[zipNum].end.z);
 	gNewObjectDefinition.scale 		= 2.5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"vehicle", "child-object"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.zipLinePully", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	newObj->ZipID = zipNum;
 	newObj->SplinePlacement = ZIP_PULLY_STARTOFF;
@@ -697,7 +709,6 @@ static void MoveZipPully_Completed(ObjNode *theNode)
 		theNode->MoveCall = MoveZipPully_Waiting;
 	}
 }
-
 
 
 

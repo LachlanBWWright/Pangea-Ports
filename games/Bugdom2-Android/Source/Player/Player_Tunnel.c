@@ -10,6 +10,9 @@
 /***************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 #include "profiling.h"
 
 
@@ -1085,6 +1088,8 @@ static const OGLPoint3D footOff = {0,0,0};
 		gNewObjectDefinition.moveCall 	= MoveTunnelSpray;
 		gNewObjectDefinition.rot 		= player->Rot.y;
 		spray = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		if (spray != nil)
+			Bugdom2Script_RegisterObject(spray, "bugdom2.tunnelSpray", "child-object");
 
 		spray->Rot.x = player->Rot.x;
 		spray->Rot.z = player->Rot.z;
@@ -1546,5 +1551,4 @@ float	fps = gFramesPerSecondFrac;
 	gPlayerTunnelIndex += gPlayerInfo.tunnelSpeed * fps;
 
 }
-
 

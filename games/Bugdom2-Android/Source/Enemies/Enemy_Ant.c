@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -140,6 +143,8 @@ ObjNode	*newObj;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_ANT,animNum, x,z, ANT_SCALE, 0, MoveAnt);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.ant", "enemy");
 
 
 
@@ -708,6 +713,8 @@ ObjNode	*food;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 2.0f;
 	food = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (food != nil)
+		Bugdom2Script_RegisterObject(food, "bugdom2.antFood", "child-object");
 
 			/* ATTACH FOOD TO ENEMY */
 
@@ -871,8 +878,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

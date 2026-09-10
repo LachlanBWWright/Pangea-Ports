@@ -117,6 +117,7 @@ typedef struct
 
 //	int					waterPatch;
 	float				waterRippleTimer;
+	Boolean				onLava;
 
 	OGLPoint3D			previousWingContrailPt[2];
 

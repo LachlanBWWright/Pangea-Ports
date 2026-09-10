@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -131,6 +135,10 @@ int		i;
 				/*******************************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_GIANTLIZARD,x,z, GIANTLIZARD_SCALE, 0, MoveGiantLizard);
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.giantLizard", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 	newObj->TerrainItemPtr = itemPtr;
 	newObj->EnemyRegenerate = itemPtr->parm[3] & (1<<1);
 
@@ -1150,7 +1158,6 @@ float					x,y,z;
 		}
 	}
 }
-
 
 
 

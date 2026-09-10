@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -114,6 +115,10 @@ ObjNode	*newObj;
 	gAntKingObj = newObj = MakeEnemySkeleton(SKELETON_TYPE_KINGANT,x,z, KINGANT_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.kingAnt", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, KINGANT_ANIM_WAIT);
@@ -587,6 +592,8 @@ ObjNode	*staff;
 	if (staff == nil)
 		return;
 
+	BugdomScript_RegisterObject(staff, "bugdom.kingAntStaff", "child-object");
+
 			/* ATTACH SPEAR TO ENEMY */
 	
 	king->ChainNode = staff;
@@ -717,6 +724,7 @@ TQ3Vector3D		delta;
 	newObj = MakeNewObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return;
+	BugdomScript_RegisterObject(newObj, "bugdom.staffProjectile", "projectile/effect");
 		
 			/* SET COLLISION INFO */
 			
@@ -900,9 +908,6 @@ TQ3Vector3D		delta;
 
 
 }
-
-
-
 
 
 

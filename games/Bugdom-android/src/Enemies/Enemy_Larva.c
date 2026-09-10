@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -76,6 +80,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_LARVA,x,z,LARVA_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.larva", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 	
 
@@ -114,6 +122,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_LARVA,x,z,LARVA_SCALE);
 	if (newObj == nil)
 		return(nil);	
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.larva", "enemy");
+#endif
 
 				/* SET BETTER INFO */
 			
@@ -268,6 +280,10 @@ float			x,z,placement;
 		
 	DetachObject(newObj);									// detach this object from the linked list
 		
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.larva", "enemy");
+#endif
+
 	newObj->SplineItemPtr = itemPtr;
 	newObj->SplineNum = splineNum;
 	
@@ -392,8 +408,6 @@ Boolean KillLarva(ObjNode *theNode)
 	theNode->CType = CTYPE_MISC;
 	return(false);
 }
-
-
 
 
 

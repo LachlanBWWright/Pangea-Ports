@@ -18,6 +18,9 @@
 #include "enemy5.h"
 #include "objecttypes.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -48,6 +51,10 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,Move8Ball,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.eightBall", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;				// remember where this came from
 	newObj->CType = CTYPE_ENEMYA;				// set collision info
@@ -112,7 +119,6 @@ void Move8Ball(void)
 
 	UpdateEnemy();
 }
-
 
 
 

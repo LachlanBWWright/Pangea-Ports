@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 #if PANGEA_SAFE_ITEM_LOADING
 #define BLOBBOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_BLOBBOSS)
@@ -921,6 +922,10 @@ float	dx,dz,force;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 1.5;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.blobBossHornBullet", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	newObj->Damage 			= .1;
 
@@ -1081,7 +1086,6 @@ float	delay;
 
 	return(true);
 }
-
 
 
 

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -124,6 +128,10 @@ ObjNode	*newObj;
 				/*******************************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_ONION,x,z, ONION_SCALE, 0, MoveOnion);
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.onion", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	SetSkeletonAnim(newObj->Skeleton, ONION_ANIM_STAND);
 
@@ -978,7 +986,6 @@ float fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

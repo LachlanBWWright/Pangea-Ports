@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -131,6 +132,8 @@ int		j,i;
 				/***********************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_COMPUTERBUG,animNum, x,z, COMPUTERBUG_SCALE, 0, MoveComputerBug);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.computerBug", "enemy");
 
 
 
@@ -691,6 +694,7 @@ int		i;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= scale;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	Bugdom2Script_RegisterObject(newObj, "bugdom2.virus", "projectile/effect");
 
 	newObj->Delta = *delta;
 
@@ -865,6 +869,4 @@ OGLPoint3D	where = virus->Coord;
 
 	return(true);
 }
-
-
 

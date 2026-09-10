@@ -17,6 +17,9 @@
 #include "misc.h"
 #include "objecttypes.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -55,6 +58,9 @@ short			animNum;
 			itemPtr->x,itemPtr->y,50,MoveTriceratops,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.triceratops", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -195,7 +201,6 @@ void MoveTri_Charging(void)
 
 	UpdateEnemy();
 }
-
 
 
 

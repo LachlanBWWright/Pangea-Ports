@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -129,6 +133,8 @@ float	s;
 
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_DRAGONFLY, animNum, x,z, s, 0, MoveDragonfly);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.dragonFly", "enemy");
 
 
 	if (LevelMetadataCaseFor("level.dragonfly", gLevelNum) == LEVEL_NUM_BALSA)
@@ -634,6 +640,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= 1.0;
 
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.killerDragonFly", "enemy");
 
 	gKillerDragonFly = newObj;
 }
@@ -683,7 +691,6 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 
 

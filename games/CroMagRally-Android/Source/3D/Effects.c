@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -999,6 +1003,9 @@ ObjNode					*newObj;
 		.scale 		= 1.0,
 	};
 	newObj = MakeNewDisplayGroupObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.shockwave", "effect");
+	#endif
 
 	newObj->ColorFilter.a = 1.0;
 
@@ -1045,6 +1052,9 @@ ObjNode					*newObj;
 		.scale 		= 1.0,
 	};
 	newObj = MakeNewDisplayGroupObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.coneBlast", "projectile/effect");
+	#endif
 
 	newObj->ColorFilter.a = 1.0;
 }
@@ -1303,6 +1313,9 @@ ObjNode					*newObj;
 		.scale 		= 50.0,
 	};
 	newObj = MakeNewDisplayGroupObject(&def);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.snowShockwave", "effect");
+	#endif
 
 	newObj->ColorFilter.a = 1.0;
 }
@@ -1687,6 +1700,9 @@ ObjNode	*newObj;
 	newObj = MakeNewObject(&def);
 	if (newObj == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.bubbleGenerator", "hazard");
+	#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1776,6 +1792,9 @@ ObjNode	*newObj;
 	newObj = MakeNewObject(&def);
 	if (newObj == nil)
 		return(false);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.lavaGenerator", "hazard");
+	#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -1903,8 +1922,6 @@ float				x,y,z;
 		}
 	}
 }
-
-
 
 
 

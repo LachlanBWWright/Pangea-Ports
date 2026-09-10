@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -107,6 +111,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FIREANT,x,z, FIREANT_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.fireAnt", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, FIREANT_ANIM_STAND);
@@ -515,6 +523,10 @@ float			x,z,placement;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_FIREANT,x,z, FIREANT_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.fireAnt", "enemy");
+#endif
 		
 	DetachObject(newObj);										// detach this object from the linked list
 		

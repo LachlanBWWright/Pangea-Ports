@@ -18,6 +18,9 @@
 #include "miscanims.h"
 #include "objecttypes.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -63,6 +66,9 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveDinoEgg,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.dinoEgg", "objective");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -225,7 +231,6 @@ void MoveHatchling(void)
 
 	UpdateEnemy();
 }
-
 
 
 

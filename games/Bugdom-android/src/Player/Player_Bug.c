@@ -116,6 +116,10 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= PLAYER_BUG_SCALE;
 	newObj 							= MakeNewSkeletonObject(&gNewObjectDefinition);	
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.playerBug", "player");
+#endif
+
 	
 				/* SET COLLISION INFO */
 
@@ -1523,6 +1527,5 @@ new_pgroup:
 		}
 	}
 }
-
 
 

@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -73,6 +74,7 @@ Boolean AddGrass(TerrainItemEntryType *itemPtr, float  x, float z)
 	}
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.grass", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -130,6 +132,7 @@ Boolean AddFern(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.fern", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -163,6 +166,7 @@ Boolean AddBerryBush(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.berryBush", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -201,6 +205,7 @@ Boolean AddCatTail(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.cattail", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -242,6 +247,7 @@ Boolean AddDesertBush(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.desertBush", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -313,6 +319,7 @@ Boolean AddCactus(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.cactus", "hazard");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -358,6 +365,7 @@ Boolean AddPalmBush(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.palmBush", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -400,6 +408,7 @@ Boolean AddGeckoPlant(TerrainItemEntryType *itemPtr, float  x, float z)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.geckoPlant", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -440,6 +449,7 @@ Boolean AddSproutPlant(TerrainItemEntryType *itemPtr, float  x, float z)
 		.rot 		= RandomFloat()*PI2,
 	};
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.sproutPlant", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -483,6 +493,7 @@ short   color = itemPtr->parm[1];
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.ivy", "scenery");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -500,7 +511,6 @@ short   color = itemPtr->parm[1];
 
 	return(true);													// item was added
 }
-
 
 
 

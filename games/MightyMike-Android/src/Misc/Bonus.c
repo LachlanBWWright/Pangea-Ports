@@ -164,6 +164,10 @@ ObjNode		*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.miscPowerup", "pickup");
+#endif
+
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
 	newObj->CType = CTYPE_BONUS;
@@ -756,6 +760,7 @@ register	ObjNode		*newObj;
 	newObj = MakeNewObject(BG_GENRE,gMyX,gMyY,NEAREST_Z,MoveNukeObject);		// make nuke object process
 	if (newObj == nil)
 		return;
+	MikeScript_RegisterObject(newObj, "mightymike.nuke", "projectile/effect");
 
 	StartShakeyScreen(newObj->NukeTimer = GAME_FPS*4);			// set duration & shake
 
@@ -791,6 +796,7 @@ ObjNode	*newNode;
 	newNode = MakeNewShape(GroupNum_Nuke,ObjType_Nuke,0,x,y,100,MoveNuke,PLAYFIELD_RELATIVE);
 	if (newNode == nil)
 		goto update;
+	MikeScript_RegisterObject(newNode, "mightymike.nukelet", "projectile/effect");
 
 	newNode->CType = CTYPE_MYBULLET;
 	newNode->CBits = CBITS_TOUCHABLE;
@@ -838,6 +844,10 @@ ObjNode		*newObj;
 						50,SimpleObjectMove,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.shipPowerup", "pickup");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 

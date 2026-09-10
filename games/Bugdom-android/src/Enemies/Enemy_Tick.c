@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -61,6 +65,8 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return;
+
+	BugdomScript_RegisterObject(newObj, "bugdom.tick", "enemy");
 
 				/* SET BETTER INFO */
 			
@@ -153,8 +159,6 @@ Boolean KillTick(ObjNode *theNode)
 	DeleteEnemy(theNode);
 	return(true);
 }
-
-
 
 
 

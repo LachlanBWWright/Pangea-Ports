@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -479,6 +483,9 @@ static const short textureTable[] =
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB+20;
 	gNewObjectDefinition.moveCall 	= MoveStaticObject;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.runwayLights", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"effect", "terrain-item"}, 2);
+	#endif
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -529,4 +536,3 @@ static const short textureTable[] =
 
 	return(true);													// item was added
 }
-

@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -710,6 +711,10 @@ OGLMatrix4x4	m;
 		gNewObjectDefinition.rot 		= 0;
 		gNewObjectDefinition.scale 		= .9;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		{
+			static const char* tags[] = {"projectile/effect"};
+			OttoScript_RegisterObjectNode(newObj, "ottomatic.mantisAcidDrop", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+		}
 
 		newObj->Damage 			= .1;
 
@@ -787,7 +792,6 @@ OGLVector3D	aim;
 	SetAlignmentMatrix(&theNode->AlignmentMatrix, &aim);
 	UpdateObject(theNode);
 }
-
 
 
 

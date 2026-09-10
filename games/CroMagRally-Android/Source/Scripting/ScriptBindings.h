@@ -13,6 +13,8 @@ void CroMagScript_OnRaceStart(int trackNum);
 void CroMagScript_OnRaceFrame(int trackNum, unsigned int frameNum, float deltaSeconds, float raceTimeSeconds);
 void CroMagScript_OnRaceComplete(int trackNum);
 void CroMagScript_OnRaceUnload(int trackNum);
+int CroMagScript_ProbeRaceCompletionJS(void);
+int CroMagScript_ProbeRaceProgressJS(void);
 int CroMagScript_RemapTerrainItemType(int trackNum, int itemType);
 Boolean CroMagScript_OnTerrainItem(TerrainItemEntryType* itemPtr, int trackNum, int playerNum, int originalType, int remappedType, float x, float z);
 Boolean CroMagScript_OnSplineItem(SplineItemType* itemPtr, int trackNum, int splineNum);

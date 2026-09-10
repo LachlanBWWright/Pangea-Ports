@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -117,6 +118,11 @@ static const Byte type[] =
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_SPIDER,x,z,SPIDER_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.spider", "enemy");
+#endif
+
 	newObj->TerrainItemPtr = itemPtr;
 
 	
@@ -152,6 +158,8 @@ static const Byte type[] =
 	threadObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (threadObj == nil)
 		return(false);
+
+	BugdomScript_RegisterObject(threadObj, "bugdom.spiderThread", "child-object");
 
 	newObj->ChainNode = threadObj;								// chain thread to spider
 
@@ -545,6 +553,7 @@ static const Byte type[] =
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return;
+	BugdomScript_RegisterObject(newObj, "bugdom.webProjectile", "projectile/effect");
 
 	newObj->Health 			= 1.0;							// timer for duration & fading
 	newObj->SpecialF[3]		= gNewObjectDefinition.scale;	// f3 is initial scale
@@ -661,6 +670,8 @@ static const Byte type[] =
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= WEB_SPHERE_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		BugdomScript_RegisterObject(newObj, "bugdom.webSphere", "child-object");
 
 	newObj->Health = SPHERE_DURATION;
 
@@ -853,6 +864,10 @@ float			x,z,placement;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_SPIDER,x,z, SPIDER_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.spider", "enemy");
+#endif
 		
 	DetachObject(newObj);										// detach this object from the linked list
 		
@@ -948,8 +963,4 @@ Boolean isVisible;
 //			theNode->ShadowNode->StatusBits |= STATUS_BIT_HIDDEN;	
 	}
 }
-
-
-
-
 

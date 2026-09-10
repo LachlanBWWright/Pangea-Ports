@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -90,6 +91,7 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_REX,x,z);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.rex", "enemy");
 	newObj->TerrainItemPtr = itemPtr;
 
 #if REX_ALWAYS_CHASE
@@ -319,4 +321,3 @@ Boolean	onGround;
 	
 	UpdateEnemy(theNode);		
 }
-

@@ -126,6 +126,7 @@ short	eggColor = itemPtr->parm[0];
 		.rot 		= RandomFloat()*PI2,
 	};
 	nest = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(nest, "nanosaur2.eggNest", "trigger");
 
 	nest->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -187,6 +188,11 @@ short	eggColor = itemPtr->parm[0];
 		def.slot 		= SLOT_OF_DUMB+50;
 		def.moveCall 	= nil;
 		beam = MakeNewDisplayGroupObject(&def);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (beam != nil)
+			Nanosaur2Script_RegisterObject(beam, "nanosaur2.eggBeam", "child-object");
+#endif
 
 //		beam->ColorFilter.a = .2f;
 
@@ -857,7 +863,5 @@ void PangeaNet_ApplyEggNetworkState(int eggIndex, int state, int carrier, float 
 }
 
 #endif // __EMSCRIPTEN__
-
-
 
 

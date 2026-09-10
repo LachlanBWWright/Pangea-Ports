@@ -624,6 +624,8 @@ void StartPlayerGliding(ObjNode *player)
 		.scale 		= player->Scale.x * .9f,
 	};
 	gPlayerInfo.blurSprite = MakeNewDisplayGroupObject(&def);
+	if (gPlayerInfo.blurSprite != nil)
+		Bugdom2Script_RegisterObject(gPlayerInfo.blurSprite, "bugdom2.wingBlur", "child-object");
 
 
 			/********************/
@@ -1245,6 +1247,8 @@ int		i;
 			gNewObjectDefinition.moveCall 	= MoveShieldSphere;
 			gNewObjectDefinition.rot 		= 0;
 			newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+			if (newObj != nil)
+				Bugdom2Script_RegisterObject(newObj, "bugdom2.shieldSphere", "child-object");
 
 			gPlayerInfo.shieldObj[i] = newObj;
 
@@ -1302,8 +1306,6 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 	UpdateObjectTransforms(theNode);
 }
-
-
 
 
 

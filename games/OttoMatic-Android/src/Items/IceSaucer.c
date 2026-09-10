@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -71,6 +75,10 @@ float	r;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= ICE_SAUCER_SCALE;
 	gPlayerSaucer = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"vehicle", "player"};
+		OttoScript_RegisterObjectNode(gPlayerSaucer, "ottomatic.iceSaucer", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
 
 	gPlayerSaucer->TerrainItemPtr = itemPtr;							// keep ptr to item list
 
@@ -93,6 +101,10 @@ float	r;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= 0;
 	hatch = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"child-object"};
+		OttoScript_RegisterObjectNode(hatch, "ottomatic.iceSaucerHatch", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	gPlayerSaucer->ChainNode = hatch;
 
@@ -426,4 +438,3 @@ static void MoveIceCrack(ObjNode *theNode)
 	if (gIceCracked)
 		DeleteObject(theNode);
 }
-

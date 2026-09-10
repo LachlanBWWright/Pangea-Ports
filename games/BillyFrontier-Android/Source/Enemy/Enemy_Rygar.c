@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 
@@ -48,6 +51,7 @@ int		i;
 				/***********************/
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_RYGAR,animNum, x,z, RYGAR_SCALE, rot, moveCall, gAutoFadeStatusBits );
+	BillyScript_RegisterObject(newObj, "billy.rygar", "enemy");
 	
 
 
@@ -76,6 +80,7 @@ int		i;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	rightGun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(rightGun, "billy.rygarGunRight", "child-object");
 	rightGun->Side = SIDE_RIGHT;
 	RygarPutgunInHolster(rightGun);
 
@@ -86,6 +91,7 @@ int		i;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	leftGun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(leftGun, "billy.rygarGunLeft", "child-object");
 	leftGun->Side = SIDE_LEFT;
 	RygarPutgunInHolster(leftGun);
 	
@@ -94,6 +100,7 @@ int		i;
 			
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_RygarHat;
 	hat = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(hat, "billy.rygarHat", "child-object");
 	RygarPutHatOnHead(hat);
 	
 			/* CHAIN THEM */
@@ -334,7 +341,6 @@ int				i;
 		
 	}	
 }
-
 
 
 

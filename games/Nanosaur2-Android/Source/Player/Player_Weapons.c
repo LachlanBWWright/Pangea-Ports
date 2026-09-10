@@ -10,11 +10,19 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
+
+static void RegisterProjectileEffect(ObjNode* object);
+
+static void RegisterProjectileEffect(ObjNode* object)
+{
+	Nanosaur2Script_RegisterObject(object, "nanosaur2.projectile", "projectile/effect");
+}
 
 static void CalcPlayerGunMuzzleInfo(ObjNode *player, OGLPoint3D *muzzleCoord, OGLVector3D *muzzleVector);
 
@@ -419,6 +427,7 @@ short		i;
 		.scale 		= 4,
 	};
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj);
 
 	newObj->Kind = WEAPON_TYPE_BLASTER;
 	newObj->PlayerNum = player->PlayerNum;					// remember which player shot this
@@ -740,6 +749,7 @@ OGLVector3D	aim;
 		.scale 		= .9,
 	};
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj);
 
 	newObj->Kind = WEAPON_TYPE_CLUSTERSHOT;
 	newObj->PlayerNum = player->PlayerNum;					// remember which player shot this
@@ -811,6 +821,7 @@ OGLVector3D	aim;
 		};
 
 		ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+		RegisterProjectileEffect(newObj);
 
 		newObj->Kind = WEAPON_TYPE_CLUSTERSHOT;
 		newObj->PlayerNum = parentShot->PlayerNum;			// remember which player shot this
@@ -1006,6 +1017,7 @@ float		speed;
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj);
 
 	newObj->Kind = WEAPON_TYPE_HEATSEEKER;
 	newObj->PlayerNum = playerNum;								// remember which player shot this
@@ -1553,6 +1565,7 @@ short   p = player->PlayerNum;
 	};
 
 	newObj = MakeNewObject(&def);
+	RegisterProjectileEffect(newObj);
 
 
 	newObj->Kind = WEAPON_TYPE_SONICSCREAM;
@@ -1795,6 +1808,7 @@ float		speed;
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj);
 
 	newObj->Kind 		= WEAPON_TYPE_BOMB;
 	newObj->PlayerNum 	= playerNum;								// remember which player shot this
@@ -2145,6 +2159,7 @@ static ObjNode *MakeBombShockwave(OGLPoint3D *where)
 	};
 
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
+	RegisterProjectileEffect(newObj);
 	newObj->ColorFilter.a = .8;
 	newObj->Damage = 1.0f;
 	return(newObj);

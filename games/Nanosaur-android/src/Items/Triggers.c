@@ -188,6 +188,7 @@ ObjNode	*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.bonusBox", "trigger");
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 		
@@ -274,6 +275,7 @@ short	n;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.stepStone", "trigger");
 
 	newObj->TerrainItemPtr = itemPtr;			// keep ptr to item list
 		

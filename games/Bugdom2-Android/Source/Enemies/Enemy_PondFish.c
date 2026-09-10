@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -120,6 +124,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.scale 		= PONDFISH_SCALE;
 
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.pondFish", "enemy");
 
 	newObj->TerrainItemPtr = itemPtr;
 
@@ -696,7 +702,6 @@ float		dist;
 		gNumCaughtFish++;
 	}
 }
-
 
 
 

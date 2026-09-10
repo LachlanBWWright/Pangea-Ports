@@ -19,6 +19,9 @@
 #include "objecttypes.h"
 #include "collision.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -64,6 +67,10 @@ static	long dyList[] = {-BATTERY_SPEED,-BATTERY_SPEED,0,BATTERY_SPEED,
 			itemPtr->x,itemPtr->y,50,MoveBattery,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.battery", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -163,5 +170,4 @@ short	diffX,diffY;
 			return(3);									// go d/r
 	}
 }
-
 

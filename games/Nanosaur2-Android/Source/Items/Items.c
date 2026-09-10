@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -250,6 +251,7 @@ long	rot = itemPtr->parm[1];
 	newObj->CType 			= CTYPE_SOLIDTOENEMY | CTYPE_PLAYERTEST | CTYPE_WEAPONTEST;
 	newObj->CBits			= CBITS_ALLSOLID;
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj, .7, .8);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.rock", "scenery");
 
 
 	return(true);													// item was added
@@ -285,6 +287,7 @@ Boolean AddRiverRock(TerrainItemEntryType *itemPtr, float  x, float z)
 	newObj->CType 			= CTYPE_SOLIDTOENEMY | CTYPE_PLAYERTEST | CTYPE_WEAPONTEST;
 	newObj->CBits			= CBITS_ALLSOLID;
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj, 1, 1);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.riverRock", "scenery");
 
 
 	return(true);													// item was added
@@ -318,6 +321,7 @@ Boolean AddGasMound(TerrainItemEntryType *itemPtr, float  x, float z)
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
 	newObj->Kind = itemPtr->parm[0];
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.gasMound", "hazard");
 
 			/* SET COLLISION STUFF */
 
@@ -503,19 +507,11 @@ Boolean AddAsteroid(TerrainItemEntryType *itemPtr, float  x, float z)
 	newObj->CType 			= CTYPE_SOLIDTOENEMY | CTYPE_PLAYERTEST | CTYPE_WEAPONTEST;
 	newObj->CBits			= CBITS_ALLSOLID;
 	CreateCollisionBoxFromBoundingBox_Rotated(newObj, 1, 1);
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.asteroid", "scenery");
 
 
 	return(true);													// item was added
 }
-
-
-
-
-
-
-
-
-
 
 
 

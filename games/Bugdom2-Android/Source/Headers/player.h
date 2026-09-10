@@ -241,6 +241,7 @@ Boolean IsPlayerDoingPushAnim(ObjNode *theNode);
 void UpdatePersonality(ObjNode *player);
 void SetPlayerRammingAnim(ObjNode *theNode);
 void SetPlayerJumpAnim(ObjNode *player, Boolean playEffect);
+Boolean Bugdom2Script_SetPlayerForm(Boolean wantBall);
 void SetPlayerLandAnim(ObjNode *player);
 Boolean IsPlayerDoingLandAnim(ObjNode *theNode);
 void PlayerStartPushingObject(ObjNode *player, ObjNode *pushObj);

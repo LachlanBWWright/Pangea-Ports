@@ -47,6 +47,11 @@ export interface GameContext {
   readonly modePhase?: number;
   readonly modeWave?: number;
   readonly modeTimer?: number;
+  readonly modeSequenceIndex?: number;
+  readonly modeSequenceLength?: number;
+  readonly modeEnemyCount?: number;
+  readonly modeReflex?: number;
+  readonly modeCanAdvance?: boolean;
 }
 
 export interface LevelContext extends GameContext {
@@ -338,9 +343,13 @@ export interface PlayerSnapshot {
   readonly fuel?: number;
   readonly score?: number;
   readonly coinCount?: number;
+  readonly bunnyCount?: number;
   readonly pesoCount?: number;
   readonly lives?: number;
   readonly activeWeapon?: number;
+  readonly weaponCharge?: number;
+  readonly giant?: boolean;
+  readonly giantTimeRemaining?: number;
   readonly weapons?: readonly PlayerWeapon[];
   readonly keys?: readonly number[];
   readonly greenCloverCount?: number;
@@ -348,6 +357,13 @@ export interface PlayerSnapshot {
   readonly goldCloverCount?: number;
   readonly tokenCount?: number;
   readonly shieldActive?: boolean;
+  readonly shieldTimeRemaining?: number;
+  readonly knockedDown?: boolean;
+  readonly knockdownTimeRemaining?: number;
+  readonly burning?: boolean;
+  readonly burnTimeRemaining?: number;
+  readonly invulnerabilityTimeRemaining?: number;
+  readonly dead?: boolean;
   readonly form?: "bug" | "ball";
   readonly miceRescued?: number;
   readonly miceTotal?: number;
@@ -364,13 +380,42 @@ export interface PlayerSnapshot {
   readonly vehicleAcceleration?: number;
   readonly vehicleTraction?: number;
   readonly vehicleSuspension?: number;
+  readonly groundTraction?: number;
+  readonly groundFriction?: number;
+  readonly groundSteering?: number;
+  readonly groundAcceleration?: number;
+  readonly stickyTiresActive?: boolean;
+  readonly stickyTiresTimeRemaining?: number;
+  readonly superSuspensionActive?: boolean;
+  readonly superSuspensionTimeRemaining?: number;
+  readonly invisibilityActive?: boolean;
+  readonly invisibilityTimeRemaining?: number;
+  readonly frozen?: boolean;
+  readonly frozenTimeRemaining?: number;
+  readonly flaming?: boolean;
+  readonly flamingTimeRemaining?: number;
+  readonly submarineImmobilized?: boolean;
+  readonly submarineImmobilizedTimeRemaining?: number;
+  readonly ramming?: boolean;
+  readonly rammingTimeRemaining?: number;
   readonly team?: number;
   readonly carryingFlag?: boolean;
   readonly captureScore?: number;
+  readonly tagged?: boolean;
+  readonly tagTimeRemaining?: number;
   readonly sceneNum?: number;
   readonly areaNum?: number;
   readonly areaComplete?: boolean;
+  readonly levelComplete?: boolean;
   readonly camera?: Vector3;
+  readonly animation?: number;
+  readonly animationSpeed?: number;
+  readonly animationFrame?: number;
+  readonly grounded?: boolean;
+  readonly heightOffGround?: number;
+  readonly onWater?: boolean;
+  readonly onLava?: boolean;
+  readonly glidePower?: number;
 }
 
 export interface RaceResult {
@@ -449,11 +494,16 @@ export interface PangeaApi {
     findByTag(tag: string): readonly ObjectHandle[];
     nearest(origin: Vector3, tag?: string): ObjectHandle | undefined;
     exists(handle: ObjectHandle): boolean;
+    type(handle: ObjectHandle): string | undefined;
+    health(handle: ObjectHandle): number | undefined;
+    damage(handle: ObjectHandle): number | undefined;
     position(handle: ObjectHandle): Vector3 | undefined;
     velocity(handle: ObjectHandle): Vector3 | undefined;
     rotation(handle: ObjectHandle): Vector3 | undefined;
     scale(handle: ObjectHandle): number | undefined;
     animation(handle: ObjectHandle): number | undefined;
+    animationSpeed(handle: ObjectHandle): number | undefined;
+    animationFrame(handle: ObjectHandle): number | undefined;
     active(handle: ObjectHandle): boolean | undefined;
     collisionEnabled(handle: ObjectHandle): boolean | undefined;
     source(handle: ObjectHandle): ObjectSource | undefined;
@@ -487,6 +537,7 @@ export interface PangeaApi {
     restoreCheckpoint(handle: ObjectHandle): boolean;
     tags(handle: ObjectHandle): readonly string[];
     hasTag(handle: ObjectHandle, tag: string): boolean;
+    category(handle: ObjectHandle): string | undefined;
     state(handle: ObjectHandle): Record<string, unknown> | undefined;
     delete(handle: ObjectHandle): boolean;
     deleteResult(handle: ObjectHandle): ObjectCommandResult;

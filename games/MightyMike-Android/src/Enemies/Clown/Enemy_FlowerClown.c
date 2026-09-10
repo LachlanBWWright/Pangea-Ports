@@ -20,6 +20,9 @@
 #include "objecttypes.h"
 #include "collision.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -66,6 +69,9 @@ register	ObjNode		*newObj;
 						itemPtr->y,50,MoveFlowerClown,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.flowerClown", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;				// remember where this came from
 	newObj->CType = CTYPE_ENEMYA;				// set collision info
@@ -332,6 +338,5 @@ void MoveFlowerClownSquirt(void)
 
 	UpdateObject();
 }
-
 
 

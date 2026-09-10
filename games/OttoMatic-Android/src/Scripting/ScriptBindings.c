@@ -9,9 +9,16 @@
 #include <string.h>
 #include <limits.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
+
 
 extern bool PangeaScript_LoadCustomBG3D(FSSpec* spec, int group);
 extern bool PangeaScript_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 
 #define SCRIPT_TERRAIN_ITEM_CAPACITY 256
 static TerrainItemEntryType gScriptTerrainItems[SCRIPT_TERRAIN_ITEM_CAPACITY];
@@ -22,6 +29,26 @@ static int gOttoLastWeaponHitScoreDelta = INT_MIN;
 int OttoScript_GetLastWeaponHitScoreDelta(void)
 {
 	return gOttoLastWeaponHitScoreDelta;
+}
+
+EMSCRIPTEN_KEEPALIVE int OttoScript_ProbeDeathJS(void)
+{
+	if (!gPlayerInfo.objNode || gPlayerIsDead)
+		return 0;
+	KillPlayer(PLAYER_DEATH_TYPE_DROWN);
+	if (!gPlayerIsDead)
+		return 0;
+	ResetPlayerAtBestCheckpoint();
+	return gPlayerIsDead ? 0 : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int OttoScript_ProbeLevelCompleteJS(void)
+{
+	if (!gPlayerInfo.objNode || gLevelCompleted)
+		return 0;
+	gLevelCompleted = true;
+	gLevelCompletedCoolDownTimer = 0.0f;
+	return 1;
 }
 
 static TerrainItemEntryType* AcquireScriptTerrainItem(void)
@@ -66,6 +93,156 @@ static const PangeaScriptNativeItem kNativeItems[] =
 		.nativeType = 57,
 		.category = "trigger",
 		.dependencySummary = "teleporter state, terrain, and level transition systems",
+	},
+	{
+		.id = "ottomatic.proximityMine",
+		.nativeType = 62,
+		.category = "hazard",
+		.dependencySummary = "proximity-mine assets, terrain, and native hazard collision",
+	},
+	{
+		.id = "ottomatic.chainReactingMine",
+		.nativeType = 67,
+		.category = "hazard",
+		.dependencySummary = "chain-mine assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "ottomatic.greenSteam",
+		.nativeType = 70,
+		.category = "hazard",
+		.dependencySummary = "green-steam assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "ottomatic.lavaPillar",
+		.nativeType = 87,
+		.category = "hazard",
+		.dependencySummary = "lava-pillar assets, terrain, and native hazard behavior",
+	},
+	{
+		.id = "ottomatic.lavaPlatform",
+		.nativeType = 98,
+		.category = "hazard",
+		.dependencySummary = "lava-platform assets, terrain, and native hazard collision",
+	},
+	{
+		.id = "ottomatic.squooshy",
+		.nativeType = 3,
+		.category = "enemy",
+		.dependencySummary = "squooshy assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.brainAlien",
+		.nativeType = 7,
+		.category = "enemy",
+		.dependencySummary = "brain-alien assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.onion",
+		.nativeType = 8,
+		.category = "enemy",
+		.dependencySummary = "onion assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.corn",
+		.nativeType = 9,
+		.category = "enemy",
+		.dependencySummary = "corn assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.tomato",
+		.nativeType = 10,
+		.category = "enemy",
+		.dependencySummary = "tomato assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.blob",
+		.nativeType = 30,
+		.category = "enemy",
+		.dependencySummary = "blob assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.slimeMech",
+		.nativeType = 38,
+		.category = "enemy",
+		.dependencySummary = "slime-mech assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.flamester",
+		.nativeType = 49,
+		.category = "enemy",
+		.dependencySummary = "flamester assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.giantLizard",
+		.nativeType = 50,
+		.category = "enemy",
+		.dependencySummary = "giant-lizard assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.flyTrap",
+		.nativeType = 51,
+		.category = "enemy",
+		.dependencySummary = "fly-trap assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.mantis",
+		.nativeType = 52,
+		.category = "enemy",
+		.dependencySummary = "mantis assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.mutant",
+		.nativeType = 59,
+		.category = "enemy",
+		.dependencySummary = "mutant assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.mutantRobot",
+		.nativeType = 60,
+		.category = "enemy",
+		.dependencySummary = "mutant-robot assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.clown",
+		.nativeType = 78,
+		.category = "enemy",
+		.dependencySummary = "clown assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.strongMan",
+		.nativeType = 81,
+		.category = "enemy",
+		.dependencySummary = "strongman assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.jawsBot",
+		.nativeType = 89,
+		.category = "enemy",
+		.dependencySummary = "Jaws-bot assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.iceCube",
+		.nativeType = 92,
+		.category = "enemy",
+		.dependencySummary = "ice-cube assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.hammerBot",
+		.nativeType = 93,
+		.category = "enemy",
+		.dependencySummary = "hammer-bot assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.drillBot",
+		.nativeType = 94,
+		.category = "enemy",
+		.dependencySummary = "drill-bot assets, terrain, and native enemy AI",
+	},
+	{
+		.id = "ottomatic.swingerBot",
+		.nativeType = 95,
+		.category = "enemy",
+		.dependencySummary = "swinger-bot assets, terrain, and native enemy AI",
 	},
 #define OTTO_TERRAIN_NATIVE_ITEM(type) { .id = #type, .nativeType = type, .category = "terrain", .dependencySummary = "current level assets, terrain systems, and the native item initializer" },
 	OTTO_TERRAIN_NATIVE_ITEM(1)
@@ -796,6 +973,24 @@ static bool OttoObjectGetActive(void* nativeObject, bool* outActive)
 	return true;
 }
 
+static bool OttoObjectGetHealth(void* nativeObject, float* outHealth)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node || !outHealth)
+		return false;
+	*outHealth = node->Health;
+	return true;
+}
+
+static bool OttoObjectGetDamage(void* nativeObject, float* outDamage)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node || !outDamage)
+		return false;
+	*outDamage = node->Damage;
+	return true;
+}
+
 static bool OttoObjectSetActive(void* nativeObject, bool active)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
@@ -814,6 +1009,23 @@ static bool OttoObjectGetAnimation(void* nativeObject, int* outAnimation)
 	if (!node || !outAnimation || !node->Skeleton)
 		return false;
 	*outAnimation = node->Skeleton->AnimNum;
+	return true;
+}
+
+static bool OttoObjectGetAnimationSpeed(void* nativeObject, float* outSpeed)
+{
+	ObjNode* node = (ObjNode*) nativeObject;
+	if (!node || !outSpeed || !node->Skeleton)
+		return false;
+	*outSpeed = node->Skeleton->AnimSpeed;
+	return true;
+}
+
+static bool OttoObjectGetAnimationFrame(void* nativeObject, int* outFrame)
+{
+	ObjNode* obj = (ObjNode*) nativeObject;
+	if (!obj || !outFrame || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG) return false;
+	*outFrame = GetScriptSkeletonFrame(obj->Skeleton);
 	return true;
 }
 
@@ -880,7 +1092,11 @@ static const PangeaScriptObjectOps kOttoObjectNodeOps =
 	.getRotation = OttoObjectGetRotation,
 	.getScale = OttoObjectGetScale,
 	.getAnimation = OttoObjectGetAnimation,
+	.getAnimationSpeed = OttoObjectGetAnimationSpeed,
+	.getAnimationFrame = OttoObjectGetAnimationFrame,
 	.getActive = OttoObjectGetActive,
+	.getHealth = OttoObjectGetHealth,
+	.getDamage = OttoObjectGetDamage,
 	.getCollisionEnabled = OttoObjectGetCollisionEnabled,
 	.setPosition = OttoObjectSetPosition,
 	.setVelocity = OttoObjectSetVelocity,
@@ -943,10 +1159,53 @@ static bool CompleteScriptReplacement(PangeaScriptObjectHandle handle, const cha
 
 static int GetScriptPlayerCount(void) { return gPlayerInfo.objNode ? 1 : 0; }
 
+static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton)
+{
+	const JointKeyFrameHeader* header;
+	int frame;
+	int frameCount;
+
+	if (!skeleton || !skeleton->skeletonDefinition || skeleton->AnimNum >= MAX_ANIMS)
+		return 0;
+	header = &skeleton->skeletonDefinition->JointKeyframes[0];
+	frameCount = header->numKeyFrames[skeleton->AnimNum];
+	if (frameCount <= 0 || !header->keyFrames || !header->keyFrames[skeleton->AnimNum])
+		return 0;
+	frame = 0;
+	while (frame + 1 < frameCount && skeleton->CurrentAnimTime >= header->keyFrames[skeleton->AnimNum][frame + 1].tick)
+		frame++;
+	return frame;
+}
+
 static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer)
 {
 	if (playerNum != 0 || !outPlayer || !gPlayerInfo.objNode) return false;
-	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .velocity = {gPlayerInfo.objNode->Delta.x, gPlayerInfo.objNode->Delta.y, gPlayerInfo.objNode->Delta.z}, .hasVelocity = true, .collisionEnabled = gPlayerInfo.objNode->CType != 0 && (gPlayerInfo.objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gPlayerInfo.health, .hasHealth = true, .fuel = gPlayerInfo.fuel, .hasFuelState = true, .score = (int64_t) gScore, .hasScore = true, .lives = gPlayerInfo.lives, .hasLives = true, .activeWeapon = gPlayerInfo.currentWeaponType, .hasWeaponState = true, .active = true};
+	*outPlayer = (PangeaScriptPlayerSnapshot){.position = {gPlayerInfo.coord.x, gPlayerInfo.coord.y, gPlayerInfo.coord.z}, .velocity = {gPlayerInfo.objNode->Delta.x, gPlayerInfo.objNode->Delta.y, gPlayerInfo.objNode->Delta.z}, .hasVelocity = true, .grounded = (gPlayerInfo.objNode->StatusBits & STATUS_BIT_ONGROUND) != 0, .hasGroundedState = true, .collisionEnabled = gPlayerInfo.objNode->CType != 0 && (gPlayerInfo.objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0, .hasCollisionEnabled = true, .health = gPlayerInfo.health, .hasHealth = true, .fuel = gPlayerInfo.fuel, .hasFuelState = true, .score = (int64_t) gScore, .hasScore = true, .lives = gPlayerInfo.lives, .hasLives = true, .activeWeapon = gPlayerInfo.currentWeaponType, .hasWeaponState = true, .invulnerable = gPlayerInfo.objNode->InvincibleTimer > 0.0f, .hasInvulnerabilityState = true, .dead = gPlayerIsDead, .hasDeathState = true, .active = true};
+	outPlayer->weaponCharge = gPlayerInfo.superNovaCharge;
+	outPlayer->hasWeaponChargeState = true;
+	outPlayer->giant = gPlayerInfo.giantTimer > 0.0f;
+	outPlayer->giantTimeRemaining = gPlayerInfo.giantTimer;
+	outPlayer->hasGiantState = true;
+	outPlayer->levelComplete = gLevelCompleted;
+	outPlayer->hasLevelCompletionState = true;
+	outPlayer->heightOffGround = gPlayerInfo.distToFloor;
+	outPlayer->hasTerrainHeightState = true;
+	outPlayer->invulnerabilityTimeRemaining = gPlayerInfo.objNode->InvincibleTimer;
+	outPlayer->hasInvulnerabilityTimerState = true;
+	outPlayer->knockedDown = gPlayerInfo.knockDownTimer > 0.0f;
+	outPlayer->knockdownTimeRemaining = gPlayerInfo.knockDownTimer;
+	outPlayer->hasKnockdownState = true;
+	outPlayer->burning = gPlayerInfo.burnTimer > 0.0f;
+	outPlayer->burnTimeRemaining = gPlayerInfo.burnTimer;
+	outPlayer->hasBurnState = true;
+	outPlayer->jetThrust = gPlayerInfo.jumpJetSpeed;
+	outPlayer->hasFlightState = true;
+	outPlayer->groundTraction = gPlayerInfo.groundTraction;
+	outPlayer->groundFriction = gPlayerInfo.groundFriction;
+	outPlayer->groundAcceleration = gPlayerInfo.groundAcceleration;
+	outPlayer->hasGroundPhysicsState = true;
+	outPlayer->onWater = (gPlayerInfo.objNode->StatusBits & STATUS_BIT_UNDERWATER) != 0;
+	outPlayer->hasWaterState = true;
 	if (gGameViewInfoPtr)
 	{
 		outPlayer->camera = (PangeaScriptVector3){gGameViewInfoPtr->cameraPlacement.cameraLocation.x, gGameViewInfoPtr->cameraPlacement.cameraLocation.y, gGameViewInfoPtr->cameraPlacement.cameraLocation.z};
@@ -956,6 +1215,15 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 	outPlayer->hasRotation = true;
 	outPlayer->aim = (PangeaScriptVector3){-sinf(gPlayerInfo.objNode->Rot.y), 0.0f, -cosf(gPlayerInfo.objNode->Rot.y)};
 	outPlayer->hasAimState = true;
+	if (gPlayerInfo.objNode->Skeleton)
+	{
+		outPlayer->animation = gPlayerInfo.objNode->Skeleton->AnimNum;
+		outPlayer->hasAnimationState = true;
+		outPlayer->animationSpeed = gPlayerInfo.objNode->Skeleton->AnimSpeed;
+		outPlayer->hasAnimationSpeedState = true;
+		outPlayer->animationFrame = GetScriptSkeletonFrame(gPlayerInfo.objNode->Skeleton);
+		outPlayer->hasAnimationFrameState = true;
+	}
 	for (int slot = 0; slot < MAX_INVENTORY_SLOTS && slot < PANGEA_SCRIPT_PLAYER_INVENTORY_CAPACITY; slot++)
 	{
 		if (gPlayerInfo.weaponInventory[slot].type == NO_INVENTORY_HERE) continue;
@@ -1854,7 +2122,16 @@ void OttoScript_OnDeath(int eventValue)
 	PangeaScriptPlayerEventContext context;
 	ObjNode* player = gPlayerInfo.objNode;
 
-	if (!player || player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
+	if (!player)
+		return;
+	if (player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0 ||
+		!PangeaScript_ObjectExists((PangeaScriptObjectHandle){player->ScriptObjectID, player->ScriptObjectGeneration}))
+	{
+		player->ScriptObjectID = 0;
+		player->ScriptObjectGeneration = 0;
+		OttoScript_RegisterPlayerObject(player);
+	}
+	if (player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{

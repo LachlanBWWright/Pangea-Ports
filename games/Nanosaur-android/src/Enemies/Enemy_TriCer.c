@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -103,6 +104,7 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_TRICER,x,z);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.triceratops", "enemy");
 
 	gLastTricer = newObj;
 
@@ -242,7 +244,6 @@ float	r;
 	
 	UpdateEnemy(theNode);		
 }
-
 
 
 

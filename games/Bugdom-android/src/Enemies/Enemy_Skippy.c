@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -72,6 +76,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_SKIPPY,x,z,SKIPPY_SCALE);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.skippy", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, SKIPPY_ANIM_SWIM);
@@ -240,6 +248,10 @@ float			x,z,placement;
 		
 	DetachObject(newObj);									// detach this object from the linked list
 		
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.skippy", "enemy");
+#endif
+
 	newObj->SplineItemPtr = itemPtr;
 	newObj->SplineNum = splineNum;
 	
@@ -350,7 +362,6 @@ Boolean KillSkippy(ObjNode *theNode)
 	
 	return(false);
 }
-
 
 
 

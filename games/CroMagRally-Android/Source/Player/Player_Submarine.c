@@ -89,6 +89,10 @@ ObjNode			*newObj;
 	if (newObj == nil)
 		return(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(newObj, "cromag.submarine", "vehicle");
+#endif
+
 
 	newObj->Rot.y = rotY;
 	newObj->CType = CTYPE_MISC|CTYPE_PLAYER;
@@ -709,6 +713,10 @@ ObjNode			*prop;
 	};
 	prop = MakeNewDisplayGroupObject(&def);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_RegisterObject(prop, "cromag.submarinePropeller", "child-object");
+#endif
+
 
 	prop->PlayerNum = playerNum;						// set playernum in this obj
 
@@ -849,7 +857,6 @@ OGLPoint3D		coord;
 		MakeBubbles(theCar, &coord, .5, 1.0);
 	}
 }
-
 
 
 

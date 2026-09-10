@@ -54,6 +54,7 @@ int Bugdom2Script_GetSelectedSplineItemFieldJS(int field);
 float Bugdom2Script_GetSelectedSplinePlacementJS(void);
 int Bugdom2Script_ProbeDamageJS(float damage);
 int Bugdom2Script_ProbeBuddyLaunchJS(void);
+int Bugdom2Script_ProbeResourceCleanupJS(void);
 int Bugdom2Script_ProbeSaveLoadJS(int saveSlot);
 
 #endif

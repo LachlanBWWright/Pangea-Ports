@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -83,6 +84,7 @@ Boolean	playroom = (LevelMetadataCaseFor("level.rideBall", gLevelNum) == LEVEL_N
 	ball->BoundingSphereRadius = ball->RightOff;				// set this to be accurate
 
 	ball->What = WHAT_RIDEBALL;
+	Bugdom2Script_RegisterObject(ball, "bugdom2.rideBall", "vehicle");
 
 
 			/* MAKE SHADOW */
@@ -294,6 +296,29 @@ static Boolean DoTrig_RideBall(ObjNode *ball, ObjNode *who, Byte sideBits)
 	return(true);
 }
 
+Boolean Bugdom2Script_SetPlayerForm(Boolean wantBall)
+{
+	ObjNode *ball;
+
+	if (!gPlayerInfo.objNode || IsTunnelLevel()) return false;
+	if (!wantBall)
+	{
+		if (!gPlayerInfo.ridingBall) return true;
+		gPlayerInfo.ridingBall = nil;
+		gPlayerInfo.objNode->Delta.y = 1600.0f;
+		SetPlayerJumpAnim(gPlayerInfo.objNode, true);
+		return true;
+	}
+	if (gPlayerInfo.ridingBall) return true;
+	for (ball = gFirstNodePtr; ball; ball = ball->NextNode)
+	{
+		if (ball->What != WHAT_RIDEBALL) continue;
+		if (CalcQuickDistance(ball->Coord.x, ball->Coord.z, gPlayerInfo.coord.x, gPlayerInfo.coord.z) > 300.0f) continue;
+		return DoTrig_RideBall(ball, gPlayerInfo.objNode, SIDE_BITS_BOTTOM) && gPlayerInfo.ridingBall == ball;
+	}
+	return false;
+}
+
 
 #pragma mark -
 
@@ -340,8 +365,6 @@ ObjNode	*ball = gPlayerInfo.ridingBall;
 	UpdateObject(player);
 	HandlePlayerLineMarkerCrossing(player);
 }
-
-
 
 
 

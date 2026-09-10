@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -68,6 +71,8 @@ int		part = itemPtr->parm[0];
 		gNewObjectDefinition.moveCall 	= MoveStaticObject;
 		gNewObjectDefinition.rot 		= 0;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		if (newObj != nil)
+			Bugdom2Script_RegisterObject(newObj, "bugdom2.puzzleMain", "objective");
 
 		newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -98,6 +103,8 @@ int		part = itemPtr->parm[0];
 		gNewObjectDefinition.moveCall 	= MovePuzzlePiece;
 		gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		if (newObj != nil)
+			Bugdom2Script_RegisterObject(newObj, "bugdom2.puzzlePiece", "pickup");
 
 		newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -271,6 +278,8 @@ float			x,z,splineIndex,x2,z2,y;
 		gNewObjectDefinition.moveCall 	= nil;
 		gNewObjectDefinition.rot 		= 0;
 		newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		if (newObj != nil)
+			Bugdom2Script_RegisterObject(newObj, "bugdom2.hanger", "trigger");
 
 
 					/* SET BETTER INFO */
@@ -294,6 +303,8 @@ float			x,z,splineIndex,x2,z2,y;
 		gNewObjectDefinition.slot++;
 		gNewObjectDefinition.moveCall 	= nil;
 		trig = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		if (trig != nil)
+			Bugdom2Script_RegisterObject(trig, "bugdom2.hangerClover", "child-object");
 
 				/* SET COLLISION INFO */
 
@@ -393,6 +404,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= MoveFishingLure;
 	gNewObjectDefinition.rot 		= RandomFloat() * PI2;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.fishingLure", "trigger");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -518,6 +531,8 @@ ObjNode	*newObj;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/4);
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.picnicBasket", "trigger");
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -565,8 +580,6 @@ static Boolean DoTrig_PicnicBasket(ObjNode *basket, ObjNode *who, Byte sideBits)
 
 	return(true);
 }
-
-
 
 
 

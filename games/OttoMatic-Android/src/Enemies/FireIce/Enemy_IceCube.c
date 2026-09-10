@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -148,6 +152,13 @@ ObjNode	*newObj;
 				/*******************************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_ICECUBE,x,z, ICECUBE_SCALE_NORMAL, 0, MoveIceCube);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"enemy", "ai"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.iceCube", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
 
 	SetSkeletonAnim(newObj->Skeleton, ICECUBE_ANIM_STAND);
 
@@ -974,6 +985,13 @@ ObjNode	*icicle;
 	gNewObjectDefinition.scale 		= .1;
 	icicle = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	{
+		static const char* tags[] = {"projectile", "effect"};
+		OttoScript_RegisterObjectNode(icicle, "ottomatic.iceCubeIcicle", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 2);
+	}
+#endif
+
 	enemy->ChainNode = icicle;
 
 	icicle->ColorFilter.a = .8;
@@ -1044,6 +1062,5 @@ float	fps = gFramesPerSecondFrac;
 
 	UpdateObject(theNode);
 }
-
 
 

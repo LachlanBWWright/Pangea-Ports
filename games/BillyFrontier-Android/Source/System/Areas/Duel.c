@@ -879,6 +879,7 @@ float	speed;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 
 	SetAlignmentMatrix(&newObj->AlignmentMatrix, aim);
+	BillyScript_RegisterObject(newObj, "billy.projectile", "projectile/effect");
 
 	newObj->Health = 4.0f;
 
@@ -975,6 +976,23 @@ int			anim;
 		
 		
 			enemy = (ObjNode *)theNode->TargetObj;				// who are we shooting?
+			Boolean applyDamage = true;
+			Boolean destroyTarget = false;
+			float damage = 1.0f;
+			#ifdef PANGEA_ENABLE_SCRIPTING
+			applyDamage = BillyScript_OnWeaponHit(theNode, enemy, damage, &damage, &destroyTarget);
+			#endif
+			if (!applyDamage)
+			{
+				DeleteObject(theNode);
+				return;
+			}
+			if (destroyTarget)
+			{
+				DeleteEnemy(enemy);
+				DeleteObject(theNode);
+				return;
+			}
 			
 			
 					/* WHICH DEATH ANIM TO DO */
@@ -1258,6 +1276,9 @@ static void DetermineDuelShootOutcome(void)
 	{
 		gPlayerToWinDuel = false;
 		gPlayerIsDead = true;
+	#ifdef PANGEA_ENABLE_SCRIPTING
+		BillyScript_OnDeath(gPlayerInfo.objNode, 0);
+	#endif
 	}
 
 //	gPlayerToWinDuel = true;	//-------
@@ -1567,9 +1588,6 @@ int		anim, i;
 		
 	}	
 }
-
-
-
 
 
 

@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -112,6 +116,9 @@ float	y;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= PLAYER_SAUCER_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.playerSaucer", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"player", "vehicle"}, 2);
+	#endif
 
 
 	gPlayerSaucer = gPlayerInfo.objNode 	= newObj;
@@ -778,6 +785,9 @@ static const OGLColorRGBA beamColors[3] =
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .6;
 	beam = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(beam, "ottomatic.saucerBeam", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"effect", "child-object"}, 2);
+	#endif
 
 	saucer->ChainNode = beam;
 
@@ -788,6 +798,9 @@ static const OGLColorRGBA beamColors[3] =
 
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_BlueSpiral;
 	spiral = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_RegisterObjectNode(spiral, "ottomatic.saucerBeamSpiral", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"effect", "child-object"}, 2);
+	#endif
 
 	beam->ChainNode = spiral;
 
@@ -1050,7 +1063,6 @@ static const OGLColorRGBA white = {1,1,1,1};
 
 	return(d);													// return dist
 }
-
 
 
 

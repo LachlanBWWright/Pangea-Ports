@@ -20,6 +20,9 @@
 #include "enemy2.h"
 #include "objecttypes.h"
 #include "externs.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    CONSTANTS             */
@@ -59,6 +62,9 @@ register	ObjNode		*newObj;
 			itemPtr->x,itemPtr->y,50,MoveMagicHat,PLAYFIELD_RELATIVE);
 	if (newObj == nil)
 		return(false);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_RegisterObject(newObj, "mightymike.magicHatBunny", "enemy");
+#endif
 
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
@@ -263,4 +269,3 @@ void DoHatBunnyMove(void)
 	gX.L += gDX;
 	gY.L += gDY;
 }
-

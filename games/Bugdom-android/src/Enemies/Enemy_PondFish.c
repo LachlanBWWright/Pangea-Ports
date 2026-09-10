@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -93,6 +97,10 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_PONDFISH,x,z,PONDFISH_SCALE+RandomFloat()*.3f);
 	if (newObj == nil)
 		return(false);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.pondFish", "enemy");
+#endif
 	newObj->TerrainItemPtr = itemPtr;
 	
 
@@ -446,4 +454,3 @@ static void PondFish_ContinueEatingPlayer(ObjNode *fish)
 		KillPlayer(false);	
 	}
 }
-

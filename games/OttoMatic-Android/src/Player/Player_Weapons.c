@@ -626,6 +626,10 @@ int				i;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 2.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.projectile", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 
 	newObj->Kind = WEAPON_TYPE_STUNPULSE;
@@ -1065,7 +1069,7 @@ static ObjNode *FindScriptWeapon(int weaponType)
 {
 	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
 	{
-		if (node != gPlayerInfo.objNode && node->CType == CTYPE_WEAPON && node->Kind == weaponType)
+		if (node != gPlayerInfo.objNode && (node->CType & CTYPE_WEAPON) && node->Kind == weaponType)
 			return node;
 	}
 	return NULL;
@@ -1088,36 +1092,38 @@ static Boolean ProbeScriptProjectileWeapon(ObjNode *target, int weaponType, OGLP
 	if (!weapon) weapon = FindScriptWeapon(weaponType);
 	if (!weapon) return false;
 	damage = weapon->Damage;
-	if (!OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget))
-		return false;
+	(void) OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget);
 	if (weapon->CType != INVALID_NODE_FLAG)
 		DeleteObject(weapon);
-	return true;
+	return OttoScript_GetLastWeaponHitScoreDelta() >= 0;
 }
 
 int OttoScript_ProbeProjectileWeaponFamiliesJS(void)
 {
 	static const int projectileTypes[] = {WEAPON_TYPE_STUNPULSE, WEAPON_TYPE_FREEZE, WEAPON_TYPE_FLAME, WEAPON_TYPE_FLARE};
-	ObjNode *target = NULL;
-	OGLPoint3D where;
 	OGLVector3D aim = {0, 0, 1};
 	int completed = 0;
 	if (!gPlayerInfo.objNode) return 0;
-	for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
+	for (int index = 0; index < (int)(sizeof(projectileTypes) / sizeof(projectileTypes[0])); index++)
 	{
-		Boolean supportsProjectile = true;
-		for (int index = 0; index < (int)(sizeof(projectileTypes) / sizeof(projectileTypes[0])); index++)
-			if (!node->HitByWeaponHandler[projectileTypes[index]]) supportsProjectile = false;
-		if (node != gPlayerInfo.objNode && supportsProjectile)
+		ObjNode *target = NULL;
+		for (ObjNode *node = gFirstNodePtr; node; node = node->NextNode)
 		{
-			target = node;
-			break;
+			if (node != gPlayerInfo.objNode && node->ScriptObjectID > 0 &&
+				node->ScriptObjectGeneration > 0 &&
+				PangeaScript_ObjectExists((PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration}) &&
+				node->HitByWeaponHandler[projectileTypes[index]])
+			{
+				target = node;
+				break;
+			}
+		}
+		if (target)
+		{
+			OGLPoint3D where = target->Coord;
+			if (ProbeScriptProjectileWeapon(target, projectileTypes[index], &where, &aim)) completed++;
 		}
 	}
-	if (!target) return 0;
-	where = target->Coord;
-	for (int index = 0; index < (int)(sizeof(projectileTypes) / sizeof(projectileTypes[0])); index++)
-		if (ProbeScriptProjectileWeapon(target, projectileTypes[index], &where, &aim)) completed++;
 	return completed;
 }
 
@@ -1918,6 +1924,10 @@ ObjNode *newObj;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= .3;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.projectile", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 
 	newObj->Kind = WEAPON_TYPE_FREEZE;
@@ -2136,6 +2146,10 @@ ObjNode *newObj;
 	gNewObjectDefinition.rot 		= player->Rot.y;
 	gNewObjectDefinition.scale 		= .5f * gPlayerInfo.scaleRatio;	// scale with player
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.projectile", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 
 	newObj->Kind = WEAPON_TYPE_FLAME;
@@ -2362,6 +2376,10 @@ int		i;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB+5;
 	gNewObjectDefinition.moveCall 	= MoveFlareBullet;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(newObj, "ottomatic.projectile", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	newObj->Kind = WEAPON_TYPE_FLARE;
 
@@ -2799,7 +2817,3 @@ static void ExplodeDart(ObjNode *theNode)
 
 	DeleteObject(theNode);
 }
-
-
-
-

@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -98,6 +99,7 @@ short			type;
 		.rot		= rot,
 	};
 	wall = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(wall, "nanosaur2.forestDoor", "trigger");
 
 	wall->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -124,6 +126,7 @@ short			type;
 	def.slot++;
 	def.moveCall 	= nil;
 	door = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(door, "nanosaur2.forestDoorDoor", "child-object");
 
 			/* SET COLLISION STUFF */
 
@@ -147,6 +150,7 @@ short			type;
 	def.flags 		|= STATUS_BIT_GLOW  | STATUS_BIT_NOLIGHTING | STATUS_BIT_NOFOG | STATUS_BIT_UVTRANSFORM;
 	def.slot		= SLOT_OF_DUMB-1;
 	ring = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(ring, "nanosaur2.forestDoorRing", "child-object");
 
 			/* SET COLLISION STUFF */
 
@@ -233,6 +237,7 @@ Boolean				keyDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 		.rot 		= rot,
 	};
 	keyHolder = MakeNewDisplayGroupObject(&def);
+	Nanosaur2Script_RegisterObject(keyHolder, "nanosaur2.forestDoorKeyHolder", "trigger");
 
 	keyHolder->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -265,6 +270,7 @@ Boolean				keyDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 		def.slot++;
 		def.moveCall 	= nil;
 		key = MakeNewDisplayGroupObject(&def);
+		Nanosaur2Script_RegisterObject(key, "nanosaur2.forestDoorKey", "child-object");
 
 
 				/* SET COLLISION STUFF */
@@ -458,8 +464,6 @@ OGLVector3D	v, delta;
 
 	keyHolder->ChainNode = nil;
 }
-
-
 
 
 

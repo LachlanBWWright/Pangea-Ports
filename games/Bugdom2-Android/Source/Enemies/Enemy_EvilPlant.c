@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -154,6 +155,8 @@ int	i,j;
 				/*******************************/
 
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_EVILPLANT, EVILPLANT_ANIM_GROW, x,z, EVILPLANT_SCALE, RandomFloat()*PI2, MoveEvilPlant);
+	if (newObj != nil)
+		Bugdom2Script_RegisterObject(newObj, "bugdom2.evilPlant", "enemy");
 
 				/*******************/
 				/* SET BETTER INFO */
@@ -669,6 +672,7 @@ float				speed;
 		gNewObjectDefinition.rot 		= 0;
 		gNewObjectDefinition.scale 		= .5f + RandomFloat() * .1f;
 		spore = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+		Bugdom2Script_RegisterObject(spore, "bugdom2.pollenSpore", "projectile/effect");
 
 		spore->BounceCount = 0;
 
@@ -759,8 +763,6 @@ boom:
 
 	UpdateObject(spore);
 }
-
-
 
 
 

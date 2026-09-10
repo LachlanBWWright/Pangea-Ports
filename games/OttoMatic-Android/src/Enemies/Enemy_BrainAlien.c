@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -1031,6 +1032,10 @@ static const OGLPoint3D brainOff = {0,20,-30};
 	gNewObjectDefinition.rot 		= enemy->Rot.y;
 	gNewObjectDefinition.scale 		= .3;
 	wave = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	{
+		static const char* tags[] = {"projectile/effect"};
+		OttoScript_RegisterObjectNode(wave, "ottomatic.brainAlienWave", PANGEA_SCRIPT_CAPABILITY_FULL, tags, 1);
+	}
 
 	wave->Damage = BRAIN_WAVE_DAMAGE;
 	wave->Health = .7f;
@@ -1302,7 +1307,6 @@ float		r,fps,c,a;
 
 	UpdateBrainAlien(theNode);
 }
-
 
 
 

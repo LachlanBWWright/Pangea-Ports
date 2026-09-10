@@ -186,7 +186,7 @@
 
 #define PANGEA_SCRIPT_BUGDOM_CAPABILITIES { true, true, false, true, true, true, true, true, true, true }
 
-#define PANGEA_SCRIPT_BUGDOM2_CAPABILITIES { true, true, false, true, true, true, true, true, true, false }
+#define PANGEA_SCRIPT_BUGDOM2_CAPABILITIES { true, true, false, true, true, true, true, true, true, true }
 
 #define PANGEA_SCRIPT_NANOSAUR_CAPABILITIES { true, false, false, true, true, true, true, true, true, false }
 

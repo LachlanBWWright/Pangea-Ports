@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #if PANGEA_SAFE_ITEM_LOADING
 #define CLOUD_SPRITE_GROUP GetOttoLevelSpriteGroup(LEVEL_NUM_CLOUD)
 #else
@@ -80,6 +84,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * PI/2;
 	gNewObjectDefinition.scale 		= 3;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.zigZagSlats", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"platform", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -157,6 +162,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB-5;
 	gNewObjectDefinition.moveCall 	= MoveCloudPlatform;
 	newObj = MakeNewObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.cloudPlatform", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"platform", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;									// keep ptr to item list
 
@@ -293,6 +299,7 @@ CollisionBoxType *boxPtr;
 	gNewObjectDefinition.rot 		= rot;
 	gNewObjectDefinition.scale 		= LAVA_STONE_SCALE;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.lavaStone", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"scenery", "obstacle"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -388,6 +395,7 @@ ObjNode	*base,*dish;
 	gNewObjectDefinition.rot 		= 0;
 	gNewObjectDefinition.scale 		= 1.0;
 	base = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(base, "ottomatic.radarDish", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"objective", "obstacle"}, 2);
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -406,6 +414,7 @@ ObjNode	*base,*dish;
 	gNewObjectDefinition.moveCall 	= nil;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	dish = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(dish, "ottomatic.radarDish", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"child-object"}, 1);
 
 	base->ChainNode = dish;
 
@@ -449,6 +458,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= (float)itemPtr->parm[0] * (PI2/8);
 	gNewObjectDefinition.scale 		= 1.6;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.blobArrow", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"obstacle", "trigger"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -481,6 +491,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.rot 		= RandomFloat()*PI2;
 	gNewObjectDefinition.scale 		= 9.0;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	OttoScript_RegisterObjectNode(newObj, "ottomatic.neuronStrand", PANGEA_SCRIPT_CAPABILITY_FULL, (const char*[]){"obstacle", "hazard"}, 2);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
 
@@ -557,8 +568,6 @@ short	i;
 	}
 
 }
-
-
 
 
 

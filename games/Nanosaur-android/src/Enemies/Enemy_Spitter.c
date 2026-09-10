@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 
 /****************************/
@@ -86,6 +87,7 @@ ObjNode	*newObj;
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_SPITTER,x,z);
 	if (newObj == nil)
 		return(false);
+	NanosaurScript_RegisterObject(newObj, "nanosaur.spitter", "enemy");
 	newObj->TerrainItemPtr = itemPtr;
 
 	SetSkeletonAnim(newObj->Skeleton, SPITTER_ANIM_WALK);
@@ -334,6 +336,7 @@ ObjNode				*newObj;
 	newObj = MakeNewDisplayGroupObject(&gNewObjectDefinition);
 	if (newObj)
 	{
+		NanosaurScript_RegisterObject(newObj, "nanosaur.spitterDinoSpit", "projectile/effect");
 		newObj->Delta.x = vector.x * SPIT_SPEED + ((RandomFloat() - .5f) * 60.0f);
 		newObj->Delta.y = vector.y * SPIT_SPEED + ((RandomFloat() - .5f) * 60.0f);
 		newObj->Delta.z = vector.z * SPIT_SPEED + ((RandomFloat() - .5f) * 60.0f);
@@ -385,8 +388,6 @@ del:
 
 	UpdateObject(theNode);
 }
-
-
 
 
 

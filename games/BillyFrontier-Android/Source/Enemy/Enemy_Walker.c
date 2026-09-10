@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -88,6 +89,7 @@ float			x,z,placement;
 				/************************/
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_WALKER, WALKER_ANIM_WALK, x,z, WALKER_SCALE, 0, nil, 0);
+	BillyScript_RegisterObject(newObj, "billy.walker", "enemy");
 				
 			/* ADD SPLINE OBJECT TO SPLINE OBJECT LIST */
 
@@ -124,6 +126,7 @@ float			x,z,placement;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	leftPod = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(leftPod, "billy.walkerLeftPod", "child-object");
 	leftPod->CType = CTYPE_PICKABLE;
 	leftPod->HitByBulletCallback = WalkerHitByBullet;
 
@@ -135,6 +138,7 @@ float			x,z,placement;
 	gNewObjectDefinition.slot++;
 	gNewObjectDefinition.moveCall 	= nil;
 	rtPod = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+	BillyScript_RegisterObject(rtPod, "billy.walkerRightPod", "child-object");
 	rtPod->CType = CTYPE_PICKABLE;
 	rtPod->HitByBulletCallback = WalkerHitByBullet;
 
@@ -597,8 +601,6 @@ ObjNode	*walker;
 		}	
 	}	
 }
-
-
 
 
 

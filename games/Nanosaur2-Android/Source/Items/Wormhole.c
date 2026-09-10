@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -157,6 +158,7 @@ ObjNode	*newObj;
 	newObj->TerrainItemPtr = itemPtr;						// keep ptr to item list
 	newObj->PlayerNum = itemPtr->parm[1];					// remember this for capture the flag modes
 	newObj->What = WHAT_EGGWORMHOLE;
+	Nanosaur2Script_RegisterObject(newObj, "nanosaur2.eggWormhole", "trigger");
 
 	newObj->Rot.x = .8f;
 	UpdateObjectTransforms(newObj);
@@ -609,9 +611,6 @@ float				dot;
 
 	gCameraInExitMode = true;
 }
-
-
-
 
 
 

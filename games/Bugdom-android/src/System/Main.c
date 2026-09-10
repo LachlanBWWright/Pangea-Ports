@@ -342,6 +342,9 @@ static void PlayGame(void)
 		BugdomScript_OnLevelUnload(gRealLevel);
 #endif
 		CleanupLevel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		BugdomScript_OnLevelCleanup();
+#endif
 		GameScreenToBlack();		
 		
 		if (gGameOverFlag)

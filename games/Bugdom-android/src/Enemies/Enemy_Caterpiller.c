@@ -12,6 +12,10 @@
 
 #include "game.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -69,6 +73,10 @@ float			x,z,placement;
 		
 	DetachObject(newObj);									// detach this object from the linked list
 	
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_RegisterObject(newObj, "bugdom.caterpillar", "enemy");
+#endif
+
 	Q3Matrix4x4_SetIdentity(&newObj->BaseTransformMatrix);	// we are going to do some manual transforms on the skeleton joints
 	newObj->Skeleton->JointsAreGlobal = true;
 		
@@ -149,4 +157,3 @@ Boolean isVisible;
 			CATERPILLER_SCALE, &theNode->SpecialF[0]);
 	}
 }
-
