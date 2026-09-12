@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include <SDL3/SDL.h>
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	// WebGL/GLES2 path: use our fixed-function compatibility layer instead of
@@ -15,6 +16,10 @@
 #include <Pomme.h>
 #include <QD3D.h>
 #include <QD3DMath.h>
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+void NanosaurScript_RegisterObject(void* obj, const char* nativeId, const char* category);
+#endif
 #include "profiling.h"
 
 #ifdef __cplusplus

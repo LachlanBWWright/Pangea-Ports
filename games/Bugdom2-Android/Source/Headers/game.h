@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include "Pomme.h"
 #include <SDL3/SDL.h>
 
@@ -10,6 +11,10 @@
 #include <SDL3/SDL_opengl_glext.h>
 #endif
 #include <stdint.h>
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+void Bugdom2Script_RegisterObject(void* obj, const char* nativeId, const char* category);
+#endif
 
 #if !defined(__LITTLE_ENDIAN__) && !(__BIG_ENDIAN__)
 #define __LITTLE_ENDIAN__ 1

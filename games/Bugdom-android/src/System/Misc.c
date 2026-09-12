@@ -14,8 +14,10 @@
 
 #include <setjmp.h>
 
+#ifdef PANGEA_ENABLE_SCRIPTING
 extern jmp_buf gPangeaScriptFatalJump;
 extern bool gPangeaScriptFatalBoundaryActive;
+#endif
 
 
 /****************************/
@@ -64,8 +66,10 @@ void DoAlert(const char* format, ...)
 
 void DoFatalAlert(const char* format, ...)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
 	if (gPangeaScriptFatalBoundaryActive)
 		longjmp(gPangeaScriptFatalJump, 1);
+#endif
 	if (gSDLWindow)
 		SDL_SetWindowFullscreen(gSDLWindow, 0);
 

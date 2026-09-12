@@ -20,6 +20,7 @@
 
 static void DrawFences(ObjNode *theNode);
 static void SubmitFence(int f, float camX, float camZ);
+static void DrawFadedFenceSegments(int f, float camX, float camZ, int numNubs);
 static void MakeFenceGeometry(void);
 static void DrawFenceNormals(short f);
 
@@ -78,6 +79,7 @@ float			gFenceHeight[] =
 
 static MOVertexArrayData		gFenceTriMeshData[MAX_FENCES];
 static MOTriangleIndecies		gFenceTriangles[MAX_FENCES][MAX_NUBS_IN_FENCE*2];
+static MOTriangleIndecies		gFenceSegmentTriangles[MAX_FENCES][MAX_NUBS_IN_FENCE-1][2];
 static OGLPoint3D				gFencePoints[MAX_FENCES][MAX_NUBS_IN_FENCE*2];
 static OGLTextureCoord			gFenceUVs[MAX_FENCES][MAX_NUBS_IN_FENCE*2];
 static OGLColorRGBA_Byte			gFenceColors[MAX_FENCES][MAX_NUBS_IN_FENCE*2];
@@ -285,6 +287,16 @@ float					minX,minY,minZ,maxX,maxY,maxZ;
 			gFenceTriangles[f][j+1].vertexIndices[0] = 3 + j;
 			gFenceTriangles[f][j+1].vertexIndices[1] = 0 + j;
 			gFenceTriangles[f][j+1].vertexIndices[2] = 2 + j;
+
+			if (i < MAX_NUBS_IN_FENCE - 1)
+			{
+				gFenceSegmentTriangles[f][i][0].vertexIndices[0] = 1;
+				gFenceSegmentTriangles[f][i][0].vertexIndices[1] = 0;
+				gFenceSegmentTriangles[f][i][0].vertexIndices[2] = 3;
+				gFenceSegmentTriangles[f][i][1].vertexIndices[0] = 3;
+				gFenceSegmentTriangles[f][i][1].vertexIndices[1] = 0;
+				gFenceSegmentTriangles[f][i][1].vertexIndices[2] = 2;
+			}
 		}
 
 				/* INIT VERTEX COLORS */
@@ -473,6 +485,80 @@ float			x,y,z,nx,nz;
 // Visibility checks have already been done, so there's a good chance the fence is visible
 //
 
+static void DrawFadedFenceSegments(int f, float camX, float camZ, int numNubs)
+{
+	int numSegments = numNubs - 1;
+	int transparentSegments[MAX_NUBS_IN_FENCE - 1];
+	float transparentDepths[MAX_NUBS_IN_FENCE - 1];
+	int numTransparentSegments = 0;
+	GLboolean oldDepthMask;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &oldDepthMask);
+
+	glAlphaFunc(GL_EQUAL, 1);
+	for (int segment = 0; segment < numSegments; segment++)
+	{
+		int firstVertex = segment * 2;
+		if (gFenceColors[f][firstVertex].a != 255 || gFenceColors[f][firstVertex + 2].a != 255)
+			continue;
+
+		MOVertexArrayData segmentData = gFenceTriMeshData[f];
+		segmentData.points = &gFencePoints[f][firstVertex];
+		segmentData.uvs[0] = &gFenceUVs[f][firstVertex];
+		segmentData.colorsByte = &gFenceColors[f][firstVertex];
+		segmentData.triangles = &gFenceSegmentTriangles[f][segment][0];
+		segmentData.numPoints = 4;
+		segmentData.numTriangles = 2;
+
+		CompatGL_InvalidateCachePtr(segmentData.colorsByte);
+		MO_DrawGeometry_VertexArray(&segmentData);
+	}
+
+	for (int segment = 0; segment < numSegments; segment++)
+	{
+		int firstVertex = segment * 2;
+		if (gFenceColors[f][firstVertex].a == 0 && gFenceColors[f][firstVertex + 2].a == 0)
+			continue;
+
+		float centerX = (gFencePoints[f][firstVertex].x + gFencePoints[f][firstVertex + 2].x) * .5f;
+		float centerZ = (gFencePoints[f][firstVertex].z + gFencePoints[f][firstVertex + 2].z) * .5f;
+		float dx = centerX - camX;
+		float dz = centerZ - camZ;
+		float depth = dx * dx + dz * dz;
+		int insertionPoint = numTransparentSegments;
+
+		while (insertionPoint > 0 && transparentDepths[insertionPoint - 1] < depth)
+		{
+			transparentSegments[insertionPoint] = transparentSegments[insertionPoint - 1];
+			transparentDepths[insertionPoint] = transparentDepths[insertionPoint - 1];
+			insertionPoint--;
+		}
+
+		transparentSegments[insertionPoint] = segment;
+		transparentDepths[insertionPoint] = depth;
+		numTransparentSegments++;
+	}
+
+	gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;
+	glAlphaFunc(GL_NOTEQUAL, 0);
+	glDepthMask(GL_FALSE);
+	for (int i = 0; i < numTransparentSegments; i++)
+	{
+		int segment = transparentSegments[i];
+		int firstVertex = segment * 2;
+		MOVertexArrayData segmentData = gFenceTriMeshData[f];
+		segmentData.points = &gFencePoints[f][firstVertex];
+		segmentData.uvs[0] = &gFenceUVs[f][firstVertex];
+		segmentData.colorsByte = &gFenceColors[f][firstVertex];
+		segmentData.triangles = &gFenceSegmentTriangles[f][segment][0];
+		segmentData.numPoints = 4;
+		segmentData.numTriangles = 2;
+
+		CompatGL_InvalidateCachePtr(segmentData.colorsByte);
+		MO_DrawGeometry_VertexArray(&segmentData);
+	}
+	glDepthMask(oldDepthMask);
+}
+
 static void SubmitFence(int f, float camX, float camZ)
 {
 float					dist,alpha;
@@ -532,8 +618,10 @@ Boolean					overrideAlphaFunc = false;
 	uint32_t oldMaterialFlags = gGlobalMaterialFlags;
 	if (overrideAlphaFunc)
 	{
-		gGlobalMaterialFlags |= BG3D_MATERIALFLAG_ALWAYSBLEND;
+		DrawFadedFenceSegments(f, camX, camZ, (int) numNubs);
+		gGlobalMaterialFlags = oldMaterialFlags;
 		glAlphaFunc(GL_NOTEQUAL, 0);
+		return;
 	}
 	else
 	{

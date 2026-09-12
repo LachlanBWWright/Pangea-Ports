@@ -10,6 +10,8 @@
 /****************************/
 
 #include "game.h"
+#include "vertex_array_compat.h"
+#include "RenderPolicy.h"
 #include "ogl_functions.h"
 
 /****************************/
@@ -918,9 +920,9 @@ go_here:
 
 
 			/***********/
-			/* DRAW IT */
-			/***********/
-		
+	/* DRAW IT */
+	/***********/
+
 //	glLockArraysEXT(0, data->numPoints);
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	CompatGL_SetVertexCount(data->numPoints);		// hint: skip O(n) index scan
@@ -1075,10 +1077,16 @@ uint32_t				matFlags;
 		/* SEE IF NEED TO ENABLE BLENDING */
 
 		
-	if (textureHasAlpha || (diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))		// if has alpha, then we need blending on
-	    glEnable(GL_BLEND);
+	RenderMaterialAlphaMode alphaMode = RenderPolicy_ResolveAlphaMode(
+		textureHasAlpha,
+		diffColor2.a,
+		matFlags,
+		0,
+		BG3D_MATERIALFLAG_ALWAYSBLEND);
+	if (RenderPolicy_ShouldBlend(alphaMode))
+		glEnable(GL_BLEND);
 	else
-	    glDisable(GL_BLEND);
+		glDisable(GL_BLEND);
 
 
 			/* SAVE THIS STUFF */

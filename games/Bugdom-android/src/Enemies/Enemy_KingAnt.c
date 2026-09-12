@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -908,7 +910,6 @@ TQ3Vector3D		delta;
 
 
 }
-
 
 
 

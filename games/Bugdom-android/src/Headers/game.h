@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include "Pomme.h"
 #include <QD3D.h>
 #include <QD3DMath.h>
@@ -15,6 +16,10 @@ extern "C"
 #endif
 
 #include "version.h"
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+void BugdomScript_RegisterObject(void* obj, const char* nativeId, const char* category);
+#endif
 #include "pool.h"
 #include "globals.h"
 #include "renderer.h"

@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -973,7 +975,6 @@ static Boolean BubbleHitByDart(ObjNode *weapon, ObjNode *bubble, OGLPoint3D *wea
 
 	return(true);			// stop weapon
 }
-
 
 
 

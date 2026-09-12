@@ -18,7 +18,9 @@
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "objecttypes.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 #endif
 
 /****************************/

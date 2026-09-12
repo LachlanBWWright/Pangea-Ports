@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -792,7 +794,6 @@ OGLVector3D	aim;
 	SetAlignmentMatrix(&theNode->AlignmentMatrix, &aim);
 	UpdateObject(theNode);
 }
-
 
 
 

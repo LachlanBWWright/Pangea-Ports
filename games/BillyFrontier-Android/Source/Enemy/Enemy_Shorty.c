@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -492,7 +494,6 @@ const OGLPoint3D	headOff = {0,15,0};
 	gTimeSinceLastEnemyShot = 0;
 
 }
-
 
 
 

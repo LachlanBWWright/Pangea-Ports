@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -1900,7 +1902,6 @@ Boolean DoTrig_LandMine(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	return(false);
 }
-
 
 
 

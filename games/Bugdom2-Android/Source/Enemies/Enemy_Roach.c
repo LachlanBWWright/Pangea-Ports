@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -1054,7 +1056,6 @@ static Boolean SeeIfRoachAttack(ObjNode *theNode, float angleToTarget, float dis
 	}
 	return(false);
 }
-
 
 
 

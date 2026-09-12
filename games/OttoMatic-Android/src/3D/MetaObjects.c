@@ -10,6 +10,8 @@
 /****************************/
 
 #include "game.h"
+#include "vertex_array_compat.h"
+#include "RenderPolicy.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -903,23 +905,7 @@ go_here:
 			/* DRAW IT */
 			/***********/
 
-	if (data->numMaterials < 0)
-	{
-		CompatGL_InvalidateCachePtr(data->points);
-		if (data->normals)
-			CompatGL_InvalidateCachePtr(data->normals);
-		if (data->colorsFloat)
-			CompatGL_InvalidateCachePtr(data->colorsFloat);
-		if (data->colorsByte)
-			CompatGL_InvalidateCachePtr(data->colorsByte);
-		for (int i = 0; i < MAX_MATERIAL_LAYERS; i++)
-		{
-			if (data->uvs[i])
-				CompatGL_InvalidateCachePtr(data->uvs[i]);
-		}
-		CompatGL_InvalidateCachePtr(data->triangles);
-	}
-
+	CompatGL_SetDynamicCacheHint(false);
 //	glLockArraysEXT(0, data->numPoints);
 	CompatGL_SetVertexCount(data->numPoints);
 	glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
@@ -1072,10 +1058,16 @@ uint32_t			matFlags;
 		/* SEE IF NEED TO ENABLE BLENDING */
 
 
-	if (textureHasAlpha || (diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND))		// if has alpha, then we need blending on
-	    glEnable(GL_BLEND);
+	RenderMaterialAlphaMode alphaMode = RenderPolicy_ResolveAlphaMode(
+		textureHasAlpha,
+		diffColor2.a,
+		matFlags,
+		0,
+		BG3D_MATERIALFLAG_ALWAYSBLEND);
+	if (RenderPolicy_ShouldBlend(alphaMode))
+		glEnable(GL_BLEND);
 	else
-	    glDisable(GL_BLEND);
+		glDisable(GL_BLEND);
 
 
 			/* SAVE THIS STUFF */
@@ -1782,13 +1774,6 @@ MOVertexArrayObject	*vObj;
 		uvPtr[i].v += dv;
 	}
 }
-
-
-
-
-
-
-
 
 
 

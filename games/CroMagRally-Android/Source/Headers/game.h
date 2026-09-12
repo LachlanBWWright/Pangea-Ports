@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include <SDL3/SDL.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -15,6 +16,10 @@
 #include "network.h"
 #include "file.h"
 #include "input.h"
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+void CroMagScript_RegisterObject(void* obj, const char* nativeId, const char* category);
+#endif
 #include "player.h"
 #include "effects.h"
 #include "mobjtypes.h"

@@ -10,6 +10,8 @@
 /****************************/
 
 #include "game.h"
+#include "vertex_array_compat.h"
+#include "RenderPolicy.h"
 #include "stb_image.h"
 
 extern	Boolean			gMyState_Lighting;
@@ -670,9 +672,8 @@ use_current:
 
 
 			/***********/
-			/* DRAW IT */
-			/***********/
-
+	/* DRAW IT */
+	/***********/
 
 //	glLockArraysEXT(0, data->numPoints);
 	glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
@@ -818,15 +819,17 @@ uint32_t				matFlags;
 		/* SEE IF NEED TO ENABLE BLENDING */
 
 
-	bool clipAlpha = 0 != (matFlags & BG3D_MATERIALFLAG_CLIPALPHA);
-	bool wantBlend = (!clipAlpha && textureHasAlpha) || (diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND);
+	RenderMaterialAlphaMode alphaMode = RenderPolicy_ResolveAlphaMode(
+		textureHasAlpha,
+		diffColor2.a,
+		matFlags,
+		BG3D_MATERIALFLAG_CLIPALPHA,
+		BG3D_MATERIALFLAG_ALWAYSBLEND);
 
-	if (wantBlend)		// if has translucent alpha, then we need blending on
-	{
-	    glEnable(GL_BLEND);
-	}
+	if (RenderPolicy_ShouldBlend(alphaMode))
+		glEnable(GL_BLEND);
 	else
-	    glDisable(GL_BLEND);
+		glDisable(GL_BLEND);
 
 
 			/* SAVE THIS STUFF */
@@ -1529,5 +1532,3 @@ MOVertexArrayObject	*vObj;
 		uvPtr[i].v += dv;
 	}
 }
-
-

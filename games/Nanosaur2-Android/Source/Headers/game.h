@@ -1,6 +1,7 @@
 #pragma once
 
 
+
 		/* MY BUILD OPTIONS */
 
 #define	VERTEXARRAYRANGES	0
@@ -15,6 +16,10 @@
 #endif
 
 		/* HEADERS */
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+void Nanosaur2Script_RegisterObject(void* obj, const char* nativeId, const char* category);
+#endif
 
 #include <Pomme.h>
 #include <SDL3/SDL.h>

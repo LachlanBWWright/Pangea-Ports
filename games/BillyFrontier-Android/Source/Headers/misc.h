@@ -1,9 +1,10 @@
 //
 
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include <setjmp.h>
-
 extern jmp_buf gPangeaScriptFatalJump;
 extern bool gPangeaScriptFatalBoundaryActive;
+#endif
 // misc.h
 //
 

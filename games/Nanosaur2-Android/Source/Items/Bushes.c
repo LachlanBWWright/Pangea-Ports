@@ -11,7 +11,9 @@
 
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -511,7 +513,6 @@ short   color = itemPtr->parm[1];
 
 	return(true);													// item was added
 }
-
 
 
 

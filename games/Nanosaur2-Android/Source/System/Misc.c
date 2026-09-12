@@ -65,8 +65,10 @@ void DoAlert(const char* format, ...)
 
 void DoFatalAlert(const char* format, ...)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
 	if (gNanosaur2ScriptFatalBoundaryActive)
 		longjmp(gNanosaur2ScriptFatalJump, 1);
+#endif
 
 	Enter2D();
 

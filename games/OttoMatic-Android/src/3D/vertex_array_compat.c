@@ -55,6 +55,7 @@ typedef struct {
     uint8_t     attrib_mask;
     GLenum      color_type;
     uint64_t    signature;
+    Boolean     dynamic;
     uint8_t     valid;
     GLuint      vbo[5];
     GLuint      ibo;
@@ -74,6 +75,7 @@ static GLuint* sIdxConvertBuf = NULL;
 static int sIdxConvertBufCap = 0;
 
 static GLsizei sVertexCountHint = 0;
+static Boolean sDynamicCacheHint = false;
 
 static Boolean ForceCacheMisses(void)
 {
@@ -145,6 +147,11 @@ static uint64_t HashDrawArrayData(
 void CompatGL_SetVertexCount(GLsizei n)
 {
     sVertexCountHint = n;
+}
+
+void CompatGL_SetDynamicCacheHint(Boolean dynamic)
+{
+    sDynamicCacheHint = dynamic;
 }
 
 // ── Attribute enable/disable helpers ────────────────────────────────────
@@ -376,7 +383,8 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
                 e->mode == mode && e->first == 0 &&
                 e->vtx_count == vertexCount && e->idx_count == (int)count &&
                 e->idx_type == (int)type &&
-                e->attrib_mask == attribMask && e->color_type == colorTypeKey)
+                e->attrib_mask == attribMask && e->color_type == colorTypeKey &&
+                e->dynamic == sDynamicCacheHint)
             {
                 cacheIdx = ci;
                 break;
@@ -442,7 +450,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         {
             glBindBuffer(GL_ARRAY_BUFFER, e->vbo[0]);
             glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (GLsizeiptr)sizeof(GLfloat),
-                         posPtr, GL_STATIC_DRAW);
+                         posPtr, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
             glVertexAttribPointer(ATTRIB_LOCATION_POSITION, 3, GL_FLOAT, GL_FALSE, 0, 0);
             uploads++;
             uploadBytes += vertexCount * 3 * (int)sizeof(GLfloat);
@@ -452,7 +460,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         {
             glBindBuffer(GL_ARRAY_BUFFER, e->vbo[1]);
             glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * (GLsizeiptr)sizeof(GLfloat),
-                         normPtr, GL_STATIC_DRAW);
+                         normPtr, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
             glVertexAttribPointer(ATTRIB_LOCATION_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, 0);
             uploads++;
             uploadBytes += vertexCount * 3 * (int)sizeof(GLfloat);
@@ -464,14 +472,14 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
             if (colorTypeKey == GL_FLOAT)
             {
                 glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (GLsizeiptr)sizeof(GLfloat),
-                             colorPtr, GL_STATIC_DRAW);
+                             colorPtr, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
                 glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_FLOAT, GL_FALSE, 0, 0);
                 uploadBytes += vertexCount * 4 * (int)sizeof(GLfloat);
             }
             else
             {
                 glBufferData(GL_ARRAY_BUFFER, vertexCount * 4 * (GLsizeiptr)sizeof(GLubyte),
-                             colorPtr, GL_STATIC_DRAW);
+                             colorPtr, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
                 glVertexAttribPointer(ATTRIB_LOCATION_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
                 uploadBytes += vertexCount * 4 * (int)sizeof(GLubyte);
             }
@@ -482,7 +490,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         {
             glBindBuffer(GL_ARRAY_BUFFER, e->vbo[3]);
             glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (GLsizeiptr)sizeof(GLfloat),
-                         tc0Ptr, GL_STATIC_DRAW);
+                         tc0Ptr, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
             glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD0, 2, GL_FLOAT, GL_FALSE, 0, 0);
             uploads++;
             uploadBytes += vertexCount * 2 * (int)sizeof(GLfloat);
@@ -492,7 +500,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         {
             glBindBuffer(GL_ARRAY_BUFFER, e->vbo[4]);
             glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * (GLsizeiptr)sizeof(GLfloat),
-                         tc1Ptr, GL_STATIC_DRAW);
+                         tc1Ptr, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
             glVertexAttribPointer(ATTRIB_LOCATION_TEXCOORD1, 2, GL_FLOAT, GL_FALSE, 0, 0);
             uploads++;
             uploadBytes += vertexCount * 2 * (int)sizeof(GLfloat);
@@ -502,7 +510,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         if (type == GL_UNSIGNED_INT)
         {
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (GLsizeiptr)sizeof(GLuint),
-                         indices, GL_STATIC_DRAW);
+                         indices, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
             uploadBytes += count * (int)sizeof(GLuint);
         }
         else
@@ -520,7 +528,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
                 sIdxConvertBuf[i] = (GLuint)src[i];
 
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * (GLsizeiptr)sizeof(GLuint),
-                         sIdxConvertBuf, GL_STATIC_DRAW);
+                         sIdxConvertBuf, sDynamicCacheHint ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
             uploadBytes += count * (int)sizeof(GLuint);
         }
         uploads++;
@@ -539,6 +547,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
         e->attrib_mask = attribMask;
         e->color_type = colorTypeKey;
         e->signature = 0;
+        e->dynamic = sDynamicCacheHint;
         e->lru_tick = ++sDCTick;
         e->valid = 1;
     }
@@ -577,7 +586,6 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
     if (!sAttrVBO[0])
     {
         glGenBuffers(5, sAttrVBO);
-        glGenBuffers(1, &sIndexIBO);
     }
 
     // ── Determine which attributes are provided ──────────────────────
@@ -622,7 +630,7 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
                 e->vtx_count == (int)count && e->idx_count == 0 &&
                 e->idx_type == 0 &&
                 e->attrib_mask == attribMask && e->color_type == colorTypeKey &&
-                e->signature == signature)
+                e->signature == signature && e->dynamic == sDynamicCacheHint)
             {
                 cacheIdx = ci;
                 break;
@@ -762,6 +770,7 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
         e->attrib_mask = attribMask;
         e->color_type = colorTypeKey;
         e->signature = signature;
+        e->dynamic = sDynamicCacheHint;
         e->lru_tick = ++sDCTick;
         e->valid = 1;
     }

@@ -1218,6 +1218,9 @@ MOVertexArrayData	mesh;
 
 	gGlobalTransparency = .3;
 	MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_GLOBAL][GLOBAL_SObjType_MagnetRay].materialObject);
+	CompatGL_InvalidateCachePtr(mesh.points);
+	CompatGL_InvalidateCachePtr(mesh.uvs[0]);
+	CompatGL_InvalidateCachePtr(mesh.triangles);
 	MO_DrawGeometry_VertexArray(&mesh);
 	gGlobalTransparency = 1.0f;
 

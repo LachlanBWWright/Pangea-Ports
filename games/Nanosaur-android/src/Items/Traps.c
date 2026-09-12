@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -397,7 +399,6 @@ ObjNode	*puff;
 		UpdateObject(theNode);
 	}
 }
-
 
 
 

@@ -24,6 +24,7 @@ static void DeleteParticleGroup(int groupNum);
 static void MoveParticleGroups(ObjNode *theNode);
 
 static void DrawParticleGroup(ObjNode *theNode);
+static void SortParticleIndices(const ParticleGroupType* particleGroup, int* particleIndices, int particleCount, const OGLPoint3D* cameraLocation);
 
 
 static void MoveBlobDroplet(ObjNode *theNode);
@@ -105,7 +106,10 @@ void InitParticleSystem(void)
 	for (int i = 0; i < MAX_PARTICLE_GROUPS; i++)
 	{
 		gParticleGroups[i].pool = Pool_New(MAX_PARTICLES);
+		gParticleGroups[i].geometryBuffer = 0;
 
+		for (int buffer = 0; buffer < 2; buffer++)
+		{
 				/* VERTEX ARRAY DATA BASE */
 
 		MOVertexArrayData vertexArrayData =
@@ -121,7 +125,7 @@ void InitParticleSystem(void)
 			.triangles		= (MOTriangleIndecies*) AllocPtr(sizeof(MOTriangleIndecies) * MAX_PARTICLES * 2),
 		};
 		
-				/* INIT UV ARRAYS */
+			/* INIT UV ARRAYS */
 
 		OGLTextureCoord* uv = vertexArrayData.uvs[0];
 		for (int j = 0; j < MAX_PARTICLES * 4; j += 4)
@@ -132,7 +136,7 @@ void InitParticleSystem(void)
 			uv[j+3] = (OGLTextureCoord) {1, 0};				// upper right
 		}
 
-				/* INIT TRIANGLE ARRAYS */
+			/* INIT TRIANGLE ARRAYS */
 
 		for (int j = 0, k = 0; j < MAX_PARTICLES * 2; j += 2, k += 4)
 		{
@@ -149,11 +153,12 @@ void InitParticleSystem(void)
 		}
 
 
-				/* CREATE NEW GEOMETRY OBJECT */
+			/* CREATE NEW GEOMETRY OBJECT */
 
-		GAME_ASSERT(gParticleGroups[i].geometryObj == NULL);
+		GAME_ASSERT(gParticleGroups[i].geometryObj[buffer] == NULL);
 
-		gParticleGroups[i].geometryObj = MO_CreateNewObjectOfType(MO_TYPE_GEOMETRY, MO_GEOMETRY_SUBTYPE_VERTEXARRAY, &vertexArrayData);
+		gParticleGroups[i].geometryObj[buffer] = MO_CreateNewObjectOfType(MO_TYPE_GEOMETRY, MO_GEOMETRY_SUBTYPE_VERTEXARRAY, &vertexArrayData);
+		}
 	}
 
 
@@ -197,9 +202,12 @@ void DisposeParticleSystem(void)
 
 	for (int i = 0; i < MAX_PARTICLE_GROUPS; i++)
 	{
-		GAME_ASSERT(gParticleGroups[i].geometryObj);
-		MO_DisposeObjectReference(gParticleGroups[i].geometryObj);
-		gParticleGroups[i].geometryObj = NULL;
+		for (int buffer = 0; buffer < 2; buffer++)
+		{
+			GAME_ASSERT(gParticleGroups[i].geometryObj[buffer]);
+			MO_DisposeObjectReference(gParticleGroups[i].geometryObj[buffer]);
+			gParticleGroups[i].geometryObj[buffer] = NULL;
+		}
 
 		GAME_ASSERT(gParticleGroups[i].pool);
 		Pool_Free(gParticleGroups[i].pool);
@@ -234,9 +242,12 @@ static void DeleteParticleGroup(int groupNum)
 	if (!Pool_IsUsed(gParticleGroupPool, groupNum))
 		return;
 
-	gParticleGroups[groupNum].geometryObj->objectData.numMaterials = 0;
-	gParticleGroups[groupNum].geometryObj->objectData.numPoints = 0;
-	gParticleGroups[groupNum].geometryObj->objectData.numTriangles = 0;
+	for (int buffer = 0; buffer < 2; buffer++)
+	{
+		gParticleGroups[groupNum].geometryObj[buffer]->objectData.numMaterials = 0;
+		gParticleGroups[groupNum].geometryObj[buffer]->objectData.numPoints = 0;
+		gParticleGroups[groupNum].geometryObj[buffer]->objectData.numTriangles = 0;
+	}
 
 	Pool_ReleaseIndex(gParticleGroupPool, groupNum);
 }
@@ -288,13 +299,16 @@ int NewParticleGroup(const NewParticleGroupDefType *def)
 		/**************************************/
 		// Note: most everything was initialized in InitParticleSystem
 
-	MOVertexArrayData* vertexArrayData = &pg->geometryObj->objectData;
+	for (int buffer = 0; buffer < 2; buffer++)
+	{
+		MOVertexArrayData* vertexArrayData = &pg->geometryObj[buffer]->objectData;
 
-	vertexArrayData->numPoints = 0;		// no quads until we call AddParticleToGroup
-	vertexArrayData->numTriangles = 0;
+		vertexArrayData->numPoints = 0;		// no quads until we call AddParticleToGroup
+		vertexArrayData->numTriangles = 0;
 
-	vertexArrayData->numMaterials = 1;
-	vertexArrayData->materials[0] = gSpriteGroupList[SPRITE_GROUP_PARTICLES][def->particleTextureNum].materialObject;	// set illegal ref because it is made legit below
+		vertexArrayData->numMaterials = 1;
+		vertexArrayData->materials[0] = gSpriteGroupList[SPRITE_GROUP_PARTICLES][def->particleTextureNum].materialObject;	// set illegal ref because it is made legit below
+	}
 
 	return i;
 }
@@ -605,7 +619,6 @@ OGLBoundingBox	bbox;
 				/* SETUP ENVIRONTMENT */
 
 	OGL_PushState();
-
 	glEnable(GL_BLEND);
 	SetColor4f(1,1,1,1);										// full white & alpha to start with
 
@@ -617,12 +630,13 @@ OGLBoundingBox	bbox;
 
 		float	minX,minY,minZ,maxX,maxY,maxZ;
 
-		const ParticleGroupType* pg = &gParticleGroups[g];
+		ParticleGroupType* pg = &gParticleGroups[g];
+		pg->geometryBuffer ^= 1;
 
 		// If we have enough horsepower (gG4), apply ALLAIM to all particles
 		Boolean allAim = gG4 || (pg->flags & PARTICLE_FLAGS_ALLAIM);
 
-		geoData = &pg->geometryObj->objectData;			// get pointer to geometry object data
+		geoData = &pg->geometryObj[pg->geometryBuffer]->objectData;			// get pointer to geometry object data
 		vertexColors = geoData->colorsByte;				// get pointer to vertex color array
 		baseScale = pg->baseScale;						// get base scale
 
@@ -633,9 +647,16 @@ OGLBoundingBox	bbox;
 		minX = minY = minZ = 1e9f;									// init bbox
 		maxX = maxY = maxZ = -minX;
 
-		int n = 0;
+		int particleIndices[MAX_PARTICLES];
+		int particleCount = 0;
 		for (int p = Pool_First(pg->pool); p >= 0; p = Pool_Next(pg->pool, p))
+			particleIndices[particleCount++] = p;
+		SortParticleIndices(pg, particleIndices, particleCount, camCoords);
+
+		int n = 0;
+		for (int particleIndex = 0; particleIndex < particleCount; particleIndex++)
 		{
+			int p = particleIndices[particleIndex];
 			GAME_ASSERT(Pool_IsUsed(pg->pool, p));
 
 			float			rot;
@@ -747,7 +768,7 @@ OGLBoundingBox	bbox;
 					glEnable(GL_FOG);
 			}
 
-			MO_DrawObject(pg->geometryObj);						// draw geometry
+			MO_DrawObject(pg->geometryObj[pg->geometryBuffer]);						// draw geometry
 		}
 	}
 
@@ -755,6 +776,41 @@ OGLBoundingBox	bbox;
 
 	SetColor4f(1,1,1,1);										// reset this
 	OGL_PopState();
+}
+
+
+/**************** SORT PARTICLES BACK TO FRONT ****************/
+
+static void SortParticleIndices(const ParticleGroupType* particleGroup, int* particleIndices, int particleCount, const OGLPoint3D* cameraLocation)
+{
+	for (int i = 1; i < particleCount; i++)
+	{
+		int index = particleIndices[i];
+		const OGLPoint3D* point = &particleGroup->coord[index];
+		float dx = point->x - cameraLocation->x;
+		float dy = point->y - cameraLocation->y;
+		float dz = point->z - cameraLocation->z;
+		float distanceSquared = dx*dx + dy*dy + dz*dz;
+		int insertionPoint = i;
+
+		while (insertionPoint > 0)
+		{
+			int previousIndex = particleIndices[insertionPoint - 1];
+			const OGLPoint3D* previousPoint = &particleGroup->coord[previousIndex];
+			float previousDX = previousPoint->x - cameraLocation->x;
+			float previousDY = previousPoint->y - cameraLocation->y;
+			float previousDZ = previousPoint->z - cameraLocation->z;
+			float previousDistanceSquared = previousDX*previousDX + previousDY*previousDY + previousDZ*previousDZ;
+
+			if (previousDistanceSquared >= distanceSquared)
+				break;
+
+			particleIndices[insertionPoint] = previousIndex;
+			insertionPoint--;
+		}
+
+		particleIndices[insertionPoint] = index;
+	}
 }
 
 

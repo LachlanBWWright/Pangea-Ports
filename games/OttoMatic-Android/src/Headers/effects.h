@@ -42,7 +42,8 @@ typedef struct
 	OGLVector3D		delta[MAX_PARTICLES];
 	short			vaporTrail[MAX_PARTICLES];
 	
-	MOVertexArrayObject	*geometryObj;
+	MOVertexArrayObject	*geometryObj[2];
+	Byte				geometryBuffer;
 	
 }ParticleGroupType;
 
@@ -132,4 +133,3 @@ void MakeSplatter(OGLPoint3D *where, short modelObjType);
 
 void MakeSteam(ObjNode *blob, float x, float y, float z);
 Boolean AddSmoker(TerrainItemEntryType *itemPtr, long  x, long z);
-

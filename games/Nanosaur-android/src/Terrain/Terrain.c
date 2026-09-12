@@ -10,7 +10,13 @@
 /***************/
 
 #include "game.h"
+#include "RenderGeometry.h"
 #include "profiling.h"
+
+static void InvalidateGeometryCache(const void *pointer)
+{
+	COMPAT_GL_InvalidateCachePtr(pointer);
+}
 
 #define TILE_TEXTURE_INTERNAL_FORMAT	GL_RGB
 #define TILE_TEXTURE_FORMAT				GL_BGRA_EXT
@@ -846,9 +852,8 @@ SuperTileMemoryType	*superTilePtr;
 
 	UpdateSuperTileTexture(superTilePtr);
 
-	COMPAT_GL_InvalidateCachePtr(triMeshPtr->points);
-	COMPAT_GL_InvalidateCachePtr(triMeshPtr->vertexNormals);
-	COMPAT_GL_InvalidateCachePtr(triMeshPtr->triangles);
+	RenderGeometry_InvalidateDynamicStreams(triMeshPtr->points, triMeshPtr->vertexNormals,
+		NULL, NULL, triMeshPtr->triangles, InvalidateGeometryCache);
 
 
 	return(superTileNum);
@@ -920,8 +925,8 @@ TQ3PlaneEquation	planeEq;
 
 	UpdateSuperTileTexture(superTilePtr);
 
-	COMPAT_GL_InvalidateCachePtr(triMeshPtr->points);
-	COMPAT_GL_InvalidateCachePtr(triMeshPtr->triangles);
+	RenderGeometry_InvalidateDynamicStreams(triMeshPtr->points, NULL,
+		NULL, NULL, triMeshPtr->triangles, InvalidateGeometryCache);
 }
 
 #endif // !(HQ_TERRAIN)
@@ -2354,6 +2359,5 @@ UInt16	tile;
 	}
 	return(0);
 }
-
 
 

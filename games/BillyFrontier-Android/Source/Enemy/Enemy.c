@@ -424,7 +424,9 @@ int		i;
 	newObj->Damage = .5;
 
 	newObj->What = WHAT_ENEMYBULLET;
+#ifdef PANGEA_ENABLE_SCRIPTING
 	BillyScript_RegisterObject(newObj, "billy.projectile", "projectile/effect");
+#endif
 	
 				/* SET SPEED OF BULLET */
 					
@@ -564,5 +566,4 @@ void DecEnemiesAtStopPoint(void)
 		gShootoutCanProceedToNextStopPoint = true;
 	}
 }
-
 

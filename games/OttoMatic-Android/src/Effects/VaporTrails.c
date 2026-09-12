@@ -558,6 +558,10 @@ float	size,dist;
 
 	glEnable(GL_CULL_FACE);
 	MO_DrawMaterial(gColorStreakMaterial);		// activate material
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.points);
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.colorsFloat);
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.uvs[0]);
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.triangles);
 	MO_DrawGeometry_VertexArray(&gSmokeColumnMesh);
 
 	OGL_PopState();
@@ -685,6 +689,10 @@ float			fps = gFramesPerSecondFrac;
 	OGL_PushState();
 
 	MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_PARTICLES][PARTICLE_SObjType_GreySmoke].materialObject);		// activate material
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.points);
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.colorsFloat);
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.uvs[0]);
+	CompatGL_InvalidateCachePtr(gSmokeColumnMesh.triangles);
 	MO_DrawGeometry_VertexArray(&gSmokeColumnMesh);
 
 	OGL_PopState();
@@ -713,4 +721,3 @@ float	size2 = size * .2f;
 		r += (PI2/(NUM_RING_POINTS-1));
 	}
 }
-

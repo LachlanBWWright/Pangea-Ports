@@ -11,6 +11,8 @@
 /****************************/
 
 #include "game.h"
+#include "gles3compat.h"
+#include "RenderPolicy.h"
 #include "profiling.h"
 
 extern PFNGLACTIVETEXTUREPROC gGlActiveTextureProc;
@@ -794,8 +796,8 @@ go_here:
 
 
 			/***********/
-			/* DRAW IT */
-			/***********/
+	/* DRAW IT */
+	/***********/
 
 //	glLockArraysEXT(0, data->numPoints);
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
@@ -969,10 +971,14 @@ uint32_t				matFlags;
 		/* SEE IF NEED TO ENABLE BLENDING */
 
 
-	bool clipAlpha = 0 != (matFlags & BG3D_MATERIALFLAG_CLIPALPHA);
-	bool wantBlend = (!clipAlpha && textureHasAlpha) || (diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND);
+	RenderMaterialAlphaMode alphaMode = RenderPolicy_ResolveAlphaMode(
+		textureHasAlpha,
+		diffColor2.a,
+		matFlags,
+		BG3D_MATERIALFLAG_CLIPALPHA,
+		BG3D_MATERIALFLAG_ALWAYSBLEND);
 
-	if (wantBlend)		// if has translucent alpha, then we need blending on
+	if (RenderPolicy_ShouldBlend(alphaMode))
 	{
 		glEnable(GL_BLEND);
 	}

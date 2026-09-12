@@ -11,7 +11,9 @@
 
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -813,7 +815,6 @@ static void MoveLaserOrbOnSpline(ObjNode *theNode)
 		MoveLaserOrb(theNode);
 	}
 }
-
 
 
 

@@ -11,7 +11,9 @@
 
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -464,7 +466,6 @@ OGLVector3D	v, delta;
 
 	keyHolder->ChainNode = nil;
 }
-
 
 
 

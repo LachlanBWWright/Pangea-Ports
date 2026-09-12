@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -1152,6 +1154,5 @@ void CountFleas(void)
 
 	gNumKilledFleas = 0;
 }
-
 
 

@@ -61,8 +61,10 @@ void DoAlert(const char* format, ...)
 
 void DoFatalAlert(const char* format, ...)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
 	if (gPangeaScriptFatalBoundaryActive)
 		longjmp(gPangeaScriptFatalJump, 1);
+#endif
 
 	Enter2D(true);
 

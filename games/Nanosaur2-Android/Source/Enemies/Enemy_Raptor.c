@@ -10,8 +10,6 @@
 /****************************/
 
 #include "game.h"
-#include "ScriptBindings.h"
-
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -892,8 +890,6 @@ Boolean			killed;
 
 	return(false);						// raptor not killed
 }
-
-
 
 
 

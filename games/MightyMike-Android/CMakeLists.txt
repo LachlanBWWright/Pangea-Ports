@@ -140,6 +140,9 @@ configure_file(${GAME_SRCDIR}/Headers/version.h.in ${GAME_SRCDIR}/Headers/versio
 
 # Glob all source files
 file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS ${GAME_SRCDIR}/*.c ${GAME_SRCDIR}/*.cpp ${GAME_SRCDIR}/*.h)
+if(NOT PANGEA_ENABLE_SCRIPTING)
+	list(FILTER GAME_SOURCES EXCLUDE REGEX "/Scripting/")
+endif()
 set(GAME_LOCAL_SOURCES ${GAME_SOURCES})
 list(APPEND GAME_SOURCES
 	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.c

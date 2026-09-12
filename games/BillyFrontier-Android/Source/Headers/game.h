@@ -1,5 +1,6 @@
 #pragma once
 
+
 #if _MSC_VER
 #define _Static_assert static_assert
 #endif
@@ -13,6 +14,10 @@
 #include "version.h"
 #include "globals.h"
 #include "structs.h"
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+void BillyScript_RegisterObject(void* obj, const char* nativeId, const char* category);
+#endif
 
 #include "metaobjects.h"
 #include "ogl_support.h"

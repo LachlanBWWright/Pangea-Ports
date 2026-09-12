@@ -171,10 +171,17 @@ configure_file(${GAME_SRCDIR}/Headers/version.h.in ${GAME_SRCDIR}/Headers/versio
 
 # Glob all source files
 file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS ${GAME_SRCDIR}/*.c ${GAME_SRCDIR}/*.cpp ${GAME_SRCDIR}/*.h)
+if(NOT PANGEA_ENABLE_SCRIPTING)
+	list(FILTER GAME_SOURCES EXCLUDE REGEX "/Scripting/")
+endif()
 set(GAME_LOCAL_SOURCES ${GAME_SOURCES})
 list(APPEND GAME_SOURCES
 	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.c
-	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.h)
+	${CMAKE_SOURCE_DIR}/../../shared/metadata/LevelMetadataJSON.h
+	${CMAKE_SOURCE_DIR}/../../shared/render/RenderPolicy.c
+	${CMAKE_SOURCE_DIR}/../../shared/render/RenderPolicy.h
+	${CMAKE_SOURCE_DIR}/../../shared/render/RenderGeometry.c
+	${CMAKE_SOURCE_DIR}/../../shared/render/RenderGeometry.h)
 
 # Make source groups match file tree
 source_group(TREE ${GAME_SRCDIR} PREFIX "" FILES ${GAME_LOCAL_SOURCES})
@@ -199,6 +206,7 @@ endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 target_include_directories(${GAME_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/../../shared/metadata)
+target_include_directories(${GAME_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/../../shared/render)
 if(PANGEA_ENABLE_SCRIPTING)
 	target_include_directories(${GAME_TARGET} PRIVATE
 		${GAME_SRCDIR}/Scripting

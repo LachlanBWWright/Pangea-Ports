@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 #include <limits.h>
 
@@ -1030,6 +1032,7 @@ explode_weapon:
 	return(false);
 }
 
+#ifdef PANGEA_ENABLE_SCRIPTING
 int OttoScript_ProbeWeaponHitJS(void)
 {
 	ObjNode *target = NULL;
@@ -1187,6 +1190,8 @@ int OttoScript_ProbeSuperNovaWeaponJS(void)
 	}
 	return dischargeAborted ? 0 : 1;
 }
+
+#endif
 
 
 /********************** SEE IF DO PICKUP *****************************/
@@ -1707,6 +1712,9 @@ static MOTriangleIndecies triangles[6*2] =
 	gNovaChargeMesh.colorsFloat		= nil;
 	gNovaChargeMesh.triangles		= triangles;
 
+	CompatGL_InvalidateCachePtr(gNovaChargeMesh.points);
+	CompatGL_InvalidateCachePtr(gNovaChargeMesh.uvs[0]);
+	CompatGL_InvalidateCachePtr(gNovaChargeMesh.triangles);
 
 			/***********/
 			/* DRAW IT */
@@ -1850,6 +1858,9 @@ static MOTriangleIndecies triangles[9*2] =
 		gNovaChargeMesh.colorsFloat		= nil;
 		gNovaChargeMesh.triangles		= triangles;
 
+		CompatGL_InvalidateCachePtr(gNovaChargeMesh.points);
+		CompatGL_InvalidateCachePtr(gNovaChargeMesh.uvs[0]);
+		CompatGL_InvalidateCachePtr(gNovaChargeMesh.triangles);
 
 				/***********/
 				/* DRAW IT */

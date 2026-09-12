@@ -58,6 +58,7 @@ void CompatGL_ColorPointer(GLint size, GLenum type, GLsizei stride, const void* 
 void CompatGL_TexCoordPointer(GLint size, GLenum type, GLsizei stride, const void* pointer);
 void CompatGL_ClientActiveTexture(GLenum texture);
 void CompatGL_SetVertexCount(GLsizei n);
+void CompatGL_SetDynamicCacheHint(Boolean dynamic);
 void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
 void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count);
 void CompatGL_InvalidateCachePtr(const void *ptr);
@@ -84,6 +85,11 @@ static inline void CompatGL_SetVertexCount(int n)
 static inline void CompatGL_InvalidateCachePtr(const void *ptr)
 {
 #pragma unused(ptr)
+}
+
+static inline void CompatGL_SetDynamicCacheHint(Boolean dynamic)
+{
+#pragma unused(dynamic)
 }
 
 #endif // __EMSCRIPTEN__ || __ANDROID__

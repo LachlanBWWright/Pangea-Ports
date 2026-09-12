@@ -11,7 +11,9 @@
 
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -512,7 +514,6 @@ Boolean AddAsteroid(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	return(true);													// item was added
 }
-
 
 
 

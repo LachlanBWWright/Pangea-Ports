@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 #if PANGEA_SAFE_ITEM_LOADING
 #define JUNGLE_BOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_JUNGLEBOSS)
@@ -1406,5 +1408,4 @@ int	i;
 
 	return(true);													// item was added
 }
-
 

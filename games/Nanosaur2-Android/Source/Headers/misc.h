@@ -4,10 +4,11 @@
 
 #pragma once
 
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include <setjmp.h>
-
 extern jmp_buf gNanosaur2ScriptFatalJump;
 extern bool gNanosaur2ScriptFatalBoundaryActive;
+#endif
 
 void	DoAlert(const char* format, ...);
 POMME_NORETURN void DoFatalAlert(const char* format, ...);

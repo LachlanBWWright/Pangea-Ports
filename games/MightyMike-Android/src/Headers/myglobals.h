@@ -4,9 +4,14 @@
 /*   By Brian Greenstone    */
 /****************************/
 
+
 #include <Pomme.h>
 #include "equates.h"
 #include "structures.h"
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+void MikeScript_RegisterObject(void* obj, const char* nativeId, const char* category);
+#endif
 
 // Simulation frames per second.
 // This is based on the PowerPC version. The game ran at 31 FPS on 68K.
@@ -62,4 +67,3 @@ void	SetPaletteColor(struct GamePalette_s *palette, int index, const RGBColor *c
 
 void	AnimateASprite(ObjNode *);
 void	SwitchAnim(ObjNode *, short);
-

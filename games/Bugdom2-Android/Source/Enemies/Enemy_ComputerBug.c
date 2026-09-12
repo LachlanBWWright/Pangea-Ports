@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -869,4 +871,3 @@ OGLPoint3D	where = virus->Coord;
 
 	return(true);
 }
-

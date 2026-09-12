@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 #if PANGEA_SAFE_ITEM_LOADING
 #define BLOBBOSS_MODEL_GROUP GetOttoLevelModelGroup(LEVEL_NUM_BLOBBOSS)
@@ -425,9 +427,12 @@ float		disruptionSize,thickness;
 				/* DRAW IT */
 				/***********/
 
-		gGlobalTransparency = .7f;
-		MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_GLOBAL][GLOBAL_SObjType_NovaCharge].materialObject);
-		MO_DrawGeometry_VertexArray(&mesh);
+	gGlobalTransparency = .7f;
+	MO_DrawMaterial(gSpriteGroupList[SPRITE_GROUP_GLOBAL][GLOBAL_SObjType_NovaCharge].materialObject);
+	CompatGL_InvalidateCachePtr(mesh.points);
+	CompatGL_InvalidateCachePtr(mesh.uvs[0]);
+	CompatGL_InvalidateCachePtr(mesh.triangles);
+	MO_DrawGeometry_VertexArray(&mesh);
 		gGlobalTransparency = 1.0f;
 	}
 }
@@ -1086,8 +1091,6 @@ float	delay;
 
 	return(true);
 }
-
-
 
 
 

@@ -15,6 +15,7 @@
 #endif
 #endif
 #include "game.h"
+#include "RenderPolicy.h"
 #include "profiling.h"
 
 extern TQ3Param2D				gEnvMapUVs[];
@@ -676,9 +677,12 @@ static void DrawMeshList(int renderPass, const MeshQueueEntry* entry)
 	{
 		const TQ3TriMeshData* mesh = entry->meshPtrList[i];
 
-		bool meshIsTransparent = mesh->texturingMode == kQ3TexturingModeAlphaBlend
-				|| mesh->diffuseColor.a < .999f
-				|| entry->mods->diffuseColor.a < .999f;
+		bool meshIsTransparent = RenderPolicy_IsMeshTransparent(
+				mesh->texturingMode == kQ3TexturingModeAlphaBlend,
+				mesh->diffuseColor.a,
+				entry->mods->diffuseColor.a,
+				1.0f,
+				false);
 
 		// Decide whether or not to draw this mesh in this pass, depending on which pass we're in
 		// (opaque or transparent), and whether the mesh has transparency.

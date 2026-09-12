@@ -43,6 +43,8 @@ void EndProfilePhase(ProfilePhaseType phase_type);
 float GetProfilePhaseMs(ProfilePhaseType phase_type);
 #define GetProfilePhaseAvgMs GetProfilePhaseMs
 
+float GetLastProfiledFrameMs(void);
+
 // Call this at the end of each frame to snapshot totals for debug display and reset accumulators
 void ResetProfilingForFrame(void);
 

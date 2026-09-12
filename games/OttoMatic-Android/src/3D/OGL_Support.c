@@ -546,7 +546,9 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	{
 		glClearColor(0, 0, 0, 1);
 		glClear(GL_COLOR_BUFFER_BIT);
+		StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		SDL_GL_SwapWindow(gSDLWindow);					// end render loop
+		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 		return;
 	}
 
@@ -659,9 +661,6 @@ do_anaglyph:
 			if (gIsInGame)
 				DrawInfobar();
 
-			StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
-
-
 			/***********************************/	
 			/* SEE IF DO ANOTHER ANAGLYPH PASS */
 			/***********************************/	
@@ -752,7 +751,7 @@ do_anaglyph:
 			"\n\n\n\n\n\n\n\nOtto Matic %s, SDL %s\n%s, OpenGL %s, %s"
 			,
 			(int)(gFramesPerSecond+.5f),
-			(gFramesPerSecond > 0.0f ? 1000.0f / gFramesPerSecond : 0.0f),
+			GetLastProfiledFrameMs(),
 			GetProfilePhaseMs(PROFILE_PHASE_INPUT),
 			GetProfilePhaseMs(PROFILE_PHASE_GAME_LOGIC),
 			GetProfilePhaseMs(PROFILE_PHASE_RENDERING),
@@ -837,8 +836,17 @@ do_anaglyph:
 
            /* SWAP THE BUFFS */
 
+	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+
+#ifdef __EMSCRIPTEN__
+	// Return to the browser after presenting. SDL's Emscripten backend queues
+	// the presentation until control returns to the browser event loop.
+	StartProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
+	GAME_YIELD_BROWSER();
+	EndProfilePhase(PROFILE_PHASE_ASYNC_YIELD);
+#endif
 
 	if (gGamePrefs.anaglyphMode != ANAGLYPH_OFF)
 		RestoreCamerasFromAnaglyph();
@@ -1739,7 +1747,7 @@ static void OGL_InitFont(void)
 	SDL_memset(&newObjDef, 0, sizeof(newObjDef));
 	newObjDef.flags = STATUS_BIT_HIDDEN;
 	newObjDef.slot = DEBUGOVERLAY_SLOT;
-	newObjDef.scale = 0.45f;
-	newObjDef.coord = (OGLPoint3D) { -320, -100, 0 };
+	newObjDef.scale = 0.30f;
+	newObjDef.coord = (OGLPoint3D) { -320, -220, 0 };
 	gDebugText = TextMesh_NewEmpty(2048, &newObjDef);
 }

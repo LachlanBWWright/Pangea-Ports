@@ -10,8 +10,6 @@
 /****************************/
 
 #include "game.h"
-#include "ScriptBindings.h"
-
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif

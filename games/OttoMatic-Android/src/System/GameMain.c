@@ -335,8 +335,6 @@ static void PlayArea(void)
 				// Also gathers frame rate info for the net clients.
 				//
 
-		GAME_YIELD_BROWSER();			// yield to browser event loop (requires ASYNCIFY)
-
 		gDrawCallsThisFrame = 0;		// reset per-frame profiling counters
 		gVerticesThisFrame = 0;
 		gBufferUploadsThisFrame = 0;
@@ -397,7 +395,7 @@ static void PlayArea(void)
 				"[perf] fps=%d  frame=%.1fms  update=%.1fms  terrain=%.1fms  render=%.1fms  "
 				"draws=%d  verts=%d  uploads=%d/%dK  cache=%d/%d/%d  tris=%d",
 				(int)(gFramesPerSecond + .5f),
-				(gFramesPerSecond > 0.0f ? 1000.0f / gFramesPerSecond : 0.0f),
+				GetLastProfiledFrameMs(),
 				gLoopUpdateTimeMs, gLoopTerrainTimeMs, gLoopRenderTimeMs,
 				gDrawCallsThisFrame, gVerticesThisFrame, gBufferUploadsThisFrame,
 				gBufferUploadBytesThisFrame / 1024,

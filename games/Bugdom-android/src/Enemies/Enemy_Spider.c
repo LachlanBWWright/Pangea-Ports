@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -963,4 +965,3 @@ Boolean isVisible;
 //			theNode->ShadowNode->StatusBits |= STATUS_BIT_HIDDEN;	
 	}
 }
-

@@ -1,5 +1,6 @@
 #pragma once
 
+
 		/* MY BUILD OPTIONS */
 
 // Default to little-endian
@@ -14,6 +15,11 @@
 #ifdef __cplusplus
 extern "C"
 {
+#endif
+
+#ifndef PANGEA_ENABLE_SCRIPTING
+enum { PANGEA_SCRIPT_CAPABILITY_FULL = 0 };
+void OttoScript_RegisterObjectNode(void* node, const char* objectType, int capabilityLevel, const char* const* tags, int tagCount);
 #endif
 
 // If enabled, "VIP" enemies are always allowed to spawn and they don't count towards the global enemy budget.

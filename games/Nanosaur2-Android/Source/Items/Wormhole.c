@@ -11,7 +11,9 @@
 
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -611,7 +613,6 @@ float				dot;
 
 	gCameraInExitMode = true;
 }
-
 
 
 

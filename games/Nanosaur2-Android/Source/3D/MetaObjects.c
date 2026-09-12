@@ -10,6 +10,8 @@
 /****************************/
 
 #include "game.h"
+#include "gl_compat.h"
+#include "RenderPolicy.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -946,6 +948,7 @@ MOMaterialData		*matData;
 OGLColorRGBA		*diffuseColor,diffColor2;
 Boolean				alreadySet;
 uint32_t				matFlags;
+Boolean				textureHasAlpha = false;
 
 
 	matData = &matObj->objectData;									// point to material data
@@ -962,6 +965,7 @@ uint32_t				matFlags;
 
 	if (matFlags & BG3D_MATERIALFLAG_TEXTURED)
 	{
+		textureHasAlpha = matData->pixelDstFormat == GL_RGBA;
 //		if (matData->setupInfo != gGameViewInfoPtr)						// make sure texture is loaded for this draw context
 //			DoFatalAlert("MO_DrawMaterial: texture is not assigned to this draw context");
 
@@ -1068,10 +1072,14 @@ uint32_t				matFlags;
 		/* SEE IF NEED TO ENABLE BLENDING */
 
 
-	bool clipAlpha = 0 != (matFlags & BG3D_MATERIALFLAG_CLIPALPHA);
-	bool wantBlend = !clipAlpha && ((diffColor2.a != 1.0f) || (matFlags & BG3D_MATERIALFLAG_ALWAYSBLEND));
+	RenderMaterialAlphaMode alphaMode = RenderPolicy_ResolveAlphaMode(
+		textureHasAlpha,
+		diffColor2.a,
+		matFlags,
+		BG3D_MATERIALFLAG_CLIPALPHA,
+		BG3D_MATERIALFLAG_ALWAYSBLEND);
 
-	if (wantBlend)		// if has translucent alpha, then we need blending on
+	if (RenderPolicy_ShouldBlend(alphaMode))
 	{
 		OGL_EnableBlend();
 	}

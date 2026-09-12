@@ -4,6 +4,7 @@
 ProfilePhase gProfilePhases[NUM_PROFILE_PHASES];
 static uint64_t gPerformanceFrequency;
 static ProfilePhaseType gCurrentPhase = -1;
+static float gLastProfiledFrameMs;
 
 void InitProfiling(void) {
     gPerformanceFrequency = SDL_GetPerformanceFrequency();
@@ -13,6 +14,7 @@ void InitProfiling(void) {
         gProfilePhases[i].samples = 0;
         gProfilePhases[i].last_frame_ms = 0.0f;
     }
+    gLastProfiledFrameMs = 0.0f;
     gProfilePhases[PROFILE_PHASE_INPUT].name = "Input";
     gProfilePhases[PROFILE_PHASE_GAME_LOGIC].name = "Game Logic";
     gProfilePhases[PROFILE_PHASE_RENDERING].name = "Render Setup";
@@ -57,16 +59,20 @@ void EndProfilePhase(ProfilePhaseType phase_type) {
 
 float GetProfilePhaseMs(ProfilePhaseType phase_type) {
     if (phase_type >= 0 && phase_type < NUM_PROFILE_PHASES) {
-        if (gProfilePhases[phase_type].samples > 0) {
-            return (float)(((double)gProfilePhases[phase_type].total_ticks * 1000.0) / (double)gPerformanceFrequency);
-        }
         return gProfilePhases[phase_type].last_frame_ms;
     }
     return 0.0f;
 }
 
+float GetLastProfiledFrameMs(void)
+{
+    return gLastProfiledFrameMs;
+}
+
 void ResetProfilingForFrame(void) {
+    uint64_t frameTicks = 0;
     for (int i = 0; i < NUM_PROFILE_PHASES; ++i) {
+        frameTicks += gProfilePhases[i].total_ticks;
         gProfilePhases[i].last_frame_ms = gProfilePhases[i].samples > 0
             ? (float)(((double)gProfilePhases[i].total_ticks * 1000.0) / (double)gPerformanceFrequency)
             : 0.0f;
@@ -74,4 +80,5 @@ void ResetProfilingForFrame(void) {
         gProfilePhases[i].samples = 0;
         gProfilePhases[i].start_tick = 0;
     }
+    gLastProfiledFrameMs = (float)(((double)frameTicks * 1000.0) / (double)gPerformanceFrequency);
 }

@@ -60,8 +60,10 @@ void DoAlert(const char* format, ...)
 
 void DoFatalAlert(const char* format, ...)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
 	if (gPangeaScriptFatalBoundaryActive)
 		longjmp(gPangeaScriptFatalJump, 1);
+#endif
 
 	if (gSDLWindow)
 		SDL_SetWindowFullscreen(gSDLWindow, 0);
@@ -553,5 +555,4 @@ float FSReadBEFloat(short refNum)
 	GAME_ASSERT(err == noErr);
 	return SwizzleFloat(&result);
 }
-
 

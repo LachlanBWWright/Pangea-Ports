@@ -14,6 +14,7 @@
 #endif
 
 #include "game.h"
+#include "RenderPolicy.h"
 
 #ifdef __EMSCRIPTEN__
 #include <GLES2/gl2.h>
@@ -1421,11 +1422,12 @@ return WorldPointToDepth(center);
 
 static bool IsMeshTransparent(const TQ3TriMeshData* mesh, const RenderModifiers* mods)
 {
-return  mesh->texturingMode == kQ3TexturingModeAlphaBlend
-|| mesh->diffuseColor.a < .999f
-|| mods->diffuseColor.a < .999f
-|| mods->autoFadeFactor < .999f
-|| (mods->statusBits & STATUS_BIT_GLOW);
+return RenderPolicy_IsMeshTransparent(
+	mesh->texturingMode == kQ3TexturingModeAlphaBlend,
+	mesh->diffuseColor.a,
+	mods->diffuseColor.a,
+	mods->autoFadeFactor,
+	(mods->statusBits & STATUS_BIT_GLOW) != 0);
 }
 
 static MeshQueueEntry* NewMeshQueueEntry(void)

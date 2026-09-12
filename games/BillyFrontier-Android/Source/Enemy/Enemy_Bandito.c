@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -52,7 +54,9 @@ ObjNode	*newObj, *gun, *hat;
 				
 	newObj = MakeEnemySkeleton(SKELETON_TYPE_BANDITO,animNum, x,z, BANDITO_SCALE, rot, moveCall,
 								gAutoFadeStatusBits);
+#ifdef PANGEA_ENABLE_SCRIPTING
 	BillyScript_RegisterObject(newObj, "billy.bandito", "enemy");
+#endif
 	
 
 
@@ -80,7 +84,9 @@ ObjNode	*newObj, *gun, *hat;
 	gNewObjectDefinition.slot 		= SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall 	= nil;
 	gun = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+#ifdef PANGEA_ENABLE_SCRIPTING
 	BillyScript_RegisterObject(gun, "billy.banditoGun", "child-object");
+#endif
 	gun->Side = SIDE_RIGHT;
 	BanditoPutgunInHolster(gun);
 	
@@ -89,7 +95,9 @@ ObjNode	*newObj, *gun, *hat;
 			
 	gNewObjectDefinition.type 		= GLOBAL_ObjType_BanditoHat;
 	hat = MakeNewDisplayGroupObject(&gNewObjectDefinition);
+#ifdef PANGEA_ENABLE_SCRIPTING
 	BillyScript_RegisterObject(hat, "billy.banditoHat", "child-object");
+#endif
 	BanditoPutHatOnBack(hat);
 	
 			/* CHAIN THEM */
@@ -472,8 +480,6 @@ const OGLPoint3D	headOff = {0,15,0};
 	
 	gTimeSinceLastEnemyShot = 0;
 }
-
-
 
 
 
