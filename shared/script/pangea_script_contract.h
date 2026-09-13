@@ -186,7 +186,7 @@
 
 #define PANGEA_SCRIPT_BUGDOM_CAPABILITIES { true, true, false, true, true, true, true, true, true, true }
 
-#define PANGEA_SCRIPT_BUGDOM2_CAPABILITIES { true, true, false, true, true, true, true, true, true, true }
+#define PANGEA_SCRIPT_BUGDOM2_CAPABILITIES { true, true, false, true, true, true, true, true, true, false }
 
 #define PANGEA_SCRIPT_NANOSAUR_CAPABILITIES { true, false, false, true, true, true, true, true, true, false }
 
@@ -210,7 +210,7 @@
 	X("pangea.player.setInvulnerable", "player-invulnerability", "disabled-network", "callback", "integer player index; finite duration in range 0..3600 seconds; adapter invulnerability timer support") \
 	X("pangea.player.setPosition", "player-position", "disabled-network", "callback", "integer player index; finite Vector3; adapter player-position mutation support") \
 	X("pangea.player.setVelocity", "player-velocity", "disabled-network", "callback", "integer player index; finite Vector3; adapter player-velocity mutation support") \
-	X("pangea.player.setForm", "player-form", "disabled-network", "callback", "player index; supported native form identifier such as bug or ball") \
+	X("pangea.player.setForm", "player-form", "disabled-network", "callback", "integer player index; supported native form identifier; adapter player-form mutation support") \
 	X("pangea.object.setPosition", "object-position", "disabled-network", "callback", "generation-checked handle; finite Vector3") \
 	X("pangea.object.setPositionOffset", "object-position-offset", "disabled-network", "callback", "generation-checked handle; finite Vector3; only during onObjectFrame") \
 	X("pangea.object.setVelocity", "object-velocity", "disabled-network", "callback", "generation-checked handle; finite Vector3") \
@@ -227,13 +227,13 @@
 	X("onWeaponHit", "next-engine-phase", "weapon:ObjectHandle|nil;target:ObjectHandle|nil;damage:number", "WeaponHitResult|nil") \
 	X("onDamage", "callback", "target:ObjectHandle;source:ObjectHandle|nil;damage:number;cause:integer", "DamageResult|nil") \
 	X("onDamageApplied", "callback", "target:ObjectHandle;source:ObjectHandle|nil;damage:number;cause:integer", "nil") \
-	X("onDeath", "callback", "player:ObjectHandle;eventValue:integer;velocity:Vector3|nil", "nil") \
-	X("onPlayerSpawn", "callback", "player:ObjectHandle;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
-	X("onPlayerRespawn", "callback", "player:ObjectHandle;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
-	X("onCheckpointReached", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
-	X("onLapComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
-	X("onRaceFinish", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
-	X("onObjectiveComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3;velocity:Vector3|nil;collisionEnabled:boolean|nil;rotation:Vector3|nil", "nil") \
+	X("onDeath", "callback", "player:ObjectHandle;eventValue:integer", "nil") \
+	X("onPlayerSpawn", "callback", "player:ObjectHandle;position:Vector3", "nil") \
+	X("onPlayerRespawn", "callback", "player:ObjectHandle;position:Vector3", "nil") \
+	X("onCheckpointReached", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
+	X("onLapComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
+	X("onRaceFinish", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
+	X("onObjectiveComplete", "callback", "player:ObjectHandle;eventValue:integer;position:Vector3", "nil") \
 	X("animationComplete", "callback", "object:ObjectHandle", "nil") \
 	X("destroy", "callback", "object:ObjectHandle", "nil")
 
