@@ -5,11 +5,14 @@
 #include <setjmp.h>
 #include <cstring>
 
-extern TQ3MetaFile* gObjectGroupFile[MAX_3DMF_GROUPS];
-extern GLuint* gObjectGroupTextures[MAX_3DMF_GROUPS];
+extern "C"
+{
+	extern TQ3MetaFile* gObjectGroupFile[MAX_3DMF_GROUPS];
+	extern GLuint* gObjectGroupTextures[MAX_3DMF_GROUPS];
 
-jmp_buf gPangeaScriptFatalJump;
-bool gPangeaScriptFatalBoundaryActive;
+	jmp_buf gPangeaScriptFatalJump;
+	bool gPangeaScriptFatalBoundaryActive;
+}
 
 static bool Has3DMFHeader(const FSSpec* spec)
 {

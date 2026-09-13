@@ -128,6 +128,9 @@ configure_file(${GAME_SRCDIR}/Headers/version.h.in ${GAME_SRCDIR}/Headers/versio
 
 # Glob all source files
 file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS ${GAME_SRCDIR}/*.c ${GAME_SRCDIR}/*.cpp ${GAME_SRCDIR}/*.h)
+if(NOT EMSCRIPTEN AND NOT ANDROID)
+	list(FILTER GAME_SOURCES EXCLUDE REGEX "/gl_compat\\.c$")
+endif()
 if(NOT PANGEA_ENABLE_SCRIPTING)
 	list(FILTER GAME_SOURCES EXCLUDE REGEX "/Scripting/")
 endif()

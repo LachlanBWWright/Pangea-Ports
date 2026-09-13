@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "vertex_array_compat.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -1922,6 +1923,5 @@ float				x,y,z;
 		}
 	}
 }
-
 
 

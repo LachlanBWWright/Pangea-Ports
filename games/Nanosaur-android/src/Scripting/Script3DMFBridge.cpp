@@ -4,11 +4,14 @@
 
 #include <setjmp.h>
 
-extern TQ3MetaFile* gObjectGroupFile[MAX_3DMF_GROUPS];
-extern GLuint* gObjectGroupTextures[MAX_3DMF_GROUPS];
+extern "C"
+{
+	extern TQ3MetaFile* gObjectGroupFile[MAX_3DMF_GROUPS];
+	extern GLuint* gObjectGroupTextures[MAX_3DMF_GROUPS];
 
-jmp_buf gPangeaScriptFatalJump;
-bool gPangeaScriptFatalBoundaryActive;
+	jmp_buf gPangeaScriptFatalJump;
+	bool gPangeaScriptFatalBoundaryActive;
+}
 
 extern "C" bool NanosaurScript_LoadCustom3DMF(FSSpec* spec, Byte group)
 {

@@ -28,6 +28,86 @@
 #include <string.h>
 #include <stdlib.h>
 
+#if defined(_WIN32)
+static PFNGLATTACHSHADERPROC gGlAttachShader;
+static PFNGLBINDATTRIBLOCATIONPROC gGlBindAttribLocation;
+static PFNGLCOMPILESHADERPROC gGlCompileShader;
+static PFNGLCREATEPROGRAMPROC gGlCreateProgram;
+static PFNGLCREATESHADERPROC gGlCreateShader;
+static PFNGLDELETESHADERPROC gGlDeleteShader;
+static PFNGLDISABLEVERTEXATTRIBARRAYPROC gGlDisableVertexAttribArray;
+static PFNGLENABLEVERTEXATTRIBARRAYPROC gGlEnableVertexAttribArray;
+static PFNGLGETATTRIBLOCATIONPROC gGlGetAttribLocation;
+static PFNGLGETPROGRAMIVPROC gGlGetProgramiv;
+static PFNGLGETPROGRAMINFOLOGPROC gGlGetProgramInfoLog;
+static PFNGLGETSHADERIVPROC gGlGetShaderiv;
+static PFNGLGETSHADERINFOLOGPROC gGlGetShaderInfoLog;
+static PFNGLGETUNIFORMLOCATIONPROC gGlGetUniformLocation;
+static PFNGLLINKPROGRAMPROC gGlLinkProgram;
+static PFNGLSHADERSOURCEPROC gGlShaderSource;
+static PFNGLUSEPROGRAMPROC gGlUseProgram;
+static PFNGLUNIFORM1FPROC gGlUniform1f;
+static PFNGLUNIFORM1IPROC gGlUniform1i;
+static PFNGLUNIFORM3FPROC gGlUniform3f;
+static PFNGLUNIFORM4FPROC gGlUniform4f;
+static PFNGLUNIFORMMATRIX3FVPROC gGlUniformMatrix3fv;
+static PFNGLUNIFORMMATRIX4FVPROC gGlUniformMatrix4fv;
+static PFNGLVERTEXATTRIBPOINTERPROC gGlVertexAttribPointer;
+
+#define glAttachShader gGlAttachShader
+#define glBindAttribLocation gGlBindAttribLocation
+#define glCompileShader gGlCompileShader
+#define glCreateProgram gGlCreateProgram
+#define glCreateShader gGlCreateShader
+#define glDeleteShader gGlDeleteShader
+#define glDisableVertexAttribArray gGlDisableVertexAttribArray
+#define glEnableVertexAttribArray gGlEnableVertexAttribArray
+#define glGetAttribLocation gGlGetAttribLocation
+#define glGetProgramiv gGlGetProgramiv
+#define glGetProgramInfoLog gGlGetProgramInfoLog
+#define glGetShaderiv gGlGetShaderiv
+#define glGetShaderInfoLog gGlGetShaderInfoLog
+#define glGetUniformLocation gGlGetUniformLocation
+#define glLinkProgram gGlLinkProgram
+#define glShaderSource gGlShaderSource
+#define glUseProgram gGlUseProgram
+#define glUniform1f gGlUniform1f
+#define glUniform1i gGlUniform1i
+#define glUniform3f gGlUniform3f
+#define glUniform4f gGlUniform4f
+#define glUniformMatrix3fv gGlUniformMatrix3fv
+#define glUniformMatrix4fv gGlUniformMatrix4fv
+#define glVertexAttribPointer gGlVertexAttribPointer
+
+static void LoadWindowsGLFunctions(void)
+{
+	gGlAttachShader = (PFNGLATTACHSHADERPROC) SDL_GL_GetProcAddress("glAttachShader");
+	gGlBindAttribLocation = (PFNGLBINDATTRIBLOCATIONPROC) SDL_GL_GetProcAddress("glBindAttribLocation");
+	gGlCompileShader = (PFNGLCOMPILESHADERPROC) SDL_GL_GetProcAddress("glCompileShader");
+	gGlCreateProgram = (PFNGLCREATEPROGRAMPROC) SDL_GL_GetProcAddress("glCreateProgram");
+	gGlCreateShader = (PFNGLCREATESHADERPROC) SDL_GL_GetProcAddress("glCreateShader");
+	gGlDeleteShader = (PFNGLDELETESHADERPROC) SDL_GL_GetProcAddress("glDeleteShader");
+	gGlDisableVertexAttribArray = (PFNGLDISABLEVERTEXATTRIBARRAYPROC) SDL_GL_GetProcAddress("glDisableVertexAttribArray");
+	gGlEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC) SDL_GL_GetProcAddress("glEnableVertexAttribArray");
+	gGlGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC) SDL_GL_GetProcAddress("glGetAttribLocation");
+	gGlGetProgramiv = (PFNGLGETPROGRAMIVPROC) SDL_GL_GetProcAddress("glGetProgramiv");
+	gGlGetProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC) SDL_GL_GetProcAddress("glGetProgramInfoLog");
+	gGlGetShaderiv = (PFNGLGETSHADERIVPROC) SDL_GL_GetProcAddress("glGetShaderiv");
+	gGlGetShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC) SDL_GL_GetProcAddress("glGetShaderInfoLog");
+	gGlGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC) SDL_GL_GetProcAddress("glGetUniformLocation");
+	gGlLinkProgram = (PFNGLLINKPROGRAMPROC) SDL_GL_GetProcAddress("glLinkProgram");
+	gGlShaderSource = (PFNGLSHADERSOURCEPROC) SDL_GL_GetProcAddress("glShaderSource");
+	gGlUseProgram = (PFNGLUSEPROGRAMPROC) SDL_GL_GetProcAddress("glUseProgram");
+	gGlUniform1f = (PFNGLUNIFORM1FPROC) SDL_GL_GetProcAddress("glUniform1f");
+	gGlUniform1i = (PFNGLUNIFORM1IPROC) SDL_GL_GetProcAddress("glUniform1i");
+	gGlUniform3f = (PFNGLUNIFORM3FPROC) SDL_GL_GetProcAddress("glUniform3f");
+	gGlUniform4f = (PFNGLUNIFORM4FPROC) SDL_GL_GetProcAddress("glUniform4f");
+	gGlUniformMatrix3fv = (PFNGLUNIFORMMATRIX3FVPROC) SDL_GL_GetProcAddress("glUniformMatrix3fv");
+	gGlUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC) SDL_GL_GetProcAddress("glUniformMatrix4fv");
+	gGlVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC) SDL_GL_GetProcAddress("glVertexAttribPointer");
+}
+#endif
+
 #pragma mark -
 
 /****************************/
@@ -744,6 +824,9 @@ lights->fillColor[i].b * lights->fillBrightness[i],
 
 void Render_InitState(const TQ3ColorRGBA* clearColor)
 {
+#if defined(_WIN32)
+LoadWindowsGLFunctions();
+#endif
 // Compile & link shaders
 CreateShaderProgram();
 

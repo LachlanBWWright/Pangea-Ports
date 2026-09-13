@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "vertex_array_compat.h"
 
 
 /****************************/
@@ -1858,7 +1859,6 @@ OGLPoint3D	verts[4];
 	
 	gGlobalColorFilter.r =gGlobalColorFilter.g = gGlobalColorFilter.b = 1;
 }
-
 
 
 
