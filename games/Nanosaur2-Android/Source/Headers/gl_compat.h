@@ -12,6 +12,15 @@
 
 #pragma once
 
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+
+static inline void COMPAT_GL_InvalidateCachePtr(const void *ptr)
+{
+    (void) ptr;
+}
+
+#else
+
 #include <SDL3/SDL_opengles2.h>   // GLES2 types and real function declarations
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -268,4 +277,6 @@ void glGetDoublev_stub(GLenum pname, GLdouble *params);
 
 #ifdef __cplusplus
 } // extern "C"
+#endif
+
 #endif

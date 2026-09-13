@@ -432,7 +432,7 @@ GLint			maxTexSize;
 	gGlActiveTextureProc = (PFNGLACTIVETEXTUREPROC) SDL_GL_GetProcAddress("glActiveTexture");
 	GAME_ASSERT(gGlActiveTextureProc);
 
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
 	gGlClientActiveTextureProc = (PFNGLCLIENTACTIVETEXTUREARBPROC) SDL_GL_GetProcAddress("glClientActiveTexture");
 	GAME_ASSERT(gGlClientActiveTextureProc);
 #endif
