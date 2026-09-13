@@ -26,12 +26,15 @@ pangea.log.info pangea.log.warn pangea.log.error pangea.level.current pangea.lev
 pangea.time.frame pangea.time.delta pangea.time.level pangea.time.after pangea.time.every pangea.time.cancel pangea.time.isActive pangea.task.start
 pangea.task.wait pangea.task.cancel pangea.task.isActive pangea.events.on pangea.events.once pangea.events.off pangea.events.emit pangea.random.number
 pangea.random.integer pangea.random.seed pangea.persistence.get pangea.persistence.set pangea.persistence.delete pangea.player.count pangea.player.get pangea.player.raceResults
-pangea.player.objectiveResults pangea.player.setHealth pangea.player.setHealthResult pangea.player.heal pangea.player.healResult pangea.player.setInvulnerable pangea.player.setInvulnerableResult pangea.player.setPosition
-pangea.player.setPositionResult pangea.player.setVelocity pangea.player.setVelocityResult pangea.spawn.native pangea.spawn.nativeResult pangea.spawn.scripted pangea.object.position pangea.object.source
-pangea.object.all pangea.object.findByTag pangea.object.nearest pangea.object.exists pangea.object.tags pangea.object.hasTag pangea.object.state pangea.object.setPosition
-pangea.object.setPositionResult pangea.object.setPositionOffset pangea.object.setPositionOffsetResult pangea.object.setVelocity pangea.object.setVelocityResult pangea.object.setRotation pangea.object.setRotationResult pangea.object.setScale
-pangea.object.setScaleResult pangea.object.setAnimation pangea.object.setAnimationResult pangea.object.setCollisionEnabled pangea.object.setCollisionEnabledResult pangea.object.setActive pangea.object.setActiveResult pangea.object.delete
-pangea.object.deleteResult
+pangea.player.objectiveResults pangea.player.checkpointResults pangea.player.setHealth pangea.player.setHealthResult pangea.player.setLives pangea.player.setLivesResult pangea.player.setScore pangea.player.setScoreResult
+pangea.player.setWeaponQuantity pangea.player.setWeaponQuantityResult pangea.player.setKey pangea.player.setKeyResult pangea.player.setCloverCount pangea.player.setCloverCountResult pangea.player.setShieldActive pangea.player.setShieldActiveResult
+pangea.player.heal pangea.player.healResult pangea.player.setInvulnerable pangea.player.setInvulnerableResult pangea.player.setPosition pangea.player.setPositionResult pangea.player.setVelocity pangea.player.setVelocityResult
+pangea.player.setForm pangea.spawn.native pangea.spawn.nativeResult pangea.spawn.scripted pangea.object.position pangea.object.source pangea.object.velocity pangea.object.rotation
+pangea.object.scale pangea.object.animation pangea.object.animationSpeed pangea.object.animationFrame pangea.object.active pangea.object.collisionEnabled pangea.object.all pangea.object.findByTag
+pangea.object.nearest pangea.object.exists pangea.object.tags pangea.object.hasTag pangea.object.type pangea.object.category pangea.object.health pangea.object.damage
+pangea.object.state pangea.object.captureCheckpoint pangea.object.restoreCheckpoint pangea.object.setPosition pangea.object.setPositionResult pangea.object.setPositionOffset pangea.object.setPositionOffsetResult pangea.object.setVelocity
+pangea.object.setVelocityResult pangea.object.setRotation pangea.object.setRotationResult pangea.object.setScale pangea.object.setScaleResult pangea.object.setAnimation pangea.object.setAnimationResult pangea.object.setCollisionEnabled
+pangea.object.setCollisionEnabledResult pangea.object.setActive pangea.object.setActiveResult pangea.object.delete pangea.object.deleteResult
 
 API reference:
 pangea.log.info(message: string): nil — Logs an informational message.
@@ -64,11 +67,24 @@ pangea.persistence.get(key: string, version: number): string|number|boolean|nil 
 pangea.persistence.set(key: string, version: number, value: unknown): boolean — Stores a versioned bounded persistent scalar in the runtime persistence backend.
 pangea.persistence.delete(key: string): boolean — Deletes a persistent value from the runtime persistence backend.
 pangea.player.count(): number — Returns the number of active players exposed by the selected game.
-pangea.player.get(playerNum: number): PangeaPlayerSnapshot|nil — Returns a normalized read-only player snapshot.
+pangea.player.get(playerNum: number): PangeaPlayerSnapshot|nil — Returns a normalized read-only player snapshot, including transform/aim, score/lives, fuel, token/coin/peso progress, child-object count, and structured weapon inventory where the selected game exposes those native fields.
 pangea.player.raceResults(): PangeaRaceResult[]|nil — Returns the native read-only race result table, or nil when the selected game does not expose validated race state.
 pangea.player.objectiveResults(): PangeaObjectiveResult[]|nil — Returns the bounded read-only objective result table observed from native objective completion events, or nil when no objective has completed.
+pangea.player.checkpointResults(): PangeaCheckpointResult[]|nil — Returns the bounded read-only checkpoint result table observed from native checkpoint events, or nil when no checkpoint has been reached.
 pangea.player.setHealth(playerNum: number, health: number): boolean — Sets a player's normalized health when the native adapter exposes a safe health mutation boundary.
 pangea.player.setHealthResult(playerNum: number, health: number): PlayerCommandResult — Sets normalized player health and returns structured status and diagnostics.
+pangea.player.setLives(playerNum: number, lives: number): boolean — Sets a player's lives count when the native adapter exposes a safe lives mutation boundary.
+pangea.player.setLivesResult(playerNum: number, lives: number): PlayerCommandResult — Sets a player's lives count and returns structured status and diagnostics.
+pangea.player.setScore(playerNum: number, score: number): boolean — Sets a player's score when the native adapter exposes a safe score mutation boundary.
+pangea.player.setScoreResult(playerNum: number, score: number): PlayerCommandResult — Sets a player's score and returns structured status and diagnostics.
+pangea.player.setWeaponQuantity(playerNum: number, weaponType: number, quantity: number): boolean — Sets a player's bounded weapon quantity when the native adapter exposes safe inventory mutation.
+pangea.player.setWeaponQuantityResult(playerNum: number, weaponType: number, quantity: number): PlayerCommandResult — Sets a player's bounded weapon quantity and returns structured status and diagnostics.
+pangea.player.setKey(playerNum: number, keyId: number, enabled: boolean): boolean — Sets a player's semantic key inventory state when the native adapter exposes safe key mutation.
+pangea.player.setKeyResult(playerNum: number, keyId: number, enabled: boolean): PlayerCommandResult — Sets a player's semantic key inventory state and returns structured status and diagnostics.
+pangea.player.setCloverCount(playerNum: number, color: stringUnion, count: number): boolean — Sets a player's named clover count when the native adapter exposes safe collectible mutation.
+pangea.player.setCloverCountResult(playerNum: number, color: stringUnion, count: number): PlayerCommandResult — Sets a player's named clover count and returns structured status and diagnostics.
+pangea.player.setShieldActive(playerNum: number, active: boolean): boolean — Activates or deactivates a player's native shield when the adapter exposes that boundary.
+pangea.player.setShieldActiveResult(playerNum: number, active: boolean): PlayerCommandResult — Activates or deactivates a player's native shield and returns structured status and diagnostics.
 pangea.player.heal(playerNum: number, amount: number): boolean — Adds normalized health to a player, clamped to full health, when the native adapter exposes safe health read and mutation boundaries.
 pangea.player.healResult(playerNum: number, amount: number): PlayerCommandResult — Heals a player and returns structured status and diagnostics.
 pangea.player.setInvulnerable(playerNum: number, durationSeconds: number): boolean — Sets a player's native invulnerability timer in seconds; zero disables it.
@@ -77,18 +93,33 @@ pangea.player.setPosition(playerNum: number, position: vector3): boolean — Tel
 pangea.player.setPositionResult(playerNum: number, position: vector3): PlayerCommandResult — Teleports a player and returns structured status and diagnostics.
 pangea.player.setVelocity(playerNum: number, velocity: vector3): boolean — Sets a player's velocity when the native adapter exposes a safe velocity mutation boundary.
 pangea.player.setVelocityResult(playerNum: number, velocity: vector3): PlayerCommandResult — Sets a player's velocity and returns structured status and diagnostics.
+pangea.player.setForm(playerNum: number, form: stringUnion): boolean — Changes a supported player's native playable form, such as Bugdom's bug and ball forms.
 pangea.spawn.native(id: string, position: vector3, options: stringUnion?): ObjectHandle|nil — Spawns a native object.
 pangea.spawn.nativeResult(id: unknown, position: vector3, options: table?): NativeSpawnResult — Spawns a native object and returns structured status and diagnostics.
 pangea.spawn.scripted(id: string, position: vector3, options: stringUnion?): ObjectHandle|nil — Spawns a custom scripted object.
 pangea.object.position(handle: objectHandle): Vector3|nil — Gets the position of an object.
 pangea.object.source(handle: objectHandle): ObjectSource|nil — Gets the validated terrain, spline, or map source record for a replacement object.
+pangea.object.velocity(handle: objectHandle): Vector3|nil — Gets the current native or scripted velocity of an object when the adapter exposes it.
+pangea.object.rotation(handle: objectHandle): Vector3|nil — Gets the current native or scripted rotation of an object when the adapter exposes it.
+pangea.object.scale(handle: objectHandle): number|nil — Gets the current uniform native or scripted scale of an object when the adapter exposes it.
+pangea.object.animation(handle: objectHandle): number|nil — Gets the current native or scripted animation index of an object when the adapter exposes it.
+pangea.object.animationSpeed(handle: objectHandle): number|nil — Gets the current native or scripted animation speed of an object when the adapter exposes it.
+pangea.object.animationFrame(handle: objectHandle): number|nil — Gets the current native animation frame of an object when the adapter exposes it.
+pangea.object.active(handle: objectHandle): boolean|nil — Gets the current active lifecycle state of an object when the adapter exposes it.
+pangea.object.collisionEnabled(handle: objectHandle): boolean|nil — Gets the current native or scripted collision state of an object when the adapter exposes it.
 pangea.object.all(): ObjectHandle[] — Returns all currently registered object handles.
 pangea.object.findByTag(tag: string): ObjectHandle[] — Returns registered object handles carrying a tag.
 pangea.object.nearest(origin: vector3, tag: string?): ObjectHandle|nil — Returns the nearest readable registered object, optionally filtered by tag.
 pangea.object.exists(handle: objectHandle): boolean — Checks whether a generation-checked object handle is live.
 pangea.object.tags(handle: objectHandle): string[] — Returns the tags assigned to an object.
 pangea.object.hasTag(handle: objectHandle, tag: string): boolean — Checks whether an object has a tag.
+pangea.object.type(handle: objectHandle): string|nil — Returns the native registration type of an object, such as an enemy, pickup, hazard, or scripted object.
+pangea.object.category(handle: objectHandle): string|nil — Returns the semantic category of a live native or scripted object, such as enemy, pickup, hazard, projectile/effect, or scripted.
+pangea.object.health(handle: objectHandle): number|nil — Returns native object health when the adapter exposes it, without granting mutation authority.
+pangea.object.damage(handle: objectHandle): number|nil — Returns native object damage contribution when the adapter exposes it, without granting mutation authority.
 pangea.object.state(handle: objectHandle): table|nil — Returns mutable script-owned state scoped to an object generation.
+pangea.object.captureCheckpoint(handle: objectHandle): boolean — Captures a bounded deep copy of script-owned object state for checkpoint/reset restoration.
+pangea.object.restoreCheckpoint(handle: objectHandle): boolean — Restores the object's script-owned state from its captured checkpoint baseline.
 pangea.object.setPosition(handle: objectHandle, position: vector3): boolean — Sets the position of an object.
 pangea.object.setPositionResult(handle: objectHandle, position: vector3): ObjectCommandResult — Sets an object's position and returns structured status and diagnostics.
 pangea.object.setPositionOffset(handle: objectHandle, offset: vector3): boolean — Sets the current frame's visual position offset for an object. Only valid during onObjectFrame.
@@ -110,7 +141,7 @@ pangea.object.deleteResult(handle: objectHandle): ObjectCommandResult — Delete
 
 Result shapes:
 ItemSpawnResult PickupResult WeaponHitResult TriggerResult DamageResult PangeaCapabilities PangeaDiagnostics PangeaPlayerSnapshot
-PangeaRaceResult PangeaObjectiveResult PlayerCommandResult NativeSpawnResult ObjectCommandResult
+PangeaRaceResult PangeaObjectiveResult PangeaCheckpointResult PlayerCommandResult NativeSpawnResult ObjectCommandResult
 
 Game adapters:
 OttoMatic-Android Bugdom-android Bugdom2-Android Nanosaur-android Nanosaur2-Android CroMagRally-Android BillyFrontier-Android MightyMike-Android
