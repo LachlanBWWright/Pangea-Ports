@@ -80,7 +80,7 @@ void LoadLevelMetadata(void)
 	{
 		UseResFile(metadataRef);
 		ReadLevelMetadata();
-		FSClose(metadataRef);
+		CloseResFile(metadataRef);
 	}
 	else
 	{
@@ -290,7 +290,6 @@ char	path[256];
 
 	SDL_Log("%s: %d ms", __func__, (timeEndLoad.lo - timeStartLoad.lo) / 1000);
 }
-
 
 
 

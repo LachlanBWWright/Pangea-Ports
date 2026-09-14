@@ -397,10 +397,19 @@ static Boolean NilAdd(TerrainItemEntryType *itemPtr, float x, float z)
 
 Boolean Bugdom2SpawnTerrainItem(int type, TerrainItemEntryType* itemPtr, float x, float z)
 {
+	Boolean result;
 	if (!itemPtr || type < 0 || type > MAX_ITEM_NUM || gTerrainItemAddRoutines[type] == NilAdd)
 		return false;
 	itemPtr->type = (uint16_t) type;
-	return gTerrainItemAddRoutines[type](itemPtr, x, z);
+#if PANGEA_SAFE_ITEM_LOADING
+	int previousModelGroup = gActiveItemModelGroup;
+	gActiveItemModelGroup = GetBugdom2ItemModelGroup(type);
+#endif
+	result = gTerrainItemAddRoutines[type](itemPtr, x, z);
+#if PANGEA_SAFE_ITEM_LOADING
+	gActiveItemModelGroup = previousModelGroup;
+#endif
+	return result;
 }
 
 

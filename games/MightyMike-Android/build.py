@@ -202,6 +202,13 @@ def rm_if_exists(path):
     with contextlib.suppress(FileNotFoundError):
         os.remove(path)
 
+def is_incomplete_cmake_build(path):
+    return (
+        os.path.isdir(path)
+        and os.path.isdir(os.path.join(path, "CMakeFiles"))
+        and not os.path.isfile(os.path.join(path, "CMakeCache.txt"))
+    )
+
 def zipdir(zipname, topleveldir, arc_topleveldir):
     with zipfile.ZipFile(zipname, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
         for root, dirs, files in os.walk(topleveldir):
@@ -229,7 +236,10 @@ class Project:
 
         if os.path.exists(self.dir_name):
             if os.listdir(self.dir_name) and not os.path.exists(self.dir_name + "/CMakeCache.txt"):
-                die(f"Path exists and isn't an old build directory: {self.dir_name}")
+                if is_incomplete_cmake_build(self.dir_name):
+                    log(f"Removing incomplete CMake build directory: {self.dir_name}")
+                else:
+                    die(f"Path exists and isn't an old build directory: {self.dir_name}")
             shutil.rmtree(self.dir_name)
 
         env = None
@@ -486,7 +496,10 @@ class EmscriptenProject(Project):
 
         if os.path.exists(self.dir_name):
             if os.listdir(self.dir_name) and not os.path.exists(self.dir_name + "/CMakeCache.txt"):
-                die(f"Path exists and isn't an old build directory: {self.dir_name}")
+                if is_incomplete_cmake_build(self.dir_name):
+                    log(f"Removing incomplete CMake build directory: {self.dir_name}")
+                else:
+                    die(f"Path exists and isn't an old build directory: {self.dir_name}")
             shutil.rmtree(self.dir_name)
 
         env = os.environ.copy()

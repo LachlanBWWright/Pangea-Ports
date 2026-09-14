@@ -212,10 +212,15 @@ ObjNode	*newObj;
 Byte	group,type;
 
 
-	#if PANGEA_SAFE_ITEM_LOADING
+#if PANGEA_SAFE_ITEM_LOADING
 	if (newObjDef->group == MODEL_GROUP_LEVELSPECIFIC)
+	{
 		newObjDef->group = gActiveItemModelGroup;
-	#endif
+		if (newObjDef->type >= gNumObjectsInBG3DGroupList[newObjDef->group] &&
+			newObjDef->type < gNumObjectsInBG3DGroupList[MODEL_GROUP_LEVELSPECIFIC])
+			newObjDef->group = MODEL_GROUP_LEVELSPECIFIC;
+	}
+#endif
 	newObjDef->genre = DISPLAY_GROUP_GENRE;
 
 	newObj = MakeNewObject(newObjDef);

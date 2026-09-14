@@ -459,7 +459,7 @@ short					skeletonResFile;
 		if (hand == nil)
 		{
 			SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-				"Missing Bone resource skeletonType=%d joint=%d numJoints=%d boneResources=%d",
+				"Missing Bone resource skeletonType=%d joint=%d numJoints=%ld boneResources=%d",
 				skeletonType, i, numJoints, Count1Resources(NANOSAUR2_BONE_RESOURCE_TYPE));
 			DoFatalAlert("Error reading Bone resource!");
 		}
