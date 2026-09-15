@@ -123,6 +123,7 @@ typedef struct
 	float				greasedTiresTimer;
 	float				nitroTimer;
 	float				stickyTiresTimer;
+	float				superSuspensionTimer;
 	float				invisibilityTimer;
 	uint8_t				isEliminated;
 	uint8_t				isIt;

@@ -16,7 +16,11 @@ typedef void* NSpPlayerLeftMessage;
 #include "network.h"
 #include "window.h"
 #include "pangea_net.h"
+#include "pickup_sync.h"
 #include <math.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 /**********************/
 /*     PROTOTYPES     */
@@ -81,7 +85,7 @@ Boolean		gJoinNetworkGame = false;
 
 #ifdef __EMSCRIPTEN__
 #define PANGEA_NET_MAGIC 0x54454E50u /* 'PNET' little-endian */
-	#define PANGEA_NET_VERSION 7u
+	#define PANGEA_NET_VERSION 8u
 #define PANGEA_NET_PLAYER_NA 0xFFFFu
 #define PANGEA_NET_MAX_PACKET_SIZE 4096
 #define PANGEA_NET_LOCAL_RECONCILE_SNAP_DISTANCE 6.0f
@@ -116,7 +120,8 @@ enum
 {
 	kPangeaReliableEventRaceComplete = 1,
 	kPangeaReliableEventEliminated = 2,
-	kPangeaReliableEventTagHandoff = 3
+	kPangeaReliableEventTagHandoff = 3,
+	kPangeaReliableEventPickupState = 4
 };
 
 #define PANGEA_NET_TAG_SPAZ_TIMER 3.0f
@@ -295,6 +300,7 @@ static uint32_t PangeaNet_ComputeAuthoritativeStateHash(short playerCount)
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].greasedTiresTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].nitroTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].stickyTiresTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].superSuspensionTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].invisibilityTimer));
 	}
 	for (int t = 0; t < gNumTorches && t < PANGEA_NET_MAX_TORCHES; t++)
@@ -396,6 +402,7 @@ static void PangeaNet_PushRemoteSnapshot(short playerNum, const PangeaNetPlayerC
 	target->greasedTiresTimer = source->greasedTiresTimer;
 	target->nitroTimer = source->nitroTimer;
 	target->stickyTiresTimer = source->stickyTiresTimer;
+	target->superSuspensionTimer = source->superSuspensionTimer;
 	target->invisibilityTimer = source->invisibilityTimer;
 	target->isIt = source->isIt;
 	target->movingBackwards = source->movingBackwards;
@@ -674,6 +681,7 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 		interp->fromState.greasedTiresTimer = source->greasedTiresTimer;
 		interp->fromState.nitroTimer = source->nitroTimer;
 		interp->fromState.stickyTiresTimer = source->stickyTiresTimer;
+		interp->fromState.superSuspensionTimer = source->superSuspensionTimer;
 		interp->fromState.invisibilityTimer = source->invisibilityTimer;
 		interp->fromState.movingBackwards = source->movingBackwards;
 		interp->fromState.accelBackwards = source->accelBackwards;
@@ -711,6 +719,7 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 	interp->toState.greasedTiresTimer = source->greasedTiresTimer;
 	interp->toState.nitroTimer = source->nitroTimer;
 	interp->toState.stickyTiresTimer = source->stickyTiresTimer;
+	interp->toState.superSuspensionTimer = source->superSuspensionTimer;
 	interp->toState.invisibilityTimer = source->invisibilityTimer;
 	interp->toState.movingBackwards = source->movingBackwards;
 	interp->toState.accelBackwards = source->accelBackwards;
@@ -850,6 +859,14 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 		{
 			return;
 		}
+		if (eventType == kPangeaReliableEventPickupState)
+		{
+			const uint16_t itemIndex = PangeaNetReader_ReadU16(&reader);
+			const uint8_t hidden = PangeaNetReader_ReadU8(&reader);
+			if (reader.ok && hidden <= 1)
+				PangeaPickup_ReceiveState(itemIndex, hidden != 0);
+			return;
+		}
 			if (eventType == kPangeaReliableEventTagHandoff)
 			{
 				const uint8_t whoIsIt = PangeaNetReader_ReadU8(&reader);
@@ -963,6 +980,7 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 			s->greasedTiresTimer = PangeaNetReader_ReadF32(&reader);
 			s->nitroTimer = PangeaNetReader_ReadF32(&reader);
 			s->stickyTiresTimer = PangeaNetReader_ReadF32(&reader);
+			s->superSuspensionTimer = PangeaNetReader_ReadF32(&reader);
 			s->invisibilityTimer = PangeaNetReader_ReadF32(&reader);
 			s->isIt = PangeaNetReader_ReadU8(&reader);
 			s->movingBackwards = PangeaNetReader_ReadU8(&reader);
@@ -990,6 +1008,19 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 				gPlayerInfo[i].greasedTiresTimer = s->greasedTiresTimer;
 				gPlayerInfo[i].nitroTimer = s->nitroTimer;
 				gPlayerInfo[i].stickyTiresTimer = s->stickyTiresTimer;
+				gPlayerInfo[i].superSuspensionTimer = s->superSuspensionTimer;
+				if (s->stickyTiresTimer > 0)
+					SetTractionPhysics(&gPlayerInfo[i].carStats, 3.0f);
+				else
+				{
+					gPlayerInfo[i].carStats.tireTraction = gPlayerInfo[i].carStatsCopy.tireTraction;
+					gPlayerInfo[i].carStats.minPlaningAngle = gPlayerInfo[i].carStatsCopy.minPlaningAngle;
+					gPlayerInfo[i].carStats.minPlaningSpeed = gPlayerInfo[i].carStatsCopy.minPlaningSpeed;
+				}
+				if (s->superSuspensionTimer > 0)
+					SetSuspensionPhysics(&gPlayerInfo[i].carStats, 3.0f);
+				else
+					gPlayerInfo[i].carStats.suspension = gPlayerInfo[i].carStatsCopy.suspension;
 				gPlayerInfo[i].invisibilityTimer = s->invisibilityTimer;
 				if (i != gMyNetworkPlayerNum)
 				{
@@ -1988,10 +2019,20 @@ static void HandleGameConfigMessage(NetConfigMessageType *inMessage)
 // indicating that they are ready to start playing.
 //
 
+static void WaitForBrowserLevelStart(void)
+{
+#ifdef __EMSCRIPTEN__
+	if (!EM_ASM_INT({ return !!Module['onNetworkLevelReady']; }))
+		return;
+	EM_ASM({ Module['onNetworkLevelReady'](); });
+	while (!gGameOver && !EM_ASM_INT({ return !!Module['pangeaNetworkStartRequested']; }))
+		emscripten_sleep(10);
+#endif
+}
+
 void HostWaitForPlayersToPrepareLevel(void)
 {
-	// Level sync is coordinated by the TypeScript layer before the C game starts.
-	(void)0;
+	WaitForBrowserLevelStart();
 #if 0
 OSStatus				status;
 NetSyncMessageType		outMess;
@@ -2064,8 +2105,7 @@ int						startTick = TickCount();
 
 void ClientTellHostLevelIsPrepared(void)
 {
-	// Level sync is coordinated by the TypeScript layer before the C game starts.
-	(void)0;
+	WaitForBrowserLevelStart();
 #if 0
 OSStatus				status;
 NetSyncMessageType		outMess;
@@ -2961,6 +3001,7 @@ void HostSend_SnapshotToClients(void)
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].greasedTiresTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].nitroTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].stickyTiresTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].superSuspensionTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].invisibilityTimer);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].isIt ? 1 : 0);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].movingBackwards ? 1 : 0);
@@ -3132,6 +3173,7 @@ void ClientApplyPendingSnapshot(void)
 			gPlayerInfo[i].greasedTiresTimer = s->greasedTiresTimer;
 			gPlayerInfo[i].nitroTimer = s->nitroTimer;
 			gPlayerInfo[i].stickyTiresTimer = s->stickyTiresTimer;
+			gPlayerInfo[i].superSuspensionTimer = s->superSuspensionTimer;
 			gPlayerInfo[i].invisibilityTimer = s->invisibilityTimer;
 			gPlayerInfo[i].isIt = s->isIt != 0;
 			gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
@@ -3199,6 +3241,7 @@ void ClientApplyPendingSnapshot(void)
 		gPlayerInfo[i].greasedTiresTimer = interp->toState.greasedTiresTimer;
 		gPlayerInfo[i].nitroTimer = interp->toState.nitroTimer;
 		gPlayerInfo[i].stickyTiresTimer = interp->toState.stickyTiresTimer;
+		gPlayerInfo[i].superSuspensionTimer = interp->toState.superSuspensionTimer;
 		gPlayerInfo[i].invisibilityTimer = interp->toState.invisibilityTimer;
 		gPlayerInfo[i].isIt = interp->toState.isIt != 0;
 		gPlayerInfo[i].isEliminated = interp->toState.isEliminated != 0;
@@ -3378,4 +3421,34 @@ Boolean PangeaNet_IsHostAuthoritativeCpuSimulation(short playerNum)
 		return false;
 	}
 	return gPlayerInfo[playerNum].isComputer;
+}
+
+void PangeaNet_SendPickupState(uint16_t itemIndex, Boolean hidden)
+{
+#ifdef __EMSCRIPTEN__
+	if (!gIsNetworkHost)
+		return;
+	uint8_t bytes[32];
+	PangeaNetWriter writer;
+	PangeaNetPacketHeader header = {
+		.magic = PANGEA_NET_MAGIC,
+		.version = PANGEA_NET_VERSION,
+		.packetType = kPangeaPacketReliableEvent,
+		.matchIdLow = gPangeaMatchId,
+		.matchIdHigh = gPangeaMatchIdHigh,
+		.tick = gPangeaLocalTick,
+		.sequence = gPangeaSendSequence++,
+		.playerIndex = PANGEA_NET_PLAYER_NA,
+	};
+	PangeaNetWriter_Init(&writer, bytes, sizeof(bytes));
+	PangeaNet_WriteHeader(&writer, &header);
+	PangeaNetWriter_WriteU8(&writer, kPangeaReliableEventPickupState);
+	PangeaNetWriter_WriteU16(&writer, itemIndex);
+	PangeaNetWriter_WriteU8(&writer, hidden ? 1 : 0);
+	if (writer.ok)
+		PangeaNetBridge_SendReliable(bytes, writer.cursor);
+#else
+	(void)itemIndex;
+	(void)hidden;
+#endif
 }

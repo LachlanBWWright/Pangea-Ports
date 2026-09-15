@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "pickup_sync.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -50,6 +51,7 @@ ObjNode	*gCycloramaObj = nil;
 void InitItemsManager(void)
 {
 int	i;
+	PangeaPickup_Reset();
 
 	gCycloramaObj = CreateCyclorama();
 

@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "pickup_sync.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -147,6 +148,11 @@ ObjNode	*gTorchObjs[MAX_TORCHES];
 
 Boolean HandleTrigger(ObjNode *triggerNode, ObjNode *whoNode, Byte side)
 {
+	const int kind = triggerNode->Kind;
+	if ((kind == TRIGTYPE_POW || kind == TRIGTYPE_TRACTION ||
+		kind == TRIGTYPE_SUSPENSION || kind == TRIGTYPE_INVISIBILITY) &&
+		!PangeaPickup_CanCollect(triggerNode))
+		return false;
 	if (triggerNode->CBits & CBITS_TOUCHABLE)					// see if a non-solid trigger
 	{
 		return(gTriggerTable[triggerNode->Kind](triggerNode,whoNode,side));	// call trigger's handler routine
@@ -258,6 +264,7 @@ float			heightOff;
 
 	SetObjectCollisionBounds(newObj, 300, 0, -150, 150, 150, -150);		// make collision box
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 9, 4, false);
+	PangeaPickup_ApplyObject(newObj);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 	CroMagScript_RegisterObject(newObj, "cromag.pow", "pickup");
@@ -279,6 +286,12 @@ static void MovePOW(ObjNode *theNode)
 		return;
 	}
 
+
+	if (PangeaPickup_ApplyObject(theNode))
+	{
+		UpdateShadow(theNode);
+		return;
+	}
 
 		/* SEE IF HIDDEN */
 
@@ -366,6 +379,7 @@ Boolean	thud = false;
 
 	theNode->POWHidden = true;
 	theNode->POWHiddenTimer = 5.0;					// n seconds until it reappears
+	PangeaPickup_Collect(theNode);
 	theNode->StatusBits |= STATUS_BIT_HIDDEN;
 	theNode->CType = 0;
 
@@ -552,6 +566,7 @@ OGLPoint3D		where;
 			/* MAKE SHADOW */
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 12, 8, false);
+	PangeaPickup_ApplyObject(newObj);
 
 
 	return(true);							// item was added
@@ -590,6 +605,7 @@ short	playerNum;
 
 	theNode->POWHidden = true;
 	theNode->POWHiddenTimer = 5.0;					// n seconds until it reappears
+	PangeaPickup_Collect(theNode);
 	theNode->StatusBits |= STATUS_BIT_HIDDEN;
 	theNode->CType = 0;
 
@@ -651,6 +667,7 @@ OGLPoint3D		where;
 			/* MAKE SHADOW */
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 13, 13, false);
+	PangeaPickup_ApplyObject(newObj);
 
 
 	return(true);							// item was added
@@ -687,6 +704,7 @@ short	playerNum;
 
 	theNode->POWHidden = true;
 	theNode->POWHiddenTimer = 5.0;					// n seconds until it reappears
+	PangeaPickup_Collect(theNode);
 	theNode->StatusBits |= STATUS_BIT_HIDDEN;
 	theNode->CType = 0;
 
@@ -749,6 +767,7 @@ OGLPoint3D		where;
 			/* MAKE SHADOW */
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 13, 13, false);
+	PangeaPickup_ApplyObject(newObj);
 
 
 	return(true);							// item was added
@@ -787,6 +806,7 @@ short	playerNum;
 
 	theNode->POWHidden = true;
 	theNode->POWHiddenTimer = 5.0;					// n seconds until it reappears
+	PangeaPickup_Collect(theNode);
 	theNode->StatusBits |= STATUS_BIT_HIDDEN;
 	theNode->CType = 0;
 

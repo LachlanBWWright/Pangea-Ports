@@ -421,6 +421,7 @@ extern "C"
 	EMSCRIPTEN_KEEPALIVE
 	void PangeaGame_StartNetworkMatch(void)
 	{
+		EM_ASM({ Module['pangeaNetworkStartRequested'] = true; });
 		SDL_Log(
 			"PangeaGame_StartNetworkMatch called mode=%s(%d) track=%d players=%d host=%d raceMode=%d",
 			CroMagGameModeName(gGameMode),

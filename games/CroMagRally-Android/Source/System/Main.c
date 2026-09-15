@@ -14,6 +14,7 @@
 #include "miscscreens.h"
 #include "network.h"
 #include "pangea_net.h"
+#include "pickup_sync.h"
 #include <SDL3/SDL.h>
 
 #ifdef PANGEA_ENABLE_SCRIPTING
@@ -913,6 +914,8 @@ static void PlayArea(void)
 	else
 	if (gIsNetworkClient)
 		ClientTellHostLevelIsPrepared();
+	if (gGameOver)
+		return;
 
 
 			/* PREP STUFF */
@@ -1172,6 +1175,7 @@ void FadeOutArea(void)
 
 void MoveEverything(void)
 {
+	PangeaPickup_Update();
 
 	MoveObjects();
 	MoveSplineObjects();
