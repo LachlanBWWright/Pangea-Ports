@@ -46,12 +46,24 @@ extern	Byte	gNumEggsSaved[NUM_EGG_TYPES];
 extern short gNumEggs;
 extern ObjNode *gEggObjs[MAX_NET_EGGS];
 
+#define PICKUP_SYNC_MARKER Flag[5]
+void Nanosaur2Pickup_Reset(void);
+Boolean Nanosaur2Pickup_CanCollect(ObjNode* pickup);
+void Nanosaur2Pickup_Collected(ObjNode* pickup);
+void Nanosaur2Pickup_CollectedPermanent(ObjNode* pickup);
+void Nanosaur2Pickup_ApplyState(ObjNode* pickup);
+void Nanosaur2Pickup_ReceiveState(uint16_t itemIndex, Boolean hidden);
+int Nanosaur2Pickup_WriteSnapshotState(uint8_t* bytes, int maxBytes);
+void Nanosaur2Pickup_ReceiveSnapshotState(const uint8_t* bytes, int byteCount);
+uint32_t Nanosaur2Pickup_HashState(void);
+void Nanosaur2Pickup_Update(void);
 #ifdef __EMSCRIPTEN__
 int PangeaNet_GetEggSnapshotData(Byte *outState, Byte *outCarrier, float *outX, float *outY, float *outZ, int maxEggs);
 void PangeaNet_ApplyEggNetworkState(int eggIndex, int state, int carrier, float x, float y, float z);
 void PangeaNet_SendEggPickedUp(int eggIndex, int playerNum);
 void PangeaNet_SendEggDropped(int eggIndex, int playerNum);
 void PangeaNet_SendEggRetrieved(int eggIndex, int kind);
+void PangeaNet_SendPickupState(uint16_t itemIndex, Boolean hidden);
 #endif
 
 
@@ -173,9 +185,3 @@ Boolean PrimeLaserOrb(long splineNum, SplineItemType *itemPtr);
 		/* HOLES */
 
 Boolean AddHole(TerrainItemEntryType *itemPtr, float  x, float z);
-
-
-
-
-
-

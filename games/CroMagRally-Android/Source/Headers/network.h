@@ -6,6 +6,7 @@
 
 //#include <NetSprocket.h>
 #include "main.h"
+#include "checkpoints.h"
 
 enum
 {
@@ -117,6 +118,7 @@ typedef struct
 	uint8_t				wrongWay;
 	short				powType;
 	short				powQuantity;
+	short				numTokens;
 	float				health;
 	float				tagTimer;
 	float				frozenTimer;
@@ -125,14 +127,20 @@ typedef struct
 	float				stickyTiresTimer;
 	float				superSuspensionTimer;
 	float				invisibilityTimer;
+	float				attackTimer;
+	float				impactResetTimer;
+	float				submarineImmobilized;
+	float				flamingTimer;
 	uint8_t				isEliminated;
 	uint8_t				isIt;
+	uint8_t				team;
 	uint8_t				movingBackwards;
 	uint8_t				accelBackwards;
 	uint8_t				braking;
 	uint8_t				onWater;
 	uint8_t				pad2[3];
 	uint32_t			lastProcessedInputSequence;
+	uint8_t			checkpointTagged[(MAX_CHECKPOINTS + 7) / 8];
 }PangeaNetPlayerCarState;
 
 enum
@@ -165,6 +173,8 @@ typedef struct
 	uint16_t					numPlayersEliminated;
 	uint16_t					reserved1;
 	float						reTagTimer;
+	float						startingLightTimer;
+	uint16_t					totalTokens;
 	PangeaNetPlayerCarState		players[MAX_PLAYERS];
 }PangeaNetHostSnapshotPacket;
 

@@ -106,6 +106,7 @@ ObjNode	*pole, *topbot, *middle;
 	pole = MakeNewDisplayGroupObject(&def);
 
 	pole->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	pole->PICKUP_SYNC_MARKER = true;
 
 
 	if (itemPtr->flags & ITEM_FLAGS_USER1)			// see if already got blown up
@@ -177,6 +178,7 @@ ObjNode	*pole, *topbot, *middle;
 
 	topbot->ChainNode = middle;
 	middle->ChainHead = topbot;
+	Nanosaur2Pickup_ApplyState(pole);
 
 
 	return(true);													// item was added
@@ -332,6 +334,7 @@ ObjNode	*pole = theNode;
 		pole->Health = 0;
 		pole->What = 0;								// no longer a zappable electrode
 		pole->TerrainItemPtr->flags |= ITEM_FLAGS_USER1;		// set flag so will come back dead next time
+		Nanosaur2Pickup_CollectedPermanent(pole);
 		pole->CType &= ~CTYPE_AUTOTARGETWEAPON;		// dont auto-target anymore
 	}
 
@@ -806,8 +809,3 @@ static void FreeZap(short zapNum)
 
 	gZaps[zapNum].isUsed = false;
 }
-
-
-
-
-

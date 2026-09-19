@@ -107,6 +107,7 @@ short	typeB, typeT, typeW, typeG;
 	Nanosaur2Script_RegisterObject(base, "nanosaur2.turretBase", "child-object");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	base->PICKUP_SYNC_MARKER = true;
 
 			/* SET COLLISION STUFF */
 
@@ -188,6 +189,7 @@ short	typeB, typeT, typeW, typeG;
 
 	gun->ChainNode = lens;
 	lens->ChainHead = gun;
+	Nanosaur2Pickup_ApplyState(base);
 
 
 
@@ -466,6 +468,7 @@ float					x,y,z, q;
 
 			/* DELETE THE ENTIRE TURRET HIERARCHY */
 
+	Nanosaur2Pickup_CollectedPermanent(base);
 	base->TerrainItemPtr = nil;				// dont ever come back
 	DeleteObject(base);
 
@@ -799,12 +802,6 @@ OGLVector3D				delta,v;
 
 	PlayEffect3D(EFFECT_IMPACTSIZZLE, &gCoord);
 }
-
-
-
-
-
-
 
 
 

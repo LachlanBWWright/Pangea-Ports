@@ -1047,6 +1047,8 @@ int		oldTimer;
 
 	oldTimer = gStartingLightTimer;
 
+	if (gIsNetworkClient)
+		return;
 	if (gCameraStartupTimer < .2f)									// dont tick down until camera intro is about done
 		gStartingLightTimer -= gFramesPerSecondFrac / (float)gNumSplitScreenPanes;
 	else
@@ -1923,4 +1925,3 @@ static void MovePressAnyKey(ObjNode* theNode)
 	theNode->SpecialF[0] += gFramesPerSecondFrac * 4.0f;
 	theNode->ColorFilter.a = 0.66f + sinf(theNode->SpecialF[0]) * 0.33f;
 }
-

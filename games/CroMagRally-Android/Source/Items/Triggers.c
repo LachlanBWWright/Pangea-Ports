@@ -287,12 +287,6 @@ static void MovePOW(ObjNode *theNode)
 	}
 
 
-	if (PangeaPickup_ApplyObject(theNode))
-	{
-		UpdateShadow(theNode);
-		return;
-	}
-
 		/* SEE IF HIDDEN */
 
 	if (theNode->POWHidden)
@@ -327,6 +321,7 @@ static void MovePOW(ObjNode *theNode)
 	}
 
 	UpdateShadow(theNode);
+	PangeaPickup_ApplyObject(theNode);
 }
 
 
@@ -445,6 +440,7 @@ OGLPoint3D		where;
 
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 12, 5, false);
+	PangeaPickup_ApplyObject(newObj);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 	CroMagScript_RegisterObject(newObj, "cromag.token", "pickup");
@@ -469,6 +465,7 @@ static void MoveToken(ObjNode *theNode)
 	theNode->Rot.y += gFramesPerSecondFrac;
 	UpdateObjectTransforms(theNode);
 	UpdateShadow(theNode);
+	PangeaPickup_ApplyObject(theNode);
 }
 
 
@@ -485,6 +482,8 @@ short	playerNum;
 
 	playerNum = whoNode->PlayerNum;
 	if (gPlayerInfo[playerNum].isComputer)		// CPU players cannot collect these, only real players can
+		return(false);
+	if (!PangeaPickup_CanCollect(theNode))
 		return(false);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
@@ -509,6 +508,7 @@ short	playerNum;
 
 			/* FREE THE POW */
 
+	PangeaPickup_CollectPermanent(theNode);
 	theNode->TerrainItemPtr	= nil;				// dont ever come back
 	DeleteObject(theNode);
 
@@ -938,6 +938,7 @@ float	speed;
 
 	if ((speed = whoNode->Speed3D) > 2000.0f)
 	{
+		PangeaPickup_CollectPermanent(theNode);
 		theNode->TerrainItemPtr	= nil;				// dont ever come back
 		theNode->Flag[0] = true;					// set the got-hit flag
 		theNode->CType = 0;							// not a trigger anymore
@@ -1023,6 +1024,7 @@ static Boolean DoTrig_SnoMan(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	if (whoNode->Speed3D > 2000.0f)
 	{
 		ExplodeSnoMan(theNode);
+		PangeaPickup_CollectPermanent(theNode);
 		theNode->TerrainItemPtr	= nil;				// dont ever come back
 		DeleteObject(theNode);
 
@@ -1187,8 +1189,9 @@ static Boolean DoTrig_CampFire(ObjNode *theNode, ObjNode *whoNode, Byte sideBits
 		PlayEffect_Parms3D(EFFECT_BOOM, &theNode->Coord, NORMAL_CHANNEL_RATE, 4);
 
 
-				/* DELETE THE FIRE */
+		/* DELETE THE FIRE */
 
+		PangeaPickup_CollectPermanent(theNode);
 		theNode->TerrainItemPtr = nil;							// dont come back
 		DeleteObject(theNode);
 
@@ -1573,6 +1576,7 @@ static Boolean DoTrig_Vase(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	if (whoNode->Speed3D > 2000.0f)
 	{
 		ExplodeVase(theNode);
+		PangeaPickup_CollectPermanent(theNode);
 		theNode->TerrainItemPtr	= nil;				// dont ever come back
 		DeleteObject(theNode);
 

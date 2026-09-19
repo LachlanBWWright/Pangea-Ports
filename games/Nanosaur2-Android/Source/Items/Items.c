@@ -48,6 +48,7 @@ ObjNode				*gCyclorama = nil;
 
 void InitItemsManager(void)
 {
+	Nanosaur2Pickup_Reset();
 	InitForestDoors();
 	InitZaps();
 	InitWormholes();
@@ -514,7 +515,6 @@ Boolean AddAsteroid(TerrainItemEntryType *itemPtr, float  x, float z)
 
 	return(true);													// item was added
 }
-
 
 
 

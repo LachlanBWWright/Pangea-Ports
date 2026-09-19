@@ -242,6 +242,7 @@ Boolean				keyDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 	Nanosaur2Script_RegisterObject(keyHolder, "nanosaur2.forestDoorKeyHolder", "trigger");
 
 	keyHolder->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	keyHolder->PICKUP_SYNC_MARKER = true;
 
 	keyHolder->Kind = keyID;
 
@@ -258,6 +259,7 @@ Boolean				keyDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 	keyHolder->HeatSeekHotSpotOff.y 	= 220.0f;
 
 	keyHolder->Health = .3f;
+	Nanosaur2Pickup_ApplyState(keyHolder);
 
 
 					/************/
@@ -285,6 +287,7 @@ Boolean				keyDestroyed = itemPtr->flags & ITEM_FLAGS_USER1;
 
 		keyHolder->ChainNode = key;
 		key->ChainHead = keyHolder;
+		Nanosaur2Pickup_ApplyState(keyHolder);
 
 
 					/* MAKE SPARKLES */
@@ -405,6 +408,7 @@ OGLVector3D	v, delta;
 			/* MAKE SURE KEY DOESNT COME BACK */
 
 	keyHolder->TerrainItemPtr->flags |= ITEM_FLAGS_USER1;
+	Nanosaur2Pickup_CollectedPermanent(keyHolder);
 	keyHolder->CType &= ~CTYPE_AUTOTARGETWEAPON;				// don't auto-target anymore
 
 
@@ -466,15 +470,6 @@ OGLVector3D	v, delta;
 
 	keyHolder->ChainNode = nil;
 }
-
-
-
-
-
-
-
-
-
 
 
 

@@ -271,22 +271,29 @@ static uint32_t PangeaNet_ComputeAuthoritativeStateHash(short playerCount)
 	hash = PangeaNet_HashMix(hash, (uint32_t)gCapturedFlagCount[1]);
 	hash = PangeaNet_HashMix(hash, (uint32_t)gNumPlayersEliminated);
 	hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gReTagTimer));
+	hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gStartingLightTimer));
+	hash = PangeaNet_HashMix(hash, (uint32_t)gTotalTokens);
+	hash = PangeaNet_HashMix(hash, PangeaPickup_HashState());
 	for (short i = 0; i < clampedPlayerCount; i++)
 	{
 		hash = PangeaNet_HashMix(hash, (uint32_t)i);
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].lapNum);
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].checkpointNum);
+		for (int checkpoint = 0; checkpoint < gNumCheckpoints && checkpoint < MAX_CHECKPOINTS; checkpoint++)
+			hash = PangeaNet_HashMix(hash, gPlayerInfo[i].checkpointTagged[checkpoint] ? 1u : 0u);
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].place);
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].raceComplete ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].wrongWay ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].isEliminated ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].isIt ? 1 : 0));
+		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].team);
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].movingBackwards ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].accelBackwards ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].braking ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)(gPlayerInfo[i].onWater ? 1 : 0));
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].powType);
 		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].powQuantity);
+		hash = PangeaNet_HashMix(hash, (uint32_t)gPlayerInfo[i].numTokens);
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Rot.x : 0.0f));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->Rot.z : 0.0f));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].objNode ? gPlayerInfo[i].objNode->DeltaRot.x : 0.0f));
@@ -302,6 +309,10 @@ static uint32_t PangeaNet_ComputeAuthoritativeStateHash(short playerCount)
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].stickyTiresTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].superSuspensionTimer));
 		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].invisibilityTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].attackTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].impactResetTimer));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].submarineImmobilized));
+		hash = PangeaNet_HashMix(hash, PangeaNet_HashF32(gPlayerInfo[i].flamingTimer));
 	}
 	for (int t = 0; t < gNumTorches && t < PANGEA_NET_MAX_TORCHES; t++)
 	{
@@ -404,7 +415,12 @@ static void PangeaNet_PushRemoteSnapshot(short playerNum, const PangeaNetPlayerC
 	target->stickyTiresTimer = source->stickyTiresTimer;
 	target->superSuspensionTimer = source->superSuspensionTimer;
 	target->invisibilityTimer = source->invisibilityTimer;
+	target->attackTimer = source->attackTimer;
+	target->impactResetTimer = source->impactResetTimer;
+	target->submarineImmobilized = source->submarineImmobilized;
+	target->flamingTimer = source->flamingTimer;
 	target->isIt = source->isIt;
+	target->team = source->team;
 	target->movingBackwards = source->movingBackwards;
 	target->accelBackwards = source->accelBackwards;
 	target->braking = source->braking;
@@ -676,6 +692,7 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 		interp->fromState.health = source->health;
 		interp->fromState.tagTimer = source->tagTimer;
 		interp->fromState.isIt = source->isIt;
+		interp->fromState.team = source->team;
 		interp->fromState.isEliminated = source->isEliminated;
 		interp->fromState.frozenTimer = source->frozenTimer;
 		interp->fromState.greasedTiresTimer = source->greasedTiresTimer;
@@ -683,6 +700,10 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 		interp->fromState.stickyTiresTimer = source->stickyTiresTimer;
 		interp->fromState.superSuspensionTimer = source->superSuspensionTimer;
 		interp->fromState.invisibilityTimer = source->invisibilityTimer;
+		interp->fromState.attackTimer = source->attackTimer;
+		interp->fromState.impactResetTimer = source->impactResetTimer;
+		interp->fromState.submarineImmobilized = source->submarineImmobilized;
+		interp->fromState.flamingTimer = source->flamingTimer;
 		interp->fromState.movingBackwards = source->movingBackwards;
 		interp->fromState.accelBackwards = source->accelBackwards;
 		interp->fromState.braking = source->braking;
@@ -714,6 +735,7 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 	interp->toState.health = source->health;
 	interp->toState.tagTimer = source->tagTimer;
 	interp->toState.isIt = source->isIt;
+	interp->toState.team = source->team;
 	interp->toState.isEliminated = source->isEliminated;
 	interp->toState.frozenTimer = source->frozenTimer;
 	interp->toState.greasedTiresTimer = source->greasedTiresTimer;
@@ -721,6 +743,10 @@ static void PangeaNet_SetRemoteInterpTarget(short playerNum, const PangeaNetPlay
 	interp->toState.stickyTiresTimer = source->stickyTiresTimer;
 	interp->toState.superSuspensionTimer = source->superSuspensionTimer;
 	interp->toState.invisibilityTimer = source->invisibilityTimer;
+	interp->toState.attackTimer = source->attackTimer;
+	interp->toState.impactResetTimer = source->impactResetTimer;
+	interp->toState.submarineImmobilized = source->submarineImmobilized;
+	interp->toState.flamingTimer = source->flamingTimer;
 	interp->toState.movingBackwards = source->movingBackwards;
 	interp->toState.accelBackwards = source->accelBackwards;
 	interp->toState.braking = source->braking;
@@ -934,6 +960,8 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 		gPendingSnapshot.numPlayersEliminated = PangeaNetReader_ReadU16(&reader);
 		gPendingSnapshot.reserved1 = PangeaNetReader_ReadU16(&reader);
 		gPendingSnapshot.reTagTimer = PangeaNetReader_ReadF32(&reader);
+		gPendingSnapshot.startingLightTimer = PangeaNetReader_ReadF32(&reader);
+		gPendingSnapshot.totalTokens = PangeaNetReader_ReadU16(&reader);
 		if (!reader.ok || gPendingSnapshot.protocolVersion != PANGEA_NET_VERSION)
 		{
 			SDL_Log("CroMag net: rejected snapshot protocolVersion=%u expected=%u",
@@ -974,6 +1002,7 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 			s->isEliminated = PangeaNetReader_ReadU8(&reader);
 			s->powType = (short)PangeaNetReader_ReadU16(&reader);
 			s->powQuantity = (short)PangeaNetReader_ReadU16(&reader);
+			s->numTokens = (short)PangeaNetReader_ReadU16(&reader);
 			s->health = PangeaNetReader_ReadF32(&reader);
 			s->tagTimer = PangeaNetReader_ReadF32(&reader);
 			s->frozenTimer = PangeaNetReader_ReadF32(&reader);
@@ -982,7 +1011,12 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 			s->stickyTiresTimer = PangeaNetReader_ReadF32(&reader);
 			s->superSuspensionTimer = PangeaNetReader_ReadF32(&reader);
 			s->invisibilityTimer = PangeaNetReader_ReadF32(&reader);
+			s->attackTimer = PangeaNetReader_ReadF32(&reader);
+			s->impactResetTimer = PangeaNetReader_ReadF32(&reader);
+			s->submarineImmobilized = PangeaNetReader_ReadF32(&reader);
+			s->flamingTimer = PangeaNetReader_ReadF32(&reader);
 			s->isIt = PangeaNetReader_ReadU8(&reader);
+			s->team = PangeaNetReader_ReadU8(&reader);
 			s->movingBackwards = PangeaNetReader_ReadU8(&reader);
 			s->accelBackwards = PangeaNetReader_ReadU8(&reader);
 			s->braking = PangeaNetReader_ReadU8(&reader);
@@ -991,10 +1025,15 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 			(void) PangeaNetReader_ReadU8(&reader);
 			(void) PangeaNetReader_ReadU8(&reader);
 			s->lastProcessedInputSequence = PangeaNetReader_ReadU32(&reader);
+			for (int checkpoint = 0; checkpoint < (MAX_CHECKPOINTS + 7) / 8; checkpoint++)
+				s->checkpointTagged[checkpoint] = PangeaNetReader_ReadU8(&reader);
 
 			if (i < MAX_PLAYERS)
 			{
+				for (int checkpoint = 0; checkpoint < MAX_CHECKPOINTS; checkpoint++)
+					gPlayerInfo[i].checkpointTagged[checkpoint] = (s->checkpointTagged[checkpoint >> 3] & (1u << (checkpoint & 7))) != 0;
 				gPlayerInfo[i].isIt = s->isIt != 0;
+				gPlayerInfo[i].team = s->team;
 				gPlayerInfo[i].isEliminated = s->isEliminated != 0;
 				gPlayerInfo[i].wrongWay = s->wrongWay != 0;
 				gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
@@ -1022,6 +1061,10 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 				else
 					gPlayerInfo[i].carStats.suspension = gPlayerInfo[i].carStatsCopy.suspension;
 				gPlayerInfo[i].invisibilityTimer = s->invisibilityTimer;
+				gPlayerInfo[i].attackTimer = s->attackTimer;
+				gPlayerInfo[i].impactResetTimer = s->impactResetTimer;
+				gPlayerInfo[i].submarineImmobilized = s->submarineImmobilized;
+				gPlayerInfo[i].flamingTimer = s->flamingTimer;
 				if (i != gMyNetworkPlayerNum)
 				{
 					PangeaNet_PushRemoteSnapshot(i, s);
@@ -1042,6 +1085,12 @@ static void HandlePangeaNetMessage(const void* bytes, int byteCount)
 				gPendingTorchCoordZ[t] = PangeaNetReader_ReadF32(&reader);
 			}
 			gHavePendingTorchState = reader.ok;
+		}
+		{
+			uint8_t pickupState[512];
+			for (int b = 0; b < (int)sizeof(pickupState); b++)
+				pickupState[b] = PangeaNetReader_ReadU8(&reader);
+			PangeaPickup_ReceiveSnapshotState(pickupState, (int)sizeof(pickupState));
 		}
 
 		if (!reader.ok)
@@ -2959,6 +3008,8 @@ void HostSend_SnapshotToClients(void)
 	PangeaNetWriter_WriteU16(&writer, (uint16_t)gNumPlayersEliminated);
 	PangeaNetWriter_WriteU16(&writer, 0);
 	PangeaNetWriter_WriteF32(&writer, gReTagTimer);
+	PangeaNetWriter_WriteF32(&writer, gStartingLightTimer);
+	PangeaNetWriter_WriteU16(&writer, (uint16_t)gTotalTokens);
 
 	for (i = 0; i < MAX_PLAYERS; i++)
 	{
@@ -2995,6 +3046,7 @@ void HostSend_SnapshotToClients(void)
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].isEliminated ? 1 : 0);
 		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].powType);
 		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].powQuantity);
+		PangeaNetWriter_WriteU16(&writer, (uint16_t)gPlayerInfo[i].numTokens);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].health);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].tagTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].frozenTimer);
@@ -3003,7 +3055,12 @@ void HostSend_SnapshotToClients(void)
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].stickyTiresTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].superSuspensionTimer);
 		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].invisibilityTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].attackTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].impactResetTimer);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].submarineImmobilized);
+		PangeaNetWriter_WriteF32(&writer, gPlayerInfo[i].flamingTimer);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].isIt ? 1 : 0);
+		PangeaNetWriter_WriteU8(&writer, (uint8_t)gPlayerInfo[i].team);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].movingBackwards ? 1 : 0);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].accelBackwards ? 1 : 0);
 		PangeaNetWriter_WriteU8(&writer, gPlayerInfo[i].braking ? 1 : 0);
@@ -3012,6 +3069,17 @@ void HostSend_SnapshotToClients(void)
 		PangeaNetWriter_WriteU8(&writer, 0);
 		PangeaNetWriter_WriteU8(&writer, 0);
 		PangeaNetWriter_WriteU32(&writer, gPangeaConnState[i].lastReceivedSequence);
+		for (int checkpoint = 0; checkpoint < (MAX_CHECKPOINTS + 7) / 8; checkpoint++)
+		{
+			uint8_t bits = 0;
+			for (int bit = 0; bit < 8; bit++)
+			{
+				const int checkpointIndex = checkpoint * 8 + bit;
+				if (checkpointIndex < MAX_CHECKPOINTS && gPlayerInfo[i].checkpointTagged[checkpointIndex])
+					bits |= (uint8_t)(1u << bit);
+			}
+			PangeaNetWriter_WriteU8(&writer, bits);
+		}
 	}
 
 	/* Write torch objective state */
@@ -3033,6 +3101,12 @@ void HostSend_SnapshotToClients(void)
 		PangeaNetWriter_WriteF32(&writer, torch->Coord.x);
 		PangeaNetWriter_WriteF32(&writer, torch->Coord.y);
 		PangeaNetWriter_WriteF32(&writer, torch->Coord.z);
+	}
+	{
+		uint8_t pickupState[512];
+		const int pickupStateBytes = PangeaPickup_WriteSnapshotState(pickupState, (int)sizeof(pickupState));
+		for (int b = 0; b < (int)sizeof(pickupState); b++)
+			PangeaNetWriter_WriteU8(&writer, pickupStateBytes > b ? pickupState[b] : 0);
 	}
 
 	if (!writer.ok)
@@ -3147,6 +3221,10 @@ void ClientApplyPendingSnapshot(void)
 	gCapturedFlagCount[1] = (short) gPendingSnapshot.capturedFlagCount[1];
 	gNumPlayersEliminated = (short) gPendingSnapshot.numPlayersEliminated;
 	gReTagTimer = gPendingSnapshot.reTagTimer;
+	gStartingLightTimer = gPendingSnapshot.startingLightTimer;
+	gTotalTokens = (short)gPendingSnapshot.totalTokens;
+	if (gIsNetworkClient)
+		gNoCarControls = gStartingLightTimer > 1.0f;
 	for (i = 0; i < MAX_PLAYERS; i++)
 	{
 		const PangeaNetPlayerCarState* s = &gPendingSnapshot.players[i];
@@ -3165,6 +3243,9 @@ void ClientApplyPendingSnapshot(void)
 			gPlayerInfo[i].wrongWay = s->wrongWay != 0;
 			gPlayerInfo[i].powType = s->powType;
 			gPlayerInfo[i].powQuantity = s->powQuantity;
+			gPlayerInfo[i].numTokens = s->numTokens;
+			for (int checkpoint = 0; checkpoint < MAX_CHECKPOINTS; checkpoint++)
+				gPlayerInfo[i].checkpointTagged[checkpoint] = (s->checkpointTagged[checkpoint >> 3] & (1u << (checkpoint & 7))) != 0;
 			gPlayerInfo[i].health = s->health;
 			gPlayerInfo[i].currentRPM = s->currentRPM;
 			gPlayerInfo[i].skidDot = s->skidDot;
@@ -3175,7 +3256,12 @@ void ClientApplyPendingSnapshot(void)
 			gPlayerInfo[i].stickyTiresTimer = s->stickyTiresTimer;
 			gPlayerInfo[i].superSuspensionTimer = s->superSuspensionTimer;
 			gPlayerInfo[i].invisibilityTimer = s->invisibilityTimer;
+			gPlayerInfo[i].attackTimer = s->attackTimer;
+			gPlayerInfo[i].impactResetTimer = s->impactResetTimer;
+			gPlayerInfo[i].submarineImmobilized = s->submarineImmobilized;
+			gPlayerInfo[i].flamingTimer = s->flamingTimer;
 			gPlayerInfo[i].isIt = s->isIt != 0;
+			gPlayerInfo[i].team = s->team;
 			gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
 			gPlayerInfo[i].accelBackwards = s->accelBackwards != 0;
 			gPlayerInfo[i].braking = s->braking != 0;
@@ -3243,7 +3329,12 @@ void ClientApplyPendingSnapshot(void)
 		gPlayerInfo[i].stickyTiresTimer = interp->toState.stickyTiresTimer;
 		gPlayerInfo[i].superSuspensionTimer = interp->toState.superSuspensionTimer;
 		gPlayerInfo[i].invisibilityTimer = interp->toState.invisibilityTimer;
+		gPlayerInfo[i].attackTimer = interp->toState.attackTimer;
+		gPlayerInfo[i].impactResetTimer = interp->toState.impactResetTimer;
+		gPlayerInfo[i].submarineImmobilized = interp->toState.submarineImmobilized;
+		gPlayerInfo[i].flamingTimer = interp->toState.flamingTimer;
 		gPlayerInfo[i].isIt = interp->toState.isIt != 0;
+		gPlayerInfo[i].team = interp->toState.team;
 		gPlayerInfo[i].isEliminated = interp->toState.isEliminated != 0;
 		gPlayerInfo[i].movingBackwards = interp->toState.movingBackwards != 0;
 		gPlayerInfo[i].accelBackwards = interp->toState.accelBackwards != 0;

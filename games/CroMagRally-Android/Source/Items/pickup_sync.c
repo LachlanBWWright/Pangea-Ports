@@ -7,6 +7,7 @@
 // Terrain IDs survive local object streaming; ObjNode pointers do not.
 static Boolean gPickupHidden[SHRT_MAX + 1];
 static float gPickupCooldown[SHRT_MAX + 1];
+#define PICKUP_SNAPSHOT_BYTES 512
 
 static int GetPickupIndex(const ObjNode* node)
 {
@@ -44,6 +45,18 @@ void PangeaPickup_Collect(ObjNode* node)
 	PangeaNet_SendPickupState((uint16_t)index, true);
 }
 
+void PangeaPickup_CollectPermanent(ObjNode* node)
+{
+	if (!gIsNetworkHost)
+		return;
+	const int index = GetPickupIndex(node);
+	if (index < 0 || gPickupHidden[index])
+		return;
+	gPickupHidden[index] = true;
+	gPickupCooldown[index] = -1.0f;
+	PangeaNet_SendPickupState((uint16_t)index, true);
+}
+
 void PangeaPickup_Update(void)
 {
 	if (!gIsNetworkHost)
@@ -51,6 +64,8 @@ void PangeaPickup_Update(void)
 	for (int i = 0; i < gNumTerrainItems; i++)
 	{
 		if (!gPickupHidden[i])
+			continue;
+		if (gPickupCooldown[i] < 0.0f)
 			continue;
 		gPickupCooldown[i] -= gFramesPerSecondFrac;
 		if (gPickupCooldown[i] > 0)
@@ -63,7 +78,48 @@ void PangeaPickup_Update(void)
 void PangeaPickup_ReceiveState(uint16_t itemIndex, Boolean hidden)
 {
 	if (gIsNetworkClient && itemIndex < gNumTerrainItems)
+	{
 		gPickupHidden[itemIndex] = hidden;
+		for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+		{
+			if (GetPickupIndex(node) != (int)itemIndex)
+				continue;
+			node->CType = hidden ? 0 : CTYPE_TRIGGER;
+			if (hidden)
+				node->StatusBits |= STATUS_BIT_HIDDEN;
+			else
+				node->StatusBits &= ~STATUS_BIT_HIDDEN;
+		}
+	}
+}
+
+int PangeaPickup_WriteSnapshotState(uint8_t* bytes, int maxBytes)
+{
+	if (!bytes || maxBytes < PICKUP_SNAPSHOT_BYTES)
+		return 0;
+	memset(bytes, 0, PICKUP_SNAPSHOT_BYTES);
+	const int count = gNumTerrainItems < PICKUP_SNAPSHOT_BYTES * 8 ? gNumTerrainItems : PICKUP_SNAPSHOT_BYTES * 8;
+	for (int i = 0; i < count; i++)
+		if (gPickupHidden[i])
+			bytes[i >> 3] |= (uint8_t)(1u << (i & 7));
+	return PICKUP_SNAPSHOT_BYTES;
+}
+
+void PangeaPickup_ReceiveSnapshotState(const uint8_t* bytes, int byteCount)
+{
+	if (!bytes || byteCount < PICKUP_SNAPSHOT_BYTES || !gIsNetworkClient)
+		return;
+	const int count = gNumTerrainItems < PICKUP_SNAPSHOT_BYTES * 8 ? gNumTerrainItems : PICKUP_SNAPSHOT_BYTES * 8;
+	for (int i = 0; i < count; i++)
+		PangeaPickup_ReceiveState((uint16_t)i, (bytes[i >> 3] & (1u << (i & 7))) != 0);
+}
+
+uint32_t PangeaPickup_HashState(void)
+{
+	uint32_t hash = 2166136261u;
+	for (int i = 0; i < gNumTerrainItems && i < PICKUP_SNAPSHOT_BYTES * 8; i++)
+		hash = (hash ^ (uint32_t)(gPickupHidden[i] ? 1 : 0)) * 16777619u;
+	return hash;
 }
 
 Boolean PangeaPickup_ApplyObject(ObjNode* node)

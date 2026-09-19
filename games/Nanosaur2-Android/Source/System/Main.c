@@ -1273,6 +1273,7 @@ static void CleanupLevel(void)
 
 void MoveEverything(void)
 {
+	Nanosaur2Pickup_Update();
 	MoveObjects();
 	MoveSplineObjects();
 	UpdateCameras();								// update camera
@@ -1293,7 +1294,10 @@ void MoveEverything(void)
 			/* RACE MODE */
 
 		case	VS_MODE_RACE:
-				gRaceReadySetGoTimer -= gFramesPerSecondFrac;
+				#ifdef __EMSCRIPTEN__
+				if (!PangeaNet_IsEnabled() || PangeaNet_IsHost())
+				#endif
+					gRaceReadySetGoTimer -= gFramesPerSecondFrac;
 				CalcPlayerPlaces();									// determinw who is in what place
 				break;
 

@@ -1071,7 +1071,8 @@ enum
 	kNS2ReliableEventDustDevilReleased = 13,
 	kNS2ReliableEventEggPickedUp = 14,
 	kNS2ReliableEventEggDropped = 15,
-	kNS2ReliableEventEggRetrieved = 16
+	kNS2ReliableEventEggRetrieved = 16,
+	kNS2ReliableEventPickupState = 17
 };
 
 enum
@@ -1107,6 +1108,7 @@ typedef struct
 	float weaponCharge;
 	uint8_t jetpackActive;
 	uint8_t currentWeapon;
+	uint8_t turretSide;
 	uint8_t place;
 	uint8_t raceComplete;
 	uint8_t deathPhase;
@@ -1129,6 +1131,10 @@ typedef struct
 	uint8_t movingBackwards;
 	uint8_t currentAnimNum;
 	uint8_t reserved0;
+	float knockDownTimer;
+	float burnTimer;
+	uint8_t onLava;
+	uint8_t reserved1[3];
 } NS2SnapshotPlayerState;
 
 typedef struct
@@ -1179,6 +1185,7 @@ static int gNS2HavePendingSnapshot = 0;
 static uint32_t gNS2PendingSnapshotTick = 0;
 static uint32_t gNS2PendingSnapshotSequence = 0;
 static uint8_t gNS2PendingSnapshotPlayerCount = 0;
+static float gNS2PendingRaceReadySetGoTimer = 0.0f;
 static uint32_t gNS2MatchId = 1;
 static uint32_t gNS2MatchIdHigh = 0;
 static uint32_t gNS2Tick = 0;
@@ -1872,6 +1879,10 @@ static uint32_t NS2ComputeAuthoritativeStateHash(uint8_t playerCount)
 		hash ^= (uint32_t)(gPlayerInfo[i].movingBackwards ? 1 : 0) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 		hash ^= (uint32_t)(gPlayerInfo[i].distToNextCheckpoint * 10.0f) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 		hash ^= (uint32_t)(gPlayerInfo[i].invincibilityTimer * 10.0f) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(gPlayerInfo[i].knockDownTimer * 10.0f) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(gPlayerInfo[i].burnTimer * 10.0f) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)(gPlayerInfo[i].onLava ? 1 : 0) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+		hash ^= (uint32_t)gPlayerInfo[i].turretSide + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 		hash ^= (uint32_t)(skeleton ? skeleton->AnimNum : 0) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 		uint32_t checkpointBits[4];
 		NS2PackCheckpointBits(i, checkpointBits);
@@ -1896,6 +1907,7 @@ static uint32_t NS2ComputeAuthoritativeStateHash(uint8_t playerCount)
 	{
 		hash ^= (uint32_t)gNumEggsSaved[k] + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 	}
+	hash ^= Nanosaur2Pickup_HashState() + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 	return hash;
 }
 
@@ -2013,6 +2025,26 @@ void PangeaNet_SendEggRetrieved(int eggIndex, int kind)
 	NS2SendEggEvent(kNS2ReliableEventEggRetrieved, (uint8_t)eggIndex, 0, (uint8_t)kind);
 }
 
+void PangeaNet_SendPickupState(uint16_t itemIndex, Boolean hidden)
+{
+	if (!gPangeaNetEnabled || !gPangeaNetIsHost) return;
+	uint8_t packet[64];
+	NS2Writer writer;
+	PangeaNetGameplayHeader header = {
+		.magic = PANGEA_NET_GAMEPLAY_MAGIC, .version = PANGEA_NET_GAMEPLAY_VERSION,
+		.packetType = kPangeaNetPacketReliableEvent, .matchIdLow = gNS2MatchId,
+		.matchIdHigh = gNS2MatchIdHigh, .tick = gNS2Tick, .sequence = gNS2Sequence++,
+		.playerIndex = PANGEA_NET_GAMEPLAY_PLAYER_NA, .reserved = 0,
+	};
+	NS2Writer_Init(&writer, packet, sizeof(packet));
+	NS2WriteHeader(&writer, &header);
+	NS2Writer_U8(&writer, kNS2ReliableEventPickupState);
+	NS2Writer_U8(&writer, (uint8_t)itemIndex);
+	NS2Writer_U8(&writer, (uint8_t)(itemIndex >> 8));
+	NS2Writer_U8(&writer, hidden ? 1 : 0);
+	if (writer.ok) JS_PangeaNet_SendReliable(packet, writer.cursor);
+}
+
 static void NS2PumpGameplayMessages(void)
 {
 	NS2EnsureMatchStateInitialized();
@@ -2108,6 +2140,7 @@ static void NS2PumpGameplayMessages(void)
 			const uint32_t lastKeyframeSeq = NS2Reader_U32(&reader);
 			const uint32_t lastDeltaSeq = NS2Reader_U32(&reader);
 			const uint8_t playerCount = NS2Reader_U8(&reader);
+			const float raceReadySetGoTimer = NS2Reader_F32(&reader);
 			for (int i = 0; i < 2; i++)
 			{
 				NS2SnapshotPlayerState* s = &gNS2PendingSnapshotPlayers[i];
@@ -2126,6 +2159,7 @@ static void NS2PumpGameplayMessages(void)
 				s->weaponCharge = NS2Reader_F32(&reader);
 				s->jetpackActive = NS2Reader_U8(&reader);
 				s->currentWeapon = NS2Reader_U8(&reader);
+				s->turretSide = NS2Reader_U8(&reader);
 				s->place = NS2Reader_U8(&reader);
 				s->raceComplete = NS2Reader_U8(&reader);
 				s->deathPhase = NS2Reader_U8(&reader);
@@ -2151,6 +2185,11 @@ static void NS2PumpGameplayMessages(void)
 				s->movingBackwards = NS2Reader_U8(&reader);
 				s->currentAnimNum = NS2Reader_U8(&reader);
 				s->reserved0 = NS2Reader_U8(&reader);
+				s->knockDownTimer = NS2Reader_F32(&reader);
+				s->burnTimer = NS2Reader_F32(&reader);
+				s->onLava = NS2Reader_U8(&reader);
+				for (int pad = 0; pad < 3; pad++)
+					s->reserved1[pad] = NS2Reader_U8(&reader);
 			}
 
 			/* Read egg objective state */
@@ -2169,6 +2208,12 @@ static void NS2PumpGameplayMessages(void)
 				}
 				gNS2HavePendingEggState = reader.ok;
 			}
+			{
+				uint8_t pickupState[512];
+				for (int b = 0; b < (int)sizeof(pickupState); b++)
+					pickupState[b] = NS2Reader_U8(&reader);
+				Nanosaur2Pickup_ReceiveSnapshotState(pickupState, (int)sizeof(pickupState));
+			}
 
 			if (!reader.ok)
 			{
@@ -2178,6 +2223,7 @@ static void NS2PumpGameplayMessages(void)
 
 			NS2DebugLogEarlyNetPhase("pump-host-snapshot");
 			gNS2PendingSnapshotPlayerCount = playerCount > 2 ? 2 : playerCount;
+			gNS2PendingRaceReadySetGoTimer = raceReadySetGoTimer;
 			gNS2PendingSnapshotKind = snapshotKind;
 			gNS2PendingSnapshotTick = header.tick;
 			gNS2PendingSnapshotSequence = header.sequence;
@@ -2247,6 +2293,14 @@ static void NS2PumpGameplayMessages(void)
 				{
 					PangeaNet_ApplyEggNetworkState(eventArg, 1, playerNum, 0.0f, 0.0f, 0.0f);
 				}
+				continue;
+			}
+			if (eventType == kNS2ReliableEventPickupState)
+			{
+				const uint16_t itemIndex = (uint16_t)eventArg | ((uint16_t)NS2Reader_U8(&reader) << 8);
+				const uint8_t hidden = NS2Reader_U8(&reader);
+				if (reader.ok && hidden <= 1)
+					Nanosaur2Pickup_ReceiveState(itemIndex, hidden != 0);
 				continue;
 			}
 			if (eventType == kNS2ReliableEventEggDropped)
@@ -2615,6 +2669,7 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_HostSendSnapshot(void)
 	NS2Writer_U32(&writer, gNS2LastHostKeyframeSeq);
 	NS2Writer_U32(&writer, gNS2LastHostDeltaSeq);
 	NS2Writer_U8(&writer, playerCount);
+	NS2Writer_F32(&writer, gRaceReadySetGoTimer);
 
 	for (int i = 0; i < 2; i++)
 	{
@@ -2642,6 +2697,7 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_HostSendSnapshot(void)
 		NS2Writer_F32(&writer, gPlayerInfo[i].weaponCharge);
 		NS2Writer_U8(&writer, gPlayerInfo[i].jetpackActive ? 1 : 0);
 		NS2Writer_U8(&writer, (uint8_t)gPlayerInfo[i].currentWeapon);
+		NS2Writer_U8(&writer, (uint8_t)gPlayerInfo[i].turretSide);
 		NS2Writer_U8(&writer, (uint8_t)gPlayerInfo[i].place);
 		NS2Writer_U8(&writer, gPlayerInfo[i].raceComplete ? 1 : 0);
 		NS2Writer_U8(&writer, NS2GetPlayerDeathPhase(i, obj));
@@ -2667,6 +2723,12 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_HostSendSnapshot(void)
 		NS2Writer_U8(&writer, gPlayerInfo[i].movingBackwards ? 1 : 0);
 		NS2Writer_U8(&writer, obj && obj->Skeleton ? obj->Skeleton->AnimNum : 0);
 		NS2Writer_U8(&writer, 0);
+		NS2Writer_F32(&writer, gPlayerInfo[i].knockDownTimer);
+		NS2Writer_F32(&writer, gPlayerInfo[i].burnTimer);
+		NS2Writer_U8(&writer, gPlayerInfo[i].onLava ? 1 : 0);
+		NS2Writer_U8(&writer, 0);
+		NS2Writer_U8(&writer, 0);
+		NS2Writer_U8(&writer, 0);
 	}
 
 	/* Write egg objective state */
@@ -2686,6 +2748,12 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_HostSendSnapshot(void)
 			NS2Writer_F32(&writer, eggY[ei]);
 			NS2Writer_F32(&writer, eggZ[ei]);
 		}
+	}
+	{
+		uint8_t pickupState[512];
+		const int pickupStateBytes = Nanosaur2Pickup_WriteSnapshotState(pickupState, (int)sizeof(pickupState));
+		for (int b = 0; b < (int)sizeof(pickupState); b++)
+			NS2Writer_U8(&writer, pickupStateBytes > b ? pickupState[b] : 0);
 	}
 
 	if (!writer.ok)
@@ -2743,6 +2811,8 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 	}
 
 	const int me = gPangeaNetLocalPlayerIndex;
+	if (havePendingSnapshot && PangeaNet_IsEnabled() && !PangeaNet_IsHost())
+		gRaceReadySetGoTimer = gNS2PendingRaceReadySetGoTimer;
 	for (int i = 0; i < gPangeaNetPlayerCount && i < 2; i++)
 	{
 		NS2SnapshotPlayerState appliedSnapshot = {0};
@@ -2829,6 +2899,7 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 		gPlayerInfo[i].weaponCharge = s->weaponCharge;
 		gPlayerInfo[i].jetpackActive = s->jetpackActive != 0;
 		gPlayerInfo[i].currentWeapon = s->currentWeapon;
+		gPlayerInfo[i].turretSide = s->turretSide;
 		gPlayerInfo[i].numFreeLives = (short)s->numFreeLives;
 		gPlayerInfo[i].wrongWay = s->wrongWay != 0;
 		gPlayerInfo[i].movingBackwards = s->movingBackwards != 0;
@@ -2836,6 +2907,9 @@ EMSCRIPTEN_KEEPALIVE void PangeaNet_ClientApplySnapshot(void)
 		gPlayerInfo[i].raceComplete = s->raceComplete != 0;
 		gPlayerInfo[i].distToNextCheckpoint = s->distToNextCheckpoint;
 		gPlayerInfo[i].invincibilityTimer = s->invincibilityTimer;
+		gPlayerInfo[i].knockDownTimer = s->knockDownTimer;
+		gPlayerInfo[i].burnTimer = s->burnTimer;
+		gPlayerInfo[i].onLava = s->onLava != 0;
 		NS2ApplySnapshotDeathState(i, obj, s);
 		if (i != me)
 		{

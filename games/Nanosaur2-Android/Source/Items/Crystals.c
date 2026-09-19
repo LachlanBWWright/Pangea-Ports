@@ -69,6 +69,7 @@ ObjNode	*base, *crystal;
 	Nanosaur2Script_RegisterObject(base, "nanosaur2.crystalBase", "child-object");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	base->PICKUP_SYNC_MARKER = true;
 
 	RotateOnTerrain(base, -2, nil);							// keep flat on terrain
 	SetObjectTransformMatrix(base);
@@ -109,6 +110,7 @@ ObjNode	*base, *crystal;
 		base->ChainNode = crystal;
 		crystal->ChainHead = base;
 	}
+	Nanosaur2Pickup_ApplyState(base);
 
 	return(true);													// item was added
 }
@@ -219,6 +221,7 @@ NewParticleDefType		newParticleDef;
 	base->ChainNode = nil;								// separate crystal from base
 
 	base->TerrainItemPtr->flags |= ITEM_FLAGS_USER1;	// set flag so next time the crystal won't be created
+	Nanosaur2Pickup_CollectedPermanent(base);
 
 	DeleteObject(crystal);
 
@@ -251,12 +254,6 @@ float fps = gFramesPerSecondFrac;
 
 	CauseBombShockwaveDamage(theNode, CTYPE_PLAYER1 | CTYPE_PLAYER2 | CTYPE_ENEMY | CTYPE_WEAPONTEST);
 }
-
-
-
-
-
-
 
 
 

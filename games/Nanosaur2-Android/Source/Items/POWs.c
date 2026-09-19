@@ -90,6 +90,7 @@ short	weaponType = itemPtr->parm[0];
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	newObj->PICKUP_SYNC_MARKER = 1;
 
 	newObj->WeaponPOWType 		= weaponType;
 	newObj->Mode				= POW_MODE_NORMAL;
@@ -121,10 +122,6 @@ short	weaponType = itemPtr->parm[0];
 	CreateCollisionBoxFromBoundingBox_Maximized(newObj, 1.5);
 
 	newObj->TriggerCallback = DoTrig_WeaponPOW;
-
-
-
-
 		/*****************/
 		/* MAKE MEMBRANE */
 		/*****************/
@@ -136,6 +133,7 @@ short	weaponType = itemPtr->parm[0];
 	ObjNode* membrane = MakeNewDisplayGroupObject(&def);
 
 	newObj->ChainNode = membrane;
+	Nanosaur2Pickup_ApplyState(newObj);
 
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 5, 2, true);
@@ -246,6 +244,7 @@ float	fps = gFramesPerSecondFrac;
 
 static Boolean DoTrig_WeaponPOW(ObjNode *trigger, ObjNode *theNode)
 {
+	if (!Nanosaur2Pickup_CanCollect(trigger)) return(false);
 short	weaponType, playerNum, quan;
 
 
@@ -270,6 +269,7 @@ short	weaponType, playerNum, quan;
 
 	trigger->Mode = POW_MODE_FADEOUT;
 	trigger->CType = 0;
+	Nanosaur2Pickup_Collected(trigger);
 
 
 			/* PLAY EFFECT */
@@ -308,6 +308,7 @@ Boolean AddHealthPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	newObj->PICKUP_SYNC_MARKER = 1;
 	newObj->Mode				= POW_MODE_NORMAL;
 
 			/* SET COLLISION STUFF */
@@ -317,8 +318,6 @@ Boolean AddHealthPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	CreateCollisionBoxFromBoundingBox_Maximized(newObj, 1.5);
 
 	newObj->TriggerCallback = DoTrig_HealthPOW;
-
-
 		/*****************/
 		/* MAKE MEMBRANE */
 		/*****************/
@@ -330,6 +329,7 @@ Boolean AddHealthPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* membrane = MakeNewDisplayGroupObject(&def);
 
 	newObj->ChainNode = membrane;
+	Nanosaur2Pickup_ApplyState(newObj);
 
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 4, 1.5, true);
@@ -350,6 +350,7 @@ Boolean AddHealthPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 static Boolean DoTrig_HealthPOW(ObjNode *trigger, ObjNode *theNode)
 {
+	if (!Nanosaur2Pickup_CanCollect(trigger)) return(false);
 short	playerNum;
 
 	playerNum 	= theNode->PlayerNum;
@@ -367,6 +368,7 @@ short	playerNum;
 
 	trigger->Mode = POW_MODE_FADEOUT;
 	trigger->CType = 0;
+	Nanosaur2Pickup_Collected(trigger);
 
 
 			/* PLAY EFFECT */
@@ -405,6 +407,7 @@ Boolean AddFuelPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	newObj->PICKUP_SYNC_MARKER = 1;
 	newObj->Mode				= POW_MODE_NORMAL;
 
 			/* SET COLLISION STUFF */
@@ -427,6 +430,7 @@ Boolean AddFuelPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* membrane = MakeNewDisplayGroupObject(&def);
 
 	newObj->ChainNode = membrane;
+	Nanosaur2Pickup_ApplyState(newObj);
 
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 5, 2, true);
@@ -447,6 +451,7 @@ Boolean AddFuelPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 static Boolean DoTrig_FuelPOW(ObjNode *trigger, ObjNode *theNode)
 {
+	if (!Nanosaur2Pickup_CanCollect(trigger)) return(false);
 short	playerNum;
 
 	playerNum 	= theNode->PlayerNum;
@@ -469,6 +474,7 @@ short	playerNum;
 
 	trigger->Mode = POW_MODE_FADEOUT;
 	trigger->CType = 0;
+	Nanosaur2Pickup_Collected(trigger);
 
 
 			/* PLAY EFFECT */
@@ -505,6 +511,7 @@ Boolean AddShieldPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	newObj->PICKUP_SYNC_MARKER = 1;
 	newObj->Mode				= POW_MODE_NORMAL;
 
 			/* SET COLLISION STUFF */
@@ -527,6 +534,7 @@ Boolean AddShieldPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* membrane = MakeNewDisplayGroupObject(&def);
 
 	newObj->ChainNode = membrane;
+	Nanosaur2Pickup_ApplyState(newObj);
 
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 5, 2, true);
@@ -547,6 +555,7 @@ Boolean AddShieldPOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 static Boolean DoTrig_ShieldPOW(ObjNode *trigger, ObjNode *theNode)
 {
+	if (!Nanosaur2Pickup_CanCollect(trigger)) return(false);
 short	playerNum;
 
 			/* GIVE PLAYER SHIELD POWER */
@@ -570,6 +579,7 @@ short	playerNum;
 
 	trigger->Mode = POW_MODE_FADEOUT;
 	trigger->CType = 0;
+	Nanosaur2Pickup_Collected(trigger);
 
 
 			/* PLAY EFFECT */
@@ -609,6 +619,7 @@ Boolean AddFreeLifePOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* newObj = MakeNewDisplayGroupObject(&def);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	newObj->PICKUP_SYNC_MARKER = 1;
 
 			/* SET COLLISION STUFF */
 
@@ -630,6 +641,7 @@ Boolean AddFreeLifePOW(TerrainItemEntryType *itemPtr, float  x, float z)
 	ObjNode* membrane = MakeNewDisplayGroupObject(&def);
 
 	newObj->ChainNode = membrane;
+	Nanosaur2Pickup_ApplyState(newObj);
 
 
 	AttachShadowToObject(newObj, SHADOW_TYPE_CIRCULAR, 4, 1.5, true);
@@ -650,6 +662,7 @@ Boolean AddFreeLifePOW(TerrainItemEntryType *itemPtr, float  x, float z)
 
 static Boolean DoTrig_FreeLifePOW(ObjNode *trigger, ObjNode *theNode)
 {
+	if (!Nanosaur2Pickup_CanCollect(trigger)) return(false);
 short	playerNum;
 
 
@@ -667,6 +680,7 @@ short	playerNum;
 
 	trigger->Mode = POW_MODE_FADEOUT;
 	trigger->CType = 0;
+	Nanosaur2Pickup_Collected(trigger);
 
 
 			/* PLAY EFFECT */
@@ -676,7 +690,4 @@ short	playerNum;
 
 	return(false);
 }
-
-
-
 

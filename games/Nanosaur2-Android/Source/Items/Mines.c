@@ -118,6 +118,7 @@ long	h = itemPtr->parm[0];
 	Nanosaur2Script_RegisterObject(base, "nanosaur2.airMineBase", "child-object");
 
 	base->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	base->PICKUP_SYNC_MARKER = true;
 
 			/* SET COLLISION STUFF */
 
@@ -178,6 +179,7 @@ long	h = itemPtr->parm[0];
 		/* CALL THE MOVE FUNCTION ONCE TO ALIGN ALL THE PARTS */
 
 	MoveAirMine(base);
+	Nanosaur2Pickup_ApplyState(base);
 
 	return(true);													// item was added
 }
@@ -486,6 +488,7 @@ ObjNode *base = chain->ChainHead;
 		/* DELETE MINE & CLEANUP LINKAGES */
 		/**********************************/
 
+	Nanosaur2Pickup_CollectedPermanent(base);
 	base->TerrainItemPtr = nil;								// don't come back
 
 	DeleteObject(mine);
@@ -603,13 +606,6 @@ short	i;
 
 
 }
-
-
-
-
-
-
-
 
 
 

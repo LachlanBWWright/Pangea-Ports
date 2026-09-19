@@ -72,7 +72,9 @@ ObjNode	*newObj;
 	newObj = MakeLaserOrb(x,z);
 
 	newObj->TerrainItemPtr = itemPtr;								// keep ptr to item list
+	newObj->PICKUP_SYNC_MARKER = true;
 	newObj->MoveCall = MoveLaserOrb;
+	Nanosaur2Pickup_ApplyState(newObj);
 
 	return(true);													// item was added
 }
@@ -502,6 +504,7 @@ float					x,y,z, q;
 
 			/* DELETE  */
 
+	Nanosaur2Pickup_CollectedPermanent(theNode);
 	theNode->TerrainItemPtr = nil;				// dont ever come back
 	DeleteObject(theNode);
 
@@ -815,11 +818,6 @@ static void MoveLaserOrbOnSpline(ObjNode *theNode)
 		MoveLaserOrb(theNode);
 	}
 }
-
-
-
-
-
 
 
 
