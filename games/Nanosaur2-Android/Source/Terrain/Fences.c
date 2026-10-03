@@ -483,7 +483,7 @@ short					f;
 			OGL_SetVertexArrayRangeDirty(gFenceObj->VertexArrayMode);				// we've updated the VAR
 
 			/* Invalidate draw cache: fence alpha (color) is modified this frame. */
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 			COMPAT_GL_InvalidateCachePtr(gFenceTriMeshData[f][buffNum].colorsFloat);
 #endif
 		}

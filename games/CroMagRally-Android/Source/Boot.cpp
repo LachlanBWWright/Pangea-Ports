@@ -655,8 +655,8 @@ retryVideo:
 	}
 
 	// Create window
-#ifdef __EMSCRIPTEN__
-	// Request GLES3 so SDL/Emscripten creates a WebGL2 context.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	// The compatibility renderer uses GLSL ES 3.00 on these targets.
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);

@@ -96,7 +96,7 @@ if(NOT EMSCRIPTEN)
 		message("Found pre-built SDL3")
 	else()
 		if(NOT DEFINED SDL3_DIR)
-			set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL")
+			set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL3-3.2.8")
 		endif()
 		message("Building SDL3 from source: " ${SDL3_DIR})
 		add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
@@ -104,26 +104,33 @@ if(NOT EMSCRIPTEN)
 		# Update SDL3_DIR so that subsequent find_package(SDL3) calls in
 		# subdirectories (e.g. Pomme) can locate those generated config files.
 		file(RELATIVE_PATH _sdl3_relpath "${CMAKE_SOURCE_DIR}" "${SDL3_DIR}")
-		set(SDL3_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}" CACHE PATH "" FORCE)
+		set(_SDL3_BIN_DIR "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
+		file(REMOVE "${_SDL3_BIN_DIR}/SDL3staticTargets.cmake"
+			"${_SDL3_BIN_DIR}/SDL3testTargets.cmake")
+		set(SDL3_DIR "${_SDL3_BIN_DIR}")
 		# Android toolchain sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY. set(CACHE FORCE)
 		# does NOT update the local variable, so use the explicit binary path here
 		# so that Pomme's find_package(SDL3) can locate SDL3Config.cmake.
-		list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_BINARY_DIR}/${_sdl3_relpath}")
+		list(APPEND CMAKE_FIND_ROOT_PATH "${_SDL3_BIN_DIR}")
 		unset(_sdl3_relpath)
 	endif()
 else()
 	# Emscripten: build SDL3 from source (required for Emscripten port)
 	if(NOT DEFINED SDL3_DIR)
-		set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL")
+		set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL3-3.2.8")
 	endif()
 	message("Emscripten: Building SDL3 from source: " ${SDL3_DIR})
 	set(_SDL3_BIN_DIR "${CMAKE_BINARY_DIR}/extern/SDL")
 	add_subdirectory("${SDL3_DIR}" "${_SDL3_BIN_DIR}" EXCLUDE_FROM_ALL)
+	# SDL's build-tree exports are generated after configure and cannot be
+	# imported by Pomme's find_package call on the next configure.
+	file(REMOVE "${_SDL3_BIN_DIR}/SDL3staticTargets.cmake"
+		"${_SDL3_BIN_DIR}/SDL3testTargets.cmake")
 	# Emscripten sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY (sysroot-only search),
 	# so we must add our SDL3 build tree to CMAKE_FIND_ROOT_PATH so that
 	# Pomme's find_package(SDL3) can locate SDL3Config.cmake.
 	list(APPEND CMAKE_FIND_ROOT_PATH "${_SDL3_BIN_DIR}")
-	set(SDL3_DIR "${_SDL3_BIN_DIR}" CACHE PATH "" FORCE)
+	set(SDL3_DIR "${_SDL3_BIN_DIR}")
 endif()
 
 #------------------------------------------------------------------------------
@@ -438,10 +445,10 @@ if(EMSCRIPTEN)
 		-sASYNCIFY=1
 		-sASYNCIFY_STACK_SIZE=65536
 
-		# Full OpenGL ES 2.0 emulation via our custom compat layer (modern_gl.c,
+		# Fixed-function emulation via our ES 3 compat layer (modern_gl.c,
 		# vertex_array_compat.c, state_compat.c) instead of LEGACY_GL_EMULATION.
 		# LEGACY_GL_EMULATION crashes in Emscripten 3.x headless (TypeError reading '1').
-		-sFULL_ES2=1
+		-sFULL_ES3=1
 
 		# Memory configuration
 		-sINITIAL_MEMORY=134217728		# 128 MB initial heap

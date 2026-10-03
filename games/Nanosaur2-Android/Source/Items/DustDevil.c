@@ -317,7 +317,7 @@ Byte	buffNum;
 		}
 
 		/* Invalidate draw cache for the just-updated UV buffer. */
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 		COMPAT_GL_InvalidateCachePtr(gDustDevilMeshes[buffNum].uvs[0]);
 #endif
 	}
@@ -779,8 +779,6 @@ short	p = player->PlayerNum;
 	gPlayerInfo[p].ejectedFromDustDevil = false;
 
 }
-
-
 
 
 

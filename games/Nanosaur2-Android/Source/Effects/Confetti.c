@@ -534,7 +534,7 @@ OGLBoundingBox	bbox;
 			{
 drawme:
 				/* Invalidate draw cache: confetti geometry is modified every frame (single buffer). */
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 				COMPAT_GL_InvalidateCachePtr(geoData->points);
 				COMPAT_GL_InvalidateCachePtr(geoData->colorsFloat);
 #endif
@@ -624,5 +624,3 @@ float					radius = 1.0f * scale;
 		}
 	}
 }
-
-

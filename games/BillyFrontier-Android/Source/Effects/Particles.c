@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "scene_depth.h"
 #include "vertex_array_compat.h"
 
 
@@ -558,6 +559,8 @@ OGLBoundingBox	bbox;
 
 	(void) theNode;
 
+	SceneDepth_Capture();
+
 	v[0].z = 												// init z's to 0
 	v[1].z = 
 	v[2].z = 
@@ -708,6 +711,10 @@ OGLBoundingBox	bbox;
 					/* DRAW IT */
 		
 				glBlendFunc(src, dst);											// set blending mode						
+				Byte texture = gParticleGroups[g]->particleTextureNum;
+				ModernGL_SetFeathering(texture == PARTICLE_SObjType_GreySmoke ||
+					texture == PARTICLE_SObjType_BlackSmoke || texture == PARTICLE_SObjType_Dust ||
+					texture == PARTICLE_SObjType_WhiteGlow);
 				CompatGL_InvalidateCachePtr(geoData->points);
 				CompatGL_InvalidateCachePtr(geoData->colorsByte);
 				MO_DrawObject(gParticleGroups[g]->geometryObj);						// draw geometry
@@ -718,6 +725,7 @@ OGLBoundingBox	bbox;
 			/* RESTORE MODES */
 				
 	OGL_PopState();
+	ModernGL_SetFeathering(false);
 	SetColor4f(1,1,1,1);										// reset this
 }
 
@@ -1859,8 +1867,6 @@ OGLPoint3D	verts[4];
 	
 	gGlobalColorFilter.r =gGlobalColorFilter.g = gGlobalColorFilter.b = 1;
 }
-
-
 
 
 

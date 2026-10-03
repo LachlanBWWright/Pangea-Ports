@@ -220,6 +220,7 @@ void InitParticleSystem(void)
 			| STATUS_BIT_NOZWRITE
 			| STATUS_BIT_NULLSHADER
 			| STATUS_BIT_GLOW
+			| STATUS_BIT_SOFT_PARTICLE
 			;
 	kParticleGroupRenderingMods.drawOrder = kDrawOrder_GlowyParticles;
 }

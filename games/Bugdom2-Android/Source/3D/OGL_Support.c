@@ -120,6 +120,9 @@ void OGL_Boot(void)
 
 	bool didMakeCurrent = SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);
 	GAME_ASSERT_MESSAGE(didMakeCurrent, SDL_GetError());
+	SDL_Log("OpenGL context: %s; GLSL: %s",
+			(const char*) glGetString(GL_VERSION),
+			(const char*) glGetString(GL_SHADING_LANGUAGE_VERSION));
 	
 	
 			/* SEE IF SUPPORT 1024x1024 TEXTURES */
@@ -133,18 +136,10 @@ void OGL_Boot(void)
 			/* GET GL PROCEDURES */
 			// Necessary on Windows
 
-#ifdef __EMSCRIPTEN__
 	gGlActiveTextureProc       = (PFNGLACTIVETEXTUREPROC)          SDL_GL_GetProcAddress("glActiveTexture");
 	GAME_ASSERT(gGlActiveTextureProc);
 	gGlClientActiveTextureProc = (PFNGLCLIENTACTIVETEXTUREARBPROC) glClientActiveTexture;
 	GLES3Compat_Init();
-#else
-	gGlActiveTextureProc = (PFNGLACTIVETEXTUREPROC) SDL_GL_GetProcAddress("glActiveTexture");
-	GAME_ASSERT(gGlActiveTextureProc);
-
-	gGlClientActiveTextureProc = (PFNGLCLIENTACTIVETEXTUREARBPROC) SDL_GL_GetProcAddress("glClientActiveTexture");
-	GAME_ASSERT(gGlClientActiveTextureProc);
-#endif
 
 	OGL_CheckError();
 }
@@ -253,6 +248,7 @@ void OGL_DisposeWindowSetup(OGLSetupOutputType *outputPtr)
 {
 	if (gAGLContext)
 	{
+		GLES3Compat_Dispose();
 		SDL_GL_DestroyContext(gAGLContext);						// nuke the AGL context
 		gAGLContext = NULL;
 	}
@@ -865,7 +861,7 @@ GLuint	textureName;
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || defined(PANGEA_GL_CORE)
 	// GLES3/WebGL2: convert legacy 16-bit ARGB1555 to 32-bit RGBA8 before upload
 	if (dataType == GL_UNSIGNED_SHORT_1_5_5_5_REV)
 	{

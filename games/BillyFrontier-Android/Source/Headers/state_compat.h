@@ -5,8 +5,6 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include "modern_gl.h"
 
 // State compatibility functions
@@ -57,6 +55,7 @@ void CompatGL_GetBooleanv(GLenum pname, GLboolean* params);
 #define glMaterialfv CompatGL_Material
 #define glTexEnvi CompatGL_TexEnvi
 #define glTexGeni CompatGL_TexGeni
+#undef glActiveTexture
 #define glActiveTexture CompatGL_ActiveTexture
 #define glMatrixMode CompatGL_MatrixMode
 #define glLoadMatrixf CompatGL_LoadMatrix
@@ -85,9 +84,5 @@ void CompatGL_GetBooleanv(GLenum pname, GLboolean* params);
 
 // GLES2 lacks these legacy GL1 entry points; provide no-ops on Android so
 // the linker is satisfied without requiring separate WASM-only stub files.
-#ifdef __ANDROID__
 #define glColorMaterial(face, mode) ((void)0)
 #define glLightModeli(pname, param) ((void)0)
-#endif
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

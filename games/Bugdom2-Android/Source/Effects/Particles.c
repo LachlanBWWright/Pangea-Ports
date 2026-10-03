@@ -530,6 +530,9 @@ OGLBoundingBox	bbox;
 	if (Pool_Empty(gParticleGroupPool))
 		return;
 
+	GLES3_BeginSoftParticles(gGameWindowWidth, gGameWindowHeight,
+							gGameView.hither, gGameView.yon);
+
 
 	v[0].z = 												// init z's to 0
 	v[1].z =
@@ -672,10 +675,8 @@ OGLBoundingBox	bbox;
 				/* DRAW IT */
 
 			glBlendFunc(src, dst);							// set blending mode
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 			GLES3_InvalidateCachePtr(geoData->points);		// vertex positions rebuilt every frame
 			GLES3_InvalidateCachePtr(geoData->colorsByte);	// vertex colours rebuilt every frame
-#endif
 			MO_DrawObject(particleGroup->geometryObj);		// draw geometry
 		}
 	}
@@ -683,6 +684,7 @@ OGLBoundingBox	bbox;
 			/* RESTORE MODES */
 
 	OGL_PopState();
+	GLES3_EndSoftParticles();
 }
 
 
@@ -1509,8 +1511,6 @@ float	x,y,z;
 		}
 	}
 }
-
-
 
 
 

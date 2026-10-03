@@ -461,10 +461,9 @@ if(EMSCRIPTEN)
 		"SHELL:-s EXPORTED_FUNCTIONS=[${WASM_EXPORTED_FUNCTIONS_STR}]"
 		"SHELL:--preload-file ${GAME_DATADIR}@/Data"
 		"SHELL:--shell-file ${CMAKE_SOURCE_DIR}/packaging/emscripten/shell.html"
-		# Use FULL_ES2 with our custom gl_compat layer instead of LEGACY_GL_EMULATION.
-		# LEGACY_GL_EMULATION crashes in Emscripten 3.x headless (TypeError reading '1').
+		# Client arrays and immediate mode are implemented by the game's GL compatibility layer.
 		"SHELL:-s FULL_ES2=1"
-		# WebGL 2.0 allows MAX_WEBGL_VERSION=2; native GL_UNSIGNED_INT index support.
+		"SHELL:-s MIN_WEBGL_VERSION=2"
 		"SHELL:-s MAX_WEBGL_VERSION=2"
 	)
 endif()

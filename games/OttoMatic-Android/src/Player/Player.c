@@ -854,7 +854,15 @@ ObjNode			*rocket;
 
 		/* DRAW IT */
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	Boolean softParticle = ModernGL_BeginSoftParticle(
+		gGameViewInfoPtr->hither, gGameViewInfoPtr->yon, 65.0f);
+#endif
 	MO_DrawGeometry_VertexArray(mesh);
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	if (softParticle)
+		ModernGL_EndSoftParticle();
+#endif
 
 		/* ANIMATE */
 

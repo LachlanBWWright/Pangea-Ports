@@ -486,7 +486,7 @@ Byte				buffNum;
 
 					/* SUBMIT IT */
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 		COMPAT_GL_InvalidateCachePtr(triMesh->points);
 		COMPAT_GL_InvalidateCachePtr(triMesh->normals);
 #endif
@@ -509,8 +509,6 @@ Byte				buffNum;
 #endif
 
 }
-
-
 
 
 

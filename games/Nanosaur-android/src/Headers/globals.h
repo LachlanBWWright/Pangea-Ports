@@ -139,11 +139,11 @@ enum
 	STATUS_BIT_NOTRICACHE 	 =  (1<<16), 	// set if want to disable triangle caching when drawing this xparent obj
 	STATUS_BIT_KEEPBACKFACES =	(1<<17),	// set if want to render both front and back faces
 	STATUS_BIT_NOZWRITE		=	(1<<18),	// set when want to turn off z buffer writes
+	STATUS_BIT_SOFTPARTICLE	=	(1<<19),	// fade selected effects against opaque scene depth
 };
 
 
 #include "structs.h"
 
 #endif
-
 

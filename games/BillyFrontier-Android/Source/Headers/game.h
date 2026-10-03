@@ -7,7 +7,7 @@
 
 #include <math.h>
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_opengl.h>
+#include "modern_gl_api.h"
 
 #include "Pomme.h"
 
@@ -218,8 +218,6 @@ extern uint32_t gScore;
 #define GAME_ASSERT(condition) do { if (!(condition)) DoFatalAlert("%s:%d: %s", __func__, __LINE__, #condition); } while(0)
 #define GAME_ASSERT_MESSAGE(condition, message) do { if (!(condition)) DoFatalAlert("%s:%d: %s", __func__, __LINE__, message); } while(0)
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-// WebGL/GLES2 compat layer — must come LAST (after all game type definitions).
+// Shader compatibility layer must come last, after the game type definitions.
 // Provides shader-based emulation of the OpenGL 1.x fixed-function pipeline.
 #include "gl_compat.h"
-#endif

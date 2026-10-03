@@ -2,17 +2,7 @@
 
 
 #include <SDL3/SDL.h>
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-	// WebGL/GLES2 path: use our fixed-function compatibility layer instead of
-	// the desktop OpenGL headers. The compat layer provides a GLSL ES 1.00
-	// shader-based implementation of the OpenGL 1.x pipeline (lighting, fog,
-	// alpha-test, matrix stacks, immediate mode, vertex arrays).
-#	include <SDL3/SDL_opengles2.h>
-#	include "gl_compat.h"
-#else
-#	include <SDL3/SDL_opengl.h>
-#	include "gl_compat.h"
-#endif
+#include "gl_compat.h"
 #include <Pomme.h>
 #include <QD3D.h>
 #include <QD3DMath.h>

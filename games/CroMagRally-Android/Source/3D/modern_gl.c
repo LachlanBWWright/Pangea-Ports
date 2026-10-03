@@ -10,10 +10,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include <GLES2/gl2.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten/html5.h>
-#endif
+#include <GLES3/gl3.h>
 
 // Render statistics counters (defined in render_stats_stub.c for this game)
 extern int gDrawCallsThisFrame;
@@ -22,7 +19,7 @@ extern int gBufferUploadsThisFrame;
 extern int gBufferUploadBytesThisFrame;
 
 // IMPORTANT: #undef macros that redirect to the compat layer, so this file
-// can call the REAL GLES2 functions.  Without this, ModernGL_DrawGeometry
+// can call the real GLES functions. Without this, ModernGL_DrawGeometry
 // would recurse through CompatGL_DrawElements → ModernGL_DrawGeometry → ∞.
 #undef glDrawElements
 #undef glDrawArrays
@@ -47,6 +44,7 @@ static int gUploadBufferCapacity = 0; // capacity in floats
 // glGenBuffers / glDeleteBuffers which stall the GPU pipeline.
 static ModernGLGeometry* gImmScratch = NULL;
 static int gImmScratchCapacity = 0;
+static GLuint gDrawVAO = 0;
 
 /****************************/
 /*    SHADER SOURCE         */
@@ -54,12 +52,13 @@ static int gImmScratchCapacity = 0;
 
 // Vertex shader source (embedded)
 static const char* gVertexShaderSource =
+"#version 300 es\n"
 "precision highp float;\nprecision mediump int;\n"
-"attribute vec3 aPosition;\n"
-"attribute vec3 aNormal;\n"
-"attribute vec4 aColor;\n"
-"attribute vec2 aTexCoord0;\n"
-"attribute vec2 aTexCoord1;\n"
+"in vec3 aPosition;\n"
+"in vec3 aNormal;\n"
+"in vec4 aColor;\n"
+"in vec2 aTexCoord0;\n"
+"in vec2 aTexCoord1;\n"
 "uniform mat4 uMVPMatrix;\n"
 "uniform mat4 uModelViewMatrix;\n"
 "uniform mediump mat3 uNormalMatrix;\n"
@@ -67,7 +66,6 @@ static const char* gVertexShaderSource =
 "uniform vec3 uLightDirection[4];\n"
 "uniform vec3 uLightColor[4];\n"
 "uniform int uNumLights;\n"
-// Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
 "uniform int uFogEnabled;\n"
 "uniform float uFogStart;\n"
 "uniform float uFogEnd;\n"
@@ -79,11 +77,11 @@ static const char* gVertexShaderSource =
 "uniform int uUseTexture0;\n"
 "uniform int uUseTexture1;\n"
 "uniform mat4 uTextureMatrix;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
+"out vec4 vColor;\n"
+"out vec2 vTexCoord0;\n"
+"out vec2 vTexCoord1;\n"
+"out float vFogFactor;\n"
+"out vec3 vNormal;\n"
 "void main() {\n"
 "    gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n"
 "    vec4 viewPos = uModelViewMatrix * vec4(aPosition, 1.0);\n"
@@ -110,7 +108,6 @@ static const char* gVertexShaderSource =
 "    if (uUseLighting != 0) {\n"
 "        vec3 ambient = uAmbientLight;\n"
 "        vec3 diffuse = vec3(0.0);\n"
-// Unrolled 4-light loop — avoids break+non-constant-bound (invalid GLSL ES 1.0)
 "        if (uNumLights > 0) diffuse += uLightColor[0] * max(dot(normal, uLightDirection[0]), 0.0);\n"
 "        if (uNumLights > 1) diffuse += uLightColor[1] * max(dot(normal, uLightDirection[1]), 0.0);\n"
 "        if (uNumLights > 2) diffuse += uLightColor[2] * max(dot(normal, uLightDirection[2]), 0.0);\n"
@@ -130,10 +127,10 @@ static const char* gVertexShaderSource =
 
 // Fragment shader source (embedded)
 static const char* gFragmentShaderSource =
+"#version 300 es\n"
 "precision mediump float;\nprecision mediump int;\n"
 "uniform sampler2D uTexture0;\n"
 "uniform sampler2D uTexture1;\n"
-// Use int instead of bool for GLSL ES 1.0 compatibility
 "uniform int uUseTexture0;\n"
 "uniform int uUseTexture1;\n"
 "uniform int uMultiTextureMode;\n"
@@ -147,15 +144,16 @@ static const char* gFragmentShaderSource =
 "uniform float uAlphaRef;\n"
 "uniform float uGlobalTransparency;\n"
 "uniform vec3 uGlobalColorFilter;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
+"in vec4 vColor;\n"
+"in vec2 vTexCoord0;\n"
+"in vec2 vTexCoord1;\n"
+"in float vFogFactor;\n"
+"in vec3 vNormal;\n"
+"out vec4 fragColor;\n"
 "void main() {\n"
 "    vec4 color = vColor;\n"
 "    if (uUseTexture0 != 0) {\n"
-"        vec4 texColor = texture2D(uTexture0, vTexCoord0);\n"
+"        vec4 texColor = texture(uTexture0, vTexCoord0);\n"
 "        color *= texColor;\n"
 "    }\n"
 "    if (uUseTexture1 != 0) {\n"
@@ -165,7 +163,7 @@ static const char* gFragmentShaderSource =
 "            vec3 viewNormal = normalize(uNormalMatrix * normal);\n"
 "            texCoord1 = viewNormal.xy * 0.5 + 0.5;\n"
 "        }\n"
-"        vec4 texColor1 = texture2D(uTexture1, texCoord1);\n"
+"        vec4 texColor1 = texture(uTexture1, texCoord1);\n"
 "        if (uMultiTextureCombine == 0)\n"
 "            color *= texColor1;\n"
 "        else if (uMultiTextureCombine == 1)\n"
@@ -187,7 +185,7 @@ static const char* gFragmentShaderSource =
 "    if (uFogEnabled != 0) {\n"
 "        color.rgb = mix(uFogColor, color.rgb, vFogFactor);\n"
 "    }\n"
-"    gl_FragColor = color;\n"
+"    fragColor = color;\n"
 "}\n";
 
 /****************************/
@@ -262,24 +260,10 @@ void ModernGL_Init(void)
 {
     printf("[ModernGL] Initializing modern GL subsystem...\n");
 
-#ifdef __EMSCRIPTEN__
-    // Enable OES_element_index_uint extension for 32-bit index buffers in WebGL 1.0
-    // Without this, glDrawElements with GL_UNSIGNED_INT would fail.
-    {
-        EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
-        if (ctx) {
-            EM_BOOL ok = emscripten_webgl_enable_extension(ctx, "OES_element_index_uint");
-            if (ok) {
-                printf("[ModernGL] OES_element_index_uint: enabled\n");
-            } else {
-                printf("[ModernGL] WARNING: OES_element_index_uint NOT available — "
-                       "32-bit index buffers may not work\n");
-            }
-        } else {
-            printf("[ModernGL] WARNING: No WebGL context — cannot enable extensions\n");
-        }
-    }
-#endif // __EMSCRIPTEN__
+    printf("[ModernGL] GL version: %s; shading language: %s\n",
+           glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
+    glGenVertexArrays(1, &gDrawVAO);
+    glBindVertexArray(gDrawVAO);
 
     // Initialize state
     memset(&gModernGLState, 0, sizeof(ModernGLState));
@@ -335,6 +319,11 @@ void ModernGL_Init(void)
 
 void ModernGL_Shutdown(void)
 {
+    if (gDrawVAO)
+    {
+        glDeleteVertexArrays(1, &gDrawVAO);
+        gDrawVAO = 0;
+    }
     if (gModernGLShader.program)
     {
         glDeleteProgram(gModernGLShader.program);

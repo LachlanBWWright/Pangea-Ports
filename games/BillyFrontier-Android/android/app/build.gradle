@@ -9,7 +9,7 @@ def sdlArchiveName = "SDL3-${sdlVersion}.tar.gz"
 def sdlArchiveUrl = "https://libsdl.org/release/${sdlArchiveName}"
 def sdlArchiveSha256 = "13388fabb361de768ecdf2b65e52bb27d1054cae6ccb6942ba926e378e00db03"
 def sdlArchiveFile = layout.buildDirectory.file("downloads/${sdlArchiveName}")
-def sdlSourceDir = file("../../extern/SDL")
+def sdlSourceDir = file("../../extern/SDL3-3.2.8")
 
 def sha256(File file) {
     def digest = MessageDigest.getInstance("SHA-256")
@@ -100,7 +100,7 @@ android {
             // Game data assets packaged into APK
             assets.srcDirs = ['../../Data']
             // SDL3 Java sources (downloaded by prepareSdlSource task) + game's own activity
-            java.srcDirs = ['src/main/java', '../../extern/SDL/android-project/app/src/main/java']
+            java.srcDirs = ['src/main/java', '../../extern/SDL3-3.2.8/android-project/app/src/main/java']
         }
     }
 }

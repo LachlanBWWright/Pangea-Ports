@@ -1,5 +1,24 @@
 # WebAssembly/WebGL Modernization
 
+## Current renderer (October 2026)
+
+The browser build requires WebGL 2 and Android requests OpenGL ES 3.0. The
+active shader source is embedded in `src/3D/modern_gl.c` and uses GLSL ES 3.00.
+Both targets use the legacy-call compatibility layer and one bound VAO with
+cached VBO uploads. The native desktop build still requests a compatibility
+profile because its active draw paths use fixed-function OpenGL calls.
+
+Smoke and fume particle groups sample a copy of the scene depth buffer and
+fade at opaque geometry intersections. The depth copy is taken when the
+particle driver draws, after the main world objects. It is skipped if the
+framebuffer is multisampled or lacks a supported 16/24-bit depth format, and
+can be disabled with `PANGEA_SOFT_PARTICLES=0`. Other particle types, HUD,
+water, and cutout surfaces retain their existing rendering. The depth texture
+is recreated on window resize and released before context destruction.
+
+The historical implementation notes below describe the earlier WebGL 1 path;
+the browser version and GLSL examples there are no longer the active target.
+
 This document describes the comprehensive modernization of the OttoMatic WebAssembly port to replace deprecated OpenGL 1.x/2.x fixed-function pipeline code with modern shader-based rendering compatible with WebGL.
 
 ## Overview

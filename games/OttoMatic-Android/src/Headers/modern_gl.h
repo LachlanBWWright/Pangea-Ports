@@ -83,6 +83,11 @@ typedef struct
     GLint uAlphaRef;
     GLint uGlobalTransparency;
     GLint uGlobalColorFilter;
+    GLint uSceneDepth;
+    GLint uSoftParticle;
+    GLint uDepthSize;
+    GLint uDepthRange;
+    GLint uFeatherDistance;
 } ModernGLShaderProgram;
 
 typedef struct
@@ -181,6 +186,10 @@ extern ModernGLState gModernGLState;
 // Initialization
 void ModernGL_Init(void);
 void ModernGL_Shutdown(void);
+void ModernGL_DisposeDepthTarget(void);
+void ModernGL_BeginDepthPass(void);
+Boolean ModernGL_BeginSoftParticle(float nearPlane, float farPlane, float distance);
+void ModernGL_EndSoftParticle(void);
 
 // Shader management
 Boolean ModernGL_LoadShaders(void);

@@ -3,17 +3,12 @@
 // Modern OpenGL/WebGL implementation for Emscripten
 //
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include "game.h"
+#include "scene_depth.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include <GLES2/gl2.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten/html5.h>
-#endif
 
 // Render statistics counters (defined in render_stats_stub.c for this game)
 extern int gDrawCallsThisFrame;
@@ -47,27 +42,39 @@ static int gUploadBufferCapacity = 0; // capacity in floats
 // glGenBuffers / glDeleteBuffers which stall the GPU pipeline.
 static ModernGLGeometry* gImmScratch = NULL;
 static int gImmScratchCapacity = 0;
+static GLuint gCompatVAO = 0;
+static GLuint gCurrentProgram = 0;
+static Boolean gFeatherEnabled = false;
 
 /****************************/
 /*    SHADER SOURCE         */
 /****************************/
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#define MODERN_GLSL_VERSION "#version 300 es\n"
+#define MODERN_GLSL_PRECISION "precision highp float;\nprecision mediump int;\n"
+#else
+#define MODERN_GLSL_VERSION "#version 330 core\n"
+#define MODERN_GLSL_PRECISION ""
+#endif
+
 // Vertex shader source (embedded)
 static const char* gVertexShaderSource =
-"precision highp float;\nprecision mediump int;\n"
-"attribute vec3 aPosition;\n"
-"attribute vec3 aNormal;\n"
-"attribute vec4 aColor;\n"
-"attribute vec2 aTexCoord0;\n"
-"attribute vec2 aTexCoord1;\n"
+MODERN_GLSL_VERSION
+MODERN_GLSL_PRECISION
+"in vec3 aPosition;\n"
+"in vec3 aNormal;\n"
+"in vec4 aColor;\n"
+"in vec2 aTexCoord0;\n"
+"in vec2 aTexCoord1;\n"
 "uniform mat4 uMVPMatrix;\n"
 "uniform mat4 uModelViewMatrix;\n"
-"uniform mediump mat3 uNormalMatrix;\n"
+"uniform mat3 uNormalMatrix;\n"
 "uniform vec3 uAmbientLight;\n"
 "uniform vec3 uLightDirection[4];\n"
 "uniform vec3 uLightColor[4];\n"
 "uniform int uNumLights;\n"
-// Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
+// Integer flags mirror the compatibility renderer's state.
 "uniform int uFogEnabled;\n"
 "uniform float uFogStart;\n"
 "uniform float uFogEnd;\n"
@@ -79,11 +86,11 @@ static const char* gVertexShaderSource =
 "uniform int uUseTexture0;\n"
 "uniform int uUseTexture1;\n"
 "uniform mat4 uTextureMatrix;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
+"out vec4 vColor;\n"
+"out vec2 vTexCoord0;\n"
+"out vec2 vTexCoord1;\n"
+"out float vFogFactor;\n"
+"out vec3 vNormal;\n"
 "void main() {\n"
 "    gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n"
 "    vec4 viewPos = uModelViewMatrix * vec4(aPosition, 1.0);\n"
@@ -110,7 +117,7 @@ static const char* gVertexShaderSource =
 "    if (uUseLighting != 0) {\n"
 "        vec3 ambient = uAmbientLight;\n"
 "        vec3 diffuse = vec3(0.0);\n"
-// Unrolled 4-light loop — avoids break+non-constant-bound (invalid GLSL ES 1.0)
+// Keep the four-light behavior of the original renderer.
 "        if (uNumLights > 0) diffuse += uLightColor[0] * max(dot(normal, uLightDirection[0]), 0.0);\n"
 "        if (uNumLights > 1) diffuse += uLightColor[1] * max(dot(normal, uLightDirection[1]), 0.0);\n"
 "        if (uNumLights > 2) diffuse += uLightColor[2] * max(dot(normal, uLightDirection[2]), 0.0);\n"
@@ -130,16 +137,17 @@ static const char* gVertexShaderSource =
 
 // Fragment shader source (embedded)
 static const char* gFragmentShaderSource =
-"precision mediump float;\nprecision mediump int;\n"
+MODERN_GLSL_VERSION
+MODERN_GLSL_PRECISION
 "uniform sampler2D uTexture0;\n"
 "uniform sampler2D uTexture1;\n"
-// Use int instead of bool for GLSL ES 1.0 compatibility
+// Integer flags mirror the compatibility renderer's state.
 "uniform int uUseTexture0;\n"
 "uniform int uUseTexture1;\n"
 "uniform int uMultiTextureMode;\n"
 "uniform int uMultiTextureCombine;\n"
 "uniform int uUseSphereMap;\n"
-"uniform mediump mat3 uNormalMatrix;\n"
+"uniform mat3 uNormalMatrix;\n"
 "uniform int uFogEnabled;\n"
 "uniform vec3 uFogColor;\n"
 "uniform int uAlphaTestEnabled;\n"
@@ -147,15 +155,22 @@ static const char* gFragmentShaderSource =
 "uniform float uAlphaRef;\n"
 "uniform float uGlobalTransparency;\n"
 "uniform vec3 uGlobalColorFilter;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
+"uniform sampler2D uDepthTexture;\n"
+"uniform vec2 uDepthTextureSize;\n"
+"uniform float uDepthNear;\n"
+"uniform float uDepthFar;\n"
+"uniform float uFeatherDistance;\n"
+"uniform int uFeatherEnabled;\n"
+"in vec4 vColor;\n"
+"in vec2 vTexCoord0;\n"
+"in vec2 vTexCoord1;\n"
+"in float vFogFactor;\n"
+"in vec3 vNormal;\n"
+"out vec4 fragColor;\n"
 "void main() {\n"
 "    vec4 color = vColor;\n"
 "    if (uUseTexture0 != 0) {\n"
-"        vec4 texColor = texture2D(uTexture0, vTexCoord0);\n"
+"        vec4 texColor = texture(uTexture0, vTexCoord0);\n"
 "        color *= texColor;\n"
 "    }\n"
 "    if (uUseTexture1 != 0) {\n"
@@ -165,7 +180,7 @@ static const char* gFragmentShaderSource =
 "            vec3 viewNormal = normalize(uNormalMatrix * normal);\n"
 "            texCoord1 = viewNormal.xy * 0.5 + 0.5;\n"
 "        }\n"
-"        vec4 texColor1 = texture2D(uTexture1, texCoord1);\n"
+"        vec4 texColor1 = texture(uTexture1, texCoord1);\n"
 "        if (uMultiTextureCombine == 0)\n"
 "            color *= texColor1;\n"
 "        else if (uMultiTextureCombine == 1)\n"
@@ -173,6 +188,14 @@ static const char* gFragmentShaderSource =
 "    }\n"
 "    color.rgb *= uGlobalColorFilter;\n"
 "    color.a *= uGlobalTransparency;\n"
+"    if (uFeatherEnabled != 0) {\n"
+"        float sceneZ = texture(uDepthTexture, gl_FragCoord.xy / uDepthTextureSize).r;\n"
+"        float sceneDepth = (2.0 * uDepthNear * uDepthFar) /\n"
+"            (uDepthFar + uDepthNear - (sceneZ * 2.0 - 1.0) * (uDepthFar - uDepthNear));\n"
+"        float particleDepth = (2.0 * uDepthNear * uDepthFar) /\n"
+"            (uDepthFar + uDepthNear - (gl_FragCoord.z * 2.0 - 1.0) * (uDepthFar - uDepthNear));\n"
+"        color.a *= clamp((sceneDepth - particleDepth) / uFeatherDistance, 0.0, 1.0);\n"
+"    }\n"
 "    if (uAlphaTestEnabled != 0) {\n"
 "        bool discard_frag = false;\n"
 "        if (uAlphaFunc == 0) discard_frag = true;\n"
@@ -187,7 +210,7 @@ static const char* gFragmentShaderSource =
 "    if (uFogEnabled != 0) {\n"
 "        color.rgb = mix(uFogColor, color.rgb, vFogFactor);\n"
 "    }\n"
-"    gl_FragColor = color;\n"
+"    fragColor = color;\n"
 "}\n";
 
 /****************************/
@@ -261,25 +284,11 @@ static GLuint LinkProgram(GLuint vertexShader, GLuint fragmentShader)
 void ModernGL_Init(void)
 {
     printf("[ModernGL] Initializing modern GL subsystem...\n");
+    gCurrentProgram = 0;
+    gFeatherEnabled = false;
 
-#ifdef __EMSCRIPTEN__
-    // Enable OES_element_index_uint extension for 32-bit index buffers in WebGL 1.0
-    // Without this, glDrawElements with GL_UNSIGNED_INT would fail.
-    {
-        EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
-        if (ctx) {
-            EM_BOOL ok = emscripten_webgl_enable_extension(ctx, "OES_element_index_uint");
-            if (ok) {
-                printf("[ModernGL] OES_element_index_uint: enabled\n");
-            } else {
-                printf("[ModernGL] WARNING: OES_element_index_uint NOT available — "
-                       "32-bit index buffers may not work\n");
-            }
-        } else {
-            printf("[ModernGL] WARNING: No WebGL context — cannot enable extensions\n");
-        }
-    }
-#endif // __EMSCRIPTEN__
+    glGenVertexArrays(1, &gCompatVAO);
+    glBindVertexArray(gCompatVAO);
 
     // Initialize state
     memset(&gModernGLState, 0, sizeof(ModernGLState));
@@ -335,6 +344,12 @@ void ModernGL_Init(void)
 
 void ModernGL_Shutdown(void)
 {
+    gCurrentProgram = 0;
+    if (gCompatVAO)
+    {
+        glDeleteVertexArrays(1, &gCompatVAO);
+        gCompatVAO = 0;
+    }
     if (gModernGLShader.program)
     {
         glDeleteProgram(gModernGLShader.program);
@@ -354,6 +369,11 @@ void ModernGL_Shutdown(void)
         gImmScratch = NULL;
         gImmScratchCapacity = 0;
     }
+    free(gUploadBuffer);
+    gUploadBuffer = NULL;
+    gUploadBufferCapacity = 0;
+    memset(&gImmediateModeBuffer, 0, sizeof(gImmediateModeBuffer));
+    memset(&gModernGLShader, 0, sizeof(gModernGLShader));
 }
 
 Boolean ModernGL_LoadShaders(void)
@@ -423,6 +443,12 @@ Boolean ModernGL_LoadShaders(void)
     gModernGLShader.uAlphaRef = glGetUniformLocation(gModernGLShader.program, "uAlphaRef");
     gModernGLShader.uGlobalTransparency = glGetUniformLocation(gModernGLShader.program, "uGlobalTransparency");
     gModernGLShader.uGlobalColorFilter = glGetUniformLocation(gModernGLShader.program, "uGlobalColorFilter");
+    gModernGLShader.uDepthTexture = glGetUniformLocation(gModernGLShader.program, "uDepthTexture");
+    gModernGLShader.uDepthTextureSize = glGetUniformLocation(gModernGLShader.program, "uDepthTextureSize");
+    gModernGLShader.uDepthNear = glGetUniformLocation(gModernGLShader.program, "uDepthNear");
+    gModernGLShader.uDepthFar = glGetUniformLocation(gModernGLShader.program, "uDepthFar");
+    gModernGLShader.uFeatherDistance = glGetUniformLocation(gModernGLShader.program, "uFeatherDistance");
+    gModernGLShader.uFeatherEnabled = glGetUniformLocation(gModernGLShader.program, "uFeatherEnabled");
 
     // Verify critical uniforms were found
     if (gModernGLShader.uMVPMatrix == -1 || gModernGLShader.uNormalMatrix == -1)
@@ -443,11 +469,10 @@ void ModernGL_UseShader(void)
     // Since there is only one shader program, skip the glUseProgram call
     // when the program is already bound.  This avoids one WebGL state
     // change per draw call (~200/frame).
-    static GLuint sCurrentProgram = 0;
-    if (sCurrentProgram != gModernGLShader.program)
+    if (gCurrentProgram != gModernGLShader.program)
     {
         glUseProgram(gModernGLShader.program);
-        sCurrentProgram = gModernGLShader.program;
+        gCurrentProgram = gModernGLShader.program;
     }
 }
 
@@ -514,7 +539,31 @@ void ModernGL_UpdateUniforms(void)
         glUniform3fv(gModernGLShader.uGlobalColorFilter, 1, gModernGLState.globalColorFilter);
     }
 
+    if (dirty & MODERNGL_DIRTY_FEATHER)
+    {
+        glUniform1i(gModernGLShader.uFeatherEnabled, gFeatherEnabled);
+        glUniform1i(gModernGLShader.uDepthTexture, 2);
+        glUniform2f(gModernGLShader.uDepthTextureSize,
+            (float)SceneDepth_Width(), (float)SceneDepth_Height());
+        if (gGameViewInfoPtr)
+        {
+            glUniform1f(gModernGLShader.uDepthNear, gGameViewInfoPtr->hither);
+            glUniform1f(gModernGLShader.uDepthFar, gGameViewInfoPtr->yon);
+        }
+        glUniform1f(gModernGLShader.uFeatherDistance, 45.0f);
+    }
+
     gModernGLState.dirtyFlags = 0;
+}
+
+void ModernGL_SetFeathering(Boolean enabled)
+{
+    enabled = enabled && SceneDepth_Texture() != 0;
+    if (gFeatherEnabled != enabled)
+    {
+        gFeatherEnabled = enabled;
+        gModernGLState.dirtyFlags |= MODERNGL_DIRTY_FEATHER;
+    }
 }
 
 // Geometry management functions
@@ -963,5 +1012,3 @@ void ModernGL_Matrix3x3FromMatrix4x4(const OGLMatrix4x4* in, float* out)
     out[3] = in->value[M01]; out[4] = in->value[M11]; out[5] = in->value[M21];
     out[6] = in->value[M02]; out[7] = in->value[M12]; out[8] = in->value[M22];
 }
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

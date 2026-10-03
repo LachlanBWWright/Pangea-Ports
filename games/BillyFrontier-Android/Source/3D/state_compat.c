@@ -3,8 +3,6 @@
 // OpenGL state management compatibility implementation
 //
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include "game.h"
 #include <string.h>
 #include <math.h>
@@ -23,6 +21,7 @@
 #undef glGetBooleanv
 #undef glBlendFunc
 #undef glDepthMask
+#undef glActiveTexture
 
 // ── Direct WebGL calls ────────────────────────────────────────────────────────
 // When LEGACY_GL_EMULATION is active, Emscripten hooks glEnable/glDisable with
@@ -425,10 +424,11 @@ void CompatGL_ActiveTexture(GLenum texture)
 {
     gCurrentTextureUnit = (texture == GL_TEXTURE1 || texture == GL_TEXTURE1_ARB) ? 1 : 0;
 
-    // Also call the real function for texture binding
-    extern PFNGLACTIVETEXTUREARBPROC procptr_glActiveTextureARB;
-    if (procptr_glActiveTextureARB)
-        procptr_glActiveTextureARB(texture);
+#ifdef _WIN32
+    bf_glActiveTexture(texture);
+#else
+    glActiveTexture(texture);
+#endif
 }
 
 void CompatGL_MatrixMode(GLenum mode)
@@ -738,5 +738,3 @@ void CompatGL_GetBooleanv(GLenum pname, GLboolean* params)
             break;
     }
 }
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

@@ -1101,7 +1101,7 @@ double				leftEdge, topEdge;
 
 			/* DRAW MAP */
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 	COMPAT_GL_InvalidateCachePtr(gOHMPoints);		// vertex positions rotate every frame
 	COMPAT_GL_InvalidateCachePtr(gOHMuv1);			// UVs scroll every frame
 #endif
@@ -1152,7 +1152,7 @@ float				v;
 	if (!gGamePrefs.lowRenderQuality)
 		DrawInfobarSprite_Centered(+2, +2, HEALTH_SCALE * 1.3, INFOBAR_SObjType_CircleShadow);
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 	COMPAT_GL_InvalidateCachePtr(gHealthuv1);		// UVs scroll every frame — evict stale cache entry
 #endif
 	MO_DrawGeometry_VertexArray(&gHealthTriMesh);
@@ -1207,7 +1207,7 @@ float				q;
 		DrawInfobarSprite_Centered(+2, +2, SHIELD_SCALE * 1.3, INFOBAR_SObjType_CircleShadow);
 
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 	COMPAT_GL_InvalidateCachePtr(gShielduv1);		// UVs scroll every frame — evict stale cache entry
 #endif
 	MO_DrawGeometry_VertexArray(&gShieldTriMesh);
@@ -1260,7 +1260,7 @@ float				v;
 		DrawInfobarSprite_Centered(+2, +2, FUEL_SCALE * 1.3, INFOBAR_SObjType_CircleShadow);
 
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 	COMPAT_GL_InvalidateCachePtr(gFueluv1);		// UVs scroll every frame — evict stale cache entry
 #endif
 	MO_DrawGeometry_VertexArray(&gFuelTriMesh);
@@ -2001,4 +2001,3 @@ float		scale;
 
 
 }
-

@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "scene_depth.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -121,6 +122,8 @@ static OGLPoint3D		frame[4] =
 
 	if (gIsPicking)
 		return;
+
+	ModernGL_SetFeathering(true);
 
 
 	OGL_PushState();
@@ -246,9 +249,8 @@ static OGLPoint3D		frame[4] =
 			/* RESTORE STATE */
 
 	OGL_PopState();	
+	ModernGL_SetFeathering(false);
 }
-
-
 
 
 

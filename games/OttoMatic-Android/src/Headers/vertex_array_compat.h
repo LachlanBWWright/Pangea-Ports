@@ -6,6 +6,7 @@
 #pragma once
 
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+void CompatGL_ResetDrawCache(void);
 
 #include "modern_gl.h"
 

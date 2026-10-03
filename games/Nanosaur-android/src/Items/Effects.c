@@ -44,7 +44,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.coord.x = x;
 	gNewObjectDefinition.coord.y = y;
 	gNewObjectDefinition.coord.z = z;
-	gNewObjectDefinition.flags = 0;
+	gNewObjectDefinition.flags = STATUS_BIT_SOFTPARTICLE;
 	gNewObjectDefinition.slot = SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall = MoveDustPuff;
 	gNewObjectDefinition.rot = 0;
@@ -108,7 +108,7 @@ ObjNode	*newObj;
 	gNewObjectDefinition.coord.x = x;
 	gNewObjectDefinition.coord.y = y;
 	gNewObjectDefinition.coord.z = z;
-	gNewObjectDefinition.flags = STATUS_BIT_NOTRICACHE;
+	gNewObjectDefinition.flags = STATUS_BIT_NOTRICACHE | STATUS_BIT_SOFTPARTICLE;
 	gNewObjectDefinition.slot = SLOT_OF_DUMB;
 	gNewObjectDefinition.moveCall = MoveSmokePuff;
 	gNewObjectDefinition.rot = 0;
@@ -166,7 +166,6 @@ float	t,fps = gFramesPerSecondFrac;
 
 	UpdateObjectTransforms(theNode);
 }
-
 
 
 

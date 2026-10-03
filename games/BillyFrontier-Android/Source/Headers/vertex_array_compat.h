@@ -5,8 +5,6 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include "modern_gl.h"
 
 // For Emscripten, we need to convert client-side vertex arrays to VBOs
@@ -61,6 +59,7 @@ void CompatGL_SetVertexCount(GLsizei n);
 void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
 void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count);
 void CompatGL_InvalidateCachePtr(const void *ptr);
+void CompatGL_Shutdown(void);
 
 // Macro redirects
 #define glEnableClientState CompatGL_EnableClientState
@@ -73,12 +72,3 @@ void CompatGL_InvalidateCachePtr(const void *ptr);
 #define glDrawArrays CompatGL_DrawArrays
 
 // Note: glClientActiveTextureARB is already handled in OGL_Functions.c
-
-#else
-
-static inline void CompatGL_InvalidateCachePtr(const void *ptr)
-{
-    (void) ptr;
-}
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

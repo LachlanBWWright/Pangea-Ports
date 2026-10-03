@@ -295,6 +295,15 @@ static void OGL_CreateDrawContext(void)
 	bool didMakeCurrent = SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);
 	GAME_ASSERT_MESSAGE(didMakeCurrent, SDL_GetError());
 	SDL_Log("OGL_CreateDrawContext: GL context made current");
+	SDL_Log("OGL_CreateDrawContext: GL version %s", (const char*) glGetString(GL_VERSION));
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	GLint actualMajor = 0;
+	GLint actualMinor = 0;
+	glGetIntegerv(GL_MAJOR_VERSION, &actualMajor);
+	glGetIntegerv(GL_MINOR_VERSION, &actualMinor);
+	GAME_ASSERT_MESSAGE(actualMajor >= 3, "OpenGL ES 3.0 / WebGL 2 context required");
+	SDL_Log("OGL_CreateDrawContext: OpenGL ES %d.%d", actualMajor, actualMinor);
+#endif
 
 
 			/* GET OPENGL EXTENSIONS */
@@ -329,6 +338,12 @@ static void OGL_DisposeDrawContext(void)
 	{
 		return;
 	}
+
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	ModernGL_DisposeDepthTarget();
+	CompatGL_ResetDrawCache();
+	ModernGL_Shutdown();
+#endif
 
 	SDL_GL_MakeCurrent(gSDLWindow, NULL);		// make context not current
 	SDL_GL_DestroyContext(gAGLContext);			// nuke context
@@ -602,6 +617,10 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 			/*************************/
 
 do_anaglyph:
+
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	ModernGL_BeginDepthPass();
+#endif
 
 	if (gGamePrefs.anaglyphMode != ANAGLYPH_OFF)
 	{

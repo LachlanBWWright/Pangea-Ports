@@ -778,7 +778,7 @@ short				paneNum;
 				gParticleGroups[g]->bbox.max.z = maxZ;
 
 				/* Invalidate draw cache: particle vertex data is modified every frame. */
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 				COMPAT_GL_InvalidateCachePtr(geoData->points);
 				COMPAT_GL_InvalidateCachePtr(geoData->colorsFloat);
 #endif
@@ -811,7 +811,6 @@ short				paneNum = gCurrentSplitScreenPane;
 
 	DrawSparkles();												// draw light sparkles
 
-
 				/* SETUP ENVIRONTMENT */
 
 	OGL_PushState();
@@ -819,6 +818,9 @@ short				paneNum = gCurrentSplitScreenPane;
 	OGL_SetColor4f(1,1,1,1);												// full white & alpha to start with
 
 	buffNum = gGameViewInfoPtr->frameCount & 1;								// which VAR buffer to use?
+#if PANGEA_GL_COMPAT
+	bool preparedSoftParticles = false;
+#endif
 
 	for (int g = 0; g < MAX_PARTICLE_GROUPS; g++)
 	{
@@ -839,6 +841,13 @@ short				paneNum = gCurrentSplitScreenPane;
 		GLint dst = pg->dstBlend;
 		OGL_BlendFunc(src, dst);											// set blending mode
 
+#if PANGEA_GL_COMPAT
+		if (!preparedSoftParticles)
+		{
+			COMPAT_GL_BeginSoftParticles(gGameWindowWidth, gGameWindowHeight);
+			preparedSoftParticles = true;
+		}
+#endif
 		MO_DrawObject(pg->geometryObj[buffNum][paneNum]);					// draw geometry
 	}
 
@@ -846,6 +855,10 @@ short				paneNum = gCurrentSplitScreenPane;
 
 	OGL_PopState();
 	OGL_SetColor4f(1,1,1,1);										// reset this
+
+#if PANGEA_GL_COMPAT
+	COMPAT_GL_EndSoftParticles();
+#endif
 
 }
 
@@ -1979,11 +1992,6 @@ float		x,y,z,s;
 
 	gGlobalTransparency = 1.0f;
 }
-
-
-
-
-
 
 
 

@@ -23,14 +23,15 @@
 #include "renderdrivers.h"
 #include "framebufferfilter.h"
 
+#define GL_GLEXT_PROTOTYPES 1
 #include <SDL3/SDL_opengl.h>
 #include <SDL3/SDL_opengl_glext.h>
-PFNGLGENBUFFERSARBPROC glGenBuffersARB;
-PFNGLDELETEBUFFERSARBPROC glDeleteBuffersARB;
-PFNGLBINDBUFFERARBPROC glBindBufferARB;
-PFNGLMAPBUFFERARBPROC glMapBufferARB;
-PFNGLBUFFERDATAARBPROC glBufferDataARB;
-PFNGLUNMAPBUFFERARBPROC glUnmapBufferARB;
+PFNGLGENBUFFERSARBPROC pglGenBuffersARB;
+PFNGLDELETEBUFFERSARBPROC pglDeleteBuffersARB;
+PFNGLBINDBUFFERARBPROC pglBindBufferARB;
+PFNGLMAPBUFFERARBPROC pglMapBufferARB;
+PFNGLBUFFERDATAARBPROC pglBufferDataARB;
+PFNGLUNMAPBUFFERARBPROC pglUnmapBufferARB;
 
 // Marginal FPS increase at the cost of 1 frame of latency
 #define DEFERRED_TEX_UPDATE 0
@@ -62,6 +63,9 @@ PFNGLUNMAPBUFFERARBPROC glUnmapBufferARB;
 static SDL_GLContext gGLContext = NULL;
 static GLuint gFrameTexture = 0;
 static GLuint gFramePBO = 0;
+static GLuint gQuadVAO = 0;
+static GLuint gQuadVBO = 0;
+static GLuint gBlitProgram = 0;
 static GLint gMaxTextureSize = 0;
 
 const char* gRendererName = "NULL";
@@ -114,14 +118,82 @@ SDL_Point FitRectKeepAR(
 	}
 }
 
-static void GLRender_InitMatrices(void)
+static GLuint CompileShader(GLenum type, const char* source)
 {
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, VISIBLE_WIDTH, VISIBLE_HEIGHT, 0, 0, 1000);
+	GLuint shader = glCreateShader(type);
+	glShaderSource(shader, 1, &source, NULL);
+	glCompileShader(shader);
+	GLint compiled = GL_FALSE;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+	if (!compiled)
+	{
+		char log[1024] = {0};
+		glGetShaderInfoLog(shader, sizeof(log), NULL, log);
+		SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Blit shader compile failed: %s", log);
+		glDeleteShader(shader);
+		return 0;
+	}
+	return shader;
+}
 
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+static bool InitBlitter(void)
+{
+	static const char* vertexSource =
+		"#version 330 core\n"
+		"layout(location=0) in vec2 position;\n"
+		"layout(location=1) in vec2 texcoord;\n"
+		"uniform vec2 uvScale;\n"
+		"out vec2 uv;\n"
+		"void main() { uv = texcoord * uvScale; gl_Position = vec4(position, 0.0, 1.0); }\n";
+	static const char* fragmentSource =
+		"#version 330 core\n"
+		"in vec2 uv;\n"
+		"uniform sampler2D frameTexture;\n"
+		"out vec4 color;\n"
+		"void main() { color = texture(frameTexture, uv); }\n";
+	GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
+	GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource);
+	if (!vertexShader || !fragmentShader)
+	{
+		if (vertexShader) glDeleteShader(vertexShader);
+		if (fragmentShader) glDeleteShader(fragmentShader);
+		return false;
+	}
+	gBlitProgram = glCreateProgram();
+	glAttachShader(gBlitProgram, vertexShader);
+	glAttachShader(gBlitProgram, fragmentShader);
+	glLinkProgram(gBlitProgram);
+	glDeleteShader(vertexShader);
+	glDeleteShader(fragmentShader);
+	GLint linked = GL_FALSE;
+	glGetProgramiv(gBlitProgram, GL_LINK_STATUS, &linked);
+	if (!linked)
+	{
+		char log[1024] = {0};
+		glGetProgramInfoLog(gBlitProgram, sizeof(log), NULL, log);
+		SDL_LogError(SDL_LOG_CATEGORY_RENDER, "Blit shader link failed: %s", log);
+		glDeleteProgram(gBlitProgram);
+		gBlitProgram = 0;
+		return false;
+	}
+	const GLfloat vertices[] = {
+		-1, -1, 0, 1,  1, -1, 1, 1,  1, 1, 1, 0,
+		-1, -1, 0, 1,  1, 1, 1, 0,  -1, 1, 0, 0,
+	};
+	glGenVertexArrays(1, &gQuadVAO);
+	glGenBuffers(1, &gQuadVBO);
+	glBindVertexArray(gQuadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, gQuadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*) 0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*) (2 * sizeof(GLfloat)));
+	glBindVertexArray(0);
+	glUseProgram(gBlitProgram);
+	glUniform1i(glGetUniformLocation(gBlitProgram, "frameTexture"), 0);
+	glUseProgram(0);
+	return true;
 }
 
 #define GL_GET_PROC_ADDRESS(t, proc) \
@@ -135,7 +207,7 @@ static void InitTextureAndPBO(int pixelZoom)
 	glGenTextures(1, &gFrameTexture);
 	CHECK_GL_ERROR();
 
-	glGenBuffersARB(1, &gFramePBO);
+	pglGenBuffersARB(1, &gFramePBO);
 	CHECK_GL_ERROR();
 
 #if 0
@@ -182,7 +254,7 @@ static void DeleteTextureAndPBO(void)
 
 	if (gFramePBO != 0)
 	{
-		glDeleteBuffersARB(1, &gFramePBO);
+		pglDeleteBuffersARB(1, &gFramePBO);
 		gFramePBO = 0;
 	}
 }
@@ -204,6 +276,7 @@ void GLRender_Init(void)
 
 	bool didMakeCurrent = SDL_GL_MakeCurrent(gSDLWindow, gGLContext);
 	GAME_ASSERT_MESSAGE(didMakeCurrent, SDL_GetError());
+	SDL_Log("OpenGL context: %s; GLSL: %s", glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &gMaxTextureSize);
 	SDL_Log("Max texture size: %d", (int) gMaxTextureSize);
@@ -215,18 +288,22 @@ void GLRender_Init(void)
 		DoAlert(message);
 	}
 
+	pglGenBuffersARB = (PFNGLGENBUFFERSARBPROC) SDL_GL_GetProcAddress("glGenBuffersARB");
+	pglDeleteBuffersARB = (PFNGLDELETEBUFFERSARBPROC) SDL_GL_GetProcAddress("glDeleteBuffersARB");
+	pglBindBufferARB = (PFNGLBINDBUFFERARBPROC) SDL_GL_GetProcAddress("glBindBufferARB");
+	pglUnmapBufferARB = (PFNGLUNMAPBUFFERARBPROC) SDL_GL_GetProcAddress("glUnmapBufferARB");
+	pglMapBufferARB = (PFNGLMAPBUFFERARBPROC) SDL_GL_GetProcAddress("glMapBufferARB");
+	pglBufferDataARB = (PFNGLBUFFERDATAARBPROC) SDL_GL_GetProcAddress("glBufferDataARB");
+	GAME_ASSERT_MESSAGE(pglGenBuffersARB && pglDeleteBuffersARB && pglBindBufferARB
+		&& pglUnmapBufferARB && pglMapBufferARB && pglBufferDataARB,
+		"Missing OpenGL buffer procedures.");
+
 #if OSXPPC
 	gCanDoHQStretch = false;
 #else
 	gCanDoHQStretch = gMaxTextureSize >= 2*kFrameTextureWidth;
 #endif
 
-	GL_GET_PROC_ADDRESS(PFNGLGENBUFFERSARBPROC, glGenBuffersARB);
-	GL_GET_PROC_ADDRESS(PFNGLDELETEBUFFERSARBPROC, glDeleteBuffersARB);
-	GL_GET_PROC_ADDRESS(PFNGLBINDBUFFERARBPROC, glBindBufferARB);
-	GL_GET_PROC_ADDRESS(PFNGLUNMAPBUFFERPROC, glUnmapBufferARB);
-	GL_GET_PROC_ADDRESS(PFNGLMAPBUFFERARBPROC, glMapBufferARB);
-	GL_GET_PROC_ADDRESS(PFNGLBUFFERDATAARBPROC, glBufferDataARB);
 
 #if !(NOVSYNC)
 	SDL_GL_SetSwapInterval(1);
@@ -234,19 +311,9 @@ void GLRender_Init(void)
 	SDL_GL_SetSwapInterval(0);
 #endif
 
-	GLRender_InitMatrices();
-
-	glDisable(GL_FOG);
-	glEnable(GL_TEXTURE_2D);
-	glEnable(GL_CULL_FACE);
-	glDisable(GL_ALPHA_TEST);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_BLEND);
-	glDisable(GL_LIGHTING);
-//	glEnable(GL_COLOR_MATERIAL);
 	glDepthMask(false);
-
-	glColor4f(1,1,1,1);
 
 	//glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glClearColor(0, 0, 0, 1);
@@ -254,6 +321,7 @@ void GLRender_Init(void)
 	CHECK_GL_ERROR();
 
 	InitTextureAndPBO(1);
+	GAME_ASSERT_MESSAGE(InitBlitter(), "Couldn't initialize OpenGL blit shaders.");
 }
 
 void GLRender_Shutdown(void)
@@ -261,6 +329,9 @@ void GLRender_Shutdown(void)
 	ShutdownRenderThreads();
 
 	DeleteTextureAndPBO();
+	if (gQuadVBO) glDeleteBuffers(1, &gQuadVBO);
+	if (gQuadVAO) glDeleteVertexArrays(1, &gQuadVAO);
+	if (gBlitProgram) glDeleteProgram(gBlitProgram);
 
 	if (gGLContext)
 	{
@@ -337,15 +408,15 @@ void GLRender_PresentFramebuffer(void)
 	//-------------------------------------------------------------------------
 	// Update PBO
 
-	glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, gFramePBO);
+	pglBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, gFramePBO);
 	CHECK_GL_ERROR();
 
 	// get new PBO
 	int numBytes = zvw * zvh * kFrameBytesPerPixel;
-	glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, numBytes, NULL, GL_STREAM_DRAW);
+	pglBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, numBytes, NULL, GL_STREAM_DRAW);
 	CHECK_GL_ERROR();
 
-	void* mappedBuffer = glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY);
+	void* mappedBuffer = pglMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY);
 	CHECK_GL_ERROR();
 	GAME_ASSERT(mappedBuffer);
 
@@ -355,7 +426,7 @@ void GLRender_PresentFramebuffer(void)
 	uint64_t endTicks = SDL_GetPerformanceCounter();
 	gFramebufferConvertMs = GLRender_ElapsedMs(startTicks, endTicks);
 
-	glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
+	pglUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB);
 	CHECK_GL_ERROR();
 
 	//-------------------------------------------------------------------------
@@ -392,15 +463,14 @@ void GLRender_PresentFramebuffer(void)
 	const float umax = vw * (1.0f / kFrameTextureWidth);
 	const float vmax = vh * (1.0f / kFrameTextureHeight);
 
-	GLRender_InitMatrices();
-
-	glBegin(GL_QUADS);
-	glTexCoord2f(   0, vmax); glVertex3f( 0, vh, 0);
-	glTexCoord2f(umax, vmax); glVertex3f(vw, vh, 0);
-	glTexCoord2f(umax,    0); glVertex3f(vw,  0, 0);
-	glTexCoord2f(   0,    0); glVertex3f( 0,  0, 0);
 	startTicks = SDL_GetPerformanceCounter();
-	glEnd();
+	glUseProgram(gBlitProgram);
+	glUniform2f(glGetUniformLocation(gBlitProgram, "uvScale"), umax, vmax);
+	glActiveTexture(GL_TEXTURE0);
+	glBindVertexArray(gQuadVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindVertexArray(0);
+	glUseProgram(0);
 	endTicks = SDL_GetPerformanceCounter();
 	gFramebufferRenderTextureMs = GLRender_ElapsedMs(startTicks, endTicks);
 	CHECK_GL_ERROR();

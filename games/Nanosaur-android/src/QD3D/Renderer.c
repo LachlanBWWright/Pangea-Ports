@@ -8,15 +8,10 @@
 /****************************/
 
 #include <SDL3/SDL.h>
-#ifndef __EMSCRIPTEN__
-#include <SDL3/SDL_opengl.h>
-#if !OSXPPC
-#include <SDL3/SDL_opengl_glext.h>
-#endif
-#endif
 #include "game.h"
 #include "RenderPolicy.h"
 #include "profiling.h"
+#include "scene_depth.h"
 
 extern TQ3Param2D				gEnvMapUVs[];
 extern RenderStats				gRenderStats;
@@ -512,6 +507,7 @@ void Render_Load3DMFTextures(TQ3MetaFile* metaFile, GLuint* outTextureNames)
 
 void Render_StartFrame(void)
 {
+	SceneDepth_BeginFrame(gWindowWidth, gWindowHeight, gGamePrefs.antialiasingLevel == 0);
 	// Clear rendering statistics
 	SDL_memset(&gRenderStats, 0, sizeof(gRenderStats));
 
@@ -563,6 +559,8 @@ void Render_FlushQueue(void)
 			DrawMeshList(kRenderPass_Opaque, gMeshQueuePtrs[i]);
 		}
 
+		SceneDepth_CaptureOpaque();
+
 		// PASS 2: draw transparent meshes, back to front
 		for (int i = gMeshQueueSize-1; i >= 0; i--)
 		{
@@ -572,6 +570,7 @@ void Render_FlushQueue(void)
 		// Clear mesh draw queue
 		gMeshQueueSize = 0;
 	}
+	COMPAT_GL_SetSoftParticle(false);
 }
 
 void Render_EndFrame(void)
@@ -590,6 +589,7 @@ void Render_EndFrame(void)
 		Render_DrawFadeOverlay(gFadeOverlayOpacity);
 	}
 #endif
+	SceneDepth_EndFrame();
 }
 
 #pragma mark -
@@ -692,6 +692,9 @@ static void DrawMeshList(int renderPass, const MeshQueueEntry* entry)
 			// Skip this mesh in this pass
 			continue;
 		}
+
+		COMPAT_GL_SetSoftParticle(meshIsTransparent &&
+			(entry->mods->statusBits & STATUS_BIT_SOFTPARTICLE) != 0);
 
 		// Enable alpha blending if the mesh has transparency
 		if (meshIsTransparent)

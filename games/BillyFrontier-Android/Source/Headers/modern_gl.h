@@ -5,9 +5,7 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
-#include <SDL3/SDL_opengles2.h>
+#include "modern_gl_api.h"
 
 /****************************/
 /*    CONSTANTS             */
@@ -83,13 +81,19 @@ typedef struct
     GLint uAlphaRef;
     GLint uGlobalTransparency;
     GLint uGlobalColorFilter;
+    GLint uDepthTexture;
+    GLint uDepthTextureSize;
+    GLint uDepthNear;
+    GLint uDepthFar;
+    GLint uFeatherDistance;
+    GLint uFeatherEnabled;
 } ModernGLShaderProgram;
 
 typedef struct
 {
     GLuint vbo;
     GLuint ibo;
-    GLuint vao; // Not used in WebGL 1.0, but kept for future WebGL 2.0 support
+    GLuint vao;
 
     int numVertices;
     int numIndices;
@@ -165,6 +169,7 @@ typedef struct
 #define MODERNGL_DIRTY_TEXTURES     (1u << 4)
 #define MODERNGL_DIRTY_ALPHA        (1u << 5)
 #define MODERNGL_DIRTY_GLOBALS      (1u << 6)
+#define MODERNGL_DIRTY_FEATHER      (1u << 7)
 #define MODERNGL_DIRTY_ALL          0xFFFFFFFFu
 
 /****************************/
@@ -186,6 +191,7 @@ void ModernGL_Shutdown(void);
 Boolean ModernGL_LoadShaders(void);
 void ModernGL_UseShader(void);
 void ModernGL_UpdateUniforms(void);
+void ModernGL_SetFeathering(Boolean enabled);
 
 // Geometry management
 ModernGLGeometry* ModernGL_CreateGeometry(int numVertices, int numIndices, Boolean dynamic);
@@ -233,5 +239,3 @@ void ModernGL_ImmediateVertex(float x, float y, float z);
 // Matrix helpers
 void ModernGL_Matrix4x4ToFloat16(const OGLMatrix4x4* in, float* out);
 void ModernGL_Matrix3x3FromMatrix4x4(const OGLMatrix4x4* in, float* out);
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

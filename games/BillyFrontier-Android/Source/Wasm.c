@@ -13,20 +13,6 @@ void BillyFrontier_RequestQuit(void)
 }
 
 // -------------------------------------------------------------------------
-// LEGACY OPENGL STUBS
-// Emscripten's LEGACY_GL_EMULATION does not implement every fixed-function
-// GL 1.x entry point.  Provide no-op stubs so the linker is satisfied.
-// -------------------------------------------------------------------------
-
-// glColorMaterial: tells GL to track current vertex color as material color.
-// Emscripten's GL emulation handles material/color differently; a no-op is fine.
-void glColorMaterial(unsigned int face, unsigned int mode) { (void)face; (void)mode; }
-
-// glLightModeli: sets integer light-model parameters (e.g. two-sided lighting).
-// Not emulated by Emscripten; a no-op has negligible visual impact for this game.
-void glLightModeli(unsigned int pname, int param) { (void)pname; (void)param; }
-
-// -------------------------------------------------------------------------
 // CHEAT / DEBUG COMMANDS
 // -------------------------------------------------------------------------
 

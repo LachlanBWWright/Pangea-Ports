@@ -1,5 +1,5 @@
 // RENDERER.C
-// Modern OpenGL ES 2.0 / WebGL-compatible renderer
+// OpenGL 3.3 / OpenGL ES 3.0 renderer
 // (C)2021 Iliyas Jorio
 // This file is part of Bugdom. https://github.com/jorio/bugdom
 
@@ -16,27 +16,34 @@
 #include "game.h"
 #include "RenderPolicy.h"
 
-#ifdef __EMSCRIPTEN__
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-#elif defined(__ANDROID__)
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-#endif
-
 #include <QD3D.h>
 #include <string.h>
 #include <stdlib.h>
 
 #if defined(_WIN32)
+static PFNGLACTIVETEXTUREPROC gGlActiveTexture;
 static PFNGLATTACHSHADERPROC gGlAttachShader;
 static PFNGLBINDATTRIBLOCATIONPROC gGlBindAttribLocation;
+static PFNGLBINDBUFFERPROC gGlBindBuffer;
+static PFNGLBINDFRAMEBUFFERPROC gGlBindFramebuffer;
+static PFNGLBINDVERTEXARRAYPROC gGlBindVertexArray;
+static PFNGLBLITFRAMEBUFFERPROC gGlBlitFramebuffer;
+static PFNGLBUFFERDATAPROC gGlBufferData;
+static PFNGLCHECKFRAMEBUFFERSTATUSPROC gGlCheckFramebufferStatus;
 static PFNGLCOMPILESHADERPROC gGlCompileShader;
 static PFNGLCREATEPROGRAMPROC gGlCreateProgram;
 static PFNGLCREATESHADERPROC gGlCreateShader;
 static PFNGLDELETESHADERPROC gGlDeleteShader;
+static PFNGLDELETEBUFFERSPROC gGlDeleteBuffers;
+static PFNGLDELETEFRAMEBUFFERSPROC gGlDeleteFramebuffers;
+static PFNGLDELETEVERTEXARRAYSPROC gGlDeleteVertexArrays;
 static PFNGLDISABLEVERTEXATTRIBARRAYPROC gGlDisableVertexAttribArray;
+static PFNGLDRAWBUFFERSPROC gGlDrawBuffers;
 static PFNGLENABLEVERTEXATTRIBARRAYPROC gGlEnableVertexAttribArray;
+static PFNGLFRAMEBUFFERTEXTURE2DPROC gGlFramebufferTexture2D;
+static PFNGLGENBUFFERSPROC gGlGenBuffers;
+static PFNGLGENFRAMEBUFFERSPROC gGlGenFramebuffers;
+static PFNGLGENVERTEXARRAYSPROC gGlGenVertexArrays;
 static PFNGLGETATTRIBLOCATIONPROC gGlGetAttribLocation;
 static PFNGLGETPROGRAMIVPROC gGlGetProgramiv;
 static PFNGLGETPROGRAMINFOLOGPROC gGlGetProgramInfoLog;
@@ -48,20 +55,36 @@ static PFNGLSHADERSOURCEPROC gGlShaderSource;
 static PFNGLUSEPROGRAMPROC gGlUseProgram;
 static PFNGLUNIFORM1FPROC gGlUniform1f;
 static PFNGLUNIFORM1IPROC gGlUniform1i;
+static PFNGLUNIFORM2FPROC gGlUniform2f;
 static PFNGLUNIFORM3FPROC gGlUniform3f;
 static PFNGLUNIFORM4FPROC gGlUniform4f;
 static PFNGLUNIFORMMATRIX3FVPROC gGlUniformMatrix3fv;
 static PFNGLUNIFORMMATRIX4FVPROC gGlUniformMatrix4fv;
 static PFNGLVERTEXATTRIBPOINTERPROC gGlVertexAttribPointer;
 
+#define glActiveTexture gGlActiveTexture
 #define glAttachShader gGlAttachShader
 #define glBindAttribLocation gGlBindAttribLocation
+#define glBindBuffer gGlBindBuffer
+#define glBindFramebuffer gGlBindFramebuffer
+#define glBindVertexArray gGlBindVertexArray
+#define glBlitFramebuffer gGlBlitFramebuffer
+#define glBufferData gGlBufferData
+#define glCheckFramebufferStatus gGlCheckFramebufferStatus
 #define glCompileShader gGlCompileShader
 #define glCreateProgram gGlCreateProgram
 #define glCreateShader gGlCreateShader
 #define glDeleteShader gGlDeleteShader
+#define glDeleteBuffers gGlDeleteBuffers
+#define glDeleteFramebuffers gGlDeleteFramebuffers
+#define glDeleteVertexArrays gGlDeleteVertexArrays
 #define glDisableVertexAttribArray gGlDisableVertexAttribArray
+#define glDrawBuffers gGlDrawBuffers
 #define glEnableVertexAttribArray gGlEnableVertexAttribArray
+#define glFramebufferTexture2D gGlFramebufferTexture2D
+#define glGenBuffers gGlGenBuffers
+#define glGenFramebuffers gGlGenFramebuffers
+#define glGenVertexArrays gGlGenVertexArrays
 #define glGetAttribLocation gGlGetAttribLocation
 #define glGetProgramiv gGlGetProgramiv
 #define glGetProgramInfoLog gGlGetProgramInfoLog
@@ -73,6 +96,7 @@ static PFNGLVERTEXATTRIBPOINTERPROC gGlVertexAttribPointer;
 #define glUseProgram gGlUseProgram
 #define glUniform1f gGlUniform1f
 #define glUniform1i gGlUniform1i
+#define glUniform2f gGlUniform2f
 #define glUniform3f gGlUniform3f
 #define glUniform4f gGlUniform4f
 #define glUniformMatrix3fv gGlUniformMatrix3fv
@@ -81,14 +105,29 @@ static PFNGLVERTEXATTRIBPOINTERPROC gGlVertexAttribPointer;
 
 static void LoadWindowsGLFunctions(void)
 {
+	gGlActiveTexture = (PFNGLACTIVETEXTUREPROC) SDL_GL_GetProcAddress("glActiveTexture");
 	gGlAttachShader = (PFNGLATTACHSHADERPROC) SDL_GL_GetProcAddress("glAttachShader");
 	gGlBindAttribLocation = (PFNGLBINDATTRIBLOCATIONPROC) SDL_GL_GetProcAddress("glBindAttribLocation");
+	gGlBindBuffer = (PFNGLBINDBUFFERPROC) SDL_GL_GetProcAddress("glBindBuffer");
+	gGlBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC) SDL_GL_GetProcAddress("glBindFramebuffer");
+	gGlBindVertexArray = (PFNGLBINDVERTEXARRAYPROC) SDL_GL_GetProcAddress("glBindVertexArray");
+	gGlBlitFramebuffer = (PFNGLBLITFRAMEBUFFERPROC) SDL_GL_GetProcAddress("glBlitFramebuffer");
+	gGlBufferData = (PFNGLBUFFERDATAPROC) SDL_GL_GetProcAddress("glBufferData");
+	gGlCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUSPROC) SDL_GL_GetProcAddress("glCheckFramebufferStatus");
 	gGlCompileShader = (PFNGLCOMPILESHADERPROC) SDL_GL_GetProcAddress("glCompileShader");
 	gGlCreateProgram = (PFNGLCREATEPROGRAMPROC) SDL_GL_GetProcAddress("glCreateProgram");
 	gGlCreateShader = (PFNGLCREATESHADERPROC) SDL_GL_GetProcAddress("glCreateShader");
 	gGlDeleteShader = (PFNGLDELETESHADERPROC) SDL_GL_GetProcAddress("glDeleteShader");
+	gGlDeleteBuffers = (PFNGLDELETEBUFFERSPROC) SDL_GL_GetProcAddress("glDeleteBuffers");
+	gGlDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSPROC) SDL_GL_GetProcAddress("glDeleteFramebuffers");
+	gGlDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC) SDL_GL_GetProcAddress("glDeleteVertexArrays");
 	gGlDisableVertexAttribArray = (PFNGLDISABLEVERTEXATTRIBARRAYPROC) SDL_GL_GetProcAddress("glDisableVertexAttribArray");
+	gGlDrawBuffers = (PFNGLDRAWBUFFERSPROC) SDL_GL_GetProcAddress("glDrawBuffers");
 	gGlEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC) SDL_GL_GetProcAddress("glEnableVertexAttribArray");
+	gGlFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC) SDL_GL_GetProcAddress("glFramebufferTexture2D");
+	gGlGenBuffers = (PFNGLGENBUFFERSPROC) SDL_GL_GetProcAddress("glGenBuffers");
+	gGlGenFramebuffers = (PFNGLGENFRAMEBUFFERSPROC) SDL_GL_GetProcAddress("glGenFramebuffers");
+	gGlGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC) SDL_GL_GetProcAddress("glGenVertexArrays");
 	gGlGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC) SDL_GL_GetProcAddress("glGetAttribLocation");
 	gGlGetProgramiv = (PFNGLGETPROGRAMIVPROC) SDL_GL_GetProcAddress("glGetProgramiv");
 	gGlGetProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC) SDL_GL_GetProcAddress("glGetProgramInfoLog");
@@ -100,6 +139,7 @@ static void LoadWindowsGLFunctions(void)
 	gGlUseProgram = (PFNGLUSEPROGRAMPROC) SDL_GL_GetProcAddress("glUseProgram");
 	gGlUniform1f = (PFNGLUNIFORM1FPROC) SDL_GL_GetProcAddress("glUniform1f");
 	gGlUniform1i = (PFNGLUNIFORM1IPROC) SDL_GL_GetProcAddress("glUniform1i");
+	gGlUniform2f = (PFNGLUNIFORM2FPROC) SDL_GL_GetProcAddress("glUniform2f");
 	gGlUniform3f = (PFNGLUNIFORM3FPROC) SDL_GL_GetProcAddress("glUniform3f");
 	gGlUniform4f = (PFNGLUNIFORM4FPROC) SDL_GL_GetProcAddress("glUniform4f");
 	gGlUniformMatrix3fv = (PFNGLUNIFORMMATRIX3FVPROC) SDL_GL_GetProcAddress("glUniformMatrix3fv");
@@ -145,6 +185,14 @@ GLint           loc_u_FogEnd;
 GLint           loc_u_AlphaTestEnabled;
 GLint           loc_u_AlphaThreshold;
 GLint           loc_u_UseVertexColors;
+GLint           loc_u_AutoFadeFactor;
+GLint           loc_u_ReflectionEnabled;
+GLint           loc_u_ReflectionTransform;
+GLint           loc_u_ReflectionNormalMatrix;
+GLint           loc_u_ReflectionCamera;
+GLint           loc_u_SceneDepth;
+GLint           loc_u_SoftParticle;
+GLint           loc_u_InvFramebufferSize;
 
 // Tracked GL state
 GLuint          boundTexture;
@@ -157,6 +205,7 @@ bool            lightingEnabled;
 bool            fogEnabled;
 bool            alphaTestEnabled;
 bool            useVertexColors;
+bool            reflectionEnabled;
 bool            sceneHasFog;
 float           fogStart;
 float           fogEnd;
@@ -187,9 +236,6 @@ static MeshQueueEntry*      gMeshQueuePtrs[MESHQUEUE_MAX_SIZE];
 static int                  gMeshQueueSize = 0;
 static bool                 gFrameStarted = false;
 
-static float                gBackupVertexColors[4*65536];
-
-#ifdef __EMSCRIPTEN__
 enum { VBO_ATTRIB_POS=0, VBO_ATTRIB_NORM=1, VBO_ATTRIB_COLOR=2, VBO_ATTRIB_TC=3, VBO_ATTRIB_COUNT=4 };
 enum { MESH_CACHE_SIZE = 256 };
 
@@ -209,8 +255,7 @@ GLuint                  vbo[VBO_ATTRIB_COUNT];
 GLuint                  ebo;
 } MeshGpuCacheEntry;
 
-static GLuint               s_attrVBO[VBO_ATTRIB_COUNT] = {0,0,0,0};
-static GLuint               s_streamEBO = 0;
+static GLuint               s_vertexArray = 0;
 static MeshGpuCacheEntry    s_meshCache[MESH_CACHE_SIZE];
 static uint32_t             s_meshCacheTick = 1;
 static int                  s_forceCacheMiss = -1;
@@ -224,38 +269,14 @@ static bool ForceMeshCacheMisses(void)
 	}
 	return s_forceCacheMiss != 0;
 }
-#endif
 
 static int DrawOrderComparator(void const* a_void, void const* b_void);
 
 static void BeginDepthPass(const MeshQueueEntry* entry);
-static void BeginShadingPass(const MeshQueueEntry* entry);
-static void PrepareOpaqueShading(const MeshQueueEntry* entry);
-static void PrepareAlphaShading(const MeshQueueEntry* entry);
-static void SendGeometry(const MeshQueueEntry* entry);
-
-#ifdef __EMSCRIPTEN__
-static void VertexAttribVBO(GLint attribLoc, GLint attrIdx, GLint components, GLsizei numVerts, const GLfloat* data)
-{
-	glBindBuffer(GL_ARRAY_BUFFER, s_attrVBO[attrIdx]);
-	GLsizeiptr byteCount = (GLsizeiptr)(numVerts * components * sizeof(GLfloat));
-	glBufferData(GL_ARRAY_BUFFER, byteCount, data, GL_STREAM_DRAW);
-	gRenderStats.bufferUploadCalls++;
-	gRenderStats.bufferUploadBytes += (int) byteCount;
-	glVertexAttribPointer(attribLoc, components, GL_FLOAT, GL_FALSE, 0, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-static void DrawElementsVBO(GLenum mode, GLsizei count, const TQ3TriMeshTriangleData* triangles)
-{
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_streamEBO);
-	GLsizeiptr byteCount = (GLsizeiptr)(count * sizeof(GLuint));
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, byteCount, triangles, GL_STREAM_DRAW);
-	gRenderStats.bufferUploadCalls++;
-	gRenderStats.bufferUploadBytes += (int) byteCount;
-	glDrawElements(mode, count, GL_UNSIGNED_INT, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-}
+static void BeginShadingPass(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry);
+static void PrepareOpaqueShading(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry);
+static void PrepareAlphaShading(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry);
+static void SendGeometry(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry);
 
 static bool MeshCacheEntryMatches(const MeshGpuCacheEntry* entry, const TQ3TriMeshData* mesh)
 {
@@ -397,12 +418,6 @@ static void DeleteMeshCacheBuffers(void)
 	}
 }
 
-#define ATTRIB_VBO(loc, vboIdx, components, mesh, field) VertexAttribVBO((loc), (vboIdx), (components), (mesh)->numPoints, (const GLfloat*)(mesh)->field)
-#define DRAW_ELEMENTS_VBO(mesh) DrawElementsVBO(GL_TRIANGLES, (mesh)->numTriangles * 3, (mesh)->triangles)
-#else
-#define ATTRIB_VBO(loc, vboIdx, components, mesh, field) glVertexAttribPointer((loc), (components), GL_FLOAT, GL_FALSE, 0, (mesh)->field)
-#define DRAW_ELEMENTS_VBO(mesh) glDrawElements(GL_TRIANGLES, (mesh)->numTriangles * 3, GL_UNSIGNED_INT, (mesh)->triangles)
-#endif
 
 #pragma mark -
 
@@ -459,12 +474,15 @@ const RenderModifiers kDefaultRenderMods_Pillarbox =
 /****************************/
 
 static const char* kVertexShaderSource =
-"precision mediump float;\n"
-"precision mediump int;\n"
-"attribute vec3 a_Position;\n"
-"attribute vec3 a_Normal;\n"
-"attribute vec2 a_TexCoord;\n"
-"attribute vec4 a_Color;\n"
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+"#version 300 es\nprecision highp float;\nprecision mediump int;\n"
+#else
+"#version 330 core\n"
+#endif
+"in vec3 a_Position;\n"
+"in vec3 a_Normal;\n"
+"in vec2 a_TexCoord;\n"
+"in vec4 a_Color;\n"
 "uniform mat4 u_Projection;\n"
 "uniform mat4 u_ModelView;\n"
 "uniform mat3 u_NormalMatrix;\n"
@@ -477,17 +495,30 @@ static const char* kVertexShaderSource =
 "uniform vec4 u_LightColor1;\n"
 "uniform int  u_UseVertexColors;\n"
 "uniform vec4 u_DiffuseColor;\n"
+"uniform float u_AutoFadeFactor;\n"
+"uniform int u_ReflectionEnabled;\n"
+"uniform mat3 u_ReflectionTransform;\n"
+"uniform mat3 u_ReflectionNormalMatrix;\n"
+"uniform vec3 u_ReflectionCamera;\n"
 "uniform int  u_FogEnabled;\n"
 "uniform float u_FogStart;\n"
 "uniform float u_FogEnd;\n"
-"varying vec2 v_TexCoord;\n"
-"varying vec4 v_Color;\n"
-"varying float v_FogFactor;\n"
+"out vec2 v_TexCoord;\n"
+"out vec4 v_Color;\n"
+"out float v_FogFactor;\n"
 "void main() {\n"
 "    vec4 eyePos = u_ModelView * vec4(a_Position, 1.0);\n"
 "    gl_Position = u_Projection * eyePos;\n"
-"    v_TexCoord = a_TexCoord;\n"
+"    if (u_ReflectionEnabled != 0) {\n"
+"        vec3 normal = normalize(u_ReflectionNormalMatrix * a_Normal);\n"
+"        vec3 viewVector = u_ReflectionTransform * a_Position - u_ReflectionCamera;\n"
+"        vec3 reflected = normalize(normal * (2.0 * dot(normal, viewVector)) - viewVector);\n"
+"        v_TexCoord = reflected.xy * 0.5 + 0.5;\n"
+"    } else {\n"
+"        v_TexCoord = a_TexCoord;\n"
+"    }\n"
 "    vec4 baseColor = (u_UseVertexColors != 0) ? a_Color : u_DiffuseColor;\n"
+"    baseColor.a *= u_AutoFadeFactor;\n"
 "    if (u_LightingEnabled != 0) {\n"
 "        vec3 eyeNormal = normalize(u_NormalMatrix * a_Normal);\n"
 "        vec3 lit = u_AmbientColor.rgb;\n"
@@ -506,27 +537,44 @@ static const char* kVertexShaderSource =
 "}\n";
 
 static const char* kFragmentShaderSource =
-"precision mediump float;\n"
-"precision mediump int;\n"
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+"#version 300 es\nprecision highp float;\nprecision mediump int;\n"
+#else
+"#version 330 core\n"
+#endif
 "uniform sampler2D u_Texture0;\n"
+"uniform sampler2D u_SceneDepth;\n"
+"uniform int u_SoftParticle;\n"
+"uniform vec2 u_InvFramebufferSize;\n"
+"uniform mat4 u_Projection;\n"
 "uniform int u_TextureEnabled;\n"
 "uniform int u_AlphaTestEnabled;\n"
 "uniform float u_AlphaThreshold;\n"
 "uniform vec4 u_FogColor;\n"
 "uniform int u_FogEnabled;\n"
-"varying vec2 v_TexCoord;\n"
-"varying vec4 v_Color;\n"
-"varying float v_FogFactor;\n"
+"in vec2 v_TexCoord;\n"
+"in vec4 v_Color;\n"
+"in float v_FogFactor;\n"
+"out vec4 fragColor;\n"
+"float eyeDepth(float depth) {\n"
+"    return u_Projection[3][2] / (depth * 2.0 - 1.0 + u_Projection[2][2]);\n"
+"}\n"
 "void main() {\n"
 "    vec4 color;\n"
 "    if (u_TextureEnabled != 0) {\n"
-"        color = v_Color * texture2D(u_Texture0, v_TexCoord);\n"
+"        color = v_Color * texture(u_Texture0, v_TexCoord);\n"
 "    } else {\n"
 "        color = v_Color;\n"
 "    }\n"
 "    if (u_AlphaTestEnabled != 0 && color.a < u_AlphaThreshold) discard;\n"
 "    if (u_FogEnabled != 0) { color.rgb = mix(u_FogColor.rgb, color.rgb, v_FogFactor); }\n"
-"    gl_FragColor = color;\n"
+"    if (u_SoftParticle != 0) {\n"
+"        float sceneDepth = texture(u_SceneDepth, gl_FragCoord.xy * u_InvFramebufferSize).r;\n"
+"        if (sceneDepth < 1.0) {\n"
+"            color.a *= clamp((eyeDepth(sceneDepth) - eyeDepth(gl_FragCoord.z)) / 60.0, 0.0, 1.0);\n"
+"        }\n"
+"    }\n"
+"    fragColor = color;\n"
 "}\n";
 
 #pragma mark -
@@ -537,6 +585,11 @@ static const char* kFragmentShaderSource =
 
 static SDL_GLContext gGLContext = NULL;
 static RendererState gState;
+static GLuint gSceneDepthTexture = 0;
+static GLuint gSceneDepthFramebuffer = 0;
+static int gSceneDepthWidth = 0;
+static int gSceneDepthHeight = 0;
+static bool gCanCopySceneDepth = false;
 float gGammaFadeFactor = 1.0f;
 static TQ3TriMeshData* gFullscreenQuad = nil;
 
@@ -642,9 +695,21 @@ gState.loc_u_FogEnd          = glGetUniformLocation(gState.shaderProgram, "u_Fog
 gState.loc_u_AlphaTestEnabled= glGetUniformLocation(gState.shaderProgram, "u_AlphaTestEnabled");
 gState.loc_u_AlphaThreshold  = glGetUniformLocation(gState.shaderProgram, "u_AlphaThreshold");
 gState.loc_u_UseVertexColors = glGetUniformLocation(gState.shaderProgram, "u_UseVertexColors");
+gState.loc_u_AutoFadeFactor = glGetUniformLocation(gState.shaderProgram, "u_AutoFadeFactor");
+gState.loc_u_ReflectionEnabled = glGetUniformLocation(gState.shaderProgram, "u_ReflectionEnabled");
+gState.loc_u_ReflectionTransform = glGetUniformLocation(gState.shaderProgram, "u_ReflectionTransform");
+gState.loc_u_ReflectionNormalMatrix = glGetUniformLocation(gState.shaderProgram, "u_ReflectionNormalMatrix");
+gState.loc_u_ReflectionCamera = glGetUniformLocation(gState.shaderProgram, "u_ReflectionCamera");
+gState.loc_u_SceneDepth = glGetUniformLocation(gState.shaderProgram, "u_SceneDepth");
+gState.loc_u_SoftParticle = glGetUniformLocation(gState.shaderProgram, "u_SoftParticle");
+gState.loc_u_InvFramebufferSize = glGetUniformLocation(gState.shaderProgram, "u_InvFramebufferSize");
 
 // Set texture sampler to unit 0
 glUniform1i(gState.loc_u_Texture0, 0);
+glUniform1i(gState.loc_u_SceneDepth, 1);
+glUniform1i(gState.loc_u_SoftParticle, 0);
+glUniform1i(gState.loc_u_ReflectionEnabled, 0);
+glUniform1f(gState.loc_u_AutoFadeFactor, 1.0f);
 
 // Set initial defaults that never change
 glUniform1f(gState.loc_u_AlphaThreshold, 0.4999f);
@@ -655,7 +720,7 @@ glUniform4f(gState.loc_u_AmbientColor, 1, 1, 1, 1);
 static void UploadMatrix4x4(GLint loc, const TQ3Matrix4x4* m)
 {
 // TQ3Matrix4x4 is column-major (value[col][row]), which matches OpenGL's expected layout.
-// WebGL 1 requires transpose=GL_FALSE.
+// ES 3 requires transpose=GL_FALSE.
 glUniformMatrix4fv(loc, 1, GL_FALSE, (const float*) m->value);
 }
 
@@ -669,6 +734,27 @@ mv->value[1][0], mv->value[1][1], mv->value[1][2],
 mv->value[2][0], mv->value[2][1], mv->value[2][2],
 };
 glUniformMatrix3fv(gState.loc_u_NormalMatrix, 1, GL_FALSE, nm);
+}
+
+static void UploadReflectionMatrix(GLint location, const TQ3Matrix4x4* matrix)
+{
+float values[9] = {
+matrix->value[0][0], matrix->value[0][1], matrix->value[0][2],
+matrix->value[1][0], matrix->value[1][1], matrix->value[1][2],
+matrix->value[2][0], matrix->value[2][1], matrix->value[2][2],
+};
+glUniformMatrix3fv(location, 1, GL_FALSE, values);
+}
+
+static void UploadReflectionState(const TQ3Matrix4x4* transform)
+{
+TQ3Matrix4x4 inverseTranspose;
+Q3Matrix4x4_Invert(transform, &inverseTranspose);
+Q3Matrix4x4_Transpose(&inverseTranspose, &inverseTranspose);
+UploadReflectionMatrix(gState.loc_u_ReflectionTransform, transform);
+UploadReflectionMatrix(gState.loc_u_ReflectionNormalMatrix, &inverseTranspose);
+const TQ3Point3D* camera = &gGameViewInfoPtr->currentCameraCoords;
+glUniform3f(gState.loc_u_ReflectionCamera, camera->x, camera->y, camera->z);
 }
 
 static inline void SetAttrib(int loc, bool* flag, bool enable)
@@ -738,17 +824,18 @@ void Render_CreateContext(void)
 {
 gGLContext = SDL_GL_CreateContext(gSDLWindow);
 GAME_ASSERT(gGLContext);
+SDL_Log("Bugdom GL context: %s; GLSL: %s", glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 }
 
 void Render_DeleteContext(void)
 {
 if (gGLContext)
 {
-#ifdef __EMSCRIPTEN__
-if (s_attrVBO[0]) { glDeleteBuffers(VBO_ATTRIB_COUNT, s_attrVBO); for (int i=0;i<VBO_ATTRIB_COUNT;i++) s_attrVBO[i]=0; }
-if (s_streamEBO) { glDeleteBuffers(1, &s_streamEBO); s_streamEBO = 0; }
+if (gSceneDepthTexture) { glDeleteTextures(1, &gSceneDepthTexture); gSceneDepthTexture = 0; }
+if (gSceneDepthFramebuffer) { glDeleteFramebuffers(1, &gSceneDepthFramebuffer); gSceneDepthFramebuffer = 0; }
+gSceneDepthWidth = gSceneDepthHeight = 0;
 DeleteMeshCacheBuffers();
-#endif
+if (s_vertexArray) { glDeleteVertexArrays(1, &s_vertexArray); s_vertexArray = 0; }
 SDL_GL_DestroyContext(gGLContext);
 gGLContext = NULL;
 }
@@ -829,8 +916,15 @@ LoadWindowsGLFunctions();
 #endif
 // Compile & link shaders
 CreateShaderProgram();
+GLint sampleCount = 0;
+glGetIntegerv(GL_SAMPLES, &sampleCount);
+gCanCopySceneDepth = sampleCount == 0;
+if (!gCanCopySceneDepth)
+SDL_Log("Soft particles disabled for multisampled default framebuffer (%d samples)", sampleCount);
 
 // Depth / blend / face culling
+if (!s_vertexArray) { glGenVertexArrays(1, &s_vertexArray); }
+glBindVertexArray(s_vertexArray);
 glEnable(GL_DEPTH_TEST);    gState.hasState_GL_DEPTH_TEST = true;
 glEnable(GL_CULL_FACE);     gState.hasState_GL_CULL_FACE  = true;
 glDisable(GL_BLEND);        gState.hasState_GL_BLEND       = false;
@@ -858,6 +952,8 @@ gState.lightingEnabled  = true;     glUniform1i(gState.loc_u_LightingEnabled,  1
 gState.fogEnabled       = false;    glUniform1i(gState.loc_u_FogEnabled,       0);
 gState.alphaTestEnabled = false;    glUniform1i(gState.loc_u_AlphaTestEnabled, 0);
 gState.useVertexColors  = false;    glUniform1i(gState.loc_u_UseVertexColors,  0);
+gState.reflectionEnabled = false;   glUniform1i(gState.loc_u_ReflectionEnabled, 0);
+glUniform1f(gState.loc_u_AutoFadeFactor, 1.0f);
 
 glUniform4f(gState.loc_u_DiffuseColor, 1, 1, 1, 1);
 glUniform4f(gState.loc_u_FogColor, 0, 0, 0, 1);
@@ -878,17 +974,12 @@ if (!gFullscreenQuad)
 gFullscreenQuad = MakeQuadMesh_UI(0, 0, GAME_VIEW_WIDTH, GAME_VIEW_HEIGHT, 0, 0, 1, 1);
 }
 
-#ifdef __EMSCRIPTEN__
-if (!s_attrVBO[0]) { glGenBuffers(VBO_ATTRIB_COUNT, s_attrVBO); }
-if (!s_streamEBO) { glGenBuffers(1, &s_streamEBO); }
-#endif
 
 CHECK_GL_ERROR();
 }
 
 void Render_InvalidateMeshCachePtr(const void* ptr)
 {
-#ifdef __EMSCRIPTEN__
 	if (!ptr)
 		return;
 
@@ -907,14 +998,10 @@ void Render_InvalidateMeshCachePtr(const void* ptr)
 			entry->valid = false;
 		}
 	}
-#else
-	(void) ptr;
-#endif
 }
 
 void Render_InvalidateMeshCacheForMesh(const TQ3TriMeshData* mesh)
 {
-#ifdef __EMSCRIPTEN__
 	if (!mesh)
 		return;
 
@@ -927,9 +1014,6 @@ void Render_InvalidateMeshCacheForMesh(const TQ3TriMeshData* mesh)
 			s_meshCache[i].valid = false;
 		}
 	}
-#else
-	(void) mesh;
-#endif
 }
 
 void Render_EndScene(void)
@@ -983,7 +1067,7 @@ gState.boundTexture = textureName;
 
 #pragma mark - Texture Loading
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 static void* ConvertBGRA32ToRGBA(const void* src, int width, int height)
 {
 int n = width * height;
@@ -1033,7 +1117,7 @@ dst[i*4+3] = hasAlpha ? (a ? 255 : 0) : 255;
 }
 return dst;
 }
-#endif // __EMSCRIPTEN__
+#endif
 
 /********************* CLASSIFY PIXMAP OPACITY ************************/
 //
@@ -1114,24 +1198,8 @@ glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 if (flags & kRendererTextureFlags_ClampV)
 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-#ifdef __EMSCRIPTEN__
-// WebGL 1 does not support GL_REPEAT on non-power-of-two (NPOT) textures:
-// sampling such a texture returns black (0,0,0,0) instead of the correct colour.
-// Only force CLAMP_TO_EDGE for NPOT textures; POT textures may legitimately
-// use GL_REPEAT (e.g. the log barrel uses UV coords up to ~4.8).
-{
-	bool npotW = (width  & (width  - 1)) != 0;
-	bool npotH = (height & (height - 1)) != 0;
-	if ((npotW || npotH) && !(flags & kRendererTextureFlags_ClampU))
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	if ((npotW || npotH) && !(flags & kRendererTextureFlags_ClampV))
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-}
-#endif
-
-#ifdef __EMSCRIPTEN__
-// WebGL 1 only supports RGBA/RGB + UNSIGNED_BYTE (and a few 16-bit packed types).
-// Convert from Mac/legacy pixel formats to WebGL-compatible ones.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+// Desktop pixel layouts are converted to formats accepted by GLES 3 and WebGL 2.
 void* converted = NULL;
 GLenum glFormat = GL_RGBA;
 GLenum glType   = GL_UNSIGNED_BYTE;
@@ -1195,14 +1263,13 @@ int rowBytesInInput)
 {
 Render_BindTexture(textureName);
 
-#ifdef __EMSCRIPTEN__
-// WebGL 1 only supports RGBA/RGB + UNSIGNED_BYTE.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 // Convert legacy pixel formats, same as Render_LoadTexture.
 void* converted = NULL;
 GLenum glFormat = bufferFormat;
 GLenum glType   = bufferType;
 
-// First, strip row padding if present (WebGL 1 has no GL_UNPACK_ROW_LENGTH).
+// Strip row padding before conversion.
 const GLvoid* srcPixels = pixels;
 uint8_t* rowStripped = NULL;
 if (rowBytesInInput > 0)
@@ -1384,6 +1451,70 @@ void Render_SetViewport(int x, int y, int w, int h)
 glViewport(x, y, w, h);
 }
 
+static bool SnapshotOpaqueDepth(void)
+{
+	if (!gCanCopySceneDepth)
+		return false;
+
+	int width = 0;
+	int height = 0;
+	SDL_GetWindowSizeInPixels(gSDLWindow, &width, &height);
+	if (width <= 0 || height <= 0)
+		return false;
+
+	if (width != gSceneDepthWidth || height != gSceneDepthHeight)
+	{
+		if (!gSceneDepthTexture)
+			glGenTextures(1, &gSceneDepthTexture);
+		if (!gSceneDepthFramebuffer)
+			glGenFramebuffers(1, &gSceneDepthFramebuffer);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, gSceneDepthTexture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0,
+			GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+		glBindFramebuffer(GL_FRAMEBUFFER, gSceneDepthFramebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+			gSceneDepthTexture, 0);
+		const GLenum none = GL_NONE;
+		glDrawBuffers(1, &none);
+		glReadBuffer(GL_NONE);
+		gCanCopySceneDepth = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glActiveTexture(GL_TEXTURE0);
+		if (!gCanCopySceneDepth)
+		{
+			SDL_Log("Soft particles disabled: depth framebuffer incomplete");
+			return false;
+		}
+		gSceneDepthWidth = width;
+		gSceneDepthHeight = height;
+	}
+
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gSceneDepthFramebuffer);
+	glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
+		GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	if (glGetError() != GL_NO_ERROR)
+	{
+		gCanCopySceneDepth = false;
+		SDL_Log("Soft particles disabled: opaque depth copy failed");
+		return false;
+	}
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, gSceneDepthTexture);
+	glActiveTexture(GL_TEXTURE0);
+	glUniform2f(gState.loc_u_InvFramebufferSize, 1.0f / width, 1.0f / height);
+	return true;
+}
+
 void Render_FlushQueue(void)
 {
 	GAME_ASSERT(gFrameStarted);
@@ -1410,6 +1541,7 @@ void Render_FlushQueue(void)
 	SetFlag(glDepthMask, true);
 	glDepthFunc(GL_LEQUAL);
 	DisableState(GL_BLEND);
+	glUniform1i(gState.loc_u_SoftParticle, 0);
 
 	for (int i = 0; i < gMeshQueueSize; i++)
 	{
@@ -1417,9 +1549,10 @@ void Render_FlushQueue(void)
 
 		if (!entry->meshIsTransparent)
 		{
-			BeginShadingPass(entry);
-			PrepareOpaqueShading(entry);
-			SendGeometry(entry);
+			const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(entry->mesh);
+			BeginShadingPass(entry, cacheEntry);
+			PrepareOpaqueShading(entry, cacheEntry);
+			SendGeometry(entry, cacheEntry);
 		}
 		else
 		{
@@ -1437,6 +1570,11 @@ void Render_FlushQueue(void)
 
 	if (numDeferredColorMeshes > 0)
 	{
+		bool hasSoftParticles = false;
+		for (int i = 0; i < numDeferredColorMeshes; i++)
+			hasSoftParticles |= (gMeshQueuePtrs[i]->mods->statusBits & STATUS_BIT_SOFT_PARTICLE) != 0;
+		const bool depthReady = hasSoftParticles && SnapshotOpaqueDepth();
+
 		EnableState(GL_BLEND);
 		gState.alphaTestEnabled = false;
 		glUniform1i(gState.loc_u_AlphaTestEnabled, 0);
@@ -1446,10 +1584,14 @@ void Render_FlushQueue(void)
 		for (int i = 0; i < numDeferredColorMeshes; i++)
 		{
 			const MeshQueueEntry* entry = gMeshQueuePtrs[i];
-			BeginShadingPass(entry);
-			PrepareAlphaShading(entry);
-			SendGeometry(entry);
+			glUniform1i(gState.loc_u_SoftParticle,
+				depthReady && (entry->mods->statusBits & STATUS_BIT_SOFT_PARTICLE) != 0);
+			const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(entry->mesh);
+			BeginShadingPass(entry, cacheEntry);
+			PrepareAlphaShading(entry, cacheEntry);
+			SendGeometry(entry, cacheEntry);
 		}
+		glUniform1i(gState.loc_u_SoftParticle, 0);
 	}
 
 	//--------------------------------------------------------------
@@ -1621,13 +1763,9 @@ static int DrawOrderComparator(const void* a_void, const void* b_void)
 
 #pragma mark -
 
-static void SendGeometry(const MeshQueueEntry* entry)
+static void SendGeometry(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry)
 {
 uint32_t statusBits = entry->mods->statusBits;
-const TQ3TriMeshData* mesh = entry->mesh;
-#ifdef __EMSCRIPTEN__
-const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
-#endif
 
 // Cull backfaces unless explicitly kept
 SetState(GL_CULL_FACE, !(statusBits & STATUS_BIT_KEEPBACKFACES));
@@ -1637,11 +1775,7 @@ if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 glCullFace(GL_FRONT);       // pass 1: draw backfaces
 
 // Submit vertex positions
-#ifdef __EMSCRIPTEN__
 CachedVertexAttrib(gState.loc_a_Position, cacheEntry, VBO_ATTRIB_POS, 3);
-#else
-ATTRIB_VBO(gState.loc_a_Position, VBO_ATTRIB_POS, 3, mesh, points);
-#endif
 
 // Upload combined modelview if the per-object transform changed
 if (gState.currentTransform != entry->transform)
@@ -1661,22 +1795,14 @@ UploadMatrix3x3NormalFromMV(&gCurrentModelView);
 gState.currentTransform = entry->transform;
 }
 
-#ifdef __EMSCRIPTEN__
 DrawCachedElements(cacheEntry);
-#else
-DRAW_ELEMENTS_VBO(mesh);
-#endif
 CHECK_GL_ERROR();
 
 // Pass 2: draw frontfaces (improves look of translucent spheres etc.)
 if (statusBits & STATUS_BIT_KEEPBACKFACES_2PASS)
 {
 glCullFace(GL_BACK);        // pass 2: draw frontfaces
-#ifdef __EMSCRIPTEN__
 DrawCachedElements(cacheEntry);
-#else
-DRAW_ELEMENTS_VBO(mesh);
-#endif
 CHECK_GL_ERROR();
 }
 }
@@ -1684,9 +1810,7 @@ CHECK_GL_ERROR();
 static void BeginDepthPass(const MeshQueueEntry* entry)
 {
 const TQ3TriMeshData* mesh = entry->mesh;
-#ifdef __EMSCRIPTEN__
 const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
-#endif
 
 GAME_ASSERT(!(entry->mods->statusBits & STATUS_BIT_NOZWRITE));
 
@@ -1699,6 +1823,8 @@ EnableState(GL_DEPTH_TEST);
 SetUniformBool(gState.loc_u_LightingEnabled, &gState.lightingEnabled, false);
 SetUniformBool(gState.loc_u_FogEnabled,      &gState.fogEnabled,      false);
 SetUniformBool(gState.loc_u_UseVertexColors, &gState.useVertexColors, false);
+SetUniformBool(gState.loc_u_ReflectionEnabled, &gState.reflectionEnabled, false);
+glUniform1f(gState.loc_u_AutoFadeFactor, 1.0f);
 glUniform4f(gState.loc_u_DiffuseColor, 1, 1, 1, 1);
 
 DisableAttrib(Normal);
@@ -1711,11 +1837,7 @@ SetUniformBool(gState.loc_u_TextureEnabled,   &gState.textureEnabled,   true);
 SetUniformBool(gState.loc_u_AlphaTestEnabled, &gState.alphaTestEnabled, true);
 EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
-#ifdef __EMSCRIPTEN__
 CachedVertexAttrib(gState.loc_a_TexCoord, cacheEntry, VBO_ATTRIB_TC, 2);
-#else
-ATTRIB_VBO(gState.loc_a_TexCoord, VBO_ATTRIB_TC, 2, mesh, vertexUVs);
-#endif
 CHECK_GL_ERROR();
 }
 else
@@ -1726,20 +1848,21 @@ DisableAttrib(TexCoord);
 }
 }
 
-static void BeginShadingPass(const MeshQueueEntry* entry)
+static void BeginShadingPass(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry)
 {
 const TQ3TriMeshData* mesh = entry->mesh;
 uint32_t statusBits = entry->mods->statusBits;
-#ifdef __EMSCRIPTEN__
-const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
-#endif
 
 // Always write to color buffer in this pass
 SetColorMask(GL_TRUE);
 
-// Environment map effect
-if (statusBits & STATUS_BIT_REFLECTIONMAP)
-EnvironmentMapTriMesh(mesh, entry->transform);
+bool reflection = (statusBits & STATUS_BIT_REFLECTIONMAP) != 0;
+SetUniformBool(gState.loc_u_ReflectionEnabled, &gState.reflectionEnabled, reflection);
+if (reflection)
+{
+GAME_ASSERT(entry->transform && mesh->hasVertexNormals);
+UploadReflectionState(entry->transform);
+}
 
 // Lighting
 bool wantLighting = !((statusBits & STATUS_BIT_NULLSHADER)
@@ -1755,17 +1878,14 @@ if (gDebugMode != DEBUG_MODE_NOTEXTURES &&
 (mesh->texturingMode & kQ3TexturingModeExt_OpacityModeMask) != kQ3TexturingModeOff)
 {
 SetUniformBool(gState.loc_u_TextureEnabled, &gState.textureEnabled, true);
-EnableAttrib(TexCoord);
 Render_BindTexture(mesh->glTextureName);
-const float* uvs = (const float*)(statusBits & STATUS_BIT_REFLECTIONMAP ? gEnvMapUVs : mesh->vertexUVs);
-#ifdef __EMSCRIPTEN__
-if (statusBits & STATUS_BIT_REFLECTIONMAP)
-VertexAttribVBO(gState.loc_a_TexCoord, VBO_ATTRIB_TC, 2, mesh->numPoints, uvs);
+if (reflection)
+DisableAttrib(TexCoord);
 else
+{
+EnableAttrib(TexCoord);
 CachedVertexAttrib(gState.loc_a_TexCoord, cacheEntry, VBO_ATTRIB_TC, 2);
-#else
-glVertexAttribPointer(gState.loc_a_TexCoord, 2, GL_FLOAT, GL_FALSE, 0, uvs);
-#endif
+}
 CHECK_GL_ERROR();
 }
 else
@@ -1775,14 +1895,10 @@ DisableAttrib(TexCoord);
 }
 
 // Normal data (only when lighting is active)
-if (mesh->hasVertexNormals && wantLighting)
+if (mesh->hasVertexNormals && (wantLighting || reflection))
 {
 EnableAttrib(Normal);
-#ifdef __EMSCRIPTEN__
 CachedVertexAttrib(gState.loc_a_Normal, cacheEntry, VBO_ATTRIB_NORM, 3);
-#else
-ATTRIB_VBO(gState.loc_a_Normal, VBO_ATTRIB_NORM, 3, mesh, vertexNormals);
-#endif
 }
 else
 {
@@ -1790,16 +1906,14 @@ DisableAttrib(Normal);
 }
 }
 
-static void PrepareOpaqueShading(const MeshQueueEntry* entry)
+static void PrepareOpaqueShading(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry)
 {
 const TQ3TriMeshData* mesh = entry->mesh;
 const uint32_t statusBits  = entry->mods->statusBits;
 TQ3TexturingMode texMode   = (mesh->texturingMode & kQ3TexturingModeExt_OpacityModeMask);
-#ifdef __EMSCRIPTEN__
-const MeshGpuCacheEntry* cacheEntry = GetMeshCacheEntry(mesh);
-#endif
 
 SetFlag(glDepthMask, !(statusBits & STATUS_BIT_NOZWRITE));
+glUniform1f(gState.loc_u_AutoFadeFactor, 1.0f);
 
 bool wantAlphaTest = (texMode == kQ3TexturingModeAlphaTest);
 SetUniformBool(gState.loc_u_AlphaTestEnabled, &gState.alphaTestEnabled, wantAlphaTest);
@@ -1808,11 +1922,7 @@ if (mesh->hasVertexColors)
 {
 SetUniformBool(gState.loc_u_UseVertexColors, &gState.useVertexColors, true);
 EnableAttrib(Color);
-#ifdef __EMSCRIPTEN__
 CachedVertexAttrib(gState.loc_a_Color, cacheEntry, VBO_ATTRIB_COLOR, 4);
-#else
-ATTRIB_VBO(gState.loc_a_Color, VBO_ATTRIB_COLOR, 4, mesh, vertexColors);
-#endif
 }
 else
 {
@@ -1826,7 +1936,7 @@ mesh->diffuseColor.b * entry->mods->diffuseColor.b,
 }
 }
 
-static void PrepareAlphaShading(const MeshQueueEntry* entry)
+static void PrepareAlphaShading(const MeshQueueEntry* entry, const MeshGpuCacheEntry* cacheEntry)
 {
 	const TQ3TriMeshData* mesh = entry->mesh;
 	const uint32_t statusBits  = entry->mods->statusBits;
@@ -1834,6 +1944,7 @@ static void PrepareAlphaShading(const MeshQueueEntry* entry)
 	// In multi-pass rendering, transparent objects should NOT write to depth
 	// to avoid blocking other transparent objects behind them.
 	SetFlag(glDepthMask, false);
+	glUniform1f(gState.loc_u_AutoFadeFactor, entry->mods->autoFadeFactor);
 
 	// Additive blending for glow meshes
 bool wantAdditive = !!(statusBits & STATUS_BIT_GLOW);
@@ -1851,21 +1962,7 @@ if (mesh->hasVertexColors)
 SetUniformBool(gState.loc_u_UseVertexColors, &gState.useVertexColors, true);
 EnableAttrib(Color);
 
-// Bake autoFadeFactor into the per-vertex alpha channel
-GAME_ASSERT(4 * mesh->numPoints <= (int)(sizeof(gBackupVertexColors) / sizeof(gBackupVertexColors[0])));
-int j = 0;
-for (int v = 0; v < mesh->numPoints; v++)
-{
-gBackupVertexColors[j++] = mesh->vertexColors[v].r;
-gBackupVertexColors[j++] = mesh->vertexColors[v].g;
-gBackupVertexColors[j++] = mesh->vertexColors[v].b;
-gBackupVertexColors[j++] = mesh->vertexColors[v].a * entry->mods->autoFadeFactor;
-}
-#ifdef __EMSCRIPTEN__
-VertexAttribVBO(gState.loc_a_Color, VBO_ATTRIB_COLOR, 4, mesh->numPoints, gBackupVertexColors);
-#else
-glVertexAttribPointer(gState.loc_a_Color, 4, GL_FLOAT, GL_FALSE, 0, gBackupVertexColors);
-#endif
+CachedVertexAttrib(gState.loc_a_Color, cacheEntry, VBO_ATTRIB_COLOR, 4);
 }
 else
 {
@@ -1875,12 +1972,14 @@ glUniform4f(gState.loc_u_DiffuseColor,
 mesh->diffuseColor.r * entry->mods->diffuseColor.r,
 mesh->diffuseColor.g * entry->mods->diffuseColor.g,
 mesh->diffuseColor.b * entry->mods->diffuseColor.b,
-mesh->diffuseColor.a * entry->mods->diffuseColor.a * entry->mods->autoFadeFactor);
+mesh->diffuseColor.a * entry->mods->diffuseColor.a);
 }
 }
 
 void Render_ResetColor(void)
 {
+glUniform1f(gState.loc_u_AutoFadeFactor, 1.0f);
+SetUniformBool(gState.loc_u_ReflectionEnabled, &gState.reflectionEnabled, false);
 DisableState(GL_BLEND);
 SetUniformBool(gState.loc_u_AlphaTestEnabled, &gState.alphaTestEnabled, false);
 SetUniformBool(gState.loc_u_LightingEnabled,  &gState.lightingEnabled,  false);

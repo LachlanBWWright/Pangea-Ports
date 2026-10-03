@@ -21,7 +21,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
 
 // #undef the macros so we can call the real GL functions for drawing.
 // Our CompatGL_* implementations set up VBOs and call the real functions
@@ -76,6 +76,26 @@ static int sIdxConvertBufCap = 0;
 
 static GLsizei sVertexCountHint = 0;
 static Boolean sDynamicCacheHint = false;
+
+void CompatGL_ResetDrawCache(void)
+{
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++)
+    {
+        DrawCacheEntry* entry = &sDC[i];
+        glDeleteBuffers(5, entry->vbo);
+        if (entry->ibo)
+            glDeleteBuffers(1, &entry->ibo);
+    }
+    if (sAttrVBO[0])
+        glDeleteBuffers(5, sAttrVBO);
+    if (sIndexIBO)
+        glDeleteBuffers(1, &sIndexIBO);
+    memset(sDC, 0, sizeof(sDC));
+    memset(sAttrVBO, 0, sizeof(sAttrVBO));
+    sIndexIBO = 0;
+    sDCTick = 0;
+    sEnabledAttribMask = 0x1F;
+}
 
 static Boolean ForceCacheMisses(void)
 {
@@ -317,31 +337,9 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
     if (type != GL_UNSIGNED_INT && type != GL_UNSIGNED_SHORT)
         return; // Unsupported index type
 
-    int vertexCount;
-    if (sVertexCountHint > 0)
-    {
-        vertexCount = (int)sVertexCountHint;
-        sVertexCountHint = 0;
-    }
-    else
-    {
-        GLuint maxIdx = 0;
-        gIndexScansThisFrame++;
-        gIndicesScannedThisFrame += count;
-        if (type == GL_UNSIGNED_INT)
-        {
-            const GLuint* idx = (const GLuint*)indices;
-            for (GLsizei i = 0; i < count; i++)
-                if (idx[i] > maxIdx) maxIdx = idx[i];
-        }
-        else
-        {
-            const GLushort* idx = (const GLushort*)indices;
-            for (GLsizei i = 0; i < count; i++)
-                if ((GLuint)idx[i] > maxIdx) maxIdx = idx[i];
-        }
-        vertexCount = (int)maxIdx + 1;
-    }
+    int vertexCount = (int)sVertexCountHint;
+    Boolean hasVertexCountHint = sVertexCountHint > 0;
+    sVertexCountHint = 0;
 
     // ── Determine which attributes are provided ──────────────────────
     Boolean hasPos   = gVertexArrayState.vertexArrayEnabled && gVertexArrayState.vertexPointer;
@@ -381,7 +379,8 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
                 e->color_ptr == colorPtr && e->tc0_ptr == tc0Ptr &&
                 e->tc1_ptr == tc1Ptr && e->idx_ptr == indices &&
                 e->mode == mode && e->first == 0 &&
-                e->vtx_count == vertexCount && e->idx_count == (int)count &&
+                (!hasVertexCountHint || e->vtx_count == vertexCount) &&
+                e->idx_count == (int)count &&
                 e->idx_type == (int)type &&
                 e->attrib_mask == attribMask && e->color_type == colorTypeKey &&
                 e->dynamic == sDynamicCacheHint)
@@ -395,6 +394,7 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
     if (cacheIdx >= 0)
     {
         DrawCacheEntry *e = &sDC[cacheIdx];
+        vertexCount = e->vtx_count;
         e->lru_tick = ++sDCTick;
         gCacheHitsThisFrame++;
 
@@ -431,6 +431,25 @@ void CompatGL_DrawElements(GLenum mode, GLsizei count, GLenum type, const void* 
     }
     else
     {
+        if (!hasVertexCountHint)
+        {
+            GLuint maxIdx = 0;
+            gIndexScansThisFrame++;
+            gIndicesScannedThisFrame += count;
+            if (type == GL_UNSIGNED_INT)
+            {
+                const GLuint* idx = (const GLuint*)indices;
+                for (GLsizei i = 0; i < count; i++)
+                    if (idx[i] > maxIdx) maxIdx = idx[i];
+            }
+            else
+            {
+                const GLushort* idx = (const GLushort*)indices;
+                for (GLsizei i = 0; i < count; i++)
+                    if ((GLuint)idx[i] > maxIdx) maxIdx = idx[i];
+            }
+            vertexCount = (int)maxIdx + 1;
+        }
         gCacheMissesThisFrame++;
         int evict = 0;
         uint64_t oldest = UINT64_MAX;

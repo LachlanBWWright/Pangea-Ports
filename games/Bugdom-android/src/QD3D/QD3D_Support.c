@@ -12,11 +12,6 @@
 
 #include "game.h"
 #include "profiling.h"
-#ifdef __EMSCRIPTEN__
-#include <GLES2/gl2.h>
-#else
-#include <SDL3/SDL_opengl.h>
-#endif
 
 
 /****************************/

@@ -439,14 +439,13 @@ if(EMSCRIPTEN)
 	set_target_properties(${GAME_TARGET} PROPERTIES SUFFIX ".html")
 
 	target_link_options(${GAME_TARGET} PRIVATE
-		# Full OpenGL ES 2.0 emulation via our custom compat layer (modern_gl.c,
+		# Legacy draw-call emulation via our custom compat layer (modern_gl.c,
 		# vertex_array_compat.c, state_compat.c) instead of LEGACY_GL_EMULATION.
 		# LEGACY_GL_EMULATION has vertex-positioning bugs in Emscripten 3.x.
 		-sFULL_ES2=1
-		# WebGL 2 for better compatibility; UNSIGNED_INT index buffers are natively
-		# supported in WebGL 2 (no OES_element_index_uint extension needed).
+		# GLSL ES 3.00 and vertex array objects require WebGL 2.
 		-sMAX_WEBGL_VERSION=2
-		-sMIN_WEBGL_VERSION=1
+		-sMIN_WEBGL_VERSION=2
 		# Asyncify: allows blocking C loops (game main loop, SDL_Delay, etc.)
 		# to yield to the browser event loop so frames can be composited.
 		-sASYNCIFY=1

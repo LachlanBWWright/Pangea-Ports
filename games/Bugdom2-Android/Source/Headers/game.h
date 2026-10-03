@@ -4,12 +4,7 @@
 #include "Pomme.h"
 #include <SDL3/SDL.h>
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #include "gles3compat.h"
-#else
-#include <SDL3/SDL_opengl.h>
-#include <SDL3/SDL_opengl_glext.h>
-#endif
 #include <stdint.h>
 
 #ifndef PANGEA_ENABLE_SCRIPTING

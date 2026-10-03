@@ -1,13 +1,26 @@
 // GLES3Compat.c
 // GLES3/WebGL2 compatibility layer – replaces legacy OpenGL 1.x calls.
-// Compiled for Emscripten/WebAssembly and Android GLES builds.
-
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+// Shared by the desktop core, Android GLES3, and WebGL2 builds.
 
 // Include the native GLES3 headers BEFORE gles3compat.h so that our
 // GLES3_* wrapper functions can call the real GL entry points without
 // being caught by the macros we define in gles3compat.h.
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #include <GLES3/gl3.h>
+#define B2_GLSL_VERSION "#version 300 es\n"
+#define B2_FRAGMENT_PRECISION "precision highp float;\n"
+#else
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_opengl.h>
+#include <SDL3/SDL_opengl_glext.h>
+#define B2_GLSL_VERSION "#version 330 core\n"
+#define B2_FRAGMENT_PRECISION ""
+#endif
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#define B2_GL_APIENTRY
+#else
+#define B2_GL_APIENTRY APIENTRY
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -22,6 +35,107 @@
 #include <stddef.h>   // offsetof
 #include <stdio.h>    // printf fallback
 #include "../Headers/profiling.h"
+
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+#define B2_DESKTOP_GL_PROCS(X) \
+    X(PFNGLACTIVETEXTUREPROC, glActiveTexture) \
+    X(PFNGLATTACHSHADERPROC, glAttachShader) \
+    X(PFNGLBINDBUFFERPROC, glBindBuffer) \
+    X(PFNGLBINDFRAMEBUFFERPROC, glBindFramebuffer) \
+    X(PFNGLBINDVERTEXARRAYPROC, glBindVertexArray) \
+    X(PFNGLBLITFRAMEBUFFERPROC, glBlitFramebuffer) \
+    X(PFNGLBUFFERDATAPROC, glBufferData) \
+    X(PFNGLBUFFERSUBDATAPROC, glBufferSubData) \
+    X(PFNGLCHECKFRAMEBUFFERSTATUSPROC, glCheckFramebufferStatus) \
+    X(PFNGLCOMPILESHADERPROC, glCompileShader) \
+    X(PFNGLCREATEPROGRAMPROC, glCreateProgram) \
+    X(PFNGLCREATESHADERPROC, glCreateShader) \
+    X(PFNGLDELETEBUFFERSPROC, glDeleteBuffers) \
+    X(PFNGLDELETEFRAMEBUFFERSPROC, glDeleteFramebuffers) \
+    X(PFNGLDELETEPROGRAMPROC, glDeleteProgram) \
+    X(PFNGLDELETESHADERPROC, glDeleteShader) \
+    X(PFNGLDELETEVERTEXARRAYSPROC, glDeleteVertexArrays) \
+    X(PFNGLDISABLEVERTEXATTRIBARRAYPROC, glDisableVertexAttribArray) \
+    X(PFNGLDRAWBUFFERSPROC, glDrawBuffers) \
+    X(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray) \
+    X(PFNGLFRAMEBUFFERTEXTURE2DPROC, glFramebufferTexture2D) \
+    X(PFNGLGENBUFFERSPROC, glGenBuffers) \
+    X(PFNGLGENFRAMEBUFFERSPROC, glGenFramebuffers) \
+    X(PFNGLGENVERTEXARRAYSPROC, glGenVertexArrays) \
+    X(PFNGLGETPROGRAMINFOLOGPROC, glGetProgramInfoLog) \
+    X(PFNGLGETPROGRAMIVPROC, glGetProgramiv) \
+    X(PFNGLGETSHADERINFOLOGPROC, glGetShaderInfoLog) \
+    X(PFNGLGETSHADERIVPROC, glGetShaderiv) \
+    X(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation) \
+    X(PFNGLLINKPROGRAMPROC, glLinkProgram) \
+    X(PFNGLSHADERSOURCEPROC, glShaderSource) \
+    X(PFNGLUNIFORM1FPROC, glUniform1f) \
+    X(PFNGLUNIFORM1IPROC, glUniform1i) \
+    X(PFNGLUNIFORM3FVPROC, glUniform3fv) \
+    X(PFNGLUNIFORM4FVPROC, glUniform4fv) \
+    X(PFNGLUNIFORMMATRIX4FVPROC, glUniformMatrix4fv) \
+    X(PFNGLUSEPROGRAMPROC, glUseProgram) \
+    X(PFNGLVERTEXATTRIB2FPROC, glVertexAttrib2f) \
+    X(PFNGLVERTEXATTRIB3FPROC, glVertexAttrib3f) \
+    X(PFNGLVERTEXATTRIB4FPROC, glVertexAttrib4f) \
+    X(PFNGLVERTEXATTRIBPOINTERPROC, glVertexAttribPointer)
+
+#define B2_DECLARE_GL_PROC(type, name) static type b2_##name;
+B2_DESKTOP_GL_PROCS(B2_DECLARE_GL_PROC)
+#undef B2_DECLARE_GL_PROC
+
+static bool LoadDesktopGL(void)
+{
+#define B2_LOAD_GL_PROC(type, name) \
+    b2_##name = (type) SDL_GL_GetProcAddress(#name); \
+    if (!b2_##name) { fprintf(stderr, "Missing OpenGL 3.3 function: %s\n", #name); return false; }
+    B2_DESKTOP_GL_PROCS(B2_LOAD_GL_PROC)
+#undef B2_LOAD_GL_PROC
+    return true;
+}
+
+#define glActiveTexture b2_glActiveTexture
+#define glAttachShader b2_glAttachShader
+#define glBindBuffer b2_glBindBuffer
+#define glBindFramebuffer b2_glBindFramebuffer
+#define glBindVertexArray b2_glBindVertexArray
+#define glBlitFramebuffer b2_glBlitFramebuffer
+#define glBufferData b2_glBufferData
+#define glBufferSubData b2_glBufferSubData
+#define glCheckFramebufferStatus b2_glCheckFramebufferStatus
+#define glCompileShader b2_glCompileShader
+#define glCreateProgram b2_glCreateProgram
+#define glCreateShader b2_glCreateShader
+#define glDeleteBuffers b2_glDeleteBuffers
+#define glDeleteFramebuffers b2_glDeleteFramebuffers
+#define glDeleteProgram b2_glDeleteProgram
+#define glDeleteShader b2_glDeleteShader
+#define glDeleteVertexArrays b2_glDeleteVertexArrays
+#define glDisableVertexAttribArray b2_glDisableVertexAttribArray
+#define glDrawBuffers b2_glDrawBuffers
+#define glEnableVertexAttribArray b2_glEnableVertexAttribArray
+#define glFramebufferTexture2D b2_glFramebufferTexture2D
+#define glGenBuffers b2_glGenBuffers
+#define glGenFramebuffers b2_glGenFramebuffers
+#define glGenVertexArrays b2_glGenVertexArrays
+#define glGetProgramInfoLog b2_glGetProgramInfoLog
+#define glGetProgramiv b2_glGetProgramiv
+#define glGetShaderInfoLog b2_glGetShaderInfoLog
+#define glGetShaderiv b2_glGetShaderiv
+#define glGetUniformLocation b2_glGetUniformLocation
+#define glLinkProgram b2_glLinkProgram
+#define glShaderSource b2_glShaderSource
+#define glUniform1f b2_glUniform1f
+#define glUniform1i b2_glUniform1i
+#define glUniform3fv b2_glUniform3fv
+#define glUniform4fv b2_glUniform4fv
+#define glUniformMatrix4fv b2_glUniformMatrix4fv
+#define glUseProgram b2_glUseProgram
+#define glVertexAttrib2f b2_glVertexAttrib2f
+#define glVertexAttrib3f b2_glVertexAttrib3f
+#define glVertexAttrib4f b2_glVertexAttrib4f
+#define glVertexAttribPointer b2_glVertexAttribPointer
+#endif
 
 // Pull in our own constant/type definitions without the macros
 // (gles3compat.h is NOT included here; this file is the implementation
@@ -80,7 +194,7 @@
 //=============================================================
 
 static const char* kVertSrc =
-"#version 300 es\n"
+B2_GLSL_VERSION
 "uniform mat4 u_proj;\n"
 "uniform mat4 u_mv;\n"
 "uniform mat4 u_texMatrix;\n"
@@ -135,9 +249,14 @@ static const char* kVertSrc =
 "}\n";
 
 static const char* kFragSrc =
-"#version 300 es\n"
-"precision mediump float;\n"
+B2_GLSL_VERSION
+B2_FRAGMENT_PRECISION
 "uniform sampler2D u_tex;\n"
+"uniform sampler2D u_sceneDepth;\n"
+"uniform bool u_softParticle;\n"
+"uniform float u_nearPlane;\n"
+"uniform float u_farPlane;\n"
+"uniform float u_featherDistance;\n"
 "uniform bool u_useTex;\n"
 "uniform vec4 u_fogColor;\n"
 "uniform bool u_alphaTest;\n"
@@ -168,6 +287,12 @@ static const char* kFragSrc =
 "    if(c.a==0.0) discard;\n"
 "  }\n"
 "  c.rgb=mix(u_fogColor.rgb,c.rgb,v_fog);\n"
+"  if(u_softParticle){\n"
+"    float sceneZ=texelFetch(u_sceneDepth,ivec2(gl_FragCoord.xy),0).r;\n"
+"    float sceneDistance=(u_nearPlane*u_farPlane)/(u_farPlane-sceneZ*(u_farPlane-u_nearPlane));\n"
+"    float particleDistance=(u_nearPlane*u_farPlane)/(u_farPlane-gl_FragCoord.z*(u_farPlane-u_nearPlane));\n"
+"    c.a*=clamp((sceneDistance-particleDistance)/u_featherDistance,0.0,1.0);\n"
+"  }\n"
 "  fragColor=c;\n"
 "}\n";
 
@@ -188,6 +313,14 @@ static size_t gArrayEBOSize = 0;
 static GLint uProj, uMV, uTexMatrix, uLighting, uAmbient, uNLights;
 static GLint uLightDir[4], uLightDiff[4];
 static GLint uFog, uFogMode, uFogDensity, uFogStart, uFogEnd, uFogColor;
+static GLint uSceneDepth, uSoftParticle, uNearPlane, uFarPlane, uFeatherDistance;
+static GLuint gSceneDepthTexture = 0;
+static GLuint gSceneDepthFBO = 0;
+static GLsizei gSceneDepthWidth = 0;
+static GLsizei gSceneDepthHeight = 0;
+static bool gSceneDepthAvailable = true;
+static bool gSoftParticleActive = false;
+static GLint gPreviousSceneDepthBinding = 0;
 static GLint uUseTex, uTex;
 static GLint uAlphaTest, uAlphaFunc, uAlphaRef;
 
@@ -559,6 +692,10 @@ void GLES3_SetVertexCount(GLsizei n)
 
 void GLES3Compat_Init(void)
 {
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+    if (!LoadDesktopGL())
+        abort();
+#endif
     // Compile shaders
     GLuint vs = CompileShader(GL_VERTEX_SHADER,   kVertSrc);
     GLuint fs = CompileShader(GL_FRAGMENT_SHADER, kFragSrc);
@@ -605,6 +742,11 @@ void GLES3Compat_Init(void)
     uAlphaTest   = glGetUniformLocation(gProgram, "u_alphaTest");
     uAlphaFunc   = glGetUniformLocation(gProgram, "u_alphaFunc");
     uAlphaRef    = glGetUniformLocation(gProgram, "u_alphaRef");
+    uSceneDepth = glGetUniformLocation(gProgram, "u_sceneDepth");
+    uSoftParticle = glGetUniformLocation(gProgram, "u_softParticle");
+    uNearPlane = glGetUniformLocation(gProgram, "u_nearPlane");
+    uFarPlane = glGetUniformLocation(gProgram, "u_farPlane");
+    uFeatherDistance = glGetUniformLocation(gProgram, "u_featherDistance");
 
     // Create VAO and immediate-mode VBO
     glGenVertexArrays(1, &gVAO);
@@ -619,6 +761,173 @@ void GLES3Compat_Init(void)
 
     glUseProgram(gProgram);
     glBindVertexArray(gVAO);
+    glUniform1i(uSceneDepth, 2);
+    glUniform1i(uSoftParticle, 0);
+}
+
+static void DeleteSceneDepth(void)
+{
+    if (gSceneDepthFBO)
+        glDeleteFramebuffers(1, &gSceneDepthFBO);
+    if (gSceneDepthTexture)
+        glDeleteTextures(1, &gSceneDepthTexture);
+    gSceneDepthFBO = 0;
+    gSceneDepthTexture = 0;
+    gSceneDepthWidth = 0;
+    gSceneDepthHeight = 0;
+}
+
+void GLES3Compat_Dispose(void)
+{
+    DeleteSceneDepth();
+    for (int i = 0; i < B2_DRAW_CACHE_SIZE; i++)
+    {
+        B2DrawCacheEntry* entry = &sB2DC[i];
+        if (entry->vao)
+            glDeleteVertexArrays(1, &entry->vao);
+        if (entry->vbo[0])
+            glDeleteBuffers(4, entry->vbo);
+        if (entry->ebo)
+            glDeleteBuffers(1, &entry->ebo);
+    }
+    memset(sB2DC, 0, sizeof(sB2DC));
+    sB2DCTick = 0;
+    if (gVAO)
+        glDeleteVertexArrays(1, &gVAO);
+    if (gImmVBO)
+        glDeleteBuffers(1, &gImmVBO);
+    if (gArrayVBO)
+        glDeleteBuffers(1, &gArrayVBO);
+    if (gArrayEBO)
+        glDeleteBuffers(1, &gArrayEBO);
+    gVAO = gImmVBO = gArrayVBO = gArrayEBO = 0;
+    gImmVBOSize = gArrayVBOSize = gArrayEBOSize = 0;
+    if (gProgram)
+        glDeleteProgram(gProgram);
+    gProgram = 0;
+    gUniformDirty = B2_UDIRTY_ALL;
+    gBlendEnabled = false;
+    gCullFaceEnabled = false;
+    gDepthTestEnabled = false;
+    gDepthWriteEnabled = true;
+    gSceneDepthAvailable = true;
+    gSoftParticleActive = false;
+}
+
+static bool CreateSceneDepth(GLsizei width, GLsizei height)
+{
+    GLint depthBits = 0;
+    GLint stencilBits = 0;
+    GLint oldActiveTexture = 0;
+    GLint oldTexture = 0;
+    GLint oldDrawFBO = 0;
+    GLint oldReadFBO = 0;
+    glGetIntegerv(GL_DEPTH_BITS, &depthBits);
+    glGetIntegerv(GL_STENCIL_BITS, &stencilBits);
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &oldActiveTexture);
+    glActiveTexture(GL_TEXTURE2);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldTexture);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &oldDrawFBO);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &oldReadFBO);
+
+    DeleteSceneDepth();
+    glGenTextures(1, &gSceneDepthTexture);
+    glBindTexture(GL_TEXTURE_2D, gSceneDepthTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    bool packedDepth = depthBits >= 24 && stencilBits >= 8;
+    GLenum format = packedDepth ? GL_DEPTH24_STENCIL8 :
+                    depthBits >= 24 ? GL_DEPTH_COMPONENT24 : GL_DEPTH_COMPONENT16;
+    GLenum sourceFormat = packedDepth ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT;
+    GLenum sourceType = packedDepth ? GL_UNSIGNED_INT_24_8 :
+                        depthBits >= 24 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0,
+                 sourceFormat, sourceType, NULL);
+    glGenFramebuffers(1, &gSceneDepthFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, gSceneDepthFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           packedDepth ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT,
+                           GL_TEXTURE_2D, gSceneDepthTexture, 0);
+    GLenum none = GL_NONE;
+    glDrawBuffers(1, &none);
+    glReadBuffer(GL_NONE);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    GLenum error = glGetError();
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint) oldDrawFBO);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) oldReadFBO);
+    glBindTexture(GL_TEXTURE_2D, (GLuint) oldTexture);
+    glActiveTexture((GLenum) oldActiveTexture);
+    if (status != GL_FRAMEBUFFER_COMPLETE || error != GL_NO_ERROR)
+    {
+        fprintf(stderr, "Scene depth framebuffer unavailable: status 0x%x, error 0x%x\n", status, error);
+        DeleteSceneDepth();
+        return false;
+    }
+    gSceneDepthWidth = width;
+    gSceneDepthHeight = height;
+    return true;
+}
+
+bool GLES3_BeginSoftParticles(GLsizei width, GLsizei height, float nearPlane, float farPlane)
+{
+    const char* setting = getenv("PANGEA_SOFT_PARTICLES");
+    if ((setting && setting[0] == '0') || !gSceneDepthAvailable ||
+        width <= 0 || height <= 0 || nearPlane <= 0 || farPlane <= nearPlane)
+        return false;
+
+    if ((gSceneDepthWidth != width || gSceneDepthHeight != height) &&
+        !CreateSceneDepth(width, height))
+    {
+        gSceneDepthAvailable = false;
+        return false;
+    }
+
+    GLint oldDrawFBO = 0;
+    GLint oldReadFBO = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &oldDrawFBO);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &oldReadFBO);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) oldDrawFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gSceneDepthFBO);
+    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
+                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    GLenum error = glGetError();
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint) oldDrawFBO);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint) oldReadFBO);
+    if (error != GL_NO_ERROR)
+    {
+        fprintf(stderr, "Scene depth copy unavailable: GL error 0x%x\n", error);
+        gSceneDepthAvailable = false;
+        return false;
+    }
+
+    GLint oldActiveTexture = 0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &oldActiveTexture);
+    glActiveTexture(GL_TEXTURE2);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &gPreviousSceneDepthBinding);
+    glBindTexture(GL_TEXTURE_2D, gSceneDepthTexture);
+    glActiveTexture((GLenum) oldActiveTexture);
+    glUniform1f(uNearPlane, nearPlane);
+    glUniform1f(uFarPlane, farPlane);
+    glUniform1f(uFeatherDistance, 40.0f);
+    glUniform1i(uSoftParticle, 1);
+    gSoftParticleActive = true;
+    return true;
+}
+
+void GLES3_EndSoftParticles(void)
+{
+    if (!gSoftParticleActive)
+        return;
+    glUniform1i(uSoftParticle, 0);
+    GLint oldActiveTexture = 0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &oldActiveTexture);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, (GLuint) gPreviousSceneDepthBinding);
+    glActiveTexture((GLenum) oldActiveTexture);
+    gSoftParticleActive = false;
 }
 
 //=============================================================
@@ -829,7 +1138,7 @@ void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const void* ptr)
         gTexcArrayPtr = ptr;
 }
 
-void glClientActiveTexture(GLenum texture)
+void B2_GL_APIENTRY glClientActiveTexture(GLenum texture)
 {
     gClientActiveUnit = (texture == 0x84C0) ? 0 : 1;  // GL_TEXTURE0 = 0x84C0
 }
@@ -1461,5 +1770,3 @@ void glEnd(void)
 
     gIMCount = 0;
 }
-
-#endif  // __EMSCRIPTEN__

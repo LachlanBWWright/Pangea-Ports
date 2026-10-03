@@ -25,13 +25,6 @@
 static PFNGLACTIVETEXTUREPROC gGlActiveTextureProc;
 #define glActiveTexture gGlActiveTextureProc
 
-#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
-// glClientActiveTexture is a GLES1/OpenGL 1.3 function that doesn't exist in
-// GLES2/WebGL. On non-Emscripten platforms we look it up via GetProcAddress.
-// On Emscripten the call is handled by our gl_compat.h compatibility layer.
-static PFNGLCLIENTACTIVETEXTUREARBPROC gGlClientActiveTextureProc;
-#define glClientActiveTexture gGlClientActiveTextureProc
-#endif
 
 static void OGL_CreateDrawContext(void);
 static void OGL_DisposeDrawContext(void);
@@ -398,6 +391,8 @@ GLint			maxTexSize;
 			sdlError && sdlError[0] ? sdlError : "(no SDL error)");
 	}
 
+	SDL_Log("OpenGL context: %s; GLSL: %s", glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
+
 	GAME_ASSERT(glGetError() == GL_NO_ERROR);
 
 			/* ENABLE VSYNC */
@@ -432,15 +427,8 @@ GLint			maxTexSize;
 	gGlActiveTextureProc = (PFNGLACTIVETEXTUREPROC) SDL_GL_GetProcAddress("glActiveTexture");
 	GAME_ASSERT(gGlActiveTextureProc);
 
-#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
-	gGlClientActiveTextureProc = (PFNGLCLIENTACTIVETEXTUREARBPROC) SDL_GL_GetProcAddress("glClientActiveTexture");
-	GAME_ASSERT(gGlClientActiveTextureProc);
-#endif
-
-#ifdef __EMSCRIPTEN__
-	// Initialise the GLES2 fixed-function compatibility layer (shaders, VBOs, etc.)
+	// Initialise the shader-based fixed-function compatibility layer.
 	COMPAT_GL_Init();
-#endif
 }
 
 /**************** OGL: NUKE DRAW CONTEXT *********************/
@@ -455,6 +443,8 @@ static void OGL_DisposeDrawContext(void)
 	{
 		return;
 	}
+
+	COMPAT_GL_Shutdown();
 
 	SDL_GL_MakeCurrent(gSDLWindow, NULL);		// make context not current
 	SDL_GL_DestroyContext(gAGLContext);			// nuke context
@@ -750,7 +740,7 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	gGlobalTransparency = 1.0f;
 	OGL_SetColor4f(1,1,1,1);
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 	// Reset per-frame GL counters (draw calls, cache hits/misses, bytes uploaded)
 	ResetGLCounters();
 #endif
@@ -1131,7 +1121,7 @@ do_anaglyph:
 
 static void DrawBlueLine(GLint window_width, GLint window_height)
 {
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	OGL_PushState();
 
 	glDisable(GL_ALPHA_TEST);
 	glDisable(GL_BLEND);
@@ -1150,7 +1140,6 @@ static void DrawBlueLine(GLint window_width, GLint window_height)
 
 	for (GLenum buffer = GL_BACK_LEFT; buffer <= GL_BACK_RIGHT; buffer++)
 	{
-		GLint matrixMode;
 		GLint vp[4];
 
 		glDrawBuffer(buffer);
@@ -1158,7 +1147,6 @@ static void DrawBlueLine(GLint window_width, GLint window_height)
 		glGetIntegerv(GL_VIEWPORT, vp);
 		glViewport(0, 0, window_width, window_height);
 
-		glGetIntegerv(GL_MATRIX_MODE, &matrixMode);
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		glLoadIdentity();
@@ -1187,11 +1175,11 @@ static void DrawBlueLine(GLint window_width, GLint window_height)
 		glPopMatrix();
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
-		glMatrixMode(matrixMode);
+		glMatrixMode(GL_MODELVIEW);
 
 		glViewport(vp[0], vp[1], vp[2], vp[3]);
 	}
-	glPopAttrib();
+	OGL_PopState();
 
 	if (OGL_CheckError())
 		DoFatalAlert("DrawBlueLine failed");

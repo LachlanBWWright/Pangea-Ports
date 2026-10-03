@@ -1,10 +1,9 @@
-// gl_compat.h – OpenGL fixed-function compatibility layer for Emscripten/WebGL.
+// gl_compat.h – fixed-function compatibility over desktop GL 3.3 and GLES 3.
 //
 // This file provides software implementations of the OpenGL 1.x/2.x
-// fixed-function pipeline API that does not exist in OpenGL ES 2.0 / WebGL.
-// It is included ONLY for __EMSCRIPTEN__ builds.
+// fixed-function pipeline API that does not exist in core GL, GLES 3, or WebGL 2.
 //
-// Approach: a single GLSL ES 1.00 shader program implements the fixed-function
+// A GLSL 330/ES 300 shader program implements the fixed-function
 // pipeline (lighting, fog, texenv, alpha-test).  The classic client-state
 // vertex-array calls (glVertexPointer, glNormalPointer, …, glDrawElements)
 // are intercepted and redirected through VBOs + vertex attributes.  Immediate-
@@ -14,7 +13,16 @@
 
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
-#include <SDL3/SDL_opengles2.h>   // GLES2 types and real function declarations
+#include <GLES3/gl3.h>
+typedef double GLdouble;
+#else
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES 1
+#endif
+#include <SDL3/SDL_opengl.h>
+#include <SDL3/SDL_opengl_glext.h>
+#include "modern_gl.h"
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -99,6 +107,9 @@ extern "C" {
 
 // Pixel format constants (GL 1.x, not in GLES2)
 #define GL_BGRA                         0x80E1
+#ifndef GL_BGRA_EXT
+#define GL_BGRA_EXT                     0x80E1
+#endif
 #define GL_UNSIGNED_INT_8_8_8_8         0x8035
 #define GL_UNSIGNED_INT_8_8_8_8_REV     0x8367
 #define GL_UNSIGNED_SHORT_1_5_5_5_REV   0x8366
@@ -123,7 +134,9 @@ extern "C" {
 #define GL_LINE_SMOOTH                  0x0B20
 #define GL_LINE_STIPPLE                 0x0B24
 #define GL_TEXTURE_1D                   0x0DE0
+#ifndef GL_ALL_ATTRIB_BITS
 #define GL_ALL_ATTRIB_BITS              0xFFFFFFFF
+#endif
 
 #define GL_BACK_LEFT                    0x0402
 #define GL_BACK_RIGHT                   0x0403
@@ -152,10 +165,79 @@ extern "C" {
 #undef glHint
 #undef glIsEnabled
 
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+// Desktop GL headers mark legacy entry points as imported on Windows.
+// Give the compatibility implementations distinct names on every desktop ABI.
+#define glMatrixMode COMPAT_GL_MatrixMode
+#define glLoadIdentity COMPAT_GL_LoadIdentity
+#define glLoadMatrixf COMPAT_GL_LoadMatrixf
+#define glMultMatrixf COMPAT_GL_MultMatrixf
+#define glPushMatrix COMPAT_GL_PushMatrix
+#define glPopMatrix COMPAT_GL_PopMatrix
+#define glTranslatef COMPAT_GL_Translatef
+#define glScalef COMPAT_GL_Scalef
+#define glRotatef COMPAT_GL_Rotatef
+#define glOrtho COMPAT_GL_Ortho
+#define glFrustum COMPAT_GL_Frustum
+#define glGetFloatv COMPAT_GL_GetFloatv
+#define glGetDoublev COMPAT_GL_GetDoublev
+#define glEnable COMPAT_GL_Enable
+#define glDisable COMPAT_GL_Disable
+#define glLightfv COMPAT_GL_Lightfv
+#define glLightModelfv COMPAT_GL_LightModelfv
+#define glLightModeli COMPAT_GL_LightModeli
+#define glMaterialfv COMPAT_GL_Materialfv
+#define glColorMaterial COMPAT_GL_ColorMaterial
+#define glFogi COMPAT_GL_Fogi
+#define glFogf COMPAT_GL_Fogf
+#define glFogfv COMPAT_GL_Fogfv
+#define glAlphaFunc COMPAT_GL_AlphaFunc
+#define glTexEnvi COMPAT_GL_TexEnvi
+#define glTexGeni COMPAT_GL_TexGeni
+#define glColor4f COMPAT_GL_Color4f
+#define glColor4fv COMPAT_GL_Color4fv
+#define glNormal3f COMPAT_GL_Normal3f
+#define glEnableClientState COMPAT_GL_EnableClientState
+#define glDisableClientState COMPAT_GL_DisableClientState
+#define glClientActiveTexture COMPAT_GL_ClientActiveTexture
+#define glVertexPointer COMPAT_GL_VertexPointer
+#define glNormalPointer COMPAT_GL_NormalPointer
+#define glColorPointer COMPAT_GL_ColorPointer
+#define glTexCoordPointer COMPAT_GL_TexCoordPointer
+#define glDrawElements COMPAT_GL_DrawElements
+#define glDrawArrays COMPAT_GL_DrawArrays
+#define glBegin COMPAT_GL_Begin
+#define glTexCoord2f COMPAT_GL_TexCoord2f
+#define glTexCoord2fv COMPAT_GL_TexCoord2fv
+#define glVertex2f COMPAT_GL_Vertex2f
+#define glVertex3f COMPAT_GL_Vertex3f
+#define glVertex3fv COMPAT_GL_Vertex3fv
+#define glEnd COMPAT_GL_End
+#define glPolygonMode COMPAT_GL_PolygonMode
+#define glPushAttrib COMPAT_GL_PushAttrib
+#define glPopAttrib COMPAT_GL_PopAttrib
+#define glDrawBuffer COMPAT_GL_DrawBuffer
+#define glHint COMPAT_GL_Hint
+#define glIsEnabled COMPAT_GL_IsEnabled
+#define glGenFencesAPPLE COMPAT_GL_GenFencesAPPLE
+#define glDeleteFencesAPPLE COMPAT_GL_DeleteFencesAPPLE
+#define glSetFenceAPPLE COMPAT_GL_SetFenceAPPLE
+#define glFinishFenceAPPLE COMPAT_GL_FinishFenceAPPLE
+#define glTestFenceAPPLE COMPAT_GL_TestFenceAPPLE
+#define glIsFenceNV COMPAT_GL_IsFenceNV
+#define glGenVertexArraysAPPLE COMPAT_GL_GenVertexArraysAPPLE
+#define glBindVertexArrayAPPLE COMPAT_GL_BindVertexArrayAPPLE
+#define glFlushVertexArrayRangeAPPLE COMPAT_GL_FlushVertexArrayRangeAPPLE
+#define glVertexArrayRangeAPPLE COMPAT_GL_VertexArrayRangeAPPLE
+#define glVertexArrayParameteriAPPLE COMPAT_GL_VertexArrayParameteriAPPLE
+#endif
+
 // ── Compatibility function declarations ──────────────────────────────────────
 
 // Init – must be called once after OpenGL context creation
 void COMPAT_GL_Init(void);
+void COMPAT_GL_SetSoftParticleDepth(GLuint depthTexture, int width, int height);
+void COMPAT_GL_SetSoftParticle(bool enabled);
 
 // Matrix stack
 void glMatrixMode(GLenum mode);
@@ -254,18 +336,3 @@ void glGetDoublev_stub(GLenum pname, GLdouble *params);
 #ifdef __cplusplus
 } // extern "C"
 #endif
-
-#else
-
-static inline void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, const void *indices, int vertex_count)
-{
-	(void) vertex_count;
-	glDrawElements(mode, count, type, indices);
-}
-
-static inline void COMPAT_GL_InvalidateCachePtr(const void *ptr)
-{
-	(void) ptr;
-}
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

@@ -855,7 +855,7 @@ OGLVector3D			*vertexNormals;
 	 * When a slot is freed and reused for a different map location, BuildTerrainSuperTile
 	 * writes entirely new geometry into the SAME memory addresses.  Without invalidation
 	 * the draw cache would find the old stale VBO data and render the wrong terrain tile. */
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 	COMPAT_GL_InvalidateCachePtr(meshData->points);
 	COMPAT_GL_InvalidateCachePtr(meshData->normals);
 	COMPAT_GL_InvalidateCachePtr(meshData->colorsFloat);
@@ -1731,8 +1731,6 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
-
 
 
 

@@ -925,8 +925,8 @@ void MakeObjectTransparent(ObjNode *theNode, float transPercent)
 
 void DrawCollisionBoxes(const ObjNode* theNode)
 {
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-	// glBegin/glEnd not available in WebGL/GLES; skip debug collision box drawing.
+#if 1
+	// Immediate-mode debug drawing is unavailable in the core renderer.
 	(void)theNode;
 #else
 int	n,i;

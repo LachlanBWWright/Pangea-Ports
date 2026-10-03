@@ -10,10 +10,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include <GLES2/gl2.h>
-#ifdef __EMSCRIPTEN__
-#include <emscripten/html5.h>
-#endif
+#include <GLES3/gl3.h>
 
 // IMPORTANT: #undef macros that redirect to the compat layer, so this file
 // can call the REAL GLES2 functions.  Without this, ModernGL_DrawGeometry
@@ -41,6 +38,9 @@ static int gUploadBufferCapacity = 0; // capacity in floats
 // glGenBuffers / glDeleteBuffers which stall the GPU pipeline.
 static ModernGLGeometry* gImmScratch = NULL;
 static int gImmScratchCapacity = 0;
+static int gImmScratchBufferCapacity = 0;
+static GLuint gDrawVAO = 0;
+static GLuint gCurrentProgram = 0;
 
 /****************************/
 /*    SHADER SOURCE         */
@@ -48,12 +48,12 @@ static int gImmScratchCapacity = 0;
 
 // Vertex shader source (embedded)
 static const char* gVertexShaderSource =
-"precision highp float;\nprecision mediump int;\n"
-"attribute vec3 aPosition;\n"
-"attribute vec3 aNormal;\n"
-"attribute vec4 aColor;\n"
-"attribute vec2 aTexCoord0;\n"
-"attribute vec2 aTexCoord1;\n"
+"#version 300 es\nprecision highp float;\nprecision mediump int;\n"
+"in vec3 aPosition;\n"
+"in vec3 aNormal;\n"
+"in vec4 aColor;\n"
+"in vec2 aTexCoord0;\n"
+"in vec2 aTexCoord1;\n"
 "uniform mat4 uMVPMatrix;\n"
 "uniform mat4 uModelViewMatrix;\n"
 "uniform mediump mat3 uNormalMatrix;\n"
@@ -73,11 +73,11 @@ static const char* gVertexShaderSource =
 "uniform int uUseTexture0;\n"
 "uniform int uUseTexture1;\n"
 "uniform mat4 uTextureMatrix;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
+"out vec4 vColor;\n"
+"out vec2 vTexCoord0;\n"
+"out vec2 vTexCoord1;\n"
+"out float vFogFactor;\n"
+"out vec3 vNormal;\n"
 "void main() {\n"
 "    gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n"
 "    vec4 viewPos = uModelViewMatrix * vec4(aPosition, 1.0);\n"
@@ -124,7 +124,7 @@ static const char* gVertexShaderSource =
 
 // Fragment shader source (embedded)
 static const char* gFragmentShaderSource =
-"precision mediump float;\nprecision mediump int;\n"
+"#version 300 es\nprecision highp float;\nprecision mediump int;\n"
 "uniform sampler2D uTexture0;\n"
 "uniform sampler2D uTexture1;\n"
 // Use int instead of bool for GLSL ES 1.0 compatibility
@@ -141,15 +141,26 @@ static const char* gFragmentShaderSource =
 "uniform float uAlphaRef;\n"
 "uniform float uGlobalTransparency;\n"
 "uniform vec3 uGlobalColorFilter;\n"
-"varying vec4 vColor;\n"
-"varying vec2 vTexCoord0;\n"
-"varying vec2 vTexCoord1;\n"
-"varying float vFogFactor;\n"
-"varying vec3 vNormal;\n"
+"uniform sampler2D uSceneDepth;\n"
+"uniform int uSoftParticle;\n"
+"uniform vec2 uDepthSize;\n"
+"uniform vec2 uDepthRange;\n"
+"uniform float uFeatherDistance;\n"
+"in vec4 vColor;\n"
+"in vec2 vTexCoord0;\n"
+"in vec2 vTexCoord1;\n"
+"in float vFogFactor;\n"
+"in vec3 vNormal;\n"
+"out vec4 fragColor;\n"
+"float linearDepth(float depth) {\n"
+"    float nearPlane = uDepthRange.x;\n"
+"    float farPlane = uDepthRange.y;\n"
+"    return (nearPlane * farPlane) / (farPlane - depth * (farPlane - nearPlane));\n"
+"}\n"
 "void main() {\n"
 "    vec4 color = vColor;\n"
 "    if (uUseTexture0 != 0) {\n"
-"        vec4 texColor = texture2D(uTexture0, vTexCoord0);\n"
+"        vec4 texColor = texture(uTexture0, vTexCoord0);\n"
 "        color *= texColor;\n"
 "    }\n"
 "    if (uUseTexture1 != 0) {\n"
@@ -158,7 +169,7 @@ static const char* gFragmentShaderSource =
 "            vec3 viewNormal = normalize(vNormal);\n"
 "            texCoord1 = viewNormal.xy * 0.5 + 0.5;\n"
 "        }\n"
-"        vec4 texColor1 = texture2D(uTexture1, texCoord1);\n"
+"        vec4 texColor1 = texture(uTexture1, texCoord1);\n"
 "        if (uMultiTextureCombine == 0)\n"
 "            color *= texColor1;\n"
 "        else if (uMultiTextureCombine == 1)\n"
@@ -180,7 +191,12 @@ static const char* gFragmentShaderSource =
 "    if (uFogEnabled != 0) {\n"
 "        color.rgb = mix(uFogColor, color.rgb, vFogFactor);\n"
 "    }\n"
-"    gl_FragColor = color;\n"
+"    if (uSoftParticle != 0) {\n"
+"        float sceneDepth = texture(uSceneDepth, gl_FragCoord.xy / uDepthSize).r;\n"
+"        float distance = linearDepth(sceneDepth) - linearDepth(gl_FragCoord.z);\n"
+"        color.a *= clamp(distance / uFeatherDistance, 0.0, 1.0);\n"
+"    }\n"
+"    fragColor = color;\n"
 "}\n";
 
 /****************************/
@@ -255,24 +271,8 @@ void ModernGL_Init(void)
 {
     printf("[ModernGL] Initializing modern GL subsystem...\n");
 
-#ifdef __EMSCRIPTEN__
-    // Enable OES_element_index_uint extension for 32-bit index buffers in WebGL 1.0
-    // Without this, glDrawElements with GL_UNSIGNED_INT would fail.
-    {
-        EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
-        if (ctx) {
-            EM_BOOL ok = emscripten_webgl_enable_extension(ctx, "OES_element_index_uint");
-            if (ok) {
-                printf("[ModernGL] OES_element_index_uint: enabled\n");
-            } else {
-                printf("[ModernGL] WARNING: OES_element_index_uint NOT available — "
-                       "32-bit index buffers may not work\n");
-            }
-        } else {
-            printf("[ModernGL] WARNING: No WebGL context — cannot enable extensions\n");
-        }
-    }
-#endif // __EMSCRIPTEN__
+    glGenVertexArrays(1, &gDrawVAO);
+    glBindVertexArray(gDrawVAO);
 
     // Initialize state
     memset(&gModernGLState, 0, sizeof(ModernGLState));
@@ -328,6 +328,10 @@ void ModernGL_Init(void)
 
 void ModernGL_Shutdown(void)
 {
+    gCurrentProgram = 0;
+    if (gDrawVAO)
+        glDeleteVertexArrays(1, &gDrawVAO);
+    gDrawVAO = 0;
     if (gModernGLShader.program)
     {
         glDeleteProgram(gModernGLShader.program);
@@ -346,6 +350,7 @@ void ModernGL_Shutdown(void)
         ModernGL_FreeGeometry(gImmScratch);
         gImmScratch = NULL;
         gImmScratchCapacity = 0;
+        gImmScratchBufferCapacity = 0;
     }
 }
 
@@ -416,6 +421,11 @@ Boolean ModernGL_LoadShaders(void)
     gModernGLShader.uAlphaRef = glGetUniformLocation(gModernGLShader.program, "uAlphaRef");
     gModernGLShader.uGlobalTransparency = glGetUniformLocation(gModernGLShader.program, "uGlobalTransparency");
     gModernGLShader.uGlobalColorFilter = glGetUniformLocation(gModernGLShader.program, "uGlobalColorFilter");
+    gModernGLShader.uSceneDepth = glGetUniformLocation(gModernGLShader.program, "uSceneDepth");
+    gModernGLShader.uSoftParticle = glGetUniformLocation(gModernGLShader.program, "uSoftParticle");
+    gModernGLShader.uDepthSize = glGetUniformLocation(gModernGLShader.program, "uDepthSize");
+    gModernGLShader.uDepthRange = glGetUniformLocation(gModernGLShader.program, "uDepthRange");
+    gModernGLShader.uFeatherDistance = glGetUniformLocation(gModernGLShader.program, "uFeatherDistance");
 
     // Verify critical uniforms were found
     if (gModernGLShader.uMVPMatrix == -1 || gModernGLShader.uNormalMatrix == -1)
@@ -436,11 +446,10 @@ void ModernGL_UseShader(void)
     // Since there is only one shader program, skip the glUseProgram call
     // when the program is already bound.  This avoids one WebGL state
     // change per draw call (~200/frame).
-    static GLuint sCurrentProgram = 0;
-    if (sCurrentProgram != gModernGLShader.program)
+    if (gCurrentProgram != gModernGLShader.program)
     {
         glUseProgram(gModernGLShader.program);
-        sCurrentProgram = gModernGLShader.program;
+        gCurrentProgram = gModernGLShader.program;
     }
 }
 
@@ -582,7 +591,21 @@ void ModernGL_UploadGeometry(ModernGLGeometry* geom)
 
     glBindBuffer(GL_ARRAY_BUFFER, geom->vbo);
     GLenum usage = geom->dynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
-    glBufferData(GL_ARRAY_BUFFER, totalFloats * sizeof(GLfloat), interleavedData, usage);
+    if (geom == gImmScratch)
+    {
+        if (gImmScratchBufferCapacity != gImmScratchCapacity)
+        {
+            glBufferData(GL_ARRAY_BUFFER,
+                         gImmScratchCapacity * floatsPerVertex * (GLsizeiptr)sizeof(GLfloat),
+                         NULL, usage);
+            gImmScratchBufferCapacity = gImmScratchCapacity;
+        }
+        glBufferSubData(GL_ARRAY_BUFFER, 0, totalFloats * (GLsizeiptr)sizeof(GLfloat), interleavedData);
+    }
+    else
+    {
+        glBufferData(GL_ARRAY_BUFFER, totalFloats * sizeof(GLfloat), interleavedData, usage);
+    }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     // Upload index buffer if present
@@ -765,9 +788,16 @@ static ModernGLGeometry* EnsureImmScratch(int needed)
 {
     if (!gImmScratch || needed > gImmScratchCapacity)
     {
+        int capacity = gImmScratchCapacity ? gImmScratchCapacity : 64;
+        while (capacity < needed && capacity <= 0x3fffffff)
+            capacity *= 2;
+        if (capacity < needed)
+            capacity = needed;
+
         if (gImmScratch) ModernGL_FreeGeometry(gImmScratch);
-        gImmScratch = ModernGL_CreateGeometry(needed, 0, true);
-        gImmScratchCapacity = needed;
+        gImmScratch = ModernGL_CreateGeometry(capacity, 0, true);
+        gImmScratchCapacity = capacity;
+        gImmScratchBufferCapacity = 0;
     }
     gImmScratch->numVertices = needed;
     gImmScratch->needsUpload = true;

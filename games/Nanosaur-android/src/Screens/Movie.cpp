@@ -6,9 +6,6 @@
 #include "PommeVideo.h"
 #include "Video/Cinepak.h"
 
-#ifndef __EMSCRIPTEN__
-#include <SDL3/SDL_opengl.h>
-#endif
 
 //-----------------------------------------------------------------------------
 // Movie

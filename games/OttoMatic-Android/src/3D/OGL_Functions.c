@@ -6,7 +6,7 @@
 PFNGLACTIVETEXTUREARBPROC			procptr_glActiveTextureARB			= NULL;
 PFNGLCLIENTACTIVETEXTUREARBPROC		procptr_glClientActiveTextureARB	= NULL;
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 // WebGL doesn't support glClientActiveTexture because it's part of the legacy
 // fixed-function pipeline. However, we need to route it to the vertex array
 // compat layer so it tracks which texture unit is active for tex coord pointers.
@@ -19,9 +19,8 @@ static void glClientActiveTexture_compat(GLenum texture)
 
 void OGL_InitFunctions(void)
 {
-#ifdef __EMSCRIPTEN__
-	// Initialize modern GL subsystem for WebAssembly
-	SDL_Log("OGL_InitFunctions: Initializing ModernGL subsystem for WebAssembly...");
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	SDL_Log("OGL_InitFunctions: Initializing ModernGL subsystem...");
 	extern void ModernGL_Init(void);
 	ModernGL_Init();
 	SDL_Log("OGL_InitFunctions: ModernGL subsystem initialized");
@@ -32,11 +31,11 @@ void OGL_InitFunctions(void)
 		procptr_glActiveTextureARB = (PFNGLACTIVETEXTUREARBPROC) SDL_GL_GetProcAddress("glActiveTexture");
 
 	GAME_ASSERT(procptr_glActiveTextureARB);
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	SDL_Log("OGL_InitFunctions: glActiveTexture resolved successfully");
 #endif
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	// WebGL/Emscripten doesn't provide glClientActiveTexture
 	// Modern GL rendering path doesn't need this function
 	procptr_glClientActiveTextureARB = (PFNGLCLIENTACTIVETEXTUREARBPROC) glClientActiveTexture_compat;

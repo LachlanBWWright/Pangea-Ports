@@ -302,7 +302,7 @@ SkeletonObjDataType	*currentSkelObjData;
 	gBBox->isEmpty =
 	theNode->LocalBBox.isEmpty = false;
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if PANGEA_GL_COMPAT
 	// Invalidate draw-cache entries for all deformed meshes in the updated buffer.
 	// Skeleton vertices are modified in-place every frame, so any cached VBO that
 	// contains previous-frame data must be refreshed on the next draw call.
@@ -569,8 +569,6 @@ long	i,b,j;
 		}
 	}
 }
-
-
 
 
 

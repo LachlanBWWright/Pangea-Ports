@@ -395,10 +395,8 @@ static void OGL_CreateDrawContext(void)
 			sdlError && sdlError[0] ? sdlError : "(no SDL error)");
 	}
 
-#ifdef __EMSCRIPTEN__
-	// Initialize the custom GLES2 fixed-function compatibility layer.
-	// ModernGL_Init() compiles the shader program and enables required
-	// WebGL extensions (OES_element_index_uint for 32-bit index buffers).
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	// Initialize the GLES3 fixed-function compatibility renderer.
 	extern void ModernGL_Init(void);
 	ModernGL_Init();
 #endif

@@ -14,6 +14,7 @@
 
 #include "stb_image.h"
 #include "ogl_functions.h"
+#include "scene_depth.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -263,6 +264,23 @@ static void OGL_CreateDrawContext(void)
 	bool mkc = SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);
 	GAME_ASSERT_MESSAGE(mkc, SDL_GetError());
 
+	int contextMajor = 0;
+	int contextMinor = 0;
+	int contextProfile = 0;
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &contextMajor);
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &contextMinor);
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &contextProfile);
+	SDL_Log("GL context: %s (reported %d.%d, profile %d)",
+		glGetString(GL_VERSION), contextMajor, contextMinor, contextProfile);
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+	GAME_ASSERT_MESSAGE(contextProfile == SDL_GL_CONTEXT_PROFILE_ES && contextMajor >= 3,
+		"Billy Frontier requires OpenGL ES 3 / WebGL 2");
+#else
+	GAME_ASSERT_MESSAGE(contextProfile == SDL_GL_CONTEXT_PROFILE_CORE &&
+		(contextMajor > 3 || (contextMajor == 3 && contextMinor >= 3)),
+		"Billy Frontier requires OpenGL 3.3 core");
+#endif
+
 			/* ENABLE VSYNC */
 
 	SDL_GL_SetSwapInterval(1);
@@ -296,6 +314,10 @@ static void OGL_DisposeDrawContext(void)
 	{
 		return;
 	}
+
+	SceneDepth_Shutdown();
+	CompatGL_Shutdown();
+	ModernGL_Shutdown();
 
 	SDL_GL_MakeCurrent(gSDLWindow, NULL);		// make context not current
 	SDL_GL_DestroyContext(gAGLContext);			// nuke context
@@ -363,7 +385,6 @@ OGLStyleDefType *styleDefPtr = &setupDefPtr->styles;
 #endif
 	glDisable(GL_RESCALE_NORMAL);
 
-    glHint(GL_FOG_HINT, GL_NICEST);		// pixel accurate fog?
 
 
 			/* ENABLE ALPHA CHANNELS */
@@ -374,7 +395,6 @@ OGLStyleDefType *styleDefPtr = &setupDefPtr->styles;
 
 		/* SET FOG */
 
-	glHint(GL_FOG_HINT, GL_FASTEST);
 
 	if (styleDefPtr->useFog)
 	{
@@ -480,6 +500,11 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	GAME_ASSERT(gGameViewInfoPtr->isActive);
 
 	SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);			// make context active
+
+	int sceneWidth, sceneHeight;
+	SDL_GetWindowSizeInPixels(gSDLWindow, &sceneWidth, &sceneHeight);
+	SceneDepth_BeginFrame(sceneWidth, sceneHeight);
+	ModernGL_SetFeathering(false);
 
 
 			/* INIT SOME STUFF */
@@ -751,6 +776,7 @@ do_anaglyph:
            	
            /* SWAP THE BUFFS */
 
+	SceneDepth_Present();
 	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
 
 	if (gGamePrefs.anaglyph)

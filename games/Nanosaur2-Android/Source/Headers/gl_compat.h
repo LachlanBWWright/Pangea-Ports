@@ -1,10 +1,9 @@
-// gl_compat.h – OpenGL fixed-function compatibility layer for Emscripten/WebGL.
+// Fixed-function compatibility API for desktop GL 3.3, GLES 3, and WebGL 2.
 //
 // This file provides software implementations of the OpenGL 1.x/2.x
-// fixed-function pipeline API that does not exist in OpenGL ES 2.0 / WebGL.
-// It is included ONLY for __EMSCRIPTEN__ builds.
+// fixed-function pipeline API removed from modern GL contexts.
 //
-// Approach: a single GLSL ES 1.00 shader program implements the fixed-function
+// GLSL 330 core / ES 3.00 shaders implement the fixed-function
 // pipeline (lighting, fog, texenv, alpha-test).  The classic client-state
 // vertex-array calls (glVertexPointer, glNormalPointer, …, glDrawElements)
 // are intercepted and redirected through VBOs + vertex attributes.  Immediate-
@@ -12,16 +11,12 @@
 
 #pragma once
 
-#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
-
-static inline void COMPAT_GL_InvalidateCachePtr(const void *ptr)
-{
-    (void) ptr;
-}
-
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#include <SDL3/SDL_opengles2.h>
 #else
-
-#include <SDL3/SDL_opengles2.h>   // GLES2 types and real function declarations
+#include <SDL3/SDL_opengl.h>
+#include <SDL3/SDL_opengl_glext.h>
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -126,7 +121,9 @@ extern "C" {
 #define GL_LINE_SMOOTH                  0x0B20
 #define GL_LINE_STIPPLE                 0x0B24
 #define GL_TEXTURE_1D                   0x0DE0
-#define GL_ALL_ATTRIB_BITS              0xFFFFFFFF
+#ifndef GL_ALL_ATTRIB_BITS
+#define GL_ALL_ATTRIB_BITS              0x000FFFFF
+#endif
 
 #define GL_BACK_LEFT                    0x0402
 #define GL_BACK_RIGHT                   0x0403
@@ -162,6 +159,9 @@ extern "C" {
 
 // Init – must be called once after OpenGL context creation
 void COMPAT_GL_Init(void);
+void COMPAT_GL_Shutdown(void);
+void COMPAT_GL_BeginSoftParticles(int width, int height);
+void COMPAT_GL_EndSoftParticles(void);
 
 // Matrix stack
 void glMatrixMode(GLenum mode);
@@ -277,6 +277,5 @@ void glGetDoublev_stub(GLenum pname, GLdouble *params);
 
 #ifdef __cplusplus
 } // extern "C"
-#endif
 
 #endif

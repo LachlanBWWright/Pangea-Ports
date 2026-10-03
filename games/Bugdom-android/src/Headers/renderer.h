@@ -1,7 +1,17 @@
 #pragma once
 
 #include <QD3D.h>
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#include <GLES3/gl3.h>
+// These tokens describe incoming legacy pixel data, which is converted before GLES upload.
+#define GL_BGR 0x80E0
+#define GL_BGRA 0x80E1
+#define GL_BGRA_EXT GL_BGRA
+#define GL_UNSIGNED_SHORT_1_5_5_5_REV 0x8366
+#define GL_UNSIGNED_INT_8_8_8_8_REV 0x8367
+#else
 #include <SDL3/SDL_opengl.h>
+#endif
 
 #if _DEBUG
 #define CHECK_GL_ERROR()												\

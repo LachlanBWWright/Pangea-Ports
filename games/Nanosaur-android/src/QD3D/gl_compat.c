@@ -1,10 +1,10 @@
-// gl_compat.c – OpenGL fixed-function compatibility layer for Emscripten/WebGL.
+// gl_compat.c – OpenGL fixed-function compatibility over core GL and GLES 3.
 //
-// Provides a GLES2 / WebGL implementation of the OpenGL 1.x fixed-function
-// pipeline used by Nanosaur 2, without using Emscripten's LEGACY_GL_EMULATION.
+// Provides a GL 3.3 / GLES 3 / WebGL 2 implementation of the OpenGL 1.x fixed-function
+// pipeline used by Nanosaur, without using Emscripten's legacy emulation.
 //
 // Architecture:
-//   • One GLSL ES 1.00 program implements vertex transforms, per-vertex
+//   • One GLSL 330/ES 300 program implements vertex transforms, per-vertex
 //     lighting (up to MAX_FILL_LIGHTS directional lights), fog, multi-texture
 //     (2 units), texture-env combine modes, and alpha-test discard.
 //   • Software matrix stacks (modelview, projection) mirror the OpenGL state.
@@ -15,8 +15,6 @@
 //     glDrawArrays when glEnd is called; GL_QUADS is split into triangles.
 //   • glGetFloatv for GL_MODELVIEW_MATRIX / GL_PROJECTION_MATRIX returns our
 //     software stack top.
-
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 
 #include <SDL3/SDL.h>
 #include "gl_compat.h"
@@ -57,20 +55,20 @@ extern GLboolean emscripten_glIsEnabled(GLenum cap);
 #define REAL_glDrawArrays       emscripten_glDrawArrays
 #define REAL_glHint             emscripten_glHint
 #define REAL_glIsEnabled        emscripten_glIsEnabled
-#else // __ANDROID__
-// On Android, we define our own gl wrappers with the same names as GLES2 functions.
-// To call the REAL GLES2 implementation from within those wrappers (without recursion),
-// we use dlsym(RTLD_NEXT, ...) to obtain function pointers from the next DSO in the
-// search order (i.e., libGLESv2.so).  The pointers are populated in COMPAT_GL_Init.
-#include <dlfcn.h>
-static void      (*real_glEnable)      (GLenum)                              = NULL;
-static void      (*real_glDisable)     (GLenum)                              = NULL;
-static void      (*real_glGetFloatv)   (GLenum, GLfloat*)                    = NULL;
-static void      (*real_glGetIntegerv) (GLenum, GLint*)                      = NULL;
-static void      (*real_glDrawElements)(GLenum, GLsizei, GLenum, const void*)= NULL;
-static void      (*real_glDrawArrays)  (GLenum, GLint, GLsizei)              = NULL;
-static void      (*real_glHint)        (GLenum, GLenum)                      = NULL;
-static GLboolean (*real_glIsEnabled)   (GLenum)                              = NULL;
+#else
+#ifdef __ANDROID__
+#define COMPAT_GL_CALL GL_APIENTRY
+#else
+#define COMPAT_GL_CALL APIENTRY
+#endif
+static void      (COMPAT_GL_CALL *real_glEnable)      (GLenum)                               = NULL;
+static void      (COMPAT_GL_CALL *real_glDisable)     (GLenum)                               = NULL;
+static void      (COMPAT_GL_CALL *real_glGetFloatv)   (GLenum, GLfloat*)                     = NULL;
+static void      (COMPAT_GL_CALL *real_glGetIntegerv) (GLenum, GLint*)                       = NULL;
+static void      (COMPAT_GL_CALL *real_glDrawElements)(GLenum, GLsizei, GLenum, const void*) = NULL;
+static void      (COMPAT_GL_CALL *real_glDrawArrays)  (GLenum, GLint, GLsizei)               = NULL;
+static void      (COMPAT_GL_CALL *real_glHint)        (GLenum, GLenum)                       = NULL;
+static GLboolean (COMPAT_GL_CALL *real_glIsEnabled)   (GLenum)                               = NULL;
 #define REAL_glEnable           real_glEnable
 #define REAL_glDisable          real_glDisable
 #define REAL_glGetFloatv        real_glGetFloatv
@@ -79,7 +77,7 @@ static GLboolean (*real_glIsEnabled)   (GLenum)                              = N
 #define REAL_glDrawArrays       real_glDrawArrays
 #define REAL_glHint             real_glHint
 #define REAL_glIsEnabled        real_glIsEnabled
-#endif // __EMSCRIPTEN__ || __ANDROID__
+#endif
 
 // ── 4×4 float matrix ─────────────────────────────────────────────────────────
 typedef struct { float m[16]; } Mat4;
@@ -183,6 +181,7 @@ static float   s_imm_cur_s0 = 0, s_imm_cur_t0 = 0;
 
 // ── GL objects ────────────────────────────────────────────────────────────────
 static GLuint  s_prog = 0;
+static GLuint  s_vao  = 0;
 static GLuint  s_vbo  = 0;
 static GLuint  s_ibo  = 0;
 
@@ -233,20 +232,22 @@ static GLint u_texture0, u_texture1;
 static GLint u_sampler0, u_sampler1;
 static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
+static GLint u_soft_particle, u_depth_sampler, u_depth_size, u_soft_distance;
+static GLuint s_soft_depth_texture = 0;
+static int s_soft_depth_width = 0, s_soft_depth_height = 0;
+static int s_soft_particle_enabled = 0;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
-    "precision mediump float;\nprecision mediump int;\n"
-    "attribute vec3 a_position;\n"
-    "attribute vec3 a_normal;\n"
-    "attribute vec4 a_color;\n"
-    "attribute vec2 a_texcoord0;\n"
-    "attribute vec2 a_texcoord1;\n"
+    "in vec3 a_position;\n"
+    "in vec3 a_normal;\n"
+    "in vec4 a_color;\n"
+    "in vec2 a_texcoord0;\n"
+    "in vec2 a_texcoord1;\n"
     "uniform mat4 u_mv;\n"
     "uniform mat4 u_proj;\n"
     "uniform mat3 u_normal_mat;\n"
     "uniform vec4 u_current_color;\n"
-    // Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
     "uniform int  u_use_color_array;\n"
     "uniform int  u_lighting;\n"
     "uniform vec4 u_ambient;\n"
@@ -256,10 +257,10 @@ static const char *VERT_SRC =
     "uniform vec4 u_light_amb[4];\n"
     "uniform int  u_fog;\n"
     "uniform int  u_texgen;\n"
-    "varying vec4 v_color;\n"
-    "varying vec2 v_tc0;\n"
-    "varying vec2 v_tc1;\n"
-    "varying float v_fog_depth;\n"
+    "out vec4 v_color;\n"
+    "out vec2 v_tc0;\n"
+    "out vec2 v_tc1;\n"
+    "out float v_fog_depth;\n"
     // Helper: compute contribution from one light
     "vec3 light_contrib(int li, vec3 n, vec4 ep) {\n"
     "  vec3 ld = (u_light_pos[li].w == 0.0)\n"
@@ -275,7 +276,7 @@ static const char *VERT_SRC =
     "  if (u_lighting != 0) {\n"
     "    vec3 n = normalize(u_normal_mat * a_normal);\n"
     "    vec4 color = u_ambient;\n"
-    // Unrolled 4-light loop — avoids break+non-constant-bound (invalid GLSL ES 1.0)
+    // Keep the existing light order and accumulation.
     "    if (u_num_lights > 0) color.rgb += light_contrib(0, n, eye_pos);\n"
     "    if (u_num_lights > 1) color.rgb += light_contrib(1, n, eye_pos);\n"
     "    if (u_num_lights > 2) color.rgb += light_contrib(2, n, eye_pos);\n"
@@ -298,12 +299,11 @@ static const char *VERT_SRC =
     "}\n";
 
 static const char *FRAG_SRC =
-    "precision mediump float;\nprecision mediump int;\n"
-    "varying vec4  v_color;\n"
-    "varying vec2  v_tc0;\n"
-    "varying vec2  v_tc1;\n"
-    "varying float v_fog_depth;\n"
-    // Use int instead of bool for the same GLSL ES 1.0 compatibility reason
+    "in vec4  v_color;\n"
+    "in vec2  v_tc0;\n"
+    "in vec2  v_tc1;\n"
+    "in float v_fog_depth;\n"
+    "out vec4 frag_color;\n"
     "uniform int       u_texture0;\n"
     "uniform int       u_texture1;\n"
     "uniform sampler2D u_sampler0;\n"
@@ -319,17 +319,28 @@ static const char *FRAG_SRC =
     "uniform int       u_alpha_test;\n"
     "uniform int       u_alpha_func;\n" // 0=NEVER 1=LESS 2=EQUAL 3=LEQUAL 4=GREATER 5=NOTEQUAL 6=GEQUAL 7=ALWAYS
     "uniform float     u_alpha_ref;\n"
+    "uniform int       u_soft_particle;\n"
+    "uniform sampler2D u_depth_sampler;\n"
+    "uniform vec2      u_depth_size;\n"
+    "uniform float     u_soft_distance;\n"
+    "uniform mat4      u_proj;\n"
+    "float eye_depth(float depth) {\n"
+    "  float ndc = depth * 2.0 - 1.0;\n"
+    "  float a = u_proj[2][2], b = u_proj[3][2];\n"
+    "  float c = u_proj[2][3], d = u_proj[3][3];\n"
+    "  return -(b - ndc * d) / (ndc * c - a);\n"
+    "}\n"
     "void main() {\n"
     "  vec4 color = v_color;\n"
     "  if (u_texture0 != 0) {\n"
-    "    vec4 tex = texture2D(u_sampler0, v_tc0);\n"
+    "    vec4 tex = texture(u_sampler0, v_tc0);\n"
     "    if      (u_texenv0 == 0) color *= tex;\n"          // MODULATE
     "    else if (u_texenv0 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"  // ADD
     "    else if (u_texenv0 == 2) color = tex;\n"           // REPLACE
     "    else if (u_texenv0 == 3) { color.rgb = min(color.rgb+tex.rgb,1.0); }\n"  // COMBINE_ADD
     "  }\n"
     "  if (u_texture1 != 0) {\n"
-    "    vec4 tex = texture2D(u_sampler1, v_tc1);\n"
+    "    vec4 tex = texture(u_sampler1, v_tc1);\n"
     "    if      (u_texenv1 == 0) color *= tex;\n"
     "    else if (u_texenv1 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"
     "    else if (u_texenv1 == 2) color = tex;\n"
@@ -353,13 +364,24 @@ static const char *FRAG_SRC =
     "    ff = clamp(ff, 0.0, 1.0);\n"
     "    color.rgb = mix(u_fog_color.rgb, color.rgb, ff);\n"
     "  }\n"
-    "  gl_FragColor = color;\n"
+    "  if (u_soft_particle != 0) {\n"
+    "    float scene = texture(u_depth_sampler, gl_FragCoord.xy / u_depth_size).r;\n"
+    "    float separation = eye_depth(scene) - eye_depth(gl_FragCoord.z);\n"
+    "    color.a *= clamp(separation / u_soft_distance, 0.0, 1.0);\n"
+    "  }\n"
+    "  frag_color = color;\n"
     "}\n";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 static GLuint compile_shader(GLenum type, const char *src) {
     GLuint s = glCreateShader(type);
-    glShaderSource(s, 1, &src, NULL);
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    const char *version = "#version 300 es\nprecision highp float;\nprecision mediump int;\n";
+#else
+    const char *version = "#version 330 core\n";
+#endif
+    const char *sources[] = {version, src};
+    glShaderSource(s, 2, sources, NULL);
     glCompileShader(s);
     GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
     if (!ok) {
@@ -443,6 +465,26 @@ static void upload_uniforms(void) {
     glUniform1i(u_texenv0,  s_texenv_mode[0]);
     glUniform1i(u_texenv1,  s_texenv_mode[1]);
     glUniform1i(u_texgen,   (s_texgen_s || s_texgen_t) ? 1 : 0);
+    int soft = s_soft_particle_enabled && s_soft_depth_texture != 0;
+    glUniform1i(u_soft_particle, soft);
+    if (soft) {
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, s_soft_depth_texture);
+        glUniform1i(u_depth_sampler, 2);
+        glUniform2f(u_depth_size, (float)s_soft_depth_width, (float)s_soft_depth_height);
+        glUniform1f(u_soft_distance, 40.0f);
+        glActiveTexture(GL_TEXTURE0);
+    }
+}
+
+void COMPAT_GL_SetSoftParticleDepth(GLuint depthTexture, int width, int height) {
+    s_soft_depth_texture = depthTexture;
+    s_soft_depth_width = width;
+    s_soft_depth_height = height;
+}
+
+void COMPAT_GL_SetSoftParticle(bool enabled) {
+    s_soft_particle_enabled = enabled;
 }
 
 static int dc_find(const void *v_ptr, int v_count, const void *n_ptr,
@@ -517,6 +559,7 @@ static void bind_vertex_attribs(void)
 {
     const int STRIDE = (3+3+4+2+2) * sizeof(float);
 
+    glBindVertexArray(s_vao);
     glEnableVertexAttribArray(ATTRIB_POSITION);
     glVertexAttribPointer(ATTRIB_POSITION,  3, GL_FLOAT, GL_FALSE, STRIDE, (void*)(0*sizeof(float)));
 
@@ -614,25 +657,23 @@ static void disable_vertex_attribs(void) {
     glDisableVertexAttribArray(ATTRIB_COLOR);
     glDisableVertexAttribArray(ATTRIB_TEXCOORD0);
     glDisableVertexAttribArray(ATTRIB_TEXCOORD1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 // ── Public: init ──────────────────────────────────────────────────────────────
 void COMPAT_GL_Init(void) {
-#ifdef __ANDROID__
-    // Load real GLES2 function pointers via dlsym(RTLD_NEXT, ...) to avoid infinite
-    // recursion when our wrappers (same symbol names as GLES2 functions) call the
-    // underlying GLES2 implementation.
-    real_glEnable       = (void(*)(GLenum))       dlsym(RTLD_NEXT, "glEnable");
-    real_glDisable      = (void(*)(GLenum))       dlsym(RTLD_NEXT, "glDisable");
-    real_glGetFloatv    = (void(*)(GLenum,GLfloat*)) dlsym(RTLD_NEXT, "glGetFloatv");
-    real_glGetIntegerv  = (void(*)(GLenum,GLint*))   dlsym(RTLD_NEXT, "glGetIntegerv");
-    real_glDrawElements = (void(*)(GLenum,GLsizei,GLenum,const void*)) dlsym(RTLD_NEXT, "glDrawElements");
-    real_glDrawArrays   = (void(*)(GLenum,GLint,GLsizei)) dlsym(RTLD_NEXT, "glDrawArrays");
-    real_glHint         = (void(*)(GLenum,GLenum)) dlsym(RTLD_NEXT, "glHint");
-    real_glIsEnabled    = (GLboolean(*)(GLenum))  dlsym(RTLD_NEXT, "glIsEnabled");
-#endif // __ANDROID__
+#if !defined(__EMSCRIPTEN__)
+    real_glEnable       = (void(COMPAT_GL_CALL *)(GLenum)) SDL_GL_GetProcAddress("glEnable");
+    real_glDisable      = (void(COMPAT_GL_CALL *)(GLenum)) SDL_GL_GetProcAddress("glDisable");
+    real_glGetFloatv    = (void(COMPAT_GL_CALL *)(GLenum,GLfloat*)) SDL_GL_GetProcAddress("glGetFloatv");
+    real_glGetIntegerv  = (void(COMPAT_GL_CALL *)(GLenum,GLint*)) SDL_GL_GetProcAddress("glGetIntegerv");
+    real_glDrawElements = (void(COMPAT_GL_CALL *)(GLenum,GLsizei,GLenum,const void*)) SDL_GL_GetProcAddress("glDrawElements");
+    real_glDrawArrays   = (void(COMPAT_GL_CALL *)(GLenum,GLint,GLsizei)) SDL_GL_GetProcAddress("glDrawArrays");
+    real_glHint         = (void(COMPAT_GL_CALL *)(GLenum,GLenum)) SDL_GL_GetProcAddress("glHint");
+    real_glIsEnabled    = (GLboolean(COMPAT_GL_CALL *)(GLenum)) SDL_GL_GetProcAddress("glIsEnabled");
+#endif
     // Init matrix stacks
     for (int i = 0; i < MATRIX_STACK_DEPTH; i++) {
         mat4_identity(&s_modelview_stack[i]);
@@ -691,8 +732,13 @@ void COMPAT_GL_Init(void) {
     u_texenv0     = glGetUniformLocation(s_prog, "u_texenv0");
     u_texenv1     = glGetUniformLocation(s_prog, "u_texenv1");
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
+    u_soft_particle = glGetUniformLocation(s_prog, "u_soft_particle");
+    u_depth_sampler = glGetUniformLocation(s_prog, "u_depth_sampler");
+    u_depth_size = glGetUniformLocation(s_prog, "u_depth_size");
+    u_soft_distance = glGetUniformLocation(s_prog, "u_soft_distance");
 
-    // VBO for interleaved vertex data
+    // ES 3 requires vertex attribute and element-buffer state in a VAO.
+    glGenVertexArrays(1, &s_vao);
     glGenBuffers(1, &s_vbo);
     glGenBuffers(1, &s_ibo);
     memset(s_draw_cache, 0, sizeof(s_draw_cache));
@@ -1288,5 +1334,3 @@ void glBindVertexArrayAPPLE(GLuint a)                { (void)a; }
 void glFlushVertexArrayRangeAPPLE(GLsizei l, void *p){ (void)l; (void)p; }
 void glVertexArrayRangeAPPLE(GLsizei l, void *p)     { (void)l; (void)p; }
 void glVertexArrayParameteriAPPLE(GLenum pname, GLint param) { (void)pname; (void)param; }
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

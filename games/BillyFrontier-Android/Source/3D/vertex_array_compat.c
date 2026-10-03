@@ -15,13 +15,10 @@
 //   do the 0–255 → 0.0–1.0 conversion, also eliminating CPU work.
 //
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include "game.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <GLES2/gl2.h>
 
 // Render statistics counters (defined in render_stats_stub.c for this game)
 extern int gDrawCallsThisFrame;
@@ -97,6 +94,27 @@ static int sIdxConvertBufCap = 0;
 // maximum index value and thereby determine vertexCount.
 // The hint is consumed (reset to 0) by the next CompatGL_DrawElements call.
 static GLsizei sVertexCountHint = 0;
+
+void CompatGL_Shutdown(void)
+{
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++)
+    {
+        if (sDC[i].vbo[0]) glDeleteBuffers(5, sDC[i].vbo);
+        if (sDC[i].ibo) glDeleteBuffers(1, &sDC[i].ibo);
+    }
+    if (sAttrVBO[0]) glDeleteBuffers(5, sAttrVBO);
+    if (sIndexIBO) glDeleteBuffers(1, &sIndexIBO);
+    free(sIdxConvertBuf);
+    sIdxConvertBuf = NULL;
+    sIdxConvertBufCap = 0;
+    sIndexIBO = 0;
+    sVertexCountHint = 0;
+    sDCTick = 0;
+    sEnabledAttribMask = 0x1F;
+    memset(sAttrVBO, 0, sizeof(sAttrVBO));
+    memset(sDC, 0, sizeof(sDC));
+    memset(&gVertexArrayState, 0, sizeof(gVertexArrayState));
+}
 
 static Boolean ForceCacheMisses(void)
 {
@@ -820,12 +838,3 @@ void CompatGL_DrawArrays(GLenum mode, GLint first, GLsizei count)
     gBufferUploadsThisFrame += uploads;
     gBufferUploadBytesThisFrame += uploadBytes;
 }
-
-#else
-
-void CompatGL_InvalidateCachePtr(const void *ptr)
-{
-	(void) ptr;
-}
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

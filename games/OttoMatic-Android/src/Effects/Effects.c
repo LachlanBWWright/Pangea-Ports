@@ -759,6 +759,18 @@ OGLBoundingBox	bbox;
 				/* DRAW IT */
 
 			glBlendFunc(src, dst);								// set blending mode
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+			Boolean softParticle = false;
+			if (pg->particleTextureNum == PARTICLE_SObjType_GreySmoke
+				|| pg->particleTextureNum == PARTICLE_SObjType_BlackSmoke
+				|| pg->particleTextureNum == PARTICLE_SObjType_Fire
+				|| pg->particleTextureNum == PARTICLE_SObjType_RedFumes
+				|| pg->particleTextureNum == PARTICLE_SObjType_GreenFumes)
+			{
+				softParticle = ModernGL_BeginSoftParticle(
+					gGameViewInfoPtr->hither, gGameViewInfoPtr->yon, 65.0f);
+			}
+#endif
 
 			if (gGameViewInfoPtr->useFog)
 			{
@@ -769,6 +781,10 @@ OGLBoundingBox	bbox;
 			}
 
 			MO_DrawObject(pg->geometryObj[pg->geometryBuffer]);						// draw geometry
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+			if (softParticle)
+				ModernGL_EndSoftParticle();
+#endif
 		}
 	}
 

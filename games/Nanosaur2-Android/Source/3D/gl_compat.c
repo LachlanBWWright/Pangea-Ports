@@ -1,10 +1,9 @@
-// gl_compat.c – OpenGL fixed-function compatibility layer for Emscripten/WebGL.
+// Fixed-function compatibility renderer for desktop GL 3.3, GLES 3, and WebGL 2.
 //
-// Provides a GLES2 / WebGL implementation of the OpenGL 1.x fixed-function
-// pipeline used by Nanosaur 2, without using Emscripten's LEGACY_GL_EMULATION.
+// Implements the OpenGL 1.x calls used by Nanosaur 2 on modern contexts.
 //
 // Architecture:
-//   • One GLSL ES 1.00 program implements vertex transforms, per-vertex
+//   • GLSL 330 core / ES 3.00 programs implement vertex transforms, per-vertex
 //     lighting (up to MAX_FILL_LIGHTS directional lights), fog, multi-texture
 //     (2 units), texture-env combine modes, and alpha-test discard.
 //   • Software matrix stacks (modelview, projection) mirror the OpenGL state.
@@ -20,17 +19,15 @@
 #include "gl_compat.h"
 #include "../Headers/profiling.h"
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-// Include GLES3 header for VAO functions (glGenVertexArrays, glBindVertexArray).
-// On Emscripten these map to WebGL2 built-ins; on Android they're in libGLESv3.
-#ifdef __ANDROID__
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #include <GLES3/gl3.h>
+#else
+#include "gl_desktop.h"
 #endif
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -79,12 +76,8 @@ extern void emscripten_glBindTexture(GLenum target, GLuint texture);
 #define REAL_glHint             emscripten_glHint
 #define REAL_glIsEnabled        emscripten_glIsEnabled
 #define REAL_glBindTexture      emscripten_glBindTexture
-#else // __ANDROID__
-// On Android, we define our own gl wrappers with the same names as GLES2 functions.
-// To call the REAL GLES2 implementation from within those wrappers (without recursion),
-// we use dlsym(RTLD_NEXT, ...) to obtain function pointers from the next DSO in the
-// search order (i.e., libGLESv2.so).  The pointers are populated in COMPAT_GL_Init.
-#include <dlfcn.h>
+#else
+// Fetch real driver entry points through SDL to bypass the compatibility wrappers.
 static void      (*real_glEnable)      (GLenum)                              = NULL;
 static void      (*real_glDisable)     (GLenum)                              = NULL;
 static void      (*real_glGetFloatv)   (GLenum, GLfloat*)                    = NULL;
@@ -103,7 +96,17 @@ static void      (*real_glBindTexture) (GLenum, GLuint)                      = N
 #define REAL_glHint             real_glHint
 #define REAL_glIsEnabled        real_glIsEnabled
 #define REAL_glBindTexture      real_glBindTexture
-#endif // __EMSCRIPTEN__ || __ANDROID__
+#endif
+
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#define SHADER_VERSION "#version 300 es\n"
+#define VERT_PRECISION "precision mediump float;\nprecision mediump int;\n"
+#define FRAG_PRECISION "precision highp float;\nprecision mediump int;\n"
+#else
+#define SHADER_VERSION "#version 330 core\n"
+#define VERT_PRECISION ""
+#define FRAG_PRECISION ""
+#endif
 
 // ── 4×4 float matrix ─────────────────────────────────────────────────────────
 typedef struct { float m[16]; } Mat4;
@@ -217,13 +220,10 @@ static float   s_imm_cur_s0 = 0, s_imm_cur_t0 = 0;
 // ── GL objects ────────────────────────────────────────────────────────────────
 static GLuint  s_prog = 0;
 static GLuint  s_vbo  = 0;
-static GLuint  s_ibo  = 0;
+static GLuint  s_stream_vao = 0;
 
 static float  *s_interleave_buf = NULL;
 static int     s_interleave_buf_capacity = 0;
-
-static GLushort *s_index_conv_buf = NULL;
-static int       s_index_conv_buf_capacity = 0;
 
 // ── Software texture-unit tracking ───────────────────────────────────────────
 // Replaces expensive glGetIntegerv(GL_ACTIVE_TEXTURE) and
@@ -303,22 +303,26 @@ static GLint u_texenv0, u_texenv1;
 static GLint u_texgen;
 static GLint u_tex_matrix;
 static GLint u_tex_matrix2;
+static GLint u_soft_particles, u_scene_depth, u_depth_size, u_depth_projection;
+static GLuint s_depth_texture, s_depth_fbo;
+static int s_depth_width, s_depth_height, s_soft_particles;
+static int s_depth_unavailable;
+static GLenum s_depth_attachment = GL_DEPTH_ATTACHMENT;
 
 // ── GLSL source strings ───────────────────────────────────────────────────────
 static const char *VERT_SRC =
-    "precision mediump float;\nprecision mediump int;\n"
-    "attribute vec3 a_position;\n"
-    "attribute vec3 a_normal;\n"
-    "attribute vec4 a_color;\n"
-    "attribute vec2 a_texcoord0;\n"
-    "attribute vec2 a_texcoord1;\n"
+    SHADER_VERSION VERT_PRECISION
+    "in vec3 a_position;\n"
+    "in vec3 a_normal;\n"
+    "in vec4 a_color;\n"
+    "in vec2 a_texcoord0;\n"
+    "in vec2 a_texcoord1;\n"
     "uniform mat4 u_mv;\n"
     "uniform mat4 u_proj;\n"
     "uniform mat3 u_normal_mat;\n"
     "uniform mat4 u_tex_matrix;\n"
     "uniform mat4 u_tex_matrix2;\n"
     "uniform vec4 u_current_color;\n"
-    // Use int instead of bool: bool uniforms can be unreliable in GLSL ES 1.0
     "uniform int  u_use_color_array;\n"
     "uniform int  u_lighting;\n"
     "uniform vec4 u_ambient;\n"
@@ -328,10 +332,10 @@ static const char *VERT_SRC =
     "uniform vec4 u_light_amb[4];\n"
     "uniform int  u_fog;\n"
     "uniform int  u_texgen;\n"
-    "varying vec4 v_color;\n"
-    "varying vec2 v_tc0;\n"
-    "varying vec2 v_tc1;\n"
-    "varying float v_fog_depth;\n"
+    "out vec4 v_color;\n"
+    "out vec2 v_tc0;\n"
+    "out vec2 v_tc1;\n"
+    "out float v_fog_depth;\n"
     // Helper: compute contribution from one light
     "vec3 light_contrib(int li, vec3 n, vec4 ep) {\n"
     "  vec3 ld = (u_light_pos[li].w == 0.0)\n"
@@ -347,7 +351,7 @@ static const char *VERT_SRC =
     "  if (u_lighting != 0) {\n"
     "    vec3 n = normalize(u_normal_mat * a_normal);\n"
     "    vec4 color = u_ambient;\n"
-    // Unrolled 4-light loop — avoids break+non-constant-bound (invalid GLSL ES 1.0)
+    // Keep the four light slots explicit to preserve the original lighting order.
     "    if (u_num_lights > 0) color.rgb += light_contrib(0, n, eye_pos);\n"
     "    if (u_num_lights > 1) color.rgb += light_contrib(1, n, eye_pos);\n"
     "    if (u_num_lights > 2) color.rgb += light_contrib(2, n, eye_pos);\n"
@@ -370,12 +374,12 @@ static const char *VERT_SRC =
     "}\n";
 
 static const char *FRAG_SRC =
-    "precision mediump float;\nprecision mediump int;\n"
-    "varying vec4  v_color;\n"
-    "varying vec2  v_tc0;\n"
-    "varying vec2  v_tc1;\n"
-    "varying float v_fog_depth;\n"
-    // Use int instead of bool for the same GLSL ES 1.0 compatibility reason
+    SHADER_VERSION FRAG_PRECISION
+    "in vec4  v_color;\n"
+    "in vec2  v_tc0;\n"
+    "in vec2  v_tc1;\n"
+    "in float v_fog_depth;\n"
+    "out vec4 frag_color;\n"
     "uniform int       u_texture0;\n"
     "uniform int       u_texture1;\n"
     "uniform sampler2D u_sampler0;\n"
@@ -391,17 +395,24 @@ static const char *FRAG_SRC =
     "uniform int       u_alpha_test;\n"
     "uniform int       u_alpha_func;\n" // 0=NEVER 1=LESS 2=EQUAL 3=LEQUAL 4=GREATER 5=NOTEQUAL 6=GEQUAL 7=ALWAYS
     "uniform float     u_alpha_ref;\n"
+    "uniform int       u_soft_particles;\n"
+    "uniform sampler2D u_scene_depth;\n"
+    "uniform vec2      u_depth_size;\n"
+    "uniform vec2      u_depth_projection;\n"
+    "float eye_depth(float depth) {\n"
+    "  return abs(u_depth_projection.y / (depth * 2.0 - 1.0 + u_depth_projection.x));\n"
+    "}\n"
     "void main() {\n"
     "  vec4 color = v_color;\n"
     "  if (u_texture0 != 0) {\n"
-    "    vec4 tex = texture2D(u_sampler0, v_tc0);\n"
+    "    vec4 tex = texture(u_sampler0, v_tc0);\n"
     "    if      (u_texenv0 == 0) color *= tex;\n"          // MODULATE
     "    else if (u_texenv0 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"  // ADD
     "    else if (u_texenv0 == 2) color = tex;\n"           // REPLACE
     "    else if (u_texenv0 == 3) { color.rgb = min(color.rgb+tex.rgb,1.0); }\n"  // COMBINE_ADD
     "  }\n"
     "  if (u_texture1 != 0) {\n"
-    "    vec4 tex = texture2D(u_sampler1, v_tc1);\n"
+    "    vec4 tex = texture(u_sampler1, v_tc1);\n"
     "    if      (u_texenv1 == 0) color *= tex;\n"
     "    else if (u_texenv1 == 1) { color.rgb = min(color.rgb+tex.rgb,1.0); color.a *= tex.a; }\n"
     "    else if (u_texenv1 == 2) color = tex;\n"
@@ -425,7 +436,14 @@ static const char *FRAG_SRC =
     "    ff = clamp(ff, 0.0, 1.0);\n"
     "    color.rgb = mix(u_fog_color.rgb, color.rgb, ff);\n"
     "  }\n"
-    "  gl_FragColor = color;\n"
+    "  if (u_soft_particles != 0) {\n"
+    "    float scene_depth = texture(u_scene_depth, gl_FragCoord.xy / u_depth_size).r;\n"
+    "    if (scene_depth < 1.0) {\n"
+    "      float separation = eye_depth(scene_depth) - eye_depth(gl_FragCoord.z);\n"
+    "      color.a *= clamp(separation / 100.0, 0.0, 1.0);\n"
+    "    }\n"
+    "  }\n"
+    "  frag_color = color;\n"
     "}\n";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -446,6 +464,11 @@ static void upload_uniforms(void) {
     StartProfilePhase(PROFILE_PHASE_GL_UNIFORMS);
 
     glUseProgram(s_prog);
+    glUniform1i(u_soft_particles, s_soft_particles);
+    if (s_soft_particles) {
+        const Mat4 *projection = &s_projection_stack[s_projection_top];
+        glUniform2f(u_depth_projection, projection->m[10], projection->m[14]);
+    }
 
     // ── Matrices (dirty when any matrix-stack op happens) ──
     if (s_uniform_dirty & UDIRTY_MATRIX) {
@@ -641,20 +664,20 @@ static int build_interleave_buffer(int vertex_count) {
     if (!buf) return -1;
 
     const char *v_ptr = (const char *)s_ca_vertex.ptr;
-    int v_stride = s_ca_vertex.stride ? s_ca_vertex.stride : 3*sizeof(float);
+    int v_stride = s_ca_vertex.stride ? s_ca_vertex.stride : 3*(int)sizeof(float);
     int v_size = s_ca_vertex.size;
 
     const char *n_ptr = (s_ca_normal.enabled && s_ca_normal.ptr) ? (const char *)s_ca_normal.ptr : NULL;
-    int n_stride = s_ca_normal.stride ? s_ca_normal.stride : 3*sizeof(float);
+    int n_stride = s_ca_normal.stride ? s_ca_normal.stride : 3*(int)sizeof(float);
 
     const char *c_ptr = (s_ca_color.enabled && s_ca_color.ptr) ? (const char *)s_ca_color.ptr : NULL;
-    int c_stride = s_ca_color.stride ? s_ca_color.stride : 4*sizeof(float);
+    int c_stride = s_ca_color.stride ? s_ca_color.stride : 4*(int)sizeof(float);
 
     const char *t0_ptr = (s_ca_texcoord[0].enabled && s_ca_texcoord[0].ptr) ? (const char *)s_ca_texcoord[0].ptr : NULL;
-    int t0_stride = s_ca_texcoord[0].stride ? s_ca_texcoord[0].stride : 2*sizeof(float);
+    int t0_stride = s_ca_texcoord[0].stride ? s_ca_texcoord[0].stride : 2*(int)sizeof(float);
 
     const char *t1_ptr = (s_ca_texcoord[1].enabled && s_ca_texcoord[1].ptr) ? (const char *)s_ca_texcoord[1].ptr : NULL;
-    int t1_stride = s_ca_texcoord[1].stride ? s_ca_texcoord[1].stride : 2*sizeof(float);
+    int t1_stride = s_ca_texcoord[1].stride ? s_ca_texcoord[1].stride : 2*(int)sizeof(float);
 
     for (int i = 0; i < vertex_count; i++) {
         float *dst = buf + i * STRIDE_FLOATS;
@@ -704,6 +727,7 @@ static int setup_vertex_attribs_from_arrays(int vertex_count) {
     if (buf_size < 0) return -1;
 
     StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+    glBindVertexArray(s_stream_vao);
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
     glBufferData(GL_ARRAY_BUFFER, buf_size, s_interleave_buf, GL_STREAM_DRAW);
     EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
@@ -737,24 +761,25 @@ static void disable_vertex_attribs(void) {
     glDisableVertexAttribArray(ATTRIB_TEXCOORD0);
     glDisableVertexAttribArray(ATTRIB_TEXCOORD1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 }
 
 // ── Public: init ──────────────────────────────────────────────────────────────
 void COMPAT_GL_Init(void) {
-#ifdef __ANDROID__
-    // Load real GLES2 function pointers via dlsym(RTLD_NEXT, ...) to avoid infinite
-    // recursion when our wrappers (same symbol names as GLES2 functions) call the
-    // underlying GLES2 implementation.
-    real_glEnable       = (void(*)(GLenum))       dlsym(RTLD_NEXT, "glEnable");
-    real_glDisable      = (void(*)(GLenum))       dlsym(RTLD_NEXT, "glDisable");
-    real_glGetFloatv    = (void(*)(GLenum,GLfloat*)) dlsym(RTLD_NEXT, "glGetFloatv");
-    real_glGetIntegerv  = (void(*)(GLenum,GLint*))   dlsym(RTLD_NEXT, "glGetIntegerv");
-    real_glDrawElements = (void(*)(GLenum,GLsizei,GLenum,const void*)) dlsym(RTLD_NEXT, "glDrawElements");
-    real_glDrawArrays   = (void(*)(GLenum,GLint,GLsizei)) dlsym(RTLD_NEXT, "glDrawArrays");
-    real_glHint         = (void(*)(GLenum,GLenum)) dlsym(RTLD_NEXT, "glHint");
-    real_glIsEnabled    = (GLboolean(*)(GLenum))  dlsym(RTLD_NEXT, "glIsEnabled");
-    real_glBindTexture  = (void(*)(GLenum,GLuint)) dlsym(RTLD_NEXT, "glBindTexture");
-#endif // __ANDROID__
+#ifndef __EMSCRIPTEN__
+#ifndef __ANDROID__
+    if (!LoadDesktopGL()) return;
+#endif
+    real_glEnable       = (void(*)(GLenum)) SDL_GL_GetProcAddress("glEnable");
+    real_glDisable      = (void(*)(GLenum)) SDL_GL_GetProcAddress("glDisable");
+    real_glGetFloatv    = (void(*)(GLenum,GLfloat*)) SDL_GL_GetProcAddress("glGetFloatv");
+    real_glGetIntegerv  = (void(*)(GLenum,GLint*)) SDL_GL_GetProcAddress("glGetIntegerv");
+    real_glDrawElements = (void(*)(GLenum,GLsizei,GLenum,const void*)) SDL_GL_GetProcAddress("glDrawElements");
+    real_glDrawArrays   = (void(*)(GLenum,GLint,GLsizei)) SDL_GL_GetProcAddress("glDrawArrays");
+    real_glHint         = (void(*)(GLenum,GLenum)) SDL_GL_GetProcAddress("glHint");
+    real_glIsEnabled    = (GLboolean(*)(GLenum)) SDL_GL_GetProcAddress("glIsEnabled");
+    real_glBindTexture  = (void(*)(GLenum,GLuint)) SDL_GL_GetProcAddress("glBindTexture");
+#endif
     // Init matrix stacks
     for (int i = 0; i < MATRIX_STACK_DEPTH; i++) {
         mat4_identity(&s_modelview_stack[i]);
@@ -829,12 +854,117 @@ void COMPAT_GL_Init(void) {
     u_texgen      = glGetUniformLocation(s_prog, "u_texgen");
     u_tex_matrix  = glGetUniformLocation(s_prog, "u_tex_matrix");
     u_tex_matrix2 = glGetUniformLocation(s_prog, "u_tex_matrix2");
+    u_soft_particles = glGetUniformLocation(s_prog, "u_soft_particles");
+    u_scene_depth = glGetUniformLocation(s_prog, "u_scene_depth");
+    u_depth_size = glGetUniformLocation(s_prog, "u_depth_size");
+    u_depth_projection = glGetUniformLocation(s_prog, "u_depth_projection");
+    glUseProgram(s_prog);
+    glUniform1i(u_scene_depth, 2);
 
-    // VBO/IBO for interleaved vertex data and indices
+    // Streaming VBO and VAO for immediate and non-cached draws.
     glGenBuffers(1, &s_vbo);
-    glGenBuffers(1, &s_ibo);
+    glGenVertexArrays(1, &s_stream_vao);
 
     SDL_Log("gl_compat: initialized (prog=%u)", s_prog);
+}
+
+void COMPAT_GL_Shutdown(void) {
+    if (s_depth_fbo) glDeleteFramebuffers(1, &s_depth_fbo);
+    if (s_depth_texture) glDeleteTextures(1, &s_depth_texture);
+    s_depth_fbo = s_depth_texture = 0;
+    s_depth_width = s_depth_height = 0;
+    s_depth_unavailable = s_soft_particles = 0;
+    if (s_prog) glDeleteProgram(s_prog);
+    s_prog = 0;
+    if (s_vbo) glDeleteBuffers(1, &s_vbo);
+    if (s_stream_vao) glDeleteVertexArrays(1, &s_stream_vao);
+    s_vbo = 0;
+    s_stream_vao = 0;
+    for (int i = 0; i < DRAW_CACHE_SIZE; i++) {
+        DrawCacheEntry *entry = &s_draw_cache[i];
+        if (entry->vao) glDeleteVertexArrays(1, &entry->vao);
+        if (entry->vbo) glDeleteBuffers(1, &entry->vbo);
+        if (entry->ibo) glDeleteBuffers(1, &entry->ibo);
+        memset(entry, 0, sizeof(*entry));
+    }
+}
+
+void COMPAT_GL_BeginSoftParticles(int width, int height) {
+    if (s_depth_unavailable || width <= 0 || height <= 0) return;
+    const char *setting = getenv("PANGEA_SOFT_PARTICLES");
+    if (setting && setting[0] == '0') return;
+
+    GLint samples = 0;
+    glGetIntegerv(GL_SAMPLES, &samples);
+    if (samples != 0) return;
+
+    if (width != s_depth_width || height != s_depth_height) {
+        GLint depth_bits = 0;
+        GLint stencil_bits = 0;
+        glGetIntegerv(GL_DEPTH_BITS, &depth_bits);
+        glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
+        if (depth_bits == 0) return;
+        GLenum depth_format = GL_DEPTH_COMPONENT;
+        GLenum depth_type = GL_UNSIGNED_SHORT;
+        GLenum depth_internal_format = GL_DEPTH_COMPONENT16;
+        s_depth_attachment = GL_DEPTH_ATTACHMENT;
+        if (stencil_bits > 0) {
+            depth_format = GL_DEPTH_STENCIL;
+            depth_type = GL_UNSIGNED_INT_24_8;
+            depth_internal_format = GL_DEPTH24_STENCIL8;
+            s_depth_attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+        } else if (depth_bits > 16) {
+            depth_type = GL_UNSIGNED_INT;
+            depth_internal_format = GL_DEPTH_COMPONENT24;
+        }
+        if (!s_depth_texture) glGenTextures(1, &s_depth_texture);
+        if (!s_depth_fbo) glGenFramebuffers(1, &s_depth_fbo);
+        glActiveTexture(GL_TEXTURE2);
+        REAL_glBindTexture(GL_TEXTURE_2D, s_depth_texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, depth_internal_format, width, height, 0,
+                     depth_format, depth_type, NULL);
+        glBindFramebuffer(GL_FRAMEBUFFER, s_depth_fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, s_depth_attachment, GL_TEXTURE_2D, s_depth_texture, 0);
+        const GLenum none = GL_NONE;
+        glDrawBuffers(1, &none);
+        glReadBuffer(GL_NONE);
+        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glActiveTexture(GL_TEXTURE0 + s_active_gl_texture_unit);
+        if (status != GL_FRAMEBUFFER_COMPLETE) {
+            SDL_Log("gl_compat: depth snapshot framebuffer incomplete: 0x%x", status);
+            s_depth_unavailable = 1;
+            return;
+        }
+        s_depth_width = width;
+        s_depth_height = height;
+    }
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, s_depth_fbo);
+    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
+                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    if (glGetError() != GL_NO_ERROR) {
+        SDL_Log("gl_compat: depth snapshot blit failed; soft particles disabled");
+        s_depth_unavailable = 1;
+        return;
+    }
+
+    glActiveTexture(GL_TEXTURE2);
+    REAL_glBindTexture(GL_TEXTURE_2D, s_depth_texture);
+    glActiveTexture(GL_TEXTURE0 + s_active_gl_texture_unit);
+    glUseProgram(s_prog);
+    glUniform2f(u_depth_size, (float)width, (float)height);
+    s_soft_particles = s_projection_stack[s_projection_top].m[15] == 0.0f;
+}
+
+void COMPAT_GL_EndSoftParticles(void) {
+    s_soft_particles = 0;
 }
 
 // ── Matrix operations ─────────────────────────────────────────────────────────
@@ -974,6 +1104,8 @@ void glEnable(GLenum cap) {
         case GL_NORMALIZE:   break;  // handled by per-vertex normalize in shader
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL; normalize handled in shader
         case GL_COLOR_MATERIAL: break;  // silently ignore
+        case GL_TEXTURE_1D: case GL_TEXTURE_3D: case GL_LINE_STIPPLE:
+        case GL_LINE_SMOOTH: case GL_COLOR_LOGIC_OP: break;
         case GL_DEPTH_TEST:  s_depth_test_enabled = 1; REAL_glEnable(cap); break;
         case GL_TEXTURE_2D:
             // Use s_active_texcoord_unit as proxy for the server-side active texture
@@ -1002,6 +1134,8 @@ void glDisable(GLenum cap) {
         case GL_NORMALIZE:   break;
         case GL_RESCALE_NORMAL: break;  // not supported in WebGL
         case GL_COLOR_MATERIAL: break;
+        case GL_TEXTURE_1D: case GL_TEXTURE_3D: case GL_LINE_STIPPLE:
+        case GL_LINE_SMOOTH: case GL_COLOR_LOGIC_OP: break;
         case GL_DEPTH_TEST:  s_depth_test_enabled = 0; REAL_glDisable(cap); break;
         case GL_TEXTURE_2D:
             s_texture_2d_enabled[s_active_texcoord_unit] = 0;
@@ -1203,11 +1337,8 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
     const void *t0_ptr = (s_ca_texcoord[0].enabled && s_ca_texcoord[0].ptr) ? s_ca_texcoord[0].ptr     : NULL;
     const void *t1_ptr = (s_ca_texcoord[1].enabled && s_ca_texcoord[1].ptr) ? s_ca_texcoord[1].ptr     : NULL;
 
-    // Determine the final index type (we may convert UINT→USHORT below)
+    // ES 3, WebGL 2, and GL 3.3 all support 32-bit element indices.
     int effective_type = type;
-#if !defined(USE_WEBGL2) && !defined(__ANDROID__)
-    if (type == GL_UNSIGNED_INT && vertex_count <= 65535) effective_type = GL_UNSIGNED_SHORT;
-#endif
 
     gCacheLookupsThisFrame++;
     int cache_idx = -1;
@@ -1236,26 +1367,8 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
     // Step 2: convert / prepare the index buffer into s_index_conv_buf if needed
     int ibo_bytes = 0;
     if (type == GL_UNSIGNED_INT) {
-#if defined(USE_WEBGL2) || defined(__ANDROID__)
         ibo_bytes = count * (int)sizeof(GLuint);
         effective_type = GL_UNSIGNED_INT;
-        // indices already usable as-is
-#else
-        if (vertex_count <= 65535) {
-            int needed_size = count * (int)sizeof(GLushort);
-            if (needed_size > s_index_conv_buf_capacity) {
-                s_index_conv_buf = (GLushort *)realloc(s_index_conv_buf, needed_size);
-                s_index_conv_buf_capacity = needed_size;
-            }
-            const GLuint *uint_idx = (const GLuint *)indices;
-            for (int i = 0; i < count; i++) s_index_conv_buf[i] = (GLushort)uint_idx[i];
-            ibo_bytes = needed_size;
-            effective_type = GL_UNSIGNED_SHORT;
-        } else {
-            ibo_bytes = count * (int)sizeof(GLuint);
-            effective_type = GL_UNSIGNED_INT;
-        }
-#endif
     } else {
         GLsizei sz = (type == GL_UNSIGNED_SHORT) ? (GLsizei)sizeof(GLushort) : (GLsizei)sizeof(GLubyte);
         ibo_bytes = count * (int)sz;
@@ -1269,7 +1382,7 @@ void glDrawElements_WithVertexCount(GLenum mode, GLsizei count, GLenum type, con
         gCacheEvictionsThisFrame++;
 
     const int STRIDE_BYTES = (3+3+4+2+2) * (int)sizeof(float);
-    const void *ibo_src = (effective_type == GL_UNSIGNED_SHORT) ? (const void *)s_index_conv_buf : indices;
+    const void *ibo_src = indices;
 
     StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
     if (!e->vao) {
@@ -1340,7 +1453,7 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     // (Not fully correct for all types, but handles the common float case)
     const void *orig = s_ca_vertex.ptr;
     if (first != 0) {
-        int vstride = s_ca_vertex.stride ? s_ca_vertex.stride : 3*sizeof(float);
+        int vstride = s_ca_vertex.stride ? s_ca_vertex.stride : 3*(int)sizeof(float);
         s_ca_vertex.ptr = (const char *)orig + first * vstride;
     }
 
@@ -1455,6 +1568,7 @@ void glEnd(void) {
     }
 
     StartProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
+    glBindVertexArray(s_stream_vao);
     glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
     glBufferData(GL_ARRAY_BUFFER, needed_bytes, vbo_data, GL_STREAM_DRAW);
     EndProfilePhase(PROFILE_PHASE_GL_GEOMETRY_UPLOAD);
@@ -1496,10 +1610,28 @@ void glEnd(void) {
 }
 
 // ── Stubs ─────────────────────────────────────────────────────────────────────
-void glPolygonMode(GLenum face, GLenum mode) { (void)face; (void)mode; }
+void glPolygonMode(GLenum face, GLenum mode) {
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+    typedef void (*pfn_t)(GLenum, GLenum);
+    static pfn_t real_fn = NULL;
+    if (!real_fn) real_fn = (pfn_t)SDL_GL_GetProcAddress("glPolygonMode");
+    if (real_fn) real_fn(face, mode);
+#else
+    (void)face; (void)mode;
+#endif
+}
 void glPushAttrib(GLbitfield mask) { (void)mask; }
 void glPopAttrib(void) {}
-void glDrawBuffer(GLenum buf) { (void)buf; }
+void glDrawBuffer(GLenum buf) {
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+    typedef void (*pfn_t)(GLenum);
+    static pfn_t real_fn = NULL;
+    if (!real_fn) real_fn = (pfn_t)SDL_GL_GetProcAddress("glDrawBuffer");
+    if (real_fn) real_fn(buf);
+#else
+    (void)buf;
+#endif
+}
 
 // glHint — WebGL only supports GL_GENERATE_MIPMAP_HINT; silently ignore
 // unsupported hints like GL_FOG_HINT to prevent GL_INVALID_ENUM errors.
@@ -1536,8 +1668,9 @@ void glGetBooleanv(GLenum pname, GLboolean *data) {
     if (pname == GL_DEPTH_WRITEMASK) {
         *data = s_depth_mask_enabled;
     } else {
-        // Fall through to real GL for anything else
-        REAL_glGetIntegerv(pname, (GLint *)data);  // piggyback via getIntegerv
+        GLint value = 0;
+        REAL_glGetIntegerv(pname, &value);
+        *data = value != 0;
     }
 }
 
@@ -1545,13 +1678,13 @@ void glGetBooleanv(GLenum pname, GLboolean *data) {
 void glDepthMask(GLboolean flag) {
     s_depth_mask_enabled = flag;
     // Pass through to real GL immediately — this is a pipeline state change.
-    typedef void (*pfn_t)(GLboolean);
 #ifdef __EMSCRIPTEN__
     extern void emscripten_glDepthMask(GLboolean);
     emscripten_glDepthMask(flag);
 #else
+    typedef void (*pfn_t)(GLboolean);
     static pfn_t real_fn = NULL;
-    if (!real_fn) real_fn = (pfn_t)dlsym(RTLD_NEXT, "glDepthMask");
+    if (!real_fn) real_fn = (pfn_t)SDL_GL_GetProcAddress("glDepthMask");
     if (real_fn) real_fn(flag);
 #endif
 }
@@ -1568,5 +1701,3 @@ void glBindVertexArrayAPPLE(GLuint a)                { (void)a; }
 void glFlushVertexArrayRangeAPPLE(GLsizei l, void *p){ (void)l; (void)p; }
 void glVertexArrayRangeAPPLE(GLsizei l, void *p)     { (void)l; (void)p; }
 void glVertexArrayParameteriAPPLE(GLenum pname, GLint param) { (void)pname; (void)param; }
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

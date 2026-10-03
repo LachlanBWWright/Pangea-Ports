@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "scene_depth.h"
 #include "profiling.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -318,6 +319,8 @@ void DefaultDrawCallback(void)
 		/* DRAW OBJECTS & TERAIN */	
 
 	DrawObjects();											// draw objNodes which includes fences, terrain, etc.
+
+	SceneDepth_Capture();
 
 			/* DRAW MISC */
 

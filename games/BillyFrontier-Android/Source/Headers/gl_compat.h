@@ -9,7 +9,6 @@
 // (GL_MODELVIEW, GL_PROJECTION, GL_BGRA, etc.)
 #include <SDL3/SDL_opengl.h>
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #include "modern_gl.h"
 #include "vertex_array_compat.h"
 #include "state_compat.h"
@@ -46,14 +45,10 @@
 // glTranslate*, glRotate*, glScale*, glFrustum, glOrtho
 
 // Functions that don't exist in WebGL/GLES2 — no-op
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 #define glPolygonMode(face, mode) ((void)0)
+#endif
 
 // Note: glHint IS a valid GLES2 function but only for GL_GENERATE_MIPMAP_HINT.
 // GL_FOG_HINT calls are guarded with #ifndef __EMSCRIPTEN__ in the source code
 // instead of a macro, to avoid conflicting with the GLES2/gl2.h declaration.
-
-#else
-
-void CompatGL_InvalidateCachePtr(const void *ptr);
-
-#endif // __EMSCRIPTEN__ || __ANDROID__

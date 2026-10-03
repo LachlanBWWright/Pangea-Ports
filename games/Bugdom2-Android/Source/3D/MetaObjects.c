@@ -800,9 +800,7 @@ go_here:
 	/***********/
 
 //	glLockArraysEXT(0, data->numPoints);
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	GLES3_SetVertexCount(data->numPoints);
-#endif
 	BeginRenderSubphase(PROFILE_RENDER_SUB_MO_SUBMIT);
 	glDrawElements(GL_TRIANGLES,data->numTriangles*3,GL_UNSIGNED_INT,&data->triangles[0]);
 	EndRenderSubphase(PROFILE_RENDER_SUB_MO_SUBMIT);

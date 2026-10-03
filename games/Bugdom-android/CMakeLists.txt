@@ -364,14 +364,14 @@ if(EMSCRIPTEN)
 	set_target_properties(${GAME_TARGET} PROPERTIES SUFFIX ".html")
 
 	# Link options for Emscripten WebAssembly build
-	# Uses modern OpenGL ES 2.0 / WebGL (no legacy emulation required)
+	# The renderer requires OpenGL ES 3.0 / WebGL 2.
 	target_link_options(${GAME_TARGET} PRIVATE
 		-sASYNCIFY=1
 		-sASYNCIFY_STACK_SIZE=65536
 		-sDISABLE_EXCEPTION_CATCHING=0
 		-sALLOW_MEMORY_GROWTH=1
 		-sMAXIMUM_MEMORY=512MB
-		-sFULL_ES2=1
+		-sMIN_WEBGL_VERSION=2
 		-sMAX_WEBGL_VERSION=2
 		-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,FS
 		-lidbfs.js

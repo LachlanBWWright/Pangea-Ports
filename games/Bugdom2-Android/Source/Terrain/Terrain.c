@@ -786,14 +786,12 @@ OGLVector3D			*vertexNormals;
 		gHiccupTimer &= 0x1;							// spread over 2 frames
 	}
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	/* Supertile slot was just (re)built with new geometry; evict any stale cache entry for these pointers.
 	   colorsByte and triangles also change when a slot is reused for a different supertile position. */
 	GLES3_InvalidateCachePtr(meshData->points);
 	GLES3_InvalidateCachePtr(meshData->normals);
 	GLES3_InvalidateCachePtr(meshData->colorsByte);
 	GLES3_InvalidateCachePtr(meshData->triangles);
-#endif
 
 	return(superTileNum);
 }
@@ -889,7 +887,6 @@ int					ro,co;
 
 static inline void ReleaseSuperTileObject(short superTileNum)
 {
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	/* Evict any draw-cache entry for this slot so the freed VBO data is
 	   not mistakenly re-used if the slot is recycled by the allocator. */
 	MOVertexArrayData *meshData = gSuperTileMemoryList[superTileNum].meshData;
@@ -900,7 +897,6 @@ static inline void ReleaseSuperTileObject(short superTileNum)
 		GLES3_InvalidateCachePtr(meshData->colorsByte);
 		GLES3_InvalidateCachePtr(meshData->triangles);
 	}
-#endif
 	gSuperTileMemoryList[superTileNum].mode = SUPERTILE_MODE_FREE;		// it's free!
 	gNumFreeSupertiles++;
 }
@@ -1264,11 +1260,9 @@ float	oneOverWaveLength,r,rw,dampenRatio;
 
 	CalculateSupertileVertexNormals(superTile->meshData, startRow, startCol);
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 	/* Terrain vertex positions and normals were modified by deformation; evict stale cache entries. */
 	GLES3_InvalidateCachePtr(superTile->meshData->points);
 	GLES3_InvalidateCachePtr(superTile->meshData->normals);
-#endif
 
 }
 
@@ -1930,6 +1924,5 @@ float	y0,y1,y2,y3;
 		}
 	}
 }
-
 
 

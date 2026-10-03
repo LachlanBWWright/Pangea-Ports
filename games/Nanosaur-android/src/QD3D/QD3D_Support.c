@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "scene_depth.h"
 #include "profiling.h"
 
 #ifdef __EMSCRIPTEN__
@@ -69,10 +70,12 @@ void QD3D_Boot(void)
 	gGLContext = SDL_GL_CreateContext(gSDLWindow);									// also makes it current
 	GAME_ASSERT_MESSAGE(gGLContext, SDL_GetError());
 
-#ifdef __EMSCRIPTEN__
-	// Initialize the GLES2 fixed-function compatibility layer (shaders, VBOs, etc.)
-	COMPAT_GL_Init();
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__)
+	GAME_ASSERT_MESSAGE(ModernGL_LoadFunctions(), "OpenGL 3.3 functions are unavailable");
 #endif
+	SDL_Log("OpenGL context: %s, GLSL: %s", glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
+	// Initialize the shader-based fixed-function compatibility layer.
+	COMPAT_GL_Init();
 }
 
 
@@ -84,6 +87,7 @@ void QD3D_Shutdown(void)
 
 	if (gGLContext)
 	{
+		SceneDepth_Shutdown();
 		SDL_GL_DestroyContext(gGLContext);
 		gGLContext = NULL;
 	}

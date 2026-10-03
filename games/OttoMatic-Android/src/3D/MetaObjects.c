@@ -1363,18 +1363,21 @@ void MO_DeleteObjectInfo_Geometry_VertexArray(MOVertexArrayData *data)
 
 	if (data->points)
 	{
+		CompatGL_InvalidateCachePtr(data->points);
 		SafeDisposePtr((Ptr)data->points);
 		data->points = nil;
 	}
 
 	if (data->normals)
 	{
+		CompatGL_InvalidateCachePtr(data->normals);
 		SafeDisposePtr((Ptr)data->normals);
 		data->normals = nil;
 	}
 
 	if (data->uvs[0])
 	{
+		CompatGL_InvalidateCachePtr(data->uvs[0]);
 		SafeDisposePtr((Ptr)data->uvs[0]);
 		data->uvs[0] = nil;
 
@@ -1382,6 +1385,7 @@ void MO_DeleteObjectInfo_Geometry_VertexArray(MOVertexArrayData *data)
 		{
 			if (data->uvs[1])
 			{
+				CompatGL_InvalidateCachePtr(data->uvs[1]);
 				SafeDisposePtr((Ptr)data->uvs[1]);
 				data->uvs[1] = nil;
 			}
@@ -1390,18 +1394,21 @@ void MO_DeleteObjectInfo_Geometry_VertexArray(MOVertexArrayData *data)
 
 	if (data->colorsByte)
 	{
+		CompatGL_InvalidateCachePtr(data->colorsByte);
 		SafeDisposePtr((Ptr)data->colorsByte);
 		data->colorsByte = nil;
 	}
 
 	if (data->colorsFloat)
 	{
+		CompatGL_InvalidateCachePtr(data->colorsFloat);
 		SafeDisposePtr((Ptr)data->colorsFloat);
 		data->colorsFloat = nil;
 	}
 
 	if (data->triangles)
 	{
+		CompatGL_InvalidateCachePtr(data->triangles);
 		SafeDisposePtr((Ptr)data->triangles);
 		data->triangles = nil;
 	}
@@ -1774,6 +1781,5 @@ MOVertexArrayObject	*vObj;
 		uvPtr[i].v += dv;
 	}
 }
-
 
 

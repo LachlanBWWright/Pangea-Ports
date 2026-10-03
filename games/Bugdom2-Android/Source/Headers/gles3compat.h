@@ -1,14 +1,17 @@
 //
 // gles3compat.h
-// GLES3/WebGL2 compatibility layer for legacy OpenGL 1.x calls.
-// Included for Emscripten and Android GLES builds.
+// Shader and buffer renderer that adapts the legacy game draw API to modern GL.
+// Uses desktop OpenGL 3.3, Android GLES 3, and WebGL 2 entry points.
 //
 
 #pragma once
 
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
-
 #include <GLES3/gl3.h>
+#else
+#include <SDL3/SDL_opengl.h>
+#include <SDL3/SDL_opengl_glext.h>
+#endif
 #include <stdlib.h>   // malloc/free for texture conversion
 
 //------------------------------------------------------------
@@ -121,10 +124,15 @@
 //------------------------------------------------------------
 // Type for ClientActiveTexture callback
 //------------------------------------------------------------
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 typedef void (*PFNGLCLIENTACTIVETEXTUREARBPROC)(GLenum);
+#define B2_GL_APIENTRY
+#else
+#define B2_GL_APIENTRY APIENTRY
+#endif
 
 // Stub for glClientActiveTexture (tracks active unit, no-op otherwise)
-void glClientActiveTexture(GLenum texture);
+void B2_GL_APIENTRY glClientActiveTexture(GLenum texture);
 
 //------------------------------------------------------------
 // Declarations for legacy GL functions we provide
@@ -221,5 +229,6 @@ void GLES3_DepthMask(GLboolean flag);
 // Init function – call from OGL_Boot
 //------------------------------------------------------------
 void GLES3Compat_Init(void);
-
-#endif // __EMSCRIPTEN__
+void GLES3Compat_Dispose(void);
+bool GLES3_BeginSoftParticles(GLsizei width, GLsizei height, float nearPlane, float farPlane);
+void GLES3_EndSoftParticles(void);

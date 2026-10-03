@@ -165,6 +165,10 @@ else()
 	add_executable(${GAME_TARGET} ${GAME_SOURCES})
 endif()
 
+if(NOT EMSCRIPTEN AND NOT ANDROID)
+	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_GL_CORE=1)
+endif()
+
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
 target_include_directories(${GAME_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/../../shared/metadata)
 target_include_directories(${GAME_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/../../shared/render)
@@ -316,6 +320,8 @@ if(EMSCRIPTEN)
 		-sMAXIMUM_MEMORY=1073741824
 		# WebGL/OpenGL ES support
 		-sUSE_WEBGL2=1
+		-sMIN_WEBGL_VERSION=2
+		-sMAX_WEBGL_VERSION=2
 		# Bundle game data into a .data file served alongside the .wasm
 		--preload-file "${CMAKE_SOURCE_DIR}/Data@/Data"
 		# Optimize for web-only delivery (removes Node.js compatibility shims)

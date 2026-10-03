@@ -518,18 +518,15 @@ MOMaterialObject	*overrideTexture, *oldTexture = nil;
 			}
 		}
 
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 		/* Skeleton vertex data is updated in-place each frame by UpdateSkinnedGeometry; evict stale cache entries. */
 		GLES3_InvalidateCachePtr(gLocalTriMeshesOfSkelType[skelType][i].points);
 		GLES3_InvalidateCachePtr(gLocalTriMeshesOfSkelType[skelType][i].normals);
-#endif
 		MO_DrawGeometry_VertexArray(&gLocalTriMeshesOfSkelType[skelType][i]);
 
 		if (overrideTexture && oldTexture)											// see if need to set texture back to normal
 			gLocalTriMeshesOfSkelType[skelType][i].materials[0] = oldTexture;
 	}
 }
-
 
 
 

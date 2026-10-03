@@ -194,9 +194,10 @@ if(EMSCRIPTEN)
 	# Emscripten link flags for the WebAssembly build:
 	#   ASYNCIFY              - allows blocking C loops to yield to the browser event loop
 	#   ASYNCIFY_STACK_SIZE   - stack size for asyncify (default 4096 is too small for this game)
-	#   FULL_ES2              - provides full OpenGL ES 2.0 emulation (no legacy GL emulation;
+	#   FULL_ES2              - provides GLES compatibility entry points (no legacy GL emulation;
 	#                           our custom compat layer in state_compat.c / modern_gl.c
 	#                           translates legacy OpenGL calls to shader-based rendering)
+	#   MIN/MAX_WEBGL_VERSION - require WebGL 2 for the GLSL ES 3.00 renderer
 	#   GL_DEBUG              - disable GL emulation debug messages (reduces console noise)
 	#   preload-file          - embed the Data/ folder into the virtual filesystem
 	#   EXPORTED_FUNCTIONS    - export extra C functions callable from JavaScript
@@ -211,6 +212,8 @@ if(EMSCRIPTEN)
 		"SHELL:-sASYNCIFY_IMPORTS=[emscripten_fast_yield]"
 		"SHELL:-sDISABLE_EXCEPTION_CATCHING=0"
 		"SHELL:-sFULL_ES2=1"
+		"SHELL:-sMIN_WEBGL_VERSION=2"
+		"SHELL:-sMAX_WEBGL_VERSION=2"
 		"SHELL:-sGL_DEBUG=0"
 		"SHELL:-sGL_UNSAFE_OPTS=0"
 		"SHELL:-sALLOW_MEMORY_GROWTH=1"
@@ -321,7 +324,7 @@ else()
 endif()
 
 # Link core dependencies
-# OpenGL not needed for Emscripten (WebGL via -sLEGACY_GL_EMULATION) or Android (OpenGL ES via SDL)
+# OpenGL is provided by the browser or Android GLES library on those platforms.
 if(NOT EMSCRIPTEN AND NOT ANDROID)
 	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
 else()
