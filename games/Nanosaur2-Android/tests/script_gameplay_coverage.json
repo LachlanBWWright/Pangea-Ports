@@ -1,0 +1,16 @@
+{
+  "hooks": [
+    "onDamage",
+    "onDamageApplied",
+    "onDeath",
+    "onPlayerRespawn"
+  ],
+  "consumer_sources": [
+    "Source/Player/Player.c"
+  ],
+  "native_calls": [
+    "PlayerLoseHealth",
+    "KillPlayer",
+    "ResetPlayerAtBestCheckpoint"
+  ]
+}

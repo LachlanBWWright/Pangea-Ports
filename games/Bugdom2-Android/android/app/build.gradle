@@ -4,6 +4,8 @@ import org.gradle.api.file.RelativePath
 
 apply plugin: 'com.android.application'
 
+def luaSmoke = providers.gradleProperty("luaSmoke").map { it.toBoolean() }.getOrElse(false)
+
 def sdlVersion = "3.2.8"
 def sdlArchiveName = "SDL3-${sdlVersion}.tar.gz"
 def sdlArchiveUrl = "https://libsdl.org/release/${sdlArchiveName}"
@@ -76,6 +78,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DPANGEA_ENABLE_SCRIPTING=ON",
+                          "-DPANGEA_ANDROID_LUA_SMOKE=${luaSmoke ? 'ON' : 'OFF'}",
                           "-DSDL_STATIC=ON",
                           "-DSDL_SHARED=OFF",
                            "-DBUILD_SDL_FROM_SOURCE=ON"
@@ -90,13 +93,22 @@ android {
         }
     }
 
+    buildFeatures { buildConfig true }
     buildTypes {
+        debug {
+            if (luaSmoke) applicationIdSuffix ".luasmoke"
+            buildConfigField "boolean", "LUA_SMOKE", luaSmoke.toString()
+        }
         release {
+            buildConfigField "boolean", "LUA_SMOKE", "false"
             minifyEnabled false
         }
     }
 
     sourceSets {
+        if (luaSmoke) {
+            debug.assets.srcDirs += ["../../../../tests/fixtures/android-lua-smoke/assets"]
+        }
         main {
             // Game data assets packaged into APK
             assets.srcDirs = ['../../Data']
@@ -115,4 +127,11 @@ tasks.matching { task ->
     task.name.startsWith("buildCMake")
 }.configureEach {
     dependsOn(tasks.named("prepareSdlSource"))
+}
+
+// Smoke progression and fixture assets are never allowed into release variants.
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variantBuilder ->
+        if (luaSmoke) variantBuilder.enable = false
+    }
 }

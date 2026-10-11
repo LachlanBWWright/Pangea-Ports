@@ -18,4 +18,4 @@ export type NanosaurLifecycleModule =
   Partial<{
     onTerrainItem(ctx: NanosaurTerrainItemContext): ItemSpawnResult | void;
   }>,
-    "onSplineItem" | "onCheckpointReached" | "onObjectiveComplete" | "onLapComplete" | "onRaceFinish">;
+    "onSplineItem" | "onCheckpointReached" | "onObjectiveComplete" | "onLapComplete" | "onRaceFinish" | "onSave" | "onLoad">;

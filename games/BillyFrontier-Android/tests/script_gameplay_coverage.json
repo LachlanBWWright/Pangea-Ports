@@ -1,0 +1,11 @@
+{
+  "hooks": [
+    "onDeath"
+  ],
+  "consumer_sources": [
+    "Source/Player/Player.c"
+  ],
+  "native_calls": [
+    "KillPlayer"
+  ]
+}

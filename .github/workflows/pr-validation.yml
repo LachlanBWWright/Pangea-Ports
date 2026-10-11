@@ -62,6 +62,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -69,8 +71,27 @@ jobs:
         run: |
           cmake -S shared/script -B build-lua-tests -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
           cmake --build build-lua-tests --parallel 2
+      - name: Check native dispatch and Lua/TypeScript hook coverage
+        run: |
+          python3 scripts/check_script_coverage.py --json build-lua-tests/script-hook-coverage.json
+          python3 -m unittest discover -s tests -p test_script_coverage.py -v
       - name: Run Lua and shipped game configuration tests
         run: ctest --test-dir build-lua-tests --output-on-failure
+      # SDL release-3.2.8, pinned to the verified release commit.
+      - uses: actions/checkout@v4
+        with:
+          repository: libsdl-org/SDL
+          ref: f6864924f76e1a0b4abaefc76ae2ed22b1a8916e
+          path: work/ci-sdl
+      - name: Build SDL for native gameplay fixtures
+        run: |
+          cmake -S work/ci-sdl -B build-sdl -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/build-sdl-install" -DCMAKE_INSTALL_LIBDIR=lib -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TESTS=OFF -DSDL_VIDEO=OFF -DSDL_AUDIO=OFF -DSDL_RENDER=OFF -DSDL_JOYSTICK=OFF -DSDL_HAPTIC=OFF -DSDL_SENSOR=OFF -DSDL_DIALOG=OFF
+          cmake --build build-sdl --parallel 2
+          cmake --install build-sdl
+      - name: Run actual native gameplay consumers in all eight games
+        run: |
+          python3 scripts/check_native_script_adapters.py --sysroot-include "$PWD/build-sdl-install/include"
+          python3 scripts/check_native_script_gameplay.py --script-build build-lua-tests --sysroot-include "$PWD/build-sdl-install/include" --sdl-lib-dir "$PWD/build-sdl-install/lib" --json build-lua-tests/native-gameplay-coverage.json
       - name: Check TypeScript contracts and examples
         working-directory: shared/script-types
         run: |

@@ -26,6 +26,7 @@ if(PANGEA_SAFE_ITEM_LOADING)
 	add_compile_definitions(PANGEA_SAFE_ITEM_LOADING=1)
 endif()
 option(PANGEA_ENABLE_SCRIPTING "Enable Lua scripting support" OFF)
+option(PANGEA_ANDROID_LUA_SMOKE "Enable opt-in Android Lua lifecycle smoke fixture" OFF)
 option(PANGEA_ENABLE_LEVEL_METADATA "Enable optional level metadata overrides" ON)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
@@ -192,6 +193,13 @@ target_compile_definitions(${GAME_TARGET} PRIVATE
 
 if(PANGEA_ENABLE_SCRIPTING)
 	target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+endif()
+
+if(PANGEA_ANDROID_LUA_SMOKE)
+  if(NOT PANGEA_ENABLE_SCRIPTING)
+    message(FATAL_ERROR "Lua smoke requires scripting")
+  endif()
+  target_compile_definitions(${GAME_TARGET} PRIVATE PANGEA_ANDROID_LUA_SMOKE=1)
 endif()
 
 if(PANGEA_ENABLE_LEVEL_METADATA)

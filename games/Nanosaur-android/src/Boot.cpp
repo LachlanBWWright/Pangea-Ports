@@ -18,6 +18,9 @@
 extern "C"
 {
 	#include "game.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+	#include "ScriptBindings.h"
+#endif
 
 	SDL_Window* gSDLWindow = nullptr;
 	WindowPtr gCoverWindow = nullptr;
@@ -260,6 +263,9 @@ static void Shutdown()
 	// Always restore the user's mouse acceleration before exiting.
 	// SetMacLinearMouse(false);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	NanosaurScript_Shutdown();
+#endif
 	Pomme::Shutdown();
 
 	if (gSDLWindow)

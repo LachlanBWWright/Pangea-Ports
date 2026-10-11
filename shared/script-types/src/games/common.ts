@@ -56,6 +56,10 @@ export interface RaceResults {
 }
 
 export type GameplayLifecycleModule = Partial<{
+  onGameStart(ctx: GameContext): void;
+  onGameShutdown(ctx: GameContext): void;
+  onSave(ctx: LevelContext): void;
+  onLoad(ctx: LevelContext): void;
   onPickupCollected(ctx: PickupContext): PickupResult | void;
   onWeaponHit(ctx: WeaponHitContext): WeaponHitResult | void;
   onTriggerEnter(ctx: TriggerContext): TriggerResult | void;

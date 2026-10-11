@@ -216,10 +216,12 @@ static void PlayGame(void)
 
 				/* DO LEVEL INTRO */
 
+#ifndef PANGEA_ANDROID_LUA_SMOKE
 		if (!(gStartLevel >= 0 && gStartLevel < NUM_LEVELS && gLevelNum == gStartLevel))
 		{
 			DoLevelIntro();
 		}
+#endif
 
 		MyFlushEvents();
 
@@ -269,6 +271,11 @@ static void PlayGame(void)
 		}
 
 
+#ifdef PANGEA_ANDROID_LUA_SMOKE
+        if (gLevelNum >= 1) break;
+        continue;
+#endif
+
 		/* DO END-LEVEL BONUS SCREEN */
 
 		if (LevelMetadataCaseFor("level.bugdom2Area", gLevelNum) == LEVEL_NUM_PARK)				// if just won game then do win screen first!
@@ -280,7 +287,12 @@ static void PlayGame(void)
 
 			/* DO HIGH SCORES */
 
+#ifndef PANGEA_ANDROID_LUA_SMOKE
 	NewScore();
+#endif
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_Shutdown();
+#endif
 
 	gPlayingFromSavedGame = false;
 }
@@ -320,9 +332,6 @@ static void PlayArea(void)
 					OGL_FadeOutScene(DrawObjects, KeepTerrainAlive);
 	}
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-	Bugdom2Script_Shutdown();
-#endif
 }
 
 
@@ -427,6 +436,11 @@ static void PlayArea_Terrain(void)
 			gNumFences = -gNumFences;					// toggle fences
 			InvalidateAllInputs();
 		}
+
+#ifdef PANGEA_ANDROID_LUA_SMOKE
+        if (gGameFrameNum >= 120 && !gLevelCompleted)
+            StartLevelCompletion(0.0f);
+#endif
 
 				/* SEE IF LEVEL IS COMPLETED */
 

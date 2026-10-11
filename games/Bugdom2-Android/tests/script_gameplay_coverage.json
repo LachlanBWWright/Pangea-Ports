@@ -1,0 +1,30 @@
+{
+  "hooks": [
+    "onDamage",
+    "onDamageApplied",
+    "onDeath",
+    "onPickupCollected",
+    "onCheckpointReached",
+    "onPlayerRespawn",
+    "onObjectFrame"
+  ],
+  "consumer_sources": [
+    "Source/Player/Player.c",
+    "Source/Items/Powerups.c"
+  ],
+  "native_sources": [
+    "Source/Player/Player.c",
+    "Source/Items/Powerups.c"
+  ],
+  "native_calls": [
+    "PlayerLoseHealth",
+    "KillPlayer",
+    "DoTrig_Powerup",
+    "StartPowerupVanish",
+    "SetCheckpoint",
+    "ResetPlayerAtBestCheckpoint",
+    "Bugdom2Script_ApplyObjectScripting"
+  ],
+  "test": "native_gameplay_test.c",
+  "notes": "Real production adapters and whole native consumer translation units with real Lua. Audio/render dependencies stubbed; unexpected untested gameplay branches assert. No save-versioning coverage."
+}

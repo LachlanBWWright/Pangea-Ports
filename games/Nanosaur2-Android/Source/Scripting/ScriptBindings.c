@@ -1073,7 +1073,8 @@ void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj)
 	}
 
 	UpdateObjectTransforms(obj);
-	CalcObjectBoxFromNode(obj);
+	if (obj->CollisionBoxes)
+		CalcObjectBoxFromNode(obj);
 	obj->ScriptVisualOffset = (OGLVector3D){0};
 	if (!result.hasPositionOffset)
 		return;

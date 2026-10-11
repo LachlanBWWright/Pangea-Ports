@@ -1,0 +1,28 @@
+{
+  "hooks": [
+    "onDamage",
+    "onDamageApplied",
+    "onDeath",
+    "onPickupCollected",
+    "onPlayerRespawn",
+    "onObjectFrame",
+    "onWeaponHit"
+  ],
+  "consumer_sources": [
+    "src/Player/MyGuy.c",
+    "src/Items/Triggers.c",
+    "src/Enemies/Enemy.c"
+  ],
+  "native_sources": [],
+  "native_calls": [
+    "PlayerGotHurt",
+    "KillPlayer",
+    "DoTrig_Crystal",
+    "ResetPlayer",
+    "EnemyGotHurt",
+    "KillEnemy",
+    "DeleteEnemy"
+  ],
+  "test": "native_gameplay_test.c",
+  "notes": "Real production adapters and whole native consumer translation units with real Lua. Audio/render dependencies stubbed; unexpected untested gameplay branches assert. No save-versioning coverage."
+}

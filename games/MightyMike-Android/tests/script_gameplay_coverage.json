@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    "onDamage",
+    "onDamageApplied",
+    "onPickupCollected"
+  ],
+  "consumer_sources": [
+    "src/MeAndMo/MyGuy.c"
+  ],
+  "native_calls": [
+    "IGotHurt",
+    "MeHitBonusObject"
+  ]
+}

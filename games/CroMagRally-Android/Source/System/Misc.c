@@ -9,6 +9,10 @@
 /* EXTERNALS   */
 /***************/
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #include "game.h"
 #include "network.h"
 
@@ -110,9 +114,11 @@ static Boolean	beenHere = false;
 
 	if (!beenHere)
 	{
-		DeleteAllObjects();
-
 		beenHere = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		CroMagScript_Shutdown();
+#endif
+		DeleteAllObjects();
 
 		SavePlayerFile();								// save player if any
 

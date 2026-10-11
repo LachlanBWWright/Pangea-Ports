@@ -18,4 +18,4 @@ export type CroMagRallyLifecycleModule =
     onTerrainItem(ctx: CroMagTerrainItemContext): ItemSpawnResult | void;
     onSplineItem(ctx: SplineItemContext): ItemSpawnResult | void;
   }>,
-    "onPlayerRespawn" | "onObjectiveComplete">;
+    "onPlayerRespawn" | "onObjectiveComplete" | "onSave" | "onLoad">;

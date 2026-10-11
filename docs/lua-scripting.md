@@ -266,6 +266,21 @@ invalidating their handles; cleanup can delete inactive children and recursion
 is guarded against duplicate deletion. A module disabled after repeated hook
 failures is no longer reported as runnable.
 
+## Transactional reloads
+
+Replacement modules initialize in a separate Lua state. A compilation or
+initialization failure preserves the running module, native handles, level
+settings, startup selection, and runtime fingerprint. The rejected candidate's
+diagnostics remain available through `pangea.api.diagnostics().lastError`.
+
+During staging, native mutation commands and persistence writes raise an error;
+local state, subscriptions, and timer declarations stay private to the candidate.
+Put gameplay mutations in lifecycle callbacks instead of module initialization.
+Configuration replacements expose the proposed settings to module-level reads.
+Hot reloads retain the current level clock, so a newly declared timer waits from
+reload time. Successful replacement installs fresh Lua state; it does not migrate
+the previous module's local variables or subscriptions.
+
 ## Regression checks
 
 Run the shared runtime and shipped game tests, including Release assertions:
@@ -286,3 +301,27 @@ python3 scripts/check_native_script_adapters.py --sysroot-include /path/to/inclu
 
 The include directory must contain `SDL3/SDL.h`; no SDL library or game assets
 are needed by these adapter tests.
+
+Production gameplay consumers are also exercised with the real Lua runtime:
+
+```sh
+python3 scripts/check_native_script_gameplay.py --script-build build-lua-tests \
+  --sysroot-include /path/to/include --sdl-lib-dir /path/to/lib \
+  --json work/native-gameplay-coverage.json
+python3 scripts/check_script_coverage.py --json work/script-hook-coverage.json
+```
+
+These fixtures stub unrelated audio and rendering services. Each game's
+`tests/script_gameplay_coverage.json` identifies its exercised consumers and
+hooks. The coverage checker also checks advertised hooks, native call sites,
+Lua API registration, and TypeScript declarations; static agreement does not
+replace the live-game smoke tests. See `docs/android-lua-smoke.md` for the
+packaged APK and cross-level persistence test.
+
+When a Lua callback fails, `pangea.api.diagnostics().lastError` contains bounded
+`status`, `message`, `traceback`, `source`, `line`, `hook`, `gameId`, `levelNum`,
+and `frameNum` fields, plus `object` when an object callback supplied it. The
+field is absent before a recorded failure. Source names preserve the selected
+Lua bundle filename so a line number points back to the authored module.
+If a hook both calls `setPositionOffset` and returns `positionOffset`, the returned
+vector takes precedence for that hook.

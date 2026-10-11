@@ -444,7 +444,21 @@ export interface CheckpointResult {
   readonly checkpoint: number;
 }
 
+export interface PangeaFailureDiagnostic {
+  readonly status: number;
+  readonly message: string;
+  readonly traceback: string;
+  readonly source: string;
+  readonly line: number;
+  readonly hook: string;
+  readonly gameId: GameId;
+  readonly levelNum: number;
+  readonly frameNum: number;
+  readonly object?: ObjectHandle;
+}
+
 export interface PangeaDiagnostics {
+  readonly lastError?: PangeaFailureDiagnostic;
   readonly memoryUsedBytes: number;
   readonly memoryLimitBytes: number;
   readonly activeTimers: number;
@@ -478,6 +492,8 @@ export interface PangeaLifecycleTraceEntry {
 
 export interface PangeaApi {
   readonly api: {
+    readonly contractVersion: 1;
+    readonly apiVersion: 1;
     readonly version: 1;
     readonly minimumVersion: 1;
     requireVersion(minimum: number, maximum?: number): true;

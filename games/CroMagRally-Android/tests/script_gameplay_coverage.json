@@ -1,0 +1,24 @@
+{
+  "hooks": [
+    "onDamage",
+    "onDamageApplied",
+    "onDeath",
+    "onWeaponHit",
+    "onCheckpointReached",
+    "onLapComplete",
+    "onRaceFinish"
+  ],
+  "consumer_sources": [
+    "Source/Player/Player.c",
+    "Source/Player/Player_Car.c",
+    "Source/Terrain/Checkpoints.c",
+    "Source/3D/3DMath.c"
+  ],
+  "native_calls": [
+    "PlayerLoseHealth",
+    "BlastCarsWithWeapon",
+    "UpdatePlayerCheckpoints",
+    "NextLap",
+    "PlayerCompletedRace"
+  ]
+}

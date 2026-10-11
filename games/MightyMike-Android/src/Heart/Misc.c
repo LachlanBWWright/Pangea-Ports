@@ -8,6 +8,10 @@
 /* EXTERNALS   */
 /***************/
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
+
 #include <SDL3/SDL.h>
 #include "version.h"
 #include "myglobals.h"
@@ -158,6 +162,10 @@ static Boolean beenHereFlag = false;
 	if (beenHereFlag)								// see if already been called
 		goto	exit;
 
+	beenHereFlag = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_Shutdown();
+#endif
 	CleanMemory();
 	ZapAllSounds();
 	CleanupDisplay();								// unloads Draw Sprocket

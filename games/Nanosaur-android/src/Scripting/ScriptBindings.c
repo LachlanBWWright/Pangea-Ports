@@ -803,7 +803,8 @@ void NanosaurScript_ApplyObjectScripting(ObjNode* obj)
 	}
 
 	UpdateObjectTransforms(obj);
-	CalcObjectBoxFromNode(obj);
+	if (obj->CollisionBoxes && obj->NumCollisionBoxes == 1)
+		CalcObjectBoxFromNode(obj);
 	obj->ScriptVisualOffset = (TQ3Vector3D){0};
 	if (!result.hasPositionOffset)
 		return;

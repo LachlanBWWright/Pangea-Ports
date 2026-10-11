@@ -94,6 +94,9 @@ static int gMapReplacementCount;
 static PangeaScriptSplineReplacement gSplineReplacements[PANGEA_CONFIG_MAX_SPLINE_REPLACEMENTS];
 static int gSplineReplacementCount;
 static PangeaConfig gParsedConfig;
+// Candidate module initialization reads its configuration without committing live state.
+static const PangeaConfig* gStagedConfig;
+static bool gStagedConfigEmpty;
 static RegisteredObject gRegisteredObjects[PANGEA_SCRIPT_MAX_OBJECTS];
 static int gBudgetExceededCount;
 static int gHooksCalledCount;
@@ -594,10 +597,13 @@ static const LevelSetting* find_level_setting(const char* key)
 	if (!key || !key[0])
 		return NULL;
 
-	for (int i = 0; i < gLevelSettingCount; i++)
+	const LevelSetting* settings = gStagedConfig ? gStagedConfig->level.levelSettings : gLevelSettings;
+	const int count = gStagedConfigEmpty ? 0
+		: (gStagedConfig ? gStagedConfig->level.levelSettingCount : gLevelSettingCount);
+	for (int i = 0; i < count; i++)
 	{
-		if (strcmp(gLevelSettings[i].key, key) == 0)
-			return &gLevelSettings[i];
+		if (strcmp(settings[i].key, key) == 0)
+			return &settings[i];
 	}
 
 	return NULL;
@@ -996,15 +1002,15 @@ static bool copy_string(char* dest, size_t destSize, const char* source)
 	return true;
 }
 
-static char* read_text_file(const char* path, long* outSize)
+static char* read_text_file_with_info(const char* path, long* outSize, const PangeaScriptGameInfo* gameInfo)
 {
 	if (outSize) *outSize = 0;
 	if (!path || !path[0]) return NULL;
 	FILE* file = fopen(path, "rb");
-	if (!file && gGameInfo.readTextFile)
+	if (!file && gameInfo->readTextFile)
 	{
 		long assetSize = -1;
-		char* asset = gGameInfo.readTextFile(path, &assetSize);
+		char* asset = gameInfo->readTextFile(path, &assetSize);
 		if (asset)
 		{
 			if (assetSize < 0 || assetSize == LONG_MAX || (uintmax_t)assetSize >= SIZE_MAX)
@@ -1066,6 +1072,82 @@ static char* read_text_file(const char* path, long* outSize)
 	return bytes;
 }
 
+static char* read_text_file(const char* path, long* outSize)
+{
+	return read_text_file_with_info(path, outSize, &gGameInfo);
+}
+
+/* Candidate backends own their Lua state and resources until a successful commit. */
+static PangeaScriptStatus stage_script_backend(const PangeaScriptGameInfo* gameInfo,
+	const char* scriptPath, bool staging, int targetLevel, const PangeaConfig* stagedConfig, PangeaScriptBackend** outBackend, uint32_t* outFingerprint)
+{
+	*outBackend = NULL;
+	long size = 0;
+	char* source = read_text_file_with_info(scriptPath, &size, gameInfo);
+	if (!source)
+	{
+		set_error(PANGEA_SCRIPT_FILE_NOT_FOUND, "Script file not found");
+		return PANGEA_SCRIPT_FILE_NOT_FOUND;
+	}
+	if (size == 0)
+	{
+		free(source);
+		set_error(PANGEA_SCRIPT_PARSE_ERROR, "Script file is empty");
+		return PANGEA_SCRIPT_PARSE_ERROR;
+	}
+	PangeaScriptBackend* candidate = PangeaScriptBackend_Create(gameInfo);
+	if (!candidate)
+	{
+		free(source);
+		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Could not allocate the replacement scripting backend");
+		return PANGEA_SCRIPT_RUNTIME_ERROR;
+	}
+	PangeaScriptBackend_SetStaging(candidate, staging);
+	if (targetLevel >= 0) PangeaScriptBackend_SetLevelContext(candidate, targetLevel);
+	else if (gBackend) PangeaScriptBackend_CopyExecutionContext(candidate, gBackend);
+	char error[PANGEA_SCRIPT_ERROR_CAPACITY] = {0};
+	const PangeaConfig* previousReadView = gStagedConfig;
+	const bool previousEmptyReadView = gStagedConfigEmpty;
+	gStagedConfig = stagedConfig;
+	// A replacement host starts with no level configuration.
+	gStagedConfigEmpty = targetLevel == 0 && !stagedConfig;
+	PangeaScriptStatus status = PangeaScriptBackend_LoadNamed(candidate, source, scriptPath, error, sizeof(error));
+	gStagedConfig = previousReadView;
+	gStagedConfigEmpty = previousEmptyReadView;
+	const uint32_t fingerprint = compute_runtime_fingerprint(gameInfo->gameId, (const unsigned char*)source, (size_t)size);
+	free(source);
+	if (status != PANGEA_SCRIPT_OK)
+	{
+		if (gBackend) PangeaScriptBackend_CopyLastError(gBackend, candidate);
+		PangeaScriptBackend_Destroy(candidate);
+		set_backend_error(status, error);
+		return status;
+	}
+	*outBackend = candidate;
+	*outFingerprint = fingerprint;
+	return PANGEA_SCRIPT_OK;
+}
+
+static void commit_script_backend(PangeaScriptBackend* candidate, uint32_t fingerprint)
+{
+	PangeaScriptBackend* previous = gBackend;
+	gBackend = candidate;
+	PangeaScriptBackend_SetStaging(candidate, false);
+	gRuntimeFingerprint = fingerprint;
+	gScriptLoaded = true;
+	gConsecutiveHookFailures = 0;
+	gScriptsDisabled = false;
+	PangeaScript_ResetCommandTrace();
+	if (previous)
+	{
+		PangeaScriptBackend_SetStaging(previous, true);
+		PangeaScriptBackend_Destroy(previous);
+	}
+	gLastError[0] = '\0';
+	gLastRuntimeError[0] = '\0';
+	set_error(PANGEA_SCRIPT_OK, "");
+}
+
 // Custom JSON parser functions removed. Config parsing is handled in pangea_script_config.c.
 
 static void restore_base_startup_script(void)
@@ -1085,30 +1167,44 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "PangeaScript_Init received incomplete game info");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
-	restore_base_startup_script();
 	effectiveGameInfo = *gameInfo;
 	if (!effectiveGameInfo.loadPersistent)
 		effectiveGameInfo.loadPersistent = default_load_persistent;
 	if (!effectiveGameInfo.savePersistent)
 		effectiveGameInfo.savePersistent = default_save_persistent;
 
-	(void)PangeaScript_ApplyObjectLifecycleToAll(&shutdownFrame, PANGEA_SCRIPT_OBJECT_DESTROY);
-	gGameInfo = effectiveGameInfo;
-	gRuntimeFingerprint = compute_runtime_fingerprint(gGameInfo.gameId, NULL, 0);
-	if (gBackend)
+	const bool replacingRuntime = gInitialized;
+	PangeaScriptBackend* candidate = NULL;
+	uint32_t fingerprint = compute_runtime_fingerprint(effectiveGameInfo.gameId, NULL, 0);
+	bool candidateLoaded = false;
+	const char* selectedPath = gLevelScriptOverride ? gBaseStartupScriptPath : gStartupScriptPath;
+	if (replacingRuntime && (selectedPath[0] || gScriptLoaded))
 	{
-		PangeaScriptBackend_Destroy(gBackend);
-		gBackend = NULL;
+		PangeaScriptStatus status = stage_script_backend(&effectiveGameInfo, selectedPath[0] ? selectedPath : "Data/Scripts/dist/main.lua", true, 0, NULL, &candidate, &fingerprint);
+		if (status != PANGEA_SCRIPT_OK) return status;
+		candidateLoaded = true;
 	}
-	gBackend = PangeaScriptBackend_Create(&effectiveGameInfo);
-	if (!gBackend)
+	else
+		candidate = PangeaScriptBackend_Create(&effectiveGameInfo);
+	if (!candidate)
 	{
-		gInitialized = false;
 		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "PangeaScript_Init could not create the scripting backend");
 		return PANGEA_SCRIPT_RUNTIME_ERROR;
 	}
+	(void)PangeaScript_ApplyObjectLifecycleToAll(&shutdownFrame, PANGEA_SCRIPT_OBJECT_DESTROY);
+	reset_objects();
+	if (gBackend)
+	{
+		PangeaScriptBackend_SetStaging(gBackend, true);
+		PangeaScriptBackend_Destroy(gBackend);
+	}
+	restore_base_startup_script();
+	gBackend = candidate;
+	PangeaScriptBackend_SetStaging(candidate, false);
+	gGameInfo = effectiveGameInfo;
+	gRuntimeFingerprint = fingerprint;
 	gInitialized = true;
-	gScriptLoaded = false;
+	gScriptLoaded = candidateLoaded;
 	gErrorCount = 0;
 	gLastError[0] = '\0';
 	gLastRuntimeError[0] = '\0';
@@ -1129,12 +1225,11 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 	gHasLastFrameContext = false;
 	PangeaScript_ResetCommandTrace();
 	PangeaScript_ResetLifecycleTrace();
-	reset_objects();
-	if (gStartupScriptPath[0])
+	if (!replacingRuntime && gStartupScriptPath[0])
 	{
 		PangeaScriptStatus startupStatus = PangeaScript_Reload();
 		if (startupStatus != PANGEA_SCRIPT_OK && startupStatus != PANGEA_SCRIPT_FILE_NOT_FOUND)
-			set_error(startupStatus, "Configured startup script could not be loaded during initialization");
+			return startupStatus;
 	}
 	set_error(PANGEA_SCRIPT_OK, "");
 	return PANGEA_SCRIPT_OK;
@@ -1200,6 +1295,7 @@ bool PangeaScript_IsNetworkedMode(void)
 
 PangeaScriptStatus PangeaScript_SetStartupScript(const char* path)
 {
+	char replacementPath[PANGEA_SCRIPT_PATH_CAPACITY];
 	if (!path || !path[0])
 	{
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Startup script path is empty");
@@ -1210,16 +1306,23 @@ PangeaScriptStatus PangeaScript_SetStartupScript(const char* path)
 		set_error(PANGEA_SCRIPT_CONFIG_ERROR, "Invalid script path: must be relative and cannot contain traversal");
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
-	if (!copy_string(gStartupScriptPath, sizeof(gStartupScriptPath), path))
+	if (!copy_string(replacementPath, sizeof(replacementPath), path))
 	{
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Startup script path is too long");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
+	if (gInitialized)
+	{
+		PangeaScriptBackend* candidate = NULL;
+		uint32_t fingerprint = 0;
+		PangeaScriptStatus status = stage_script_backend(&gGameInfo, replacementPath,
+			gScriptLoaded, -1, NULL, &candidate, &fingerprint);
+		if (status != PANGEA_SCRIPT_OK) return status;
+		commit_script_backend(candidate, fingerprint);
+	}
+	copy_string(gStartupScriptPath, sizeof(gStartupScriptPath), replacementPath);
 	gLevelScriptOverride = false;
-	if (!gInitialized)
-		return PANGEA_SCRIPT_OK;
-
-	return PangeaScript_Reload();
+	return PANGEA_SCRIPT_OK;
 }
 
 #ifdef __EMSCRIPTEN__
@@ -1243,50 +1346,14 @@ PangeaScriptStatus PangeaScript_Reload(void)
 		set_error(PANGEA_SCRIPT_NOT_ENABLED, "Scripting host is not initialized");
 		return PANGEA_SCRIPT_NOT_ENABLED;
 	}
-
 	const char* scriptPath = gStartupScriptPath[0] ? gStartupScriptPath : "Data/Scripts/dist/main.lua";
-	long scriptSize = 0;
-	char* script = read_text_file(scriptPath, &scriptSize);
-	if (!script)
-	{
-		gScriptLoaded = false;
-		set_error(PANGEA_SCRIPT_FILE_NOT_FOUND, "Script file not found");
-		return PANGEA_SCRIPT_FILE_NOT_FOUND;
-	}
-
-	gScriptLoaded = scriptSize > 0;
-	if (!gScriptLoaded)
-	{
-		free(script);
-		set_error(PANGEA_SCRIPT_PARSE_ERROR, "Script file is empty");
-		return PANGEA_SCRIPT_PARSE_ERROR;
-	}
-	gRuntimeFingerprint = compute_runtime_fingerprint(gGameInfo.gameId, (const unsigned char*)script, (size_t)scriptSize);
-
-	if (gBackend)
-	{
-		char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
-		backendError[0] = '\0';
-		PangeaScriptStatus status = PangeaScriptBackend_Load(gBackend, script, backendError, (int)sizeof(backendError));
-		free(script);
-		if (status != PANGEA_SCRIPT_OK)
-		{
-			gScriptLoaded = false;
-			set_backend_error(status, backendError);
-			return status;
-		}
-
-		gConsecutiveHookFailures = 0;
-		gScriptsDisabled = false;
-		gLastError[0] = '\0';
-		gLastRuntimeError[0] = '\0';
-		set_error(PANGEA_SCRIPT_OK, "");
-		return PANGEA_SCRIPT_OK;
-	}
-
-	free(script);
-	set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Lua runtime is not linked; script execution is unavailable");
-	return PANGEA_SCRIPT_RUNTIME_ERROR;
+	PangeaScriptBackend* candidate = NULL;
+	uint32_t fingerprint = 0;
+	const bool staging = gScriptLoaded;
+	PangeaScriptStatus status = stage_script_backend(&gGameInfo, scriptPath, staging, -1, NULL, &candidate, &fingerprint);
+	if (status != PANGEA_SCRIPT_OK) return status;
+	commit_script_backend(candidate, fingerprint);
+	return PANGEA_SCRIPT_OK;
 }
 
 static bool ensure_startup_script_loaded(void)
@@ -1367,18 +1434,23 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
 
-	if (found && scriptPath[0])
+	const bool needsModuleReload = (found && scriptPath[0]) || gLevelScriptOverride;
+	PangeaScriptBackend* candidate = NULL;
+	uint32_t fingerprint = 0;
+	if (needsModuleReload)
 	{
-		long moduleSize = 0;
-		char* module = read_text_file(scriptPath, &moduleSize);
-		if (!module)
+		const char* replacementPath = found && scriptPath[0] ? scriptPath
+			: (gBaseStartupScriptPath[0] ? gBaseStartupScriptPath : "Data/Scripts/dist/main.lua");
+		PangeaScriptStatus status = stage_script_backend(&gGameInfo, replacementPath,
+			gInitialized && gScriptLoaded, levelNum, parsedConfig, &candidate, &fingerprint);
+		if (status != PANGEA_SCRIPT_OK)
 		{
 			free(parsedConfig);
 			free(config);
-			set_error(PANGEA_SCRIPT_FILE_NOT_FOUND, "Configured level script file not found");
-			return PANGEA_SCRIPT_FILE_NOT_FOUND;
+			if (status == PANGEA_SCRIPT_FILE_NOT_FOUND)
+				set_error(status, "Configured level script file not found");
+			return status;
 		}
-		free(module);
 	}
 
 	PangeaScriptFrameContext resetFrame = {
@@ -1431,7 +1503,6 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 			gSplineReplacements[i] = gParsedConfig.level.splineReplacements[i];
 	}
 
-	const bool needsModuleReload = (found && scriptPath[0]) || gLevelScriptOverride;
 	if (found && scriptPath[0])
 	{
 		if (!gLevelScriptOverride)
@@ -1441,17 +1512,11 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 	}
 	else
 		restore_base_startup_script();
-	if (needsModuleReload)
-	{
-		PangeaScriptStatus reloadStatus = PangeaScript_Reload();
-		if (reloadStatus != PANGEA_SCRIPT_OK)
-		{
-			free(config);
-			gItemRemapCount = 0;
-			clear_level_settings();
-			return reloadStatus;
-		}
-	}
+	if (candidate) commit_script_backend(candidate, fingerprint);
+	free(gLastFrameMode);
+	gLastFrameMode = NULL;
+	gLastFrameContext = (PangeaScriptFrameContext){0};
+	gHasLastFrameContext = false;
 
 	free(config);
 	set_error(PANGEA_SCRIPT_OK, "");

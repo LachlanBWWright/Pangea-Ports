@@ -875,7 +875,8 @@ void Bugdom2Script_ApplyObjectScripting(ObjNode* obj)
 	}
 
 	UpdateObjectTransforms(obj);
-	CalcObjectBoxFromNode(obj);
+	if (obj->CollisionBoxes && obj->NumCollisionBoxes == 1)
+		CalcObjectBoxFromNode(obj);
 	obj->ScriptVisualOffset = (OGLVector3D){0};
 	if (!result.hasPositionOffset)
 		return;

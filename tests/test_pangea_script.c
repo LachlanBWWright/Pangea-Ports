@@ -16,6 +16,10 @@ static PangeaScriptStatus g_mock_hook_status = PANGEA_SCRIPT_OK;
 static int g_mock_scripted_spawn_count;
 static int g_mock_native_spawn_count;
 static char g_mock_loaded_source[128];
+static bool g_mock_read_setting;
+static int g_mock_staged_gravity;
+static bool g_mock_create_failure;
+static int g_mock_backends_alive;
 static int g_native_delete_count;
 static PangeaScriptStatus (*g_object_hook)(const PangeaScriptObjectFrameContext*);
 static bool g_mock_executed_hook = true;
@@ -41,14 +45,17 @@ static PangeaScriptStatus mock_spawn_scripted(
 
 PangeaScriptBackend* PangeaScriptBackend_Create(const PangeaScriptGameInfo* gameInfo)
 {
-	static PangeaScriptBackend backend;
+	if (g_mock_create_failure) return NULL;
+	PangeaScriptBackend* backend = calloc(1, sizeof(*backend));
+	assert(backend);
+	g_mock_backends_alive++;
 	g_mock_effective_info = *gameInfo;
-	return &backend;
+	return backend;
 }
 
 void PangeaScriptBackend_Destroy(PangeaScriptBackend* backend)
 {
-	(void) backend;
+	if (backend) { g_mock_backends_alive--; free(backend); }
 }
 
 PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* source, char* error, int errorCapacity)
@@ -57,9 +64,30 @@ PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const 
 	(void) source;
 	(void) error;
 	(void) errorCapacity;
-	snprintf(g_mock_loaded_source, sizeof(g_mock_loaded_source), "%s", source);
+	if (g_mock_read_setting)
+	{
+		g_mock_staged_gravity = -1;
+		PangeaScript_GetLevelIntSetting("gravity", &g_mock_staged_gravity);
+	}
+	if (g_mock_load_status == PANGEA_SCRIPT_OK)
+		snprintf(g_mock_loaded_source, sizeof(g_mock_loaded_source), "%s", source);
 	return g_mock_load_status;
 }
+
+void PangeaScriptBackend_SetStaging(PangeaScriptBackend* backend, bool staging)
+{ (void)backend; (void)staging; }
+
+void PangeaScriptBackend_CopyLastError(PangeaScriptBackend* destination, const PangeaScriptBackend* source)
+{ (void)destination; (void)source; }
+
+void PangeaScriptBackend_CopyExecutionContext(PangeaScriptBackend* destination, const PangeaScriptBackend* source)
+{ (void)destination; (void)source; }
+
+void PangeaScriptBackend_SetLevelContext(PangeaScriptBackend* backend, int levelNum)
+{ (void)backend; (void)levelNum; }
+
+PangeaScriptStatus PangeaScriptBackend_LoadNamed(PangeaScriptBackend* backend, const char* source, const char* sourceName, char* error, int errorCapacity)
+{ (void)sourceName; return PangeaScriptBackend_Load(backend, source, error, errorCapacity); }
 
 PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backend, PangeaScriptHook hook, const PangeaScriptLevelContext* context, char* error, int errorCapacity)
 {
@@ -729,7 +757,7 @@ static void test_packaged_script_transport(void)
  assert(g_mock_asset_reads>=3);
  g_mock_invalid_asset_size=true;
  assert(PangeaScript_Reload()==PANGEA_SCRIPT_FILE_NOT_FOUND);
- assert(!PangeaScript_HasRunnableModule());
+ assert(PangeaScript_HasRunnableModule());
  PangeaScript_Shutdown();
  g_mock_invalid_asset_size=false;
 }
@@ -886,8 +914,8 @@ static void test_level_module_selection(void)
 	assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_OK);
 	assert(remove("Data/Scripts/dist/other.lua") == 0);
 	assert(PangeaScript_LoadLevelConfig(2) == PANGEA_SCRIPT_FILE_NOT_FOUND);
-	assert(!PangeaScript_HasRunnableModule());
-	assert(!PangeaScript_GetLevelIntSetting("gravity", &gravity));
+	assert(PangeaScript_HasRunnableModule());
+	assert(PangeaScript_GetLevelIntSetting("gravity", &gravity) && gravity == 111);
 	PangeaScript_Shutdown();
 	system("rm -rf Data");
 }
@@ -972,12 +1000,77 @@ static void test_inactive_collision_and_activation_capabilities(void)
 	PangeaScript_Shutdown();
 }
 
+static void test_transactional_replacements(void)
+{
+	const PangeaScriptGameInfo game = {.gameId = "transaction", .gameName = "Transaction"};
+	const PangeaScriptGameInfo otherGame = {.gameId = "replacement", .gameName = "Replacement"};
+	assert(PangeaScript_Init(&game) == PANGEA_SCRIPT_OK);
+	system("mkdir -p Data/Scripts/dist Data/Scripts/config");
+	write_temp_file("Data/Scripts/dist/live.lua", "return { marker = 'live' }");
+	write_temp_file("Data/Scripts/dist/replacement.lua", "return { marker = 'replacement' }");
+	write_temp_file("Data/Scripts/config/transactions.json",
+		"{\"version\":1,\"levels\":{"
+		"\"1\":{\"script\":\"Data/Scripts/dist/live.lua\",\"levelSettings\":{\"gravity\":111}},"
+		"\"2\":{\"script\":\"Data/Scripts/dist/replacement.lua\",\"levelSettings\":{\"gravity\":222}}}}");
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/live.lua") == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SetConfigPath("Data/Scripts/config/transactions.json") == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_OK);
+	DummyObject object = {0};
+	PangeaScriptObjectHandle handle;
+	const PangeaScriptObjectRegistration registration = {
+		.nativeObject = &object, .ops = &kDummyOps, .capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL,
+	};
+	assert(PangeaScript_RegisterObject(&registration, &handle) == PANGEA_SCRIPT_OK);
+	const uint32_t fingerprint = PangeaScript_GetRuntimeFingerprint();
+	const PangeaScriptStatus failures[] = {PANGEA_SCRIPT_PARSE_ERROR, PANGEA_SCRIPT_RUNTIME_ERROR};
+	for (unsigned int i = 0; i < sizeof(failures) / sizeof(failures[0]); i++)
+	{
+		g_mock_load_status = failures[i];
+		assert(PangeaScript_SetStartupScript("Data/Scripts/dist/replacement.lua") == failures[i]);
+		g_mock_read_setting = true;
+		assert(PangeaScript_LoadLevelConfig(2) == failures[i]);
+		assert(g_mock_staged_gravity == 222);
+		assert(PangeaScript_Init(&otherGame) == failures[i]);
+		assert(g_mock_staged_gravity == -1);
+		g_mock_read_setting = false;
+		assert(PangeaScript_HasRunnableModule() && PangeaScript_ObjectExists(handle));
+		assert(!object.deleted && g_mock_backends_alive == 1);
+		assert(PangeaScript_GetRuntimeFingerprint() == fingerprint);
+		assert(strcmp(PangeaScript_GetStatusActiveScriptPath(), "Data/Scripts/dist/live.lua") == 0);
+		int gravity = 0;
+		assert(PangeaScript_GetLevelIntSetting("gravity", &gravity) && gravity == 111);
+		assert(!PangeaScript_GetStatusScriptsDisabled());
+	}
+	g_mock_load_status = PANGEA_SCRIPT_OK;
+	g_mock_create_failure = true;
+	assert(PangeaScript_Reload() == PANGEA_SCRIPT_RUNTIME_ERROR);
+	assert(PangeaScript_Init(&otherGame) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	assert(PangeaScript_HasRunnableModule() && PangeaScript_ObjectExists(handle));
+	assert(PangeaScript_GetRuntimeFingerprint() == fingerprint && g_mock_backends_alive == 1);
+	g_mock_create_failure = false;
+	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
+	assert(strcmp(g_mock_effective_info.gameId, "transaction") == 0);
+	assert(strstr(g_mock_loaded_source, "'live'"));
+	assert(PangeaScript_ObjectExists(handle));
+	g_mock_read_setting = true;
+	assert(PangeaScript_LoadLevelConfig(2) == PANGEA_SCRIPT_OK);
+	assert(g_mock_staged_gravity == 222);
+	g_mock_read_setting = false;
+	int gravity = 0;
+	assert(PangeaScript_GetLevelIntSetting("gravity", &gravity) && gravity == 222);
+	assert(strstr(g_mock_loaded_source, "'replacement'"));
+	assert(!PangeaScript_ObjectExists(handle) && g_mock_backends_alive == 1);
+	PangeaScript_Shutdown();
+	system("rm -rf Data");
+}
+
 int main(void)
 {
 	printf("========================================\n");
 	printf(" Running Native PangeaScript Unit Tests \n");
 	printf("========================================\n");
 
+	test_transactional_replacements();
 	test_inactive_collision_and_activation_capabilities();
 	test_level_module_selection();
 	test_rejected_path_preserves_transport();
@@ -994,6 +1087,7 @@ int main(void)
 	test_packaged_script_transport();
 
 	printf("========================================\n");
+	assert(g_mock_backends_alive == 0);
 	printf(" All Native Unit Tests Passed!          \n");
 	printf("========================================\n");
 	return 0;

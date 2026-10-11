@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "levels": {
+    "0": {
+      "script": "Data/Scripts/smoke/level0.lua",
+      "levelSettings": {
+        "smokeModule": 0
+      }
+    },
+    "1": {
+      "script": "Data/Scripts/smoke/level1.lua",
+      "levelSettings": {
+        "smokeModule": 1
+      }
+    }
+  }
+}

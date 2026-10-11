@@ -9,6 +9,11 @@ void PangeaScriptBackend_Destroy(PangeaScriptBackend* backend);
 /* Optional hooks that have no callable Lua handler do not count as successes. */
 bool PangeaScriptBackend_DidExecuteHook(PangeaScriptBackend* backend);
 PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* source, char* error, int errorCapacity);
+PangeaScriptStatus PangeaScriptBackend_LoadNamed(PangeaScriptBackend* backend, const char* source, const char* sourceName, char* error, int errorCapacity);
+void PangeaScriptBackend_SetStaging(PangeaScriptBackend* backend, bool staging);
+void PangeaScriptBackend_CopyLastError(PangeaScriptBackend* destination, const PangeaScriptBackend* source);
+void PangeaScriptBackend_CopyExecutionContext(PangeaScriptBackend* destination, const PangeaScriptBackend* source);
+void PangeaScriptBackend_SetLevelContext(PangeaScriptBackend* backend, int levelNum);
 PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backend, PangeaScriptHook hook, const PangeaScriptLevelContext* context, char* error, int errorCapacity);
 PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backend, const PangeaScriptFrameContext* context, char* error, int errorCapacity);
 PangeaScriptStatus PangeaScriptBackend_CallTerrainItemHook(PangeaScriptBackend* backend, PangeaScriptTerrainItemContext* context, char* error, int errorCapacity);

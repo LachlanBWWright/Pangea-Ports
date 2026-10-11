@@ -155,9 +155,10 @@ QD3DSetupOutputType	*outputPtr;
 
 	SDL_GL_SetSwapInterval(gGamePrefs.vsync);
 
-	CreateLights(&setupDefPtr->lights);
-
 	Render_InitState(&setupDefPtr->view.clearColor);
+
+	// Light uniforms require the shader program created by Render_InitState.
+	CreateLights(&setupDefPtr->lights);
 
 	if (setupDefPtr->lights.useFog)
 	{

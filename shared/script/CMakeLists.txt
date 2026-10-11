@@ -35,6 +35,14 @@ if(UNIX AND NOT EMSCRIPTEN)
 endif()
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
+	find_package(Python3 REQUIRED COMPONENTS Interpreter)
+	add_test(NAME ScriptHookCoverage
+		COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/check_script_coverage.py
+		--json ${CMAKE_CURRENT_BINARY_DIR}/script-hook-coverage.json)
+	add_test(NAME ScriptCoverageCheckerTests
+		COMMAND ${Python3_EXECUTABLE} -m unittest discover -s tests -p test_script_coverage.py -v)
+	set_tests_properties(ScriptCoverageCheckerTests PROPERTIES
+		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 	# Exercise the runtime independently of Lua using the controllable mock backend.
 	add_executable(PangeaScriptCoreTests ../../tests/test_pangea_script.c
 		pangea_script.c pangea_script_config.c)
@@ -50,12 +58,20 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
 	add_executable(PangeaScriptLuaTests ../../tests/test_pangea_script_lua.c)
 	target_link_libraries(PangeaScriptLuaTests PRIVATE PangeaScript)
 	target_compile_features(PangeaScriptLuaTests PRIVATE c_std_17)
+	add_executable(PangeaTransactionalLuaTests ../../tests/test_transactional_lua.c)
+	target_link_libraries(PangeaTransactionalLuaTests PRIVATE PangeaScript)
+	target_compile_features(PangeaTransactionalLuaTests PRIVATE c_std_17)
+	file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/transactional-tests")
+	add_test(NAME PangeaTransactionalLuaTests COMMAND PangeaTransactionalLuaTests)
+	set_tests_properties(PangeaTransactionalLuaTests PROPERTIES
+		WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/transactional-tests")
 	add_executable(PangeaGameScriptSampleTests ../../tests/test_game_script_samples.c)
 	target_link_libraries(PangeaGameScriptSampleTests PRIVATE PangeaScript)
 	target_compile_features(PangeaGameScriptSampleTests PRIVATE c_std_17)
 	if(EMSCRIPTEN)
 		# The conformance fixtures exercise nested Lua/native callbacks and exceed Emscripten's 64 KiB default stack.
 		target_link_options(PangeaScriptLuaTests PRIVATE "-sSTACK_SIZE=262144")
+		target_link_options(PangeaTransactionalLuaTests PRIVATE "-sSTACK_SIZE=262144")
 		target_link_options(PangeaGameScriptSampleTests PRIVATE "-sSTACK_SIZE=262144")
 	endif()
 	if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -99,7 +115,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
 	endif()
 	# Assertions are executable conformance checks, including in Release builds.
 	foreach(test_target IN ITEMS PangeaScriptCoreTests PangeaScriptLuaTests
-		PangeaGameScriptSampleTests PangeaShippedGameScriptTests)
+		PangeaGameScriptSampleTests PangeaShippedGameScriptTests PangeaTransactionalLuaTests)
 		if(TARGET ${test_target})
 			if(MSVC)
 				target_compile_options(${test_target} PRIVATE /UNDEBUG)

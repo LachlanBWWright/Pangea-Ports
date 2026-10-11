@@ -1,0 +1,24 @@
+{
+  "hooks": [
+    "onDamage",
+    "onDamageApplied",
+    "onDeath",
+    "onPlayerRespawn",
+    "onWeaponHit"
+  ],
+  "consumer_sources": [
+    "src/Player/Player.c",
+    "src/Player/Player_Weapons.c"
+  ],
+  "native_sources": [
+    "src/Player/Player.c"
+  ],
+  "native_calls": [
+    "PlayerLoseHealth",
+    "KillPlayer",
+    "ResetPlayerAtBestCheckpoint",
+    "OttoScript_ApplyWeaponHit"
+  ],
+  "test": "native_gameplay_test.c",
+  "notes": "Real production adapters and whole native consumer translation units with real Lua. Audio/render dependencies stubbed; unexpected untested gameplay branches assert. No save-versioning coverage."
+}

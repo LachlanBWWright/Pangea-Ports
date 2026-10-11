@@ -528,6 +528,89 @@ static void test_zero_wait_started_during_frame(PangeaScriptBackend* backend, ch
 	}
 }
 
+static void write_script(const char* path, const char* source);
+
+static void test_actionable_failure_diagnostics(PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+	const char* source =
+		"return {onFrame=function(ctx)\n"
+		" if ctx.frameNum==1 then error('diagnostic boom') end\n"
+		" local d=pangea.api.diagnostics().lastError; assert(d and d.hook=='onFrame' and d.gameId=='Test')\n"
+		" assert(d.source=='Data/Scripts/dist/diagnostic-case.lua' and d.line==2 and d.levelNum==7 and d.frameNum==1)\n"
+		" assert(string.find(d.message,'diagnostic boom',1,true) and string.find(d.traceback,'stack traceback:',1,true))\n"
+		"end}";
+	assert(PangeaScriptBackend_LoadNamed(backend, source, "Data/Scripts/dist/diagnostic-case.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptFrameContext frame = {.levelNum=7,.frameNum=1,.levelTimeSeconds=100};
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	assert(strstr(error, "diagnostic-case.lua:2") && strstr(error, "level=7 frame=1"));
+	frame.frameNum=2;
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	const char* spoof = "return {onFrame=function() error('script instruction budget exceeded: user text') end}";
+	assert(PangeaScriptBackend_LoadNamed(backend, spoof, "Data/Scripts/dist/spoof-budget.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	const char* caughtBudget = "return {onFrame=function() local ok=pcall(function() while true do end end); assert(not ok) end}";
+	assert(PangeaScriptBackend_LoadNamed(backend, caughtBudget, "Data/Scripts/dist/caught-budget.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_BUDGET_EXCEEDED);
+
+	write_script("Data/Scripts/dist/diagnostic-module.lua", "return function()\n error('module diagnostic')\nend");
+	const char* moduleSource =
+		"local fail=require('diagnostic-module'); return {onObjectFrame=function() fail() end, onFrame=function()\n"
+		" local d=pangea.api.diagnostics().lastError; assert(d.source=='Data/Scripts/dist/diagnostic-module.lua' and d.line==2)\n"
+		" assert(d.hook=='onObjectFrame' and d.object.id==42 and d.object.generation==9) end}";
+	assert(PangeaScriptBackend_LoadNamed(backend, moduleSource, "Data/Scripts/dist/diagnostic-main.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptObjectFrameContext object = {.levelNum=7,.object={42,9}};
+	PangeaScriptObjectFrameResult result = {0};
+	assert(PangeaScriptBackend_CallObjectFrameHook(backend, &object, &result, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	assert(strstr(error, "object=42:9"));
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+}
+
+static void test_scheduler_failure_diagnostics(PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+	const char* sources[] = {
+		"pangea.time.after(0,function() error('timer diagnostic') end); return {onFrame=function() local d=pangea.api.diagnostics().lastError; assert(d.hook=='timer:1' and d.line==1) end}",
+		"pangea.task.start(function() pangea.task.wait(0); error('task diagnostic') end); return {onFrame=function() local d=pangea.api.diagnostics().lastError; assert(d.hook=='task:1' and d.line==1) end}",
+		"local fired=false; pangea.events.on('diagnostic',function() error('event diagnostic') end); return {onFrame=function() if not fired then fired=true; pangea.events.emit('diagnostic') else local d=pangea.api.diagnostics().lastError; assert(d.hook=='event:diagnostic' and d.line==1) end end}",
+	};
+	for (int i=0;i<3;i++)
+	{
+		assert(PangeaScriptBackend_LoadNamed(backend, sources[i], "Data/Scripts/dist/scheduler-diagnostic.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+		PangeaScriptFrameContext frame = {.levelNum=7,.frameNum=1};
+		assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
+		frame.frameNum=2;
+		assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	}
+}
+
+static void test_backend_staging_and_relative_clock(PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+	assert(PangeaScriptBackend_LoadNamed(backend, "return {}", "Data/Scripts/dist/live.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptFrameContext frame = {.levelNum=7,.frameNum=25,.levelTimeSeconds=100};
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptGameInfo gameInfo = {.gameId="Test",.gameName="Lua Test"};
+	PangeaScriptBackend* candidate = PangeaScriptBackend_Create(&gameInfo);
+	assert(candidate);
+	PangeaScriptBackend_SetStaging(candidate, true);
+	PangeaScriptBackend_CopyExecutionContext(candidate, backend);
+	const char* mutators[] = {
+		"pangea.spawn.native(1,{x=0,y=0,z=0})", "pangea.object.delete({id=1,generation=1})",
+		"pangea.player.setHealth(0,1)", "pangea.persistence.set('stage',1,'bad')", "pangea.persistence.delete('stage')"
+	};
+	for (int i=0;i<5;i++)
+	{
+		assert(PangeaScriptBackend_LoadNamed(candidate, mutators[i], "Data/Scripts/dist/staged.lua", error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
+		assert(strstr(error, "staged reload") && strstr(error, "level=7 frame=25"));
+	}
+	const char* timer = "assert(pangea.level.current()==7 and pangea.time.level()==100); local fired=false; pangea.time.after(1,function() fired=true end); return {onFrame=function(ctx) assert(fired==(ctx.levelTimeSeconds>=101)) end}";
+	assert(PangeaScriptBackend_LoadNamed(candidate, timer, "Data/Scripts/dist/staged.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptBackend_SetStaging(candidate, false);
+	frame.levelTimeSeconds=100.5f;
+	assert(PangeaScriptBackend_CallFrameHook(candidate, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	frame.levelTimeSeconds=101;
+	assert(PangeaScriptBackend_CallFrameHook(candidate, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptBackend_Destroy(candidate);
+}
+
 static void test_coroutine_tasks(PangeaScriptBackend* backend, char* error, int errorCapacity)
 {
 	const char* source =
@@ -1837,6 +1920,8 @@ static void test_public_fallback_spawn_callback(void)
 		.gameId = "FallbackTest",
 		.gameName = "Fallback Test",
 	};
+	PangeaScript_Shutdown();
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/preinit-startup.lua") == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_Init(&fallbackGameInfo) == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_SetStartupScript(path) == PANGEA_SCRIPT_OK);
 	PangeaScriptObjectHandle handle = {0};
@@ -1997,6 +2082,9 @@ static void test_public_boundary_errors(const PangeaScriptGameInfo* gameInfo)
 	assert(PangeaScript_CallWeaponHitHook(NULL, &weaponResult) == PANGEA_SCRIPT_BAD_ARGUMENT);
 	assert(PangeaScript_CallDamageHook(NULL, &damageResult) == PANGEA_SCRIPT_BAD_ARGUMENT);
 	assert(PangeaScript_CallPlayerEvent(NULL, "onDeath") == PANGEA_SCRIPT_BAD_ARGUMENT);
+	/* This fixture restores a fresh host whose legacy bundle has top-level
+	   mutations; replacement initialization now deliberately stages them. */
+	PangeaScript_Shutdown();
 	assert(PangeaScript_Init(gameInfo) == PANGEA_SCRIPT_OK);
 }
 
@@ -2137,14 +2225,20 @@ static void test_default_persistence_fallback(const PangeaScriptGameInfo* source
 	PangeaScriptGameInfo fallbackGameInfo = *sourceGameInfo;
 	fallbackGameInfo.loadPersistent = NULL;
 	fallbackGameInfo.savePersistent = NULL;
+	PangeaScript_Shutdown();
 	assert(PangeaScript_Init(&fallbackGameInfo) == PANGEA_SCRIPT_OK);
-	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.set('fallback', 3, 'native-file'))\nreturn {}\n");
+	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nreturn {onFrame=function() assert(pangea.persistence.set('fallback', 3, 'native-file')) end}\n");
 	PangeaScriptStatus startupStatus = PangeaScript_SetStartupScript("Data/Scripts/dist/default-persistence.lua");
 	assert(startupStatus == PANGEA_SCRIPT_OK);
-	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.get('fallback', 3) == 'native-file')\nassert(pangea.persistence.delete('fallback'))\nreturn {}\n");
+	PangeaScriptFrameContext frame = {0};
+	assert(PangeaScript_CallFrameHook(&frame) == PANGEA_SCRIPT_OK);
+	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.get('fallback', 3) == 'native-file')\nreturn {onFrame=function() assert(pangea.persistence.delete('fallback')) end}\n");
 	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_CallFrameHook(&frame) == PANGEA_SCRIPT_OK);
 	(void)error;
 	(void)errorCapacity;
+	PangeaScript_Shutdown();
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/preinit-startup.lua") == PANGEA_SCRIPT_OK);
 	assert(PangeaScript_Init(sourceGameInfo) == PANGEA_SCRIPT_OK);
 	assert(remove("Data/Scripts/dist/default-persistence.lua") == 0);
 #ifdef __EMSCRIPTEN__
@@ -2290,6 +2384,9 @@ int main(void)
 	test_context_immutability_and_finite_numbers(backend, error, sizeof(error));
 	test_plain_callback_and_result_records(backend, error, sizeof(error));
 	test_zero_wait_started_during_frame(backend, error, sizeof(error));
+	test_actionable_failure_diagnostics(backend, error, sizeof(error));
+	test_scheduler_failure_diagnostics(backend, error, sizeof(error));
+	test_backend_staging_and_relative_clock(backend, error, sizeof(error));
 	test_coroutine_tasks(backend, error, sizeof(error));
 	test_object_queries_and_events(backend, error, sizeof(error));
 	test_object_command_results(backend, error, sizeof(error));

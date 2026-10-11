@@ -454,7 +454,8 @@ unsigned long	someLong;
 	SetMyRandomSeed(someLong);
 
 #ifndef __EMSCRIPTEN__
-	ShowCharity();
+	if (!gSkipToLevel)
+		ShowCharity();
 #endif
 
 	LoadSoundBank();								// load sound bank for entire game

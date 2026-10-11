@@ -1,0 +1,33 @@
+{
+  "hooks": [
+    "onDamage",
+    "onDamageApplied",
+    "onDeath",
+    "onCheckpointReached",
+    "onPickupCollected",
+    "onPlayerRespawn",
+    "onObjectFrame"
+  ],
+  "consumer_sources": [
+    "src/Player/MyGuy.c",
+    "src/Screens/Infobar.c",
+    "src/Items/Triggers2.c",
+    "src/Items/Triggers.c"
+  ],
+  "native_sources": [
+    "src/Player/MyGuy.c",
+    "src/Screens/Infobar.c",
+    "src/Items/Triggers2.c"
+  ],
+  "native_calls": [
+    "PlayerGotHurt",
+    "LoseHealth",
+    "KillPlayer",
+    "DoTrig_Checkpoint",
+    "DoTrig_Powerup",
+    "ShowThePOW",
+    "ResetPlayer"
+  ],
+  "test": "native_gameplay_test.c",
+  "notes": "Real production adapters and whole native consumer translation units with real Lua. Audio/render dependencies stubbed; unexpected untested gameplay branches assert. No save-versioning coverage."
+}

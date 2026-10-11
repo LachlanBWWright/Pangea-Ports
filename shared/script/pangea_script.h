@@ -747,6 +747,8 @@ typedef struct PangeaScriptSplineReplacement
 	bool strict;
 } PangeaScriptSplineReplacement;
 
+/* Reinitialization prepares a candidate before releasing the active host.
+ * A failed replacement leaves the previous host, objects, and settings intact. */
 PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo);
 void PangeaScript_Shutdown(void);
 
@@ -755,6 +757,8 @@ bool PangeaScript_HasRunnableModule(void);
 void PangeaScript_SetNetworkedMode(bool networked);
 bool PangeaScript_IsNetworkedMode(void);
 
+/* Loaded replacements commit only after compilation and initialization succeed.
+ * During replacement initialization, native mutations must wait for lifecycle hooks. */
 PangeaScriptStatus PangeaScript_SetStartupScript(const char* path);
 PangeaScriptStatus PangeaScript_SetConfigPath(const char* path);
 PangeaScriptStatus PangeaScript_Reload(void);
@@ -764,6 +768,7 @@ void PangeaScript_ClearLastError(void);
 int PangeaScript_GetErrorCount(void);
 PangeaScriptStatus PangeaScript_GetLastStatus(void);
 
+/* Configuration and its selected module are validated together before commit. */
 PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum);
 int PangeaScript_RemapTerrainItemType(int levelNum, int itemType);
 int PangeaScript_GetLevelAssetDependencyCount(void);
