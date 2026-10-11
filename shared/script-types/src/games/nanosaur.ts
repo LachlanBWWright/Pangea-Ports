@@ -14,8 +14,8 @@ export interface NanosaurTerrainItemContext extends TerrainItemContext {
 }
 
 export type NanosaurLifecycleModule =
-  AdventureLifecycleModule<NanosaurLevelContext, NanosaurFrameContext> &
+  Omit<AdventureLifecycleModule<NanosaurLevelContext, NanosaurFrameContext> &
   Partial<{
     onTerrainItem(ctx: NanosaurTerrainItemContext): ItemSpawnResult | void;
-  }>;
-
+  }>,
+    "onSplineItem" | "onCheckpointReached" | "onObjectiveComplete" | "onLapComplete" | "onRaceFinish">;

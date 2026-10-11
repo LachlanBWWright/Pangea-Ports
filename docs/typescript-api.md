@@ -21,7 +21,7 @@ export const bouncingHealth = defineTerrainItem({
   nativeType: 240,
   onSpawn(item) {
     return pangea.spawn.scripted("custom.bouncingPickup", item.position, {
-      amount: item.params[0] + 10,
+      scale: 1,
     })
       ? { handled: true, markInUse: true }
       : { handled: false };
@@ -59,3 +59,10 @@ const result = parseScriptConfigV1(json);
 
 The parser returns a `neverthrow` `Result` and validates unknown JSON with Zod
 before exposing typed config data.
+
+Compatibility declarations mirror the Lua value shapes: clover colors are
+`"green"`, `"blue"`, or `"gold"`; native spawn IDs accept a name or integer.
+`ObjectFrameContext` includes optional velocity, collision state, other-object,
+side-bit, and event-value fields when the adapter supplies them. Its event may
+be `"frame"` as well as a lifecycle event, including `triggerStay` and
+`triggerExit`. Check optional fields before reading them.

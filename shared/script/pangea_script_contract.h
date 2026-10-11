@@ -130,6 +130,8 @@
 	X("onRaceComplete") \
 	X("onRaceUnload") \
 	X("onTerrainItem") \
+	X("onWeaponHit") \
+	X("onSplineItem") \
 	X("onObjectFrame") \
 	X("onPickupCollected") \
 	X("onTriggerEnter") \
@@ -150,6 +152,7 @@
 	X("onAreaComplete") \
 	X("onAreaUnload") \
 	X("onTerrainItem") \
+	X("onWeaponHit") \
 	X("onSplineItem") \
 	X("onObjectFrame") \
 	X("onPickupCollected") \

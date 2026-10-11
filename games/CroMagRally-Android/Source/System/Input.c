@@ -4,6 +4,42 @@
 
 #include "game.h"
 
+#define PANGEA_TOUCH_IMPLEMENTATION
+#include "../../../../shared/android/TouchControls.h"
+
+static const TouchControlButton kTouchButtons[] =
+{
+	{"GAS", kNeed_Forward},
+	{"BRAKE", kNeed_Brakes},
+	{"THROW F", kNeed_ThrowForward},
+	{"THROW B", kNeed_ThrowBackward},
+	{"REAR", kNeed_RearView},
+	{"CAMERA", kNeed_CameraMode},
+};
+static const TouchControlProfile kTouchProfile =
+{
+	.leftNeed = kNeed_Left,
+	.rightNeed = kNeed_Right,
+	.upNeed = kNeed_Forward,
+	.downNeed = kNeed_Backward,
+	.confirmNeed = kNeed_UIConfirm,
+	.backNeed = kNeed_UIBack,
+	.pauseNeed = kNeed_UIPause,
+	.uiLeftNeed = kNeed_UILeft,
+	.uiRightNeed = kNeed_UIRight,
+	.uiUpNeed = kNeed_UIUp,
+	.uiDownNeed = kNeed_UIDown,
+	.buttons = kTouchButtons,
+	.buttonCount = sizeof(kTouchButtons) / sizeof(kTouchButtons[0]),
+};
+
+static bool IsTouchMovementNeed(int need)
+{
+	return need == kTouchProfile.leftNeed || need == kTouchProfile.rightNeed
+		|| need == kTouchProfile.upNeed || need == kTouchProfile.downNeed;
+}
+
+
 extern SDL_Window* gSDLWindow;
 
 /***************/
@@ -89,6 +125,7 @@ void InvalidateNeedState(int need)
 
 void InvalidateAllInputs(void)
 {
+	TouchControls_Reset();
 	_Static_assert(1 == sizeof(KeyState), "sizeof(KeyState) has changed -- Rewrite this function without SDL_memset()!");
 
 	SDL_memset(gNeedStates, KEYSTATE_IGNOREHELD, NUM_CONTROL_NEEDS);
@@ -132,7 +169,7 @@ static void ParseAltEnter(void)
 
 static void UpdateMouseButtonStates(int mouseWheelDelta)
 {
-	uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
+	uint32_t mouseButtons = TouchControls_GetMouseState(NULL, NULL);
 
 	for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
 	{
@@ -164,6 +201,7 @@ static void UpdateInputNeeds(void)
 
 //		downNow |= gMouseButtonStates[kb->mouseButton] & KEYSTATE_ACTIVE_BIT;
 
+		downNow |= TouchControls_NeedPressed(i);
 		UpdateKeyState(&gNeedStates[i], downNow);
 	}
 }
@@ -240,6 +278,7 @@ static void UpdateGamepadSpecificInputNeeds(int gamepadNum)
 
 void DoSDLMaintenance(void)
 {
+	TouchControls_BeginFrame(gSDLWindow, &kTouchProfile);
 	gTextInput[0] = '\0';
 	gMouseMotionNow = false;
 	int mouseWheelDelta = 0;
@@ -255,6 +294,8 @@ void DoSDLMaintenance(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+		if (TouchControls_HandleEvent(&event))
+			continue;
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:
@@ -450,6 +491,9 @@ Boolean GetNewNeedStateAnyP(int needID)
 
 static float GetAnalogValue(int needID, int playerID)
 {
+	if (playerID == 0 && TouchControls_StickActive() && IsTouchMovementNeed(needID))
+		return TouchControls_NeedAnalog(needID);
+
 	GAME_ASSERT(playerID >= 0);
 	GAME_ASSERT(playerID < MAX_LOCAL_PLAYERS);
 	GAME_ASSERT(needID >= 0);
@@ -458,7 +502,7 @@ static float GetAnalogValue(int needID, int playerID)
 	const Gamepad* gamepad = &gGamepads[playerID];
 
 	// Keyboard takes precedence when the key is pressed
-	if ((gNumLocalPlayers <= 1 || gamepad->fallbackToKeyboard) && gNeedStates[needID])
+	if ((gNumLocalPlayers <= 1 || gamepad->fallbackToKeyboard) && (gNeedStates[needID] & KEYSTATE_ACTIVE_BIT))
 	{
 		return 1.0f;
 	}
@@ -489,6 +533,16 @@ float GetNeedAxis1D(int negativeNeedID, int positiveNeedID, int playerID)
 #if 0
 OGLPolar2D GetNeedAxis2D(int negXID, int posXID, int negYID, int posYID)
 {
+	/* Touch input already has radial clamping and must bypass pad deadzones. */
+	if (TouchControls_StickActive()
+		&& negXID == kTouchProfile.leftNeed && posXID == kTouchProfile.rightNeed
+		&& negYID == kTouchProfile.upNeed && posYID == kTouchProfile.downNeed)
+	{
+		float x = TouchControls_GetStickX();
+		float y = TouchControls_GetStickY();
+		return (OGLPolar2D){.a = atan2f(y, x), .r = fminf(1.0f, hypotf(x, y))};
+	}
+
 	float deadZone = negXID < NUM_REMAPPABLE_NEEDS ? kJoystickDeadZoneFrac : kJoystickDeadZoneFrac_UI;
 
 	float negX = GetAnalogValue(negXID, true);

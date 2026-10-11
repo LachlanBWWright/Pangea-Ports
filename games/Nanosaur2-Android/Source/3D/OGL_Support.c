@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/android/TouchControlsDraw.h"
 #include "profiling.h"
 #include "stb_image.h"
 
@@ -607,19 +608,23 @@ static void ClearAllBuffersToBlack(void)
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		glDrawBuffer(GL_BACK_RIGHT);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		TouchControls_DrawGL(gSDLWindow);
 		SDL_GL_SwapWindow(gSDLWindow);
 		glDrawBuffer(GL_BACK_LEFT);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		glDrawBuffer(GL_BACK_RIGHT);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		TouchControls_DrawGL(gSDLWindow);
 		SDL_GL_SwapWindow(gSDLWindow);
 		OGL_CheckError();
 	}
 	else
 	{
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);		// clear buffer
+		TouchControls_DrawGL(gSDLWindow);
 		SDL_GL_SwapWindow(gSDLWindow);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);		// clear buffer
+		TouchControls_DrawGL(gSDLWindow);
 		SDL_GL_SwapWindow(gSDLWindow);
 		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	}
@@ -1095,6 +1100,7 @@ do_anaglyph:
            /* SWAP THE BUFFS */
 
 	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
 
 #ifdef __EMSCRIPTEN__

@@ -1284,7 +1284,7 @@ Ptr						tempBuffer16 = nil;
 OSErr SaveGame(int fileSlot)
 {
 #ifdef PANGEA_ENABLE_SCRIPTING
-	(void) PangeaScript_CallNativeSaveHook(0, fileSlot, false);
+	(void) PangeaScript_CallNativeSaveHook(gCurrentArea, fileSlot, false);
 #endif
 	char path[64];
 	SaveGameType saveData;
@@ -1349,7 +1349,7 @@ void UseSavedGame(const SaveGameType* saveData)
 	gLevelWonMask = saveData->levelWonMask;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	(void) PangeaScript_CallNativeSaveHook(0, gScriptLoadedSaveSlot, true);
+	(void) PangeaScript_CallNativeSaveHook(gCurrentArea, gScriptLoadedSaveSlot, true);
 #endif
 }
 

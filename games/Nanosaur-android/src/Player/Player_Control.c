@@ -10,6 +10,19 @@
 /****************************/
 
 #include "game.h"
+#ifdef __ANDROID__
+#include "../../../../shared/android/TouchControls.h"
+#endif
+
+static float TouchMovementScale(int need)
+{
+#if defined(__ANDROID__)
+	if (TouchControls_StickActive()) return TouchControls_NeedAnalog(need);
+#else
+	(void) need;
+#endif
+	return 1.0f;
+}
 
 
 /****************************/
@@ -138,7 +151,7 @@ Byte		currentAnim;
 				
 	if (bits & KEYCONTROL_ROTLEFT)
 	{
-		theNode->Rot.y += 2.0f*slugFactor*gFramesPerSecondFrac;				
+		theNode->Rot.y += 2.0f*slugFactor*gFramesPerSecondFrac * TouchMovementScale(kNeed_TurnLeft);
 		
 			/* IF SLOW ENOUGH, THEN DO LEFT TURN ANIM */
 			
@@ -166,7 +179,7 @@ Byte		currentAnim;
 	else
 	if (bits & KEYCONTROL_ROTRIGHT)
 	{
-		theNode->Rot.y -= 2.0f*slugFactor*gFramesPerSecondFrac;
+		theNode->Rot.y -= 2.0f*slugFactor*gFramesPerSecondFrac * TouchMovementScale(kNeed_TurnRight);
 
 			/* IF SLOW ENOUGH, THEN DO RIGHT TURN ANIM */
 			
@@ -202,13 +215,13 @@ Byte		currentAnim;
 				
 	if (bits & KEYCONTROL_FORWARD)							// forward
 	{
-		theNode->Accel = (PLAYER_WALK_ACCEL*slugFactor);
+		theNode->Accel = (PLAYER_WALK_ACCEL*slugFactor) * TouchMovementScale(kNeed_Forward);
 		if (theNode->Speed < 40)							// see if jump-start if going slow
 			theNode->Accel *= 2;
 	}
 	else
 	if (bits & KEYCONTROL_BACKWARD)							// backward
-		theNode->Accel = (-PLAYER_WALK_ACCEL*slugFactor);
+		theNode->Accel = (-PLAYER_WALK_ACCEL*slugFactor) * TouchMovementScale(kNeed_Backward);
 	else
 		theNode->Accel = 0;
 	
@@ -302,22 +315,22 @@ KeyControlType	bits;
 			/* SEE IF ROTATE PLAYER LEFT  */
 				
 	if (bits & KEYCONTROL_ROTLEFT)
-		theNode->Rot.y += 2*gFramesPerSecondFrac;						
+		theNode->Rot.y += 2*gFramesPerSecondFrac * TouchMovementScale(kNeed_TurnLeft);
 	
 			/* SEE IF ROTATE PLAYER RIGHT */
 	
 	else
 	if (bits & KEYCONTROL_ROTRIGHT)
-		theNode->Rot.y -= 2*gFramesPerSecondFrac;
+		theNode->Rot.y -= 2*gFramesPerSecondFrac * TouchMovementScale(kNeed_TurnRight);
 
 
 			/* SEE IF FORWARD/BACKWARD */
 				
 	if (bits & KEYCONTROL_FORWARD)							// forward
-		theNode->Accel = (PLAYER_WALK_ACCEL * .3);
+		theNode->Accel = (PLAYER_WALK_ACCEL * .3) * TouchMovementScale(kNeed_Forward);
 	else
 	if (bits & KEYCONTROL_BACKWARD)							// backward
-		theNode->Accel = (-PLAYER_WALK_ACCEL * .3);
+		theNode->Accel = (-PLAYER_WALK_ACCEL * .3) * TouchMovementScale(kNeed_Backward);
 	else
 		theNode->Accel = 0;
 
@@ -538,26 +551,36 @@ float	targetHeight,diff,fps;
 	dz = gDelta.z + dz;
 	
 				/* DO AIR FRICTION */
-				
+
+	float touchFrictionScale = 1.0f;
+#if defined(__ANDROID__)
+	if (TouchControls_StickActive())
+	{
+		float thrust = TouchControls_NeedAnalog(kNeed_Forward) + TouchControls_NeedAnalog(kNeed_Backward);
+		if (thrust > 0) touchFrictionScale = thrust;
+	}
+#endif
+
+
 	if (dx > 0)
 	{
-		dx -= fps * 100;
+		dx -= fps * 100 * touchFrictionScale;
 		if (dx < 0)
 			dx = 0;
 	}
 	else
 	if (dx < 0)
-		dx += fps * 100;
+		dx += fps * 100 * touchFrictionScale;
 
 	if (dz > 0)
 	{
-		dz -= fps * 100;
+		dz -= fps * 100 * touchFrictionScale;
 		if (dz < 0)
 			dz = 0;
 	}
 	else
 	if (dz < 0)
-		dz += fps * 100;
+		dz += fps * 100 * touchFrictionScale;
 
 	
 				/* CALC SPEED */

@@ -1,5 +1,5 @@
 import type { RaceContext, RaceLifecycleModule } from "./common";
-import type { ItemSpawnResult, TerrainItemContext } from "../pangea";
+import type { ItemSpawnResult, SplineItemContext, TerrainItemContext } from "../pangea";
 
 export interface CroMagRaceContext extends RaceContext {
   readonly gameId: "CroMagRally-Android";
@@ -13,8 +13,9 @@ export interface CroMagTerrainItemContext extends TerrainItemContext {
 }
 
 export type CroMagRallyLifecycleModule =
-  RaceLifecycleModule<CroMagRaceContext> &
+  Omit<RaceLifecycleModule<CroMagRaceContext> &
   Partial<{
     onTerrainItem(ctx: CroMagTerrainItemContext): ItemSpawnResult | void;
-  }>;
-
+    onSplineItem(ctx: SplineItemContext): ItemSpawnResult | void;
+  }>,
+    "onPlayerRespawn" | "onObjectiveComplete">;

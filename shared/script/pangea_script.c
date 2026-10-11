@@ -21,7 +21,7 @@
 #define PANGEA_SCRIPT_MAX_REMAPS 64
 #define PANGEA_SCRIPT_MAX_LEVEL_SETTINGS 64
 #define PANGEA_SCRIPT_MAX_ASSET_DEPENDENCIES 64
-#define PANGEA_SCRIPT_MAX_NATIVE_ITEMS 128
+#define PANGEA_SCRIPT_MAX_NATIVE_ITEMS 256
 #define PANGEA_SCRIPT_NATIVE_ID_CAPACITY 96
 #define PANGEA_SCRIPT_NATIVE_CATEGORY_CAPACITY 32
 #define PANGEA_SCRIPT_NATIVE_DEPENDENCY_CAPACITY 260
@@ -101,6 +101,7 @@ static PangeaScriptFrameContext gCurrentCallbackFrame;
 static bool gHasCurrentCallbackFrame;
 static PangeaScriptFrameContext gLastFrameContext;
 static bool gHasLastFrameContext;
+static char* gLastFrameMode;
 static PangeaScriptObjectHandle gCurrentCallbackObject;
 static bool gHasCurrentCallbackObject;
 static PangeaScriptObjectFrameResult* gCurrentObjectFrameResult;
@@ -204,7 +205,9 @@ static PangeaScriptStatus default_load_persistent(const char* key, unsigned char
 	if (!file)
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	size = fread(outData, 1, (size_t)capacity, file);
-	if (ferror(file) || !feof(file))
+	/* fread does not set EOF when a file exactly fills the buffer. */
+	const int extraByte = fgetc(file);
+	if (ferror(file) || extraByte != EOF)
 	{
 		fclose(file);
 		return PANGEA_SCRIPT_RUNTIME_ERROR;
@@ -770,20 +773,8 @@ static void set_error(PangeaScriptStatus status, const char* message)
 	if (status != PANGEA_SCRIPT_OK && status != PANGEA_SCRIPT_FILE_NOT_FOUND)
 	{
 		gErrorCount++;
-		gConsecutiveHookFailures++;
 		if (status == PANGEA_SCRIPT_BUDGET_EXCEEDED)
-		{
 			gBudgetExceededCount++;
-		}
-		if (gConsecutiveHookFailures >= 5)
-		{
-			gScriptsDisabled = true;
-			PangeaScript_Log(PANGEA_LOG_ERROR, "Native", "Disabling scripting host: exceeded maximum consecutive hook failures (5)");
-		}
-	}
-	else
-	{
-		gConsecutiveHookFailures = 0;
 	}
 
 	if (!message)
@@ -824,6 +815,25 @@ static void set_backend_error(PangeaScriptStatus status, const char* message)
 		set_error(status, "Lua runtime could not be created; script execution is unavailable");
 	else
 		set_error(status, "Script execution failed");
+}
+
+static void record_hook_result(PangeaScriptStatus status, const char* message)
+{
+	if (status == PANGEA_SCRIPT_OK)
+	{
+		if (PangeaScriptBackend_DidExecuteHook(gBackend))
+			gConsecutiveHookFailures = 0;
+		gLastStatus = PANGEA_SCRIPT_OK;
+		gLastError[0] = '\0';
+		return;
+	}
+	set_backend_error(status, message);
+	gConsecutiveHookFailures++;
+	if (gConsecutiveHookFailures >= 5 && !gScriptsDisabled)
+	{
+		gScriptsDisabled = true;
+		PangeaScript_Log(PANGEA_LOG_ERROR, "Native", "Disabling scripting host: exceeded maximum consecutive hook failures (5)");
+	}
 }
 
 static PangeaScriptStatus reject_networked_execution(void)
@@ -974,7 +984,24 @@ static bool copy_string(char* dest, size_t destSize, const char* source)
 
 static char* read_text_file(const char* path, long* outSize)
 {
+	if (outSize) *outSize = 0;
+	if (!path || !path[0]) return NULL;
 	FILE* file = fopen(path, "rb");
+	if (!file && gGameInfo.readTextFile)
+	{
+		long assetSize = -1;
+		char* asset = gGameInfo.readTextFile(path, &assetSize);
+		if (asset)
+		{
+			if (assetSize < 0 || assetSize == LONG_MAX || (uintmax_t)assetSize >= SIZE_MAX)
+			{
+				free(asset);
+				return NULL;
+			}
+			if (outSize) *outSize = assetSize;
+			return asset;
+		}
+	}
 	char rootedPath[PANGEA_SCRIPT_PATH_CAPACITY + 1];
 	if (!file && path && path[0] != '/')
 	{
@@ -1075,6 +1102,8 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 	gCurrentCallbackFrame = (PangeaScriptFrameContext){0};
 	gHasCurrentCallbackFrame = false;
 	gLastFrameContext = (PangeaScriptFrameContext){0};
+	free(gLastFrameMode);
+	gLastFrameMode = NULL;
 	gHasLastFrameContext = false;
 	PangeaScript_ResetCommandTrace();
 	PangeaScript_ResetLifecycleTrace();
@@ -1107,6 +1136,8 @@ void PangeaScript_Shutdown(void)
 	gCurrentCallbackFrame = (PangeaScriptFrameContext){0};
 	gHasCurrentCallbackFrame = false;
 	gLastFrameContext = (PangeaScriptFrameContext){0};
+	free(gLastFrameMode);
+	gLastFrameMode = NULL;
 	gHasLastFrameContext = false;
 	PangeaScript_ResetCommandTrace();
 	PangeaScript_ResetLifecycleTrace();
@@ -1548,6 +1579,10 @@ PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const Pange
 		if (gBackend && gScriptLoaded && !gScriptsDisabled && !gNetworkedMode)
 			(void) PangeaScript_ApplyObjectLifecycleToAll(&lifecycleContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 		reset_objects();
+		free(gLastFrameMode);
+		gLastFrameMode = NULL;
+		gLastFrameContext = (PangeaScriptFrameContext){0};
+		gHasLastFrameContext = false;
 	}
 	status = reject_networked_execution();
 	if (status != PANGEA_SCRIPT_OK)
@@ -1589,8 +1624,7 @@ PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const Pange
 	status = PangeaScriptBackend_CallLevelHook(gBackend, hook, context, backendError, (int)sizeof(backendError));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK)
-		set_backend_error(status, backendError);
+	record_hook_result(status, backendError);
 
 	level_cleanup:
 	if (hook == PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD)
@@ -1663,15 +1697,31 @@ PangeaScriptStatus PangeaScript_CallFrameHook(const PangeaScriptFrameContext* co
 	if (context)
 	{
 		gCurrentCallbackFrame = *context;
+		char* modeSnapshot = NULL;
+		if (context->mode)
+		{
+			const size_t modeSize = strlen(context->mode) + 1;
+			modeSnapshot = malloc(modeSize);
+			if (!modeSnapshot)
+			{
+				gCurrentCallbackFrame = previousFrame;
+				gHasCurrentCallbackFrame = previousFrameValid;
+				set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Could not snapshot script frame mode");
+				return PANGEA_SCRIPT_RUNTIME_ERROR;
+			}
+			memcpy(modeSnapshot, context->mode, modeSize);
+		}
+		free(gLastFrameMode);
+		gLastFrameMode = modeSnapshot;
 		gLastFrameContext = *context;
+		gLastFrameContext.mode = gLastFrameMode;
 		gHasLastFrameContext = true;
 		gHasCurrentCallbackFrame = true;
 	}
 	PangeaScriptStatus status = PangeaScriptBackend_CallFrameHook(gBackend, context, backendError, (int)sizeof(backendError));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK)
-		set_backend_error(status, backendError);
+	record_hook_result(status, backendError);
 	return status;
 }
 
@@ -1702,8 +1752,7 @@ PangeaScriptStatus PangeaScript_CallTerrainItemHook(PangeaScriptTerrainItemConte
 	char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
 	backendError[0] = '\0';
 	PangeaScriptStatus status = PangeaScriptBackend_CallTerrainItemHook(gBackend, context, backendError, (int)sizeof(backendError));
-	if (status != PANGEA_SCRIPT_OK)
-		set_backend_error(status, backendError);
+	record_hook_result(status, backendError);
 	PangeaScript_RecordLifecycleEvent("terrainItem", (PangeaScriptObjectHandle){0}, status);
 	return status;
 }
@@ -1735,8 +1784,7 @@ PangeaScriptStatus PangeaScript_CallSplineItemHook(PangeaScriptSplineItemContext
 	char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
 	backendError[0] = '\0';
 	PangeaScriptStatus status = PangeaScriptBackend_CallSplineItemHook(gBackend, context, backendError, (int)sizeof(backendError));
-	if (status != PANGEA_SCRIPT_OK)
-		set_backend_error(status, backendError);
+	record_hook_result(status, backendError);
 	PangeaScript_RecordLifecycleEvent("splineItem", (PangeaScriptObjectHandle){0}, status);
 	return status;
 }
@@ -1768,8 +1816,7 @@ PangeaScriptStatus PangeaScript_CallMapItemHook(PangeaScriptMapItemContext* cont
 	char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
 	backendError[0] = '\0';
 	PangeaScriptStatus status = PangeaScriptBackend_CallMapItemHook(gBackend, context, backendError, (int)sizeof(backendError));
-	if (status != PANGEA_SCRIPT_OK)
-		set_backend_error(status, backendError);
+	record_hook_result(status, backendError);
 	PangeaScript_RecordLifecycleEvent("mapItem", (PangeaScriptObjectHandle){0}, status);
 	return status;
 }
@@ -1871,8 +1918,7 @@ static PangeaScriptStatus call_object_event(PangeaScriptObjectHandle handle, con
 	gCurrentCallbackObject = previousObject;
 	gHasCurrentCallbackObject = previousObjectValid;
 	gCurrentObjectFrameResult = previousObjectFrameResult;
-	if (status != PANGEA_SCRIPT_OK)
-		set_backend_error(status, backendError);
+	record_hook_result(status, backendError);
 	return status;
 }
 
@@ -2026,6 +2072,8 @@ static PangeaScriptStatus prepare_gameplay_hook(
 	const char* lifecycleEvent,
 	PangeaScriptObjectHandle target)
 {
+	(void) lifecycleEvent;
+	(void) target;
 	if (!context || !result)
 	{
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Gameplay hook context and result are required");
@@ -2070,7 +2118,7 @@ PangeaScriptStatus PangeaScript_CallTriggerHook(const PangeaScriptTriggerContext
 	PangeaScriptStatus status = PangeaScriptBackend_CallTriggerHook(gBackend, context, outResult, error, sizeof(error));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	record_hook_result(status, error);
 	PangeaScript_RecordLifecycleEvent("trigger", context ? context->self : (PangeaScriptObjectHandle){0}, status);
 	return status;
 }
@@ -2114,7 +2162,7 @@ PangeaScriptStatus PangeaScript_CallPickupHook(const PangeaScriptPickupContext* 
 	PangeaScriptStatus status = PangeaScriptBackend_CallPickupHook(gBackend, context, outResult, error, sizeof(error));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	record_hook_result(status, error);
 	PangeaScript_RecordLifecycleEvent("pickup", context->pickup, status);
 	return status;
 }
@@ -2158,7 +2206,7 @@ PangeaScriptStatus PangeaScript_CallWeaponHitHook(const PangeaScriptWeaponHitCon
 	PangeaScriptStatus status = PangeaScriptBackend_CallWeaponHitHook(gBackend, context, outResult, error, sizeof(error));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	record_hook_result(status, error);
 	PangeaScript_RecordLifecycleEvent("weaponHit", context->target, status);
 	return status;
 }
@@ -2189,7 +2237,7 @@ PangeaScriptStatus PangeaScript_CallDamageHook(const PangeaScriptDamageContext* 
 	PangeaScriptStatus status = PangeaScriptBackend_CallDamageHook(gBackend, context, outResult, error, sizeof(error));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	record_hook_result(status, error);
 	PangeaScript_RecordLifecycleEvent("damage", context ? context->target : (PangeaScriptObjectHandle){0}, status);
 	return status;
 }
@@ -2214,7 +2262,7 @@ PangeaScriptStatus PangeaScript_CallDamageAppliedHook(const PangeaScriptDamageCo
 	PangeaScriptStatus status = PangeaScriptBackend_CallDamageAppliedHook(gBackend, context, error, sizeof(error));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	record_hook_result(status, error);
 	PangeaScript_RecordLifecycleEvent("damageApplied", context->target, status);
 	return status;
 }
@@ -2249,7 +2297,7 @@ PangeaScriptStatus PangeaScript_CallPlayerEvent(const PangeaScriptPlayerEventCon
 	PangeaScriptStatus status = PangeaScriptBackend_CallPlayerEvent(gBackend, context, event, error, sizeof(error));
 	gCurrentCallbackFrame = previousFrame;
 	gHasCurrentCallbackFrame = previousFrameValid;
-	if (status != PANGEA_SCRIPT_OK) set_backend_error(status, error);
+	record_hook_result(status, error);
 	PangeaScript_RecordLifecycleEvent(event, context->player, status);
 	return status;
 }
@@ -2305,17 +2353,20 @@ static PangeaScriptStatus queue_deferred_deletion(PangeaScriptObjectHandle handl
 PangeaScriptStatus PangeaScript_ApplyDeferredActions(const PangeaScriptFrameContext* frameContext)
 {
 	PangeaScriptStatus firstFailure = PANGEA_SCRIPT_OK;
+	PangeaScriptDeferredDeletion actions[PANGEA_SCRIPT_DEFERRED_ACTION_CAPACITY];
 	if (!frameContext)
 	{
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Deferred action frame context is required");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
+	/* Destruction callbacks may enqueue more work; run it on the next pump. */
+	memcpy(actions, gDeferredDeletions, sizeof(actions));
+	memset(gDeferredDeletions, 0, sizeof(gDeferredDeletions));
 	for (int i = 0; i < PANGEA_SCRIPT_DEFERRED_ACTION_CAPACITY; i++)
 	{
-		PangeaScriptDeferredDeletion action = gDeferredDeletions[i];
+		PangeaScriptDeferredDeletion action = actions[i];
 		if (!action.active)
 			continue;
-		gDeferredDeletions[i].active = false;
 		if (action.levelNum != frameContext->levelNum || !resolve_object(action.handle))
 			continue;
 		if (!PangeaScript_DeleteObject(action.handle) && firstFailure == PANGEA_SCRIPT_OK)
@@ -2610,6 +2661,10 @@ bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle)
 	}
 
 	cleanup_owned_children(handle);
+	/* Child destruction callbacks can unregister and reuse the owner's slot. */
+	object = resolve_registered_object(handle);
+	if (!object)
+		return true;
 	if (gBackend)
 		PangeaScriptBackend_ClearObjectState(gBackend, handle);
 	clear_trigger_contacts_for_handle(handle);
@@ -3118,7 +3173,7 @@ bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
 			? gCurrentCallbackFrame
 			: (gHasLastFrameContext ? gLastFrameContext : (PangeaScriptFrameContext){0});
 		(void) PangeaScript_CallObjectEvent(handle, &destroyFrame, "destroy");
-		object = resolve_object(handle);
+		object = resolve_registered_object(handle);
 		if (!object)
 		{
 			set_error(PANGEA_SCRIPT_OK, "");
@@ -3127,9 +3182,12 @@ bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
 	}
 
 	bool deleted = object->ops->deleteObject(object->nativeObject);
-	if (deleted && resolve_object(handle) == object)
+	if (deleted && resolve_registered_object(handle) == object)
 	{
 		cleanup_owned_children(handle);
+		object = resolve_registered_object(handle);
+		if (!object)
+			return finish_object_command("pangea.object.delete", handle, true, PANGEA_SCRIPT_RUNTIME_ERROR, "");
 		release_scripted_object_state(object);
 		if (gBackend)
 			PangeaScriptBackend_ClearObjectState(gBackend, handle);
@@ -3252,6 +3310,8 @@ void PangeaScript_ResetLifecycleTrace(void)
 	gLifecycleTrace.overflow = false;
 	memset(gLifecycleTraceEntries, 0, sizeof(gLifecycleTraceEntries));
 	gLastFrameContext = (PangeaScriptFrameContext){0};
+	free(gLastFrameMode);
+	gLastFrameMode = NULL;
 	gHasLastFrameContext = false;
 }
 

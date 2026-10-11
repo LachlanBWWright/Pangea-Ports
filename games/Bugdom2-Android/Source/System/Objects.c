@@ -367,6 +367,18 @@ ObjNode		*thisNodePtr;
 
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+			thisNodePtr = gNextNode;
+			continue;
+		}
+#endif
+
 
 
 		if (gGamePaused && !(thisNodePtr->StatusBits & STATUS_BIT_MOVEINPAUSE))
@@ -389,6 +401,13 @@ ObjNode		*thisNodePtr;
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+		}
 		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
 			Bugdom2Script_RunObjectFrame(thisNodePtr);
 #endif

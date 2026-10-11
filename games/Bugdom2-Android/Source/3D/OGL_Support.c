@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/android/TouchControlsDraw.h"
 #include "profiling.h"
 #include "tga.h"
 #ifdef __EMSCRIPTEN__
@@ -327,6 +328,7 @@ void OGL_InitDrawContext(OGLViewDefType *viewDefPtr)
 	glClearColor(0,0,0, 1.0);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glClear(GL_COLOR_BUFFER_BIT);
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glClearColor(viewDefPtr->clearColor.r, viewDefPtr->clearColor.g, viewDefPtr->clearColor.b, 1.0);
@@ -783,6 +785,7 @@ do_anaglyph:
            /* SWAP THE BUFFS */
 
 	BeginSwapSubphase(PROFILE_SWAP_PRESENT);
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
 	EndSwapSubphase(PROFILE_SWAP_PRESENT);
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);

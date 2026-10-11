@@ -466,3 +466,8 @@ if(EMSCRIPTEN)
 		-sDISABLE_EXCEPTION_CATCHING=0
 	)
 endif()
+
+# Shared native touchscreen overlay for the Android ports.
+if(ANDROID)
+	target_sources(${GAME_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/android/TouchControlsDraw.c)
+endif()

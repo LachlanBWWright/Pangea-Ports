@@ -797,12 +797,13 @@ explode:
 		float damage = 1.1f;
 		Boolean destroyTarget = false;
 #ifdef PANGEA_ENABLE_SCRIPTING
-		if (BugdomScript_OnWeaponHit(theNode, gCollisionList[0].objectPtr, damage, &damage, &destroyTarget))
+		Boolean applyDamage = BugdomScript_OnWeaponHit(theNode, gCollisionList[0].objectPtr, damage, &damage, &destroyTarget);
+		if (applyDamage || destroyTarget)
 #endif
 		{
 #ifdef PANGEA_ENABLE_SCRIPTING
 			if (destroyTarget)
-				DeleteObject(gCollisionList[0].objectPtr);
+				DeleteEnemy(gCollisionList[0].objectPtr);
 			else
 #endif
 				EnemyGotHurt(gCollisionList[0].objectPtr, damage);		// cause massive damage

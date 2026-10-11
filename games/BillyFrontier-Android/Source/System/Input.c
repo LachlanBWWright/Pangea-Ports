@@ -3,6 +3,35 @@
 // This file is part of Cro-Mag Rally. https://github.com/jorio/CroMagRally
 
 #include "game.h"
+
+#define PANGEA_TOUCH_IMPLEMENTATION
+#include "../../../../shared/android/TouchControls.h"
+
+static const TouchControlButton kTouchButtons[] =
+{
+	{"SHOOT", kNeed_Shoot},
+	{"DUCK", kNeed_Duck},
+	{"NEXT", kNeed_Continue},
+	{"JUMP", kNeed_Jump},
+};
+static const TouchControlProfile kTouchProfile =
+{
+	.leftNeed = kNeed_Left,
+	.rightNeed = kNeed_Right,
+	.upNeed = kNeed_UIUp,
+	.downNeed = kNeed_UIDown,
+	.confirmNeed = kNeed_UIConfirm,
+	.backNeed = kNeed_UIBack,
+	.pauseNeed = kNeed_UIPause,
+	.uiLeftNeed = kNeed_UILeft,
+	.uiRightNeed = kNeed_UIRight,
+	.uiUpNeed = kNeed_UIUp,
+	.uiDownNeed = kNeed_UIDown,
+	.buttons = kTouchButtons,
+	.buttonCount = sizeof(kTouchButtons) / sizeof(kTouchButtons[0]),
+};
+
+
 #include <SDL3/SDL.h>
 
 extern SDL_Window* gSDLWindow;
@@ -210,7 +239,7 @@ void GetMousePixelCoord(float *x, float *y)
 {
 	float windowX = 0;
 	float windowY = 0;
-	SDL_GetMouseState(&windowX, &windowY);
+	TouchControls_GetMouseState(&windowX, &windowY);
 
 	*x = windowX * gMouseDPIScaleX;
 	*y = windowY * gMouseDPIScaleY;
@@ -246,6 +275,7 @@ void InvalidateNeedState(int need)
 
 void InvalidateAllInputs(void)
 {
+	TouchControls_Reset();
 	_Static_assert(1 == sizeof(KeyState), "sizeof(KeyState) has changed -- Rewrite this function without memset()!");
 
 	SDL_memset(gNeedStates, KEYSTATE_IGNOREHELD, NUM_CONTROL_NEEDS);
@@ -288,7 +318,7 @@ static void ParseAltEnter(void)
 
 static void UpdateMouseButtonStates(int mouseWheelDelta)
 {
-	uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
+	uint32_t mouseButtons = TouchControls_GetMouseState(NULL, NULL);
 
 	for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
 	{
@@ -320,6 +350,7 @@ static void UpdateInputNeeds(void)
 
 		downNow |= gMouseButtonStates[kb->mouseButton] & KEYSTATE_ACTIVE_BIT;
 
+		downNow |= TouchControls_NeedPressed(i);
 		UpdateKeyState(&gNeedStates[i], downNow);
 	}
 }
@@ -378,6 +409,7 @@ static void UpdateGamepadSpecificInputNeeds(int gamepadNum)
 
 void DoSDLMaintenance(void)
 {
+	TouchControls_BeginFrame(gSDLWindow, &kTouchProfile);
 	gTextInput[0] = '\0';
 	gMouseMotionNow = false;
 	gMouseDeltaX = 0;
@@ -406,6 +438,8 @@ void DoSDLMaintenance(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+		if (TouchControls_HandleEvent(&event))
+			continue;
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:
@@ -687,6 +721,12 @@ OGLVector2D GetAnalogSteering(int playerID)
 	else if (GetNeedStateP(kNeed_UIDown, playerID))				// is Down Key pressed?
 	{
 		steer.y = 1.0f;
+	}
+
+	if (playerID == 0 && TouchControls_StickActive())
+	{
+		steer.x = TouchControls_GetStickX();
+		steer.y = TouchControls_GetStickY();
 	}
 
 	return steer;

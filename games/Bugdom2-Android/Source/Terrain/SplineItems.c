@@ -431,11 +431,30 @@ ObjNode	*theNode;
 		theNode = gSplineObjectList[i];
 		if (theNode)
 		{
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (theNode->ScriptDeleteRequested)
+			{
+				if ((theNode->CType & CTYPE_ENEMY) && !theNode->ScriptDefinitionID[0])
+					DeleteEnemy(theNode);
+				else
+					DeleteObject(theNode);
+				continue;
+			}
+#endif
 			if (theNode->SplineMoveCall)
 			{
 				KeepOldCollisionBoxes(theNode);					// keep old boxes & other stuff
 				theNode->SplineMoveCall(theNode);				// call object's spline move routine
 			}
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (theNode->CType != INVALID_NODE_FLAG && theNode->ScriptDeleteRequested)
+			{
+				if ((theNode->CType & CTYPE_ENEMY) && !theNode->ScriptDefinitionID[0])
+					DeleteEnemy(theNode);
+				else
+					DeleteObject(theNode);
+			}
+#endif
 		}
 	}
 }

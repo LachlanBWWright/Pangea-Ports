@@ -4,6 +4,42 @@
 
 #include "game.h"
 
+#define PANGEA_TOUCH_IMPLEMENTATION
+#include "../../../../shared/android/TouchControls.h"
+
+static const TouchControlButton kTouchButtons[] =
+{
+	{"FIRE", kNeed_Fire},
+	{"DROP", kNeed_Drop},
+	{"JET", kNeed_Jetpack},
+	{"PREV", kNeed_PrevWeapon},
+	{"NEXT", kNeed_NextWeapon},
+	{"CAMERA", kNeed_CameraMode},
+};
+static const TouchControlProfile kTouchProfile =
+{
+	.leftNeed = kNeed_YawLeft,
+	.rightNeed = kNeed_YawRight,
+	.upNeed = kNeed_PitchUp,
+	.downNeed = kNeed_PitchDown,
+	.confirmNeed = kNeed_UIConfirm,
+	.backNeed = kNeed_UIBack,
+	.pauseNeed = kNeed_UIPause,
+	.uiLeftNeed = kNeed_UIPrev,
+	.uiRightNeed = kNeed_UINext,
+	.uiUpNeed = kNeed_UIUp,
+	.uiDownNeed = kNeed_UIDown,
+	.buttons = kTouchButtons,
+	.buttonCount = sizeof(kTouchButtons) / sizeof(kTouchButtons[0]),
+};
+
+static bool IsTouchMovementNeed(int need)
+{
+	return need == kTouchProfile.leftNeed || need == kTouchProfile.rightNeed
+		|| need == kTouchProfile.upNeed || need == kTouchProfile.downNeed;
+}
+
+
 #if __EMSCRIPTEN__
 extern int PangeaNet_IsEnabled(void);
 extern int PangeaNet_IsHost(void);
@@ -130,6 +166,7 @@ void InvalidateNeedState(int need)
 
 void InvalidateAllInputs(void)
 {
+	TouchControls_Reset();
 	_Static_assert(1 == sizeof(KeyState), "sizeof(KeyState) has changed -- Rewrite this function without SDL_memset()!");
 
 	SDL_memset(gNeedStates, KEYSTATE_IGNOREHELD, NUM_CONTROL_NEEDS);
@@ -178,7 +215,7 @@ static void ProcessSystemKeyChords(void)
 
 static void UpdateMouseButtonStates(int mouseWheelDeltaX, int mouseWheelDeltaY)
 {
-	uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
+	uint32_t mouseButtons = TouchControls_GetMouseState(NULL, NULL);
 
 	for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
 	{
@@ -212,6 +249,7 @@ static void UpdateInputNeeds(void)
 
 		pressed |= gMouseButtonStates[kb->mouseButton] & KEYSTATE_ACTIVE_BIT;
 
+		pressed |= TouchControls_NeedPressed(need);
 		UpdateKeyState(&gNeedStates[need], pressed);
 	}
 }
@@ -295,6 +333,7 @@ static void UpdateControllerSpecificInputNeeds(int controllerNum)
 
 void DoSDLMaintenance(void)
 {
+	TouchControls_BeginFrame(gSDLWindow, &kTouchProfile);
 	gTextInput[0] = '\0';
 	gMouseMotionNow = false;
 	int mouseWheelDeltaX = 0;
@@ -315,6 +354,8 @@ void DoSDLMaintenance(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+		if (TouchControls_HandleEvent(&event))
+			continue;
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:
@@ -495,6 +536,10 @@ static float GetNeedAnalogValueAnyP(int needID)
 
 float GetNeedAnalogValue(int needID, int playerID)
 {
+	if ((playerID == 0 || playerID == ANY_PLAYER)
+		&& TouchControls_StickActive() && IsTouchMovementNeed(needID))
+		return TouchControls_NeedAnalog(needID);
+
 	if (playerID == ANY_PLAYER)
 	{
 		return GetNeedAnalogValueAnyP(needID);
@@ -1200,7 +1245,7 @@ OGLPoint2D GetMouseCoords640x480(void)
 {
 	float mx, my;
 	int ww, wh;
-	SDL_GetMouseState(&mx, &my);
+	TouchControls_GetMouseState(&mx, &my);
 	SDL_GetWindowSize(gSDLWindow, &ww, &wh);
 
 	OGLRect r = Get2DLogicalRect(GetOverlayPaneNumber(), 1);

@@ -2,6 +2,7 @@
 
 #include "game.h"
 #include "ScriptBindings.h"
+#include "pangea_script_platform_sdl.h"
 
 #include "splineitems.h"
 #include "structs.h"
@@ -468,23 +469,12 @@ static bool BugdomScript_SetObjectAnimationNamed(void* nativeObject, const char*
 static bool BugdomScript_DeleteObject(void* nativeObject)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || obj->CType == INVALID_NODE_FLAG || obj == gPlayerObj)
 		return false;
 
-	if (obj->ScriptDefinitionID[0])
-	{
-		if ((obj->TerrainItemPtr || obj->SplineItemPtr) && !obj->ScriptStreamOutSent)
-		{
-			PangeaScriptObjectHandle handle = {obj->ScriptObjectID, obj->ScriptObjectGeneration};
-			if (PangeaScript_ObjectExists(handle))
-				(void) PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_OUT);
-			obj->ScriptStreamOutSent = true;
-		}
-		obj->ScriptDeleteRequested = true;
-		return true;
-	}
-	BugdomScript_UnregisterObject(obj);
-	DeleteObject(obj);
+	// Hooks can delete their source or target. Keep native memory and collision
+	// references valid until the object loop reaches a safe boundary.
+	obj->ScriptDeleteRequested = true;
 	return true;
 }
 
@@ -676,6 +666,8 @@ Boolean BugdomScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pic
 	};
 	status = PangeaScript_CallPickupHook(&context, &result);
 	LogScriptStatus("onPickupCollected", status);
+	if (pickup->ScriptDeleteRequested || pickup->CType == INVALID_NODE_FLAG)
+		return false;
 	if (status != PANGEA_SCRIPT_OK)
 		return true;
 	if (isfinite(result.healthDelta))
@@ -742,7 +734,8 @@ Boolean BugdomScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage,
 		gScore = (unsigned long)score;
 	}
 	*outDamage = result.damage;
-	*outDestroyTarget = result.destroyTarget;
+	*outDestroyTarget = result.destroyTarget || (target && target->ScriptDeleteRequested);
+	if (weapon && weapon->ScriptDeleteRequested) return false;
 	return result.hasApplyDamage ? result.applyDamage : true;
 }
 
@@ -891,7 +884,10 @@ void BugdomScript_RunObjectFrame(ObjNode* obj)
 		return;
 	if (obj->ScriptDeleteRequested)
 	{
-		DeleteObject(obj);
+		if ((obj->CType & CTYPE_ENEMY) && !obj->ScriptDefinitionID[0])
+			DeleteEnemy(obj);
+		else
+			DeleteObject(obj);
 		return;
 	}
 	if (obj->Skeleton && obj->Skeleton->AnimHasStopped && !obj->ScriptAnimationCompletionSent)
@@ -905,6 +901,16 @@ void BugdomScript_RunObjectFrame(ObjNode* obj)
 
 void BugdomScript_OnObjectDeleted(ObjNode* obj)
 {
+	// Registered native objects have lifecycle callbacks too, even when they
+	// were not created from a custom object definition.
+	if (obj && !obj->ScriptDefinitionID[0] && obj->ScriptObjectID > 0)
+	{
+		PangeaScriptObjectHandle handle = {obj->ScriptObjectID, (uint32_t)obj->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			(void) PangeaScript_ApplyObjectLifecycle(handle, &gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+		return;
+	}
+
 	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {obj->ScriptObjectID, obj->ScriptObjectGeneration};
@@ -1417,7 +1423,7 @@ static PangeaScriptStatus SetScriptPlayerInvulnerable(int playerNum, float durat
 
 void BugdomScript_Init(void)
 {
-	const PangeaScriptGameInfo gameInfo =
+	PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "Bugdom-android",
 		.gameName = "Bugdom",
@@ -1438,6 +1444,7 @@ void BugdomScript_Init(void)
 		.capabilities = PANGEA_SCRIPT_BUGDOM_CAPABILITIES,
 	};
 
+	PangeaScriptPlatform_Configure(&gameInfo);
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	LogScriptStatus("init", status);
 

@@ -88,25 +88,20 @@ export type MikeLifecycleModule<
   TScene extends SceneAreaContext,
   TArea extends SceneAreaContext,
 > = GameplayLifecycleModule & Partial<{
-  onSceneLoad(ctx: TScene): void;
-  onAreaLoad(ctx: TArea): void;
+  onAreaLoad(ctx: TScene & TArea): void;
   onAreaStart(ctx: TArea): void;
   onAreaFrame(ctx: FrameContext): void;
   onObjectFrame(ctx: ObjectFrameContext): ObjectFrameResult | void;
+  onAreaComplete(ctx: TArea): void;
   onMapItem(ctx: MikeMapItemContext): ItemSpawnResult | void;
   onAreaUnload(ctx: TArea): void;
 }>;
 
 export type RaceLifecycleModule<TRace extends RaceContext> = GameplayLifecycleModule & Partial<{
-  onRaceConfig(ctx: RaceConfigContext): void;
+  onRaceLoad(ctx: TRace): void;
   onRaceStart(ctx: TRace): void;
+  onRaceFrame(ctx: FrameContext): void;
+  onRaceComplete(ctx: TRace): void;
+  onRaceUnload(ctx: TRace): void;
   onObjectFrame(ctx: ObjectFrameContext): ObjectFrameResult | void;
-  onCheckpoint(player: RacePlayer, checkpoint: number, ctx: TRace): void;
-  onLapComplete(player: RacePlayer, lap: number, ctx: TRace): void;
-  onPowerupCollected(
-    player: RacePlayer,
-    powerup: PowerupContext,
-    ctx: TRace,
-  ): void;
-  onRaceFinish(results: RaceResults, ctx: TRace): void;
 }>;

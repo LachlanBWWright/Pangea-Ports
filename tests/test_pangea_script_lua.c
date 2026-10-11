@@ -435,6 +435,26 @@ static void test_repeating_timers_and_api_version(PangeaScriptBackend* backend, 
 	assert(strstr(error, "incompatible Pangea API version") != NULL);
 }
 
+static void test_nested_callbacks_and_scheduler_safety(PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+ const char* source =
+  "local seen=0; pangea.events.on('missing',function(value) assert(value==nil); seen=seen+1 end)\n"
+  "assert(pangea.events.emit('missing')==1 and seen==1)\n"
+  "local count=0; local timer=pangea.time.every(1e-30,function() count=count+1 end)\n"
+  "local task; local nested=0; task=pangea.task.start(function() pangea.task.wait(0); assert(pangea.task.cancel(task)); pangea.task.start(function() nested=nested+1; pangea.task.wait(0); nested=nested+1 end) end)\n"
+  "for i=1,100 do local r=pangea.random.integer(math.mininteger,math.maxinteger); assert(math.type(r)=='integer'); r=pangea.random.integer(math.mininteger,0); assert(r<=0) end\n"
+  "return {onFrame=function(ctx) assert(count<=ctx.frameNum); if ctx.frameNum==3 then assert(nested==2 and not pangea.task.isActive(task)); assert(pangea.time.cancel(timer)) end end}";
+ assert(PangeaScriptBackend_Load(backend,source,error,errorCapacity)==PANGEA_SCRIPT_OK);
+ for (int i=1;i<=3;i++) {
+  PangeaScriptFrameContext frame={.frameNum=i,.levelTimeSeconds=(float)i*1000000};
+  assert(PangeaScriptBackend_CallFrameHook(backend,&frame,error,errorCapacity)==PANGEA_SCRIPT_OK);
+ }
+ const char* budget = "pangea.events.on('tick',function() end); return {onFrame=function() while true do pangea.events.emit('tick') end end}";
+ assert(PangeaScriptBackend_Load(backend,budget,error,errorCapacity)==PANGEA_SCRIPT_OK);
+ PangeaScriptFrameContext frame={0};
+ assert(PangeaScriptBackend_CallFrameHook(backend,&frame,error,errorCapacity)==PANGEA_SCRIPT_BUDGET_EXCEEDED);
+}
+
 static void test_context_immutability_and_finite_numbers(PangeaScriptBackend* backend, char* error, int errorCapacity)
 {
 	const char* immutable =
@@ -463,7 +483,10 @@ static void test_context_immutability_and_finite_numbers(PangeaScriptBackend* ba
 	PangeaScriptWeaponHitResult result = {0};
 	assert(PangeaScriptBackend_CallWeaponHitHook(backend, &hit, &result, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
 	assert(strstr(error, "finite number") != NULL);
-	const char* negativeResult = "return { onWeaponHit = function() return { damage = -1 } end }";
+	const char* overflowResult = "return { onWeaponHit = function() return { damage = 1e100 } end }";
+ assert(PangeaScriptBackend_Load(backend, overflowResult, error, errorCapacity) == PANGEA_SCRIPT_OK);
+ assert(PangeaScriptBackend_CallWeaponHitHook(backend, &hit, &result, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
+ const char* negativeResult = "return { onWeaponHit = function() return { damage = -1 } end }";
 	assert(PangeaScriptBackend_Load(backend, negativeResult, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	assert(PangeaScriptBackend_CallWeaponHitHook(backend, &hit, &result, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
 	assert(strstr(error, "non-negative") != NULL);
@@ -842,6 +865,9 @@ static void test_otto_humans_jump_sample(PangeaScriptBackend* backend, char* err
 	assert(PangeaScriptBackend_Load(backend, legacySource, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	assert(PangeaScriptBackend_CallObjectFrameHook(backend, &scientist, &result, error, errorCapacity) == PANGEA_SCRIPT_BAD_ARGUMENT);
 	assert(strstr(error, "must return nil") != NULL);
+	/* Repeated rejected result tables must not accumulate on the Lua stack. */
+	for (int i = 0; i < 2000; i++)
+		assert(PangeaScriptBackend_CallObjectFrameHook(backend, &scientist, &result, error, errorCapacity) == PANGEA_SCRIPT_BAD_ARGUMENT);
 }
 
 static void test_hover_beacon_sample(PangeaScriptBackend* backend, char* error, int errorCapacity)
@@ -1600,6 +1626,31 @@ static void test_direct_delete_delivers_destroy(void)
 	assert(remove(path) == 0);
 }
 
+static int gDestroyNativeDeletes;
+static bool test_destroy_native_delete(void* object)
+{
+ assert(object != NULL);
+ gDestroyNativeDeletes++;
+ return true;
+}
+
+static void test_destroy_callback_deactivation_still_deletes_native(void)
+{
+ const char* path="Data/Scripts/dist/destroy-deactivation.lua";
+ write_script(path,"return {onObjectFrame=function(ctx) if ctx.event=='destroy' then assert(pangea.object.setActive(ctx.object,false)) end end}");
+ assert(PangeaScript_SetStartupScript(path)==PANGEA_SCRIPT_OK);
+ PangeaScriptVector3 position={0};
+ const PangeaScriptObjectOps ops={.getPosition=test_object_position,.deleteObject=test_destroy_native_delete};
+ const PangeaScriptObjectRegistration registration={.nativeObject=&position,.ops=&ops,.objectType="deactivate-destroy",.capabilityLevel=PANGEA_SCRIPT_CAPABILITY_FULL};
+ PangeaScriptObjectHandle handle;
+ assert(PangeaScript_RegisterObject(&registration,&handle)==PANGEA_SCRIPT_OK);
+ gDestroyNativeDeletes=0;
+ assert(PangeaScript_DeleteObject(handle));
+ assert(gDestroyNativeDeletes==1);
+ assert(!PangeaScript_ObjectExists(handle));
+ assert(remove(path)==0);
+}
+
 static void test_public_lifecycle_failure_cleanup(void)
 {
 	const char* path = "Data/Scripts/dist/lifecycle-failure-test.lua";
@@ -2195,6 +2246,7 @@ int main(void)
 	assert(PangeaScriptBackend_CallTerrainItemHook(backend, &item, error, sizeof(error)) == PANGEA_SCRIPT_OK);
 	assert(item.handled && item.markInUse && item.remappedItemType == 9);
 	test_gameplay_hooks(backend, error, sizeof(error));
+	test_nested_callbacks_and_scheduler_safety(backend, error, sizeof(error));
 	test_timers(backend, error, sizeof(error));
 	test_repeating_timers_and_api_version(backend, error, sizeof(error));
 	test_context_immutability_and_finite_numbers(backend, error, sizeof(error));
@@ -2250,6 +2302,7 @@ int main(void)
 	test_public_player_gameplay_events();
 	test_public_lifecycle_self_removal();
 	test_direct_delete_delivers_destroy();
+	test_destroy_callback_deactivation_still_deletes_native();
 	test_public_lifecycle_failure_cleanup();
 	test_public_spawn_failure_cleanup();
 	test_lifecycle_cleanup_without_position();

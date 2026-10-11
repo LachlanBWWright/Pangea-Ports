@@ -396,6 +396,21 @@ ObjNode		*thisNodePtr;
 
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
+#ifdef PANGEA_ENABLE_SCRIPTING
+		thisNodePtr->ScriptFrameCalled = false;
+#endif
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+			thisNodePtr = gNextNode;
+			continue;
+		}
+#endif
+
 
 
 		if (gGamePaused && !(thisNodePtr->StatusBits & STATUS_BIT_MOVEINPAUSE))
@@ -417,6 +432,24 @@ ObjNode		*thisNodePtr;
 				thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
 			}
 		}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->CType != INVALID_NODE_FLAG && !thisNodePtr->ScriptDeleteRequested
+			&& !(thisNodePtr->StatusBits & STATUS_BIT_ONSPLINE)
+			&& thisNodePtr->ScriptObjectID > 0 && !thisNodePtr->ScriptFrameCalled)
+		{
+			OttoScript_RunObjectFrame(thisNodePtr, false);
+			if (!thisNodePtr->ScriptDeleteRequested)
+				OttoScript_ApplyObjectVisualOffset(thisNodePtr);
+		}
+		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+		}
+#endif
 
 next:
 		thisNodePtr = gNextNode;							// next node

@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef __ANDROID__
+#include "../../../../shared/android/TouchControls.h"
+#endif
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -1201,10 +1204,19 @@ const float fps = gFramesPerSecondFrac;
 	{
 		float analogMagnitude = sqrtf(SQUARED(gPlayerInfo.analogControlX) + SQUARED(gPlayerInfo.analogControlZ));
 
-		if (analogMagnitude > EPS && analogMagnitude < 1.0f - EPS)
+		if (analogMagnitude > 0.0f && analogMagnitude < 1.0f - EPS
+#ifdef __ANDROID__
+			&& (TouchControls_StickActive() || analogMagnitude > EPS)
+#else
+			&& analogMagnitude > EPS
+#endif
+		)
 		{
-			// Floor speed to 0.5x so we walk a reasonable pace when gently pushing the thumbstick.
-			analogMagnitude = SDL_clamp(analogMagnitude, 0.5f, 1.0f);
+			// Physical sticks retain a walking-speed floor; touch follows the visible magnitude.
+#ifdef __ANDROID__
+			if (!TouchControls_StickActive())
+#endif
+				analogMagnitude = SDL_clamp(analogMagnitude, 0.5f, 1.0f);
 
 			// Cap max speed to analog magnitude
 			gTargetMaxSpeed *= analogMagnitude;

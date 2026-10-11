@@ -75,7 +75,8 @@ android {
         }
         externalNativeBuild {
             cmake {
-                arguments "-DSDL_STATIC=ON",
+                arguments "-DPANGEA_ENABLE_SCRIPTING=ON",
+                          "-DSDL_STATIC=ON",
                           "-DSDL_SHARED=OFF",
                            "-DBUILD_SDL_FROM_SOURCE=ON"
             }

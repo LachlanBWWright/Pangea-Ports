@@ -1,6 +1,7 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "ScriptBindings.h"
+#include "pangea_script_platform_sdl.h"
 
 #include "structs.h"
 #include "splineitems.h"
@@ -22,6 +23,7 @@ static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
 static PangeaScriptFrameContext gScriptFrameContext;
+static float gScriptElapsedTime;
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE int CroMagScript_ProbeRaceCompletionJS(void)
@@ -538,7 +540,7 @@ void CroMagScript_RegisterPlayerObject(ObjNode* playerObj, short playerNum)
 	if (playerObj && playerObj->ScriptObjectID > 0 && playerNum >= 0 && playerNum < MAX_PLAYERS)
 	{
 		PangeaScriptPlayerEventContext context = {
-			.levelNum = gScriptFrameContext.levelNum,
+			.levelNum = gTrackNum,
 			.playerNum = playerNum,
 			.player = {playerObj->ScriptObjectID, (uint32_t)playerObj->ScriptObjectGeneration},
 			.position = {playerObj->Coord.x, playerObj->Coord.y, playerObj->Coord.z},
@@ -568,7 +570,7 @@ Boolean CroMagScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pic
 		return true;
 	context = (PangeaScriptPickupContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gTrackNum,
 		.playerNum = player->PlayerNum,
 		.pickupType = pickupType,
 		.amount = amount,
@@ -583,6 +585,34 @@ Boolean CroMagScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pic
 	if (status != PANGEA_SCRIPT_OK)
 		return true;
 	return result.hasConsumePickup ? result.consumePickup : true;
+}
+
+Boolean CroMagScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, short owner,
+    short weaponType, float damage, float* outDamage, Boolean* outDestroyTarget)
+{
+    PangeaScriptWeaponHitResult result = {0};
+    if (!outDamage || !outDestroyTarget) return true;
+    *outDamage = damage;
+    *outDestroyTarget = false;
+    if (!target) return true;
+    PangeaScriptWeaponHitContext context = {
+        .levelNum = gTrackNum, .playerNum = owner, .weaponType = weaponType,
+        .targetType = target->Kind, .targetFlags = target->StatusBits,
+        .damage = damage, .weaponId = "cromag.projectile",
+        .position = {target->Coord.x, target->Coord.y, target->Coord.z},
+    };
+    if (weapon && weapon->ScriptObjectID > 0)
+        context.weapon = (PangeaScriptObjectHandle){weapon->ScriptObjectID, (uint32_t)weapon->ScriptObjectGeneration};
+    if (target->ScriptObjectID > 0)
+        context.target = (PangeaScriptObjectHandle){target->ScriptObjectID, (uint32_t)target->ScriptObjectGeneration};
+    PangeaScriptStatus status = PangeaScript_CallWeaponHitHook(&context, &result);
+    LogScriptStatus("onWeaponHit", status);
+    if (status != PANGEA_SCRIPT_OK) return true;
+    if (context.target.id > 0 && !PangeaScript_ObjectExists(context.target))
+        return false; /* The hook may have removed the native target. */
+    *outDamage = result.damage;
+    *outDestroyTarget = result.destroyTarget;
+    return result.hasApplyDamage ? result.applyDamage : true;
 }
 
 Boolean CroMagScript_OnDamage(short playerNum, float damage, int cause, float* outDamage)
@@ -604,7 +634,7 @@ Boolean CroMagScript_OnDamage(short playerNum, float damage, int cause, float* o
 		return true;
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gTrackNum,
 		.playerNum = playerNum,
 		.cause = cause,
 		.damage = damage,
@@ -632,7 +662,7 @@ void CroMagScript_OnDamageApplied(short playerNum, float damage, int cause)
 		return;
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gTrackNum,
 		.playerNum = playerNum,
 		.cause = cause,
 		.damage = damage,
@@ -654,7 +684,7 @@ void CroMagScript_OnDeath(short playerNum, int eventValue)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gTrackNum,
 		.playerNum = playerNum,
 		.eventValue = eventValue,
 		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
@@ -674,7 +704,7 @@ void CroMagScript_OnCheckpointReached(short playerNum, short checkpointNum)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gTrackNum,
 		.playerNum = playerNum,
 		.eventValue = checkpointNum,
 		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
@@ -694,7 +724,7 @@ void CroMagScript_OnLapComplete(short playerNum, short lapNum)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gTrackNum,
 		.playerNum = playerNum,
 		.eventValue = lapNum,
 		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
@@ -714,7 +744,7 @@ void CroMagScript_OnRaceFinish(short playerNum, int placement)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gTrackNum,
 		.playerNum = playerNum,
 		.eventValue = placement,
 		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
@@ -1150,7 +1180,7 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 
 void CroMagScript_Init(void)
 {
-	const PangeaScriptGameInfo gameInfo =
+	PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "CroMagRally-Android",
 		.gameName = "Cro-Mag Rally",
@@ -1165,6 +1195,7 @@ void CroMagScript_Init(void)
 		.capabilities = PANGEA_SCRIPT_CRO_MAG_RALLY_CAPABILITIES,
 	};
 
+	PangeaScriptPlatform_Configure(&gameInfo);
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	LogScriptStatus("init", status);
 
@@ -1205,7 +1236,8 @@ static const char* CroMagScript_TrackName(int trackNum)
 static const char* CroMagScript_ModeName(void)
 {
 	if (gGameMode == GAME_MODE_PRACTICE) return "practice";
-	if (gGameMode == GAME_MODE_MULTIPLAYERRACE || gNetGameInProgress) return "network";
+	if (gNetGameInProgress) return "network";
+	if (gGameMode == GAME_MODE_MULTIPLAYERRACE) return "race";
 	if (gGameMode == GAME_MODE_TAG1) return "tag1";
 	if (gGameMode == GAME_MODE_TAG2) return "tag2";
 	if (gGameMode == GAME_MODE_SURVIVAL) return "survival";
@@ -1215,7 +1247,7 @@ static const char* CroMagScript_ModeName(void)
 
 static bool CroMagScript_IsNetworked(void)
 {
-	return gGameMode == GAME_MODE_MULTIPLAYERRACE || gNetGameInProgress;
+	return gNetGameInProgress;
 }
 
 static void CallRaceHook(PangeaScriptHook hook, int trackNum, const char* action)
@@ -1240,17 +1272,20 @@ void CroMagScript_OnRaceLoad(int trackNum)
 
 void CroMagScript_OnRaceStart(int trackNum)
 {
+    gScriptElapsedTime = 0.0f;
 	CallRaceHook(PANGEA_SCRIPT_HOOK_LEVEL_START, trackNum, "onRaceStart");
 }
 
 void CroMagScript_OnRaceFrame(int trackNum, unsigned int frameNum, float deltaSeconds, float raceTimeSeconds)
 {
+    (void)raceTimeSeconds;
+    if (isfinite(deltaSeconds) && deltaSeconds > 0.0f) gScriptElapsedTime += deltaSeconds;
 	const PangeaScriptFrameContext context =
 	{
 		.levelNum = trackNum,
 		.frameNum = frameNum,
 		.deltaSeconds = deltaSeconds,
-		.levelTimeSeconds = raceTimeSeconds,
+		.levelTimeSeconds = gScriptElapsedTime,
 		.mode = CroMagScript_ModeName(),
 		.networked = CroMagScript_IsNetworked(),
 		.trackName = CroMagScript_TrackName(trackNum),

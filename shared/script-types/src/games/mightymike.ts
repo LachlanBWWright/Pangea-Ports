@@ -14,7 +14,8 @@ export interface MikeMapItemHookContext extends MikeMapItemContext {
 }
 
 export type MightyMikeLifecycleModule =
-  MikeLifecycleModule<MikeSceneContext, MikeAreaContext> &
+  Omit<MikeLifecycleModule<MikeSceneContext, MikeAreaContext> &
   Partial<{
     onMapItem(ctx: MikeMapItemHookContext): ItemSpawnResult | void;
-  }>;
+  }>,
+    "onCheckpointReached" | "onObjectiveComplete" | "onLapComplete" | "onRaceFinish">;

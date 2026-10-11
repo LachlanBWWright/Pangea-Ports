@@ -312,6 +312,7 @@ struct ObjNode
 	Boolean			ScriptActiveStateInitialized;
 	Boolean			ScriptActive;
 	Boolean			ScriptDeleteRequested;
+	Boolean			ScriptFrameCalled;
 	Boolean			ScriptStreamOutSent;
 	
 	float			Health;				// health 0..1

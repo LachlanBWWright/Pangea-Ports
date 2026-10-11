@@ -6,6 +6,8 @@ typedef struct PangeaScriptBackend PangeaScriptBackend;
 
 PangeaScriptBackend* PangeaScriptBackend_Create(const PangeaScriptGameInfo* gameInfo);
 void PangeaScriptBackend_Destroy(PangeaScriptBackend* backend);
+/* Optional hooks that have no callable Lua handler do not count as successes. */
+bool PangeaScriptBackend_DidExecuteHook(PangeaScriptBackend* backend);
 PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const char* source, char* error, int errorCapacity);
 PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backend, PangeaScriptHook hook, const PangeaScriptLevelContext* context, char* error, int errorCapacity);
 PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backend, const PangeaScriptFrameContext* context, char* error, int errorCapacity);

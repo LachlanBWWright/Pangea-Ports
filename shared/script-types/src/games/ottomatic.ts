@@ -19,9 +19,9 @@ export interface OttoMaticSplineItemContext extends SplineItemContext {
 }
 
 export type OttoMaticLifecycleModule =
-  AdventureLifecycleModule<OttoMaticLevelContext, OttoMaticFrameContext> &
+  Omit<AdventureLifecycleModule<OttoMaticLevelContext, OttoMaticFrameContext> &
   Partial<{
     onTerrainItem(ctx: OttoMaticTerrainItemContext): ItemSpawnResult | void;
     onSplineItem(ctx: OttoMaticSplineItemContext): ItemSpawnResult | void;
-  }>;
-
+  }>,
+    "onObjectiveComplete" | "onLapComplete" | "onRaceFinish">;

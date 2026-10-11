@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/android/TouchControlsDraw.h"
 #include "profiling.h"
 #include "stb_image.h"
 #include "pillarbox.h"
@@ -600,6 +601,7 @@ void OGL_DrawScene(void (*drawRoutine)(void))
 	{
 		glClearColor(0, 0, 0, 1);
 		glClear(GL_COLOR_BUFFER_BIT);
+		TouchControls_DrawGL(gSDLWindow);
 		SDL_GL_SwapWindow(gSDLWindow);					// end render loop
 		return;
 	}
@@ -711,6 +713,7 @@ void OGL_DrawScene(void (*drawRoutine)(void))
            /* SWAP THE BUFFS */
 
 	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);							// end render loop
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 #ifdef __EMSCRIPTEN__

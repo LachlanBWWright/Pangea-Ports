@@ -1,4 +1,4 @@
-import type { AdventureLifecycleModule, RaceContext, RaceLifecycleModule } from "./common";
+import type { AdventureLifecycleModule, RaceContext } from "./common";
 import type { FrameContext, ItemSpawnResult, LevelContext, SplineItemContext, TerrainItemContext } from "../pangea";
 
 export type Nanosaur2Mode = "adventure" | "race" | "battle" | "capture";
@@ -34,7 +34,6 @@ export interface Nanosaur2RaceContext extends RaceContext {
 
 export type Nanosaur2LifecycleModule =
   AdventureLifecycleModule<Nanosaur2LevelContext, Nanosaur2FrameContext> &
-  RaceLifecycleModule<Nanosaur2RaceContext> &
   Partial<{
     onTerrainItem(ctx: Nanosaur2TerrainItemContext): ItemSpawnResult | void;
     onSplineItem(ctx: Nanosaur2SplineItemContext): ItemSpawnResult | void;

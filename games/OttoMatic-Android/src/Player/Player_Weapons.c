@@ -943,7 +943,10 @@ static Boolean OttoScript_ApplyWeaponHit(ObjNode *weapon, ObjNode *target)
 	applyDamage = OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget);
 	if (destroyTarget)
 	{
-		DeleteObject(target);
+		if ((target->CType & CTYPE_ENEMY) && !target->ScriptDefinitionID[0])
+			DeleteEnemy(target);
+		else
+			DeleteObject(target);
 		return true;
 	}
 #endif

@@ -2,6 +2,8 @@
 
 #include "game.h"
 #include "ScriptBindings.h"
+#include "pangea_script_platform_sdl.h"
+#include "pangea_net.h"
 
 #include "structs.h"
 #include "splineitems.h"
@@ -583,7 +585,7 @@ Boolean Nanosaur2Script_OnDamage(short playerNum, ObjNode* source, float damage,
 
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.cause = cause,
 		.damage = damage,
@@ -628,7 +630,7 @@ Boolean Nanosaur2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int 
 	playerNum = player->PlayerNum;
 	context = (PangeaScriptPickupContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.pickupType = pickupType,
 		.amount = amount,
@@ -663,7 +665,7 @@ Boolean Nanosaur2Script_OnWeaponHit(ObjNode* weapon, ObjNode* target, float dama
 	*outDestroyTarget = false;
 	context = (PangeaScriptWeaponHitContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = weapon ? weapon->PlayerNum : 0,
 		.weaponType = weapon ? weapon->Kind : -1,
 		.targetType = target ? target->Kind : -1,
@@ -702,7 +704,7 @@ void Nanosaur2Script_OnPlayerSpawn(ObjNode* playerObj)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerObj->PlayerNum,
 		.eventValue = 0,
 		.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
@@ -718,7 +720,7 @@ void Nanosaur2Script_OnPlayerRespawn(ObjNode* playerObj)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerObj->PlayerNum,
 		.eventValue = 0,
 		.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
@@ -738,7 +740,7 @@ void Nanosaur2Script_OnDamageApplied(short playerNum, float damage, int cause)
 		return;
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.cause = cause,
 		.damage = damage,
@@ -761,7 +763,7 @@ void Nanosaur2Script_OnDeath(short playerNum, int eventValue)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.eventValue = eventValue,
 		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
@@ -781,7 +783,7 @@ void Nanosaur2Script_OnCheckpointReached(short playerNum, short checkpointNum)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.eventValue = checkpointNum,
 		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
@@ -802,7 +804,7 @@ void Nanosaur2Script_OnLapComplete(short playerNum, short lapNum)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.eventValue = lapNum,
 		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
@@ -837,7 +839,7 @@ void Nanosaur2Script_OnRaceFinish(short playerNum, int placement)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.eventValue = placement,
 		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
@@ -868,7 +870,7 @@ void Nanosaur2Script_OnObjectiveComplete(short playerNum, int outcome)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gLevelNum,
 		.playerNum = playerNum,
 		.eventValue = outcome,
 		.player = {player->ScriptObjectID, player->ScriptObjectGeneration},
@@ -1517,7 +1519,7 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 
 void Nanosaur2Script_Init(void)
 {
-	const PangeaScriptGameInfo gameInfo =
+	PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "Nanosaur2-Android",
 		.gameName = "Nanosaur 2",
@@ -1535,6 +1537,7 @@ void Nanosaur2Script_Init(void)
 		.capabilities = PANGEA_SCRIPT_NANOSAUR2_CAPABILITIES,
 	};
 
+	PangeaScriptPlatform_Configure(&gameInfo);
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	LogScriptStatus("init", status);
 
@@ -1559,6 +1562,15 @@ void Nanosaur2Script_LoadLevelConfig(int levelNum)
 {
 	PangeaScriptStatus status = PangeaScript_LoadLevelConfig(levelNum);
 	LogScriptStatus("level config load", status);
+}
+
+static bool Nanosaur2Script_IsNetworked(void)
+{
+#ifdef __EMSCRIPTEN__
+    return PangeaNet_IsEnabled() != 0;
+#else
+    return false; /* Multiple local players are split-screen, not a network match. */
+#endif
 }
 
 static const char* Nanosaur2Script_ModeName(int levelNum)
@@ -1605,7 +1617,7 @@ static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* actio
 		.levelNum = levelNum,
 		.levelName = Nanosaur2Script_LevelName(levelNum),
 		.mode = mode,
-		.networked = gNumPlayers > 1,
+		.networked = Nanosaur2Script_IsNetworked(),
 	};
 
 	PangeaScriptStatus status = PangeaScript_CallLevelHook(hook, &context);
@@ -1639,7 +1651,7 @@ void Nanosaur2Script_OnFrame(int levelNum, unsigned int frameNum, float deltaSec
 		.deltaSeconds = deltaSeconds,
 		.levelTimeSeconds = levelTimeSeconds,
 		.mode = mode,
-		.networked = gNumPlayers > 1,
+		.networked = Nanosaur2Script_IsNetworked(),
 	};
 	Nanosaur2Script_CacheFrameContext(&context);
 	PangeaScript_ExpireTriggerContacts(&context);
@@ -1682,7 +1694,7 @@ Boolean Nanosaur2Script_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNu
 		.levelNum = levelNum,
 		.itemType = originalType,
 		.remappedItemType = remappedType,
-		.networked = gNumPlayers > 1,
+		.networked = Nanosaur2Script_IsNetworked(),
 		.mode = mode,
 		.x = x,
 		.z = z,
@@ -1716,7 +1728,7 @@ Boolean Nanosaur2Script_OnSplineItem(SplineItemType* itemPtr, int levelNum, int 
 		.splineNum = splineNum,
 		.placement = itemPtr->placement,
 		.mode = mode,
-		.networked = gNumPlayers > 1,
+		.networked = Nanosaur2Script_IsNetworked(),
 		.params = params,
 		.paramCount = (int)(sizeof(params) / sizeof(params[0])),
 		.handled = false,

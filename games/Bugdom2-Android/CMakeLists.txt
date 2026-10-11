@@ -431,3 +431,8 @@ endif()
 
 # Copy documentation to output folder
 configure_file(${CMAKE_SOURCE_DIR}/packaging/ReadMe.txt.in ${CMAKE_CURRENT_BINARY_DIR}/ReadMe.txt)
+
+# Shared native touchscreen overlay for the Android ports.
+if(ANDROID)
+	target_sources(${GAME_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/android/TouchControlsDraw.c)
+endif()

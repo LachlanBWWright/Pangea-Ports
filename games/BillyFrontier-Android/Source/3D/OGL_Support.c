@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/android/TouchControlsDraw.h"
 #include "profiling.h"
 
 #include "stb_image.h"
@@ -332,8 +333,10 @@ static void OGL_InitDrawContext(OGLViewDefType* viewDefPtr)
 			
 	glClearColor(0,0,0,1);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);		// clear buffer
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);		// clear buffer
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
@@ -777,6 +780,7 @@ do_anaglyph:
            /* SWAP THE BUFFS */
 
 	SceneDepth_Present();
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
 
 	if (gGamePrefs.anaglyph)

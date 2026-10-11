@@ -12,6 +12,39 @@
 
 #include "game.h"
 
+#if defined(__ANDROID__)
+#define PANGEA_TOUCH_IMPLEMENTATION
+#include "../../../../shared/android/TouchControls.h"
+#define SDL_GetMouseState TouchControls_GetMouseState
+static const TouchControlButton kTouchButtons[] =
+{
+    {"Jump", kNeed_Jump},
+    {"Fire", kNeed_Attack},
+    {"Pickup", kNeed_PickUp},
+    {"Jet Up", kNeed_JetUp},
+    {"Jet Down", kNeed_JetDown},
+    {"Weapon", kNeed_NextWeapon},
+    {"GPS", kNeed_ToggleGPS},
+};
+static const TouchControlProfile kTouchProfile =
+{
+    .upNeed = kNeed_Forward,
+    .downNeed = kNeed_Backward,
+    .leftNeed = kNeed_TurnLeft,
+    .rightNeed = kNeed_TurnRight,
+    .confirmNeed = kNeed_UIConfirm,
+    .backNeed = kNeed_UIBack,
+    .pauseNeed = kNeed_UIPause,
+    .buttons = kTouchButtons,
+    .buttonCount = sizeof(kTouchButtons) / sizeof(kTouchButtons[0]),
+    .uiUpNeed = kNeed_UIUp,
+    .uiDownNeed = kNeed_UIDown,
+    .uiLeftNeed = kNeed_UILeft,
+    .uiRightNeed = kNeed_UIRight,
+};
+#endif
+
+
 
 /**********************/
 /*     PROTOTYPES     */
@@ -148,9 +181,15 @@ void UpdateInput(void)
 	int mouseWheelDelta = 0;
 
 	SDL_PumpEvents();
+#if defined(__ANDROID__)
+	TouchControls_BeginFrame(gSDLWindow, &kTouchProfile);
+#endif
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+#if defined(__ANDROID__)
+		if (TouchControls_HandleEvent(&event)) continue;
+#endif
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:
@@ -285,6 +324,9 @@ void UpdateInput(void)
 			}
 		}
 
+#if defined(__ANDROID__)
+		downNow |= TouchControls_NeedPressed(i);
+#endif
 		UpdateKeyState(&gNeedStates[i], downNow);
 	}
 }

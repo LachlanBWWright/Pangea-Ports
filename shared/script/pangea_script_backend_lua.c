@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <limits.h>
+#include <float.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,7 @@ struct PangeaScriptBackend
 	lua_State* lua;
 	PangeaScriptGameInfo gameInfo;
 	int entryReference;
+	bool didExecuteHook;
 	size_t allocatedBytes;
 	size_t memoryLimitBytes;
 	int currentLevelNum;
@@ -74,6 +76,7 @@ struct PangeaScriptBackend
 		bool active;
 		int id;
 		int threadReference;
+		bool running;
 		lua_State* thread;
 		float dueTimeSeconds;
 		bool hasOwner;
@@ -206,15 +209,21 @@ static int protected_call(lua_State* lua, int arguments, int results, int budget
 	freeze_context_argument(lua, functionIndex, arguments);
 	lua_pushcfunction(lua, traceback_handler);
 	lua_insert(lua, functionIndex);
-	lua_sethook(lua, instruction_budget_hook, LUA_MASKCOUNT, budget);
+	lua_Hook previousHook = lua_gethook(lua);
+	int previousMask = lua_gethookmask(lua);
+	int previousCount = lua_gethookcount(lua);
+	/* Nested emits must not reset or remove the caller's instruction budget. */
+	bool installHook = previousHook != instruction_budget_hook;
+	if (installHook) lua_sethook(lua, instruction_budget_hook, LUA_MASKCOUNT, budget);
 	int status = lua_pcall(lua, arguments, results, functionIndex);
-	lua_sethook(lua, NULL, 0, 0);
+	if (installHook) lua_sethook(lua, previousHook, previousMask, previousCount);
 	lua_remove(lua, functionIndex);
 	if (status == LUA_OK) return PANGEA_SCRIPT_OK;
-	copy_error(error, errorCapacity, lua_tostring(lua, -1));
+	const char* message = lua_tostring(lua, -1);
+	bool budgetExceeded = status == LUA_ERRMEM || (message && strstr(message, "instruction budget"));
+	copy_error(error, errorCapacity, message);
 	lua_pop(lua, 1);
-	if (status == LUA_ERRMEM) return PANGEA_SCRIPT_BUDGET_EXCEEDED;
-	return strstr(error ? error : "", "instruction budget") ? PANGEA_SCRIPT_BUDGET_EXCEEDED : PANGEA_SCRIPT_RUNTIME_ERROR;
+	return budgetExceeded ? PANGEA_SCRIPT_BUDGET_EXCEEDED : PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
 static PangeaScriptStatus validate_hook_result(lua_State* lua, const char* hookName, char* error, int errorCapacity)
@@ -247,7 +256,8 @@ static PangeaScriptStatus validate_result_fields(lua_State* lua, const char* hoo
 	{
 		lua_getfield(lua, -1, fields[i].name);
 		int actualType = lua_type(lua, -1);
-		bool finiteNumber = actualType != LUA_TNUMBER || isfinite((double) lua_tonumber(lua, -1));
+		double number = actualType == LUA_TNUMBER ? (double)lua_tonumber(lua, -1) : 0;
+		bool finiteNumber = actualType != LUA_TNUMBER || (isfinite(number) && fabs(number) <= FLT_MAX);
 		bool validInteger = !fields[i].integerOnly || (lua_isinteger(lua, -1) && lua_tointeger(lua, -1) >= INT_MIN && lua_tointeger(lua, -1) <= INT_MAX);
 		lua_pop(lua, 1);
 		if (actualType == LUA_TNIL || (actualType == fields[i].type && finiteNumber && validInteger)) continue;
@@ -294,6 +304,7 @@ static bool read_vector(lua_State* lua, int index, PangeaScriptVector3* vector)
 		}
 		values[i] = (float) lua_tonumber(lua, -1);
 		lua_pop(lua, 1);
+		if (!isfinite(values[i])) return false;
 	}
 	*vector = (PangeaScriptVector3){values[0], values[1], values[2]};
 	return true;
@@ -1084,7 +1095,7 @@ void PangeaScriptBackend_ClearObjectResources(PangeaScriptBackend* backend, Pang
 		if (!backend->tasks[i].active || !backend->tasks[i].hasOwner ||
 			backend->tasks[i].owner.id != handle.id || backend->tasks[i].owner.generation != handle.generation)
 			continue;
-		if (i != backend->runningTaskIndex)
+		if (!backend->tasks[i].running)
 			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[i].threadReference);
 		backend->tasks[i].active = false;
 	}
@@ -1188,7 +1199,7 @@ void PangeaScriptBackend_ResetObjectStates(PangeaScriptBackend* backend)
 	}
 	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
 	{
-		if (backend->tasks[i].active && i != backend->runningTaskIndex)
+		if (backend->tasks[i].active && !backend->tasks[i].running)
 			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[i].threadReference);
 		backend->tasks[i].active = false;
 	}
@@ -2677,10 +2688,12 @@ static PangeaScriptStatus resume_task(PangeaScriptBackend* backend, int taskInde
 	int resultCount = 0;
 	int previousRunningTaskIndex = backend->runningTaskIndex;
 	backend->runningTaskIndex = taskIndex;
+	backend->tasks[taskIndex].running = true;
 	lua_sethook(thread, instruction_budget_hook, LUA_MASKCOUNT, PANGEA_LUA_EVENT_BUDGET);
 	int status = lua_resume(thread, backend->lua, 0, &resultCount);
 	lua_sethook(thread, NULL, 0, 0);
 	backend->runningTaskIndex = previousRunningTaskIndex;
+	backend->tasks[taskIndex].running = false;
 	if (status == LUA_YIELD)
 	{
 		if (!backend->tasks[taskIndex].active)
@@ -2711,6 +2724,7 @@ static PangeaScriptStatus resume_task(PangeaScriptBackend* backend, int taskInde
 		return PANGEA_SCRIPT_OK;
 	}
 	const char* message = lua_tostring(thread, -1);
+	bool budgetExceeded = status == LUA_ERRMEM || (message && strstr(message, "instruction budget"));
 	luaL_traceback(backend->lua, thread, message ? message : "Lua task error", 1);
 	copy_error(error, errorCapacity, lua_tostring(backend->lua, -1));
 	lua_pop(backend->lua, 1);
@@ -2718,8 +2732,7 @@ static PangeaScriptStatus resume_task(PangeaScriptBackend* backend, int taskInde
 	luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[taskIndex].threadReference);
 	backend->tasks[taskIndex].threadReference = LUA_NOREF;
 	backend->tasks[taskIndex].active = false;
-	if (status == LUA_ERRMEM) return PANGEA_SCRIPT_BUDGET_EXCEEDED;
-	return strstr(error ? error : "", "instruction budget") ? PANGEA_SCRIPT_BUDGET_EXCEEDED : PANGEA_SCRIPT_RUNTIME_ERROR;
+	return budgetExceeded ? PANGEA_SCRIPT_BUDGET_EXCEEDED : PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
 static int lua_task_start(lua_State* lua)
@@ -2728,7 +2741,7 @@ static int lua_task_start(lua_State* lua)
 	luaL_checktype(lua, 1, LUA_TFUNCTION);
 	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
 	{
-		if (backend->tasks[i].active) continue;
+		if (backend->tasks[i].active || backend->tasks[i].running) continue;
 		backend->nextTaskId++;
 		if (backend->nextTaskId <= 0) backend->nextTaskId = 1;
 		lua_State* thread = lua_newthread(lua);
@@ -2758,7 +2771,11 @@ static int lua_task_cancel(lua_State* lua)
 	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
 	{
 		if (!backend->tasks[i].active || backend->tasks[i].id != taskId) continue;
-		luaL_unref(lua, LUA_REGISTRYINDEX, backend->tasks[i].threadReference);
+		if (!backend->tasks[i].running)
+		{
+			luaL_unref(lua, LUA_REGISTRYINDEX, backend->tasks[i].threadReference);
+			backend->tasks[i].threadReference = LUA_NOREF;
+		}
 		backend->tasks[i].active = false;
 		lua_pushboolean(lua, true);
 		return 1;
@@ -2827,6 +2844,7 @@ static int lua_events_emit(lua_State* lua)
 {
 	PangeaScriptBackend* backend = current_backend(lua);
 	const char* eventName = luaL_checkstring(lua, 1);
+	bool hasPayload = lua_gettop(lua) >= 2;
 	int lastSubscriptionId = backend->nextSubscriptionId;
 	int delivered = 0;
 	for (int i = 0; i < (int)(sizeof(backend->subscriptions) / sizeof(backend->subscriptions[0])); i++)
@@ -2840,7 +2858,7 @@ static int lua_events_emit(lua_State* lua)
 			luaL_unref(lua, LUA_REGISTRYINDEX, callbackReference);
 			backend->subscriptions[i].active = false;
 		}
-		if (lua_gettop(lua) >= 2) lua_pushvalue(lua, 2); else lua_pushnil(lua);
+		if (hasPayload) lua_pushvalue(lua, 2); else lua_pushnil(lua);
 		char eventError[512] = {0};
 		bool previousHasObject = backend->hasCurrentObject;
 		PangeaScriptObjectHandle previousObject = backend->currentObject;
@@ -2879,8 +2897,12 @@ static int lua_random_integer(lua_State* lua)
 	lua_Integer minimum = luaL_checkinteger(lua, 1);
 	lua_Integer maximum = luaL_checkinteger(lua, 2);
 	if (maximum < minimum) return luaL_error(lua, "maximum must be greater than or equal to minimum");
-	uint64_t range = (uint64_t)(maximum - minimum) + 1;
-	lua_pushinteger(lua, minimum + (lua_Integer)(next_random(backend) % range));
+	uint64_t range = (uint64_t)maximum - (uint64_t)minimum + 1;
+	uint64_t random = next_random(backend);
+	if (range == 0 || range > UINT32_MAX)
+		random = (random << 32) | next_random(backend);
+	uint64_t offset = range == 0 ? random : random % range;
+	lua_pushinteger(lua, (lua_Integer)((uint64_t)minimum + offset));
 	return 1;
 }
 
@@ -3156,31 +3178,17 @@ static bool reset_lua(PangeaScriptBackend* backend)
 
 static bool push_hook(PangeaScriptBackend* backend, const char* name)
 {
+	backend->didExecuteHook = false;
 	lua_rawgeti(backend->lua, LUA_REGISTRYINDEX, backend->entryReference);
 	lua_getfield(backend->lua, -1, name);
 	lua_remove(backend->lua, -2);
-	if (lua_isfunction(backend->lua, -1)) return true;
+	if (lua_isfunction(backend->lua, -1)) { backend->didExecuteHook = true; return true; }
 	lua_pop(backend->lua, 1); return false;
 }
 
-static void clear_timers(PangeaScriptBackend* backend)
+bool PangeaScriptBackend_DidExecuteHook(PangeaScriptBackend* backend)
 {
-	for (int i = 0; i < (int)(sizeof(backend->timers) / sizeof(backend->timers[0])); i++)
-	{
-		if (backend->timers[i].active)
-			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->timers[i].callbackReference);
-		backend->timers[i].active = false;
-	}
-}
-
-static void clear_tasks(PangeaScriptBackend* backend)
-{
-	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
-	{
-		if (backend->tasks[i].active)
-			luaL_unref(backend->lua, LUA_REGISTRYINDEX, backend->tasks[i].threadReference);
-		backend->tasks[i].active = false;
-	}
+	return backend && backend->didExecuteHook;
 }
 
 static const char* hook_name(PangeaScriptBackend* backend, PangeaScriptHook hook)
@@ -3277,6 +3285,12 @@ PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const 
 PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backend, PangeaScriptHook hook, const PangeaScriptLevelContext* context, char* error, int errorCapacity)
 {
 	if (!backend || !context) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (backend->currentLevelNum != context->levelNum)
+	{
+		memset(backend->objectiveResults, 0, sizeof backend->objectiveResults);
+		memset(backend->checkpointResults, 0, sizeof backend->checkpointResults);
+	}
+	backend->currentLevelNum = context->levelNum;
 	if (hook == PANGEA_SCRIPT_HOOK_LEVEL_LOAD || hook == PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD)
 	{
 		PangeaScriptBackend_ResetObjectStates(backend);
@@ -3291,15 +3305,22 @@ PangeaScriptStatus PangeaScriptBackend_CallLevelHook(PangeaScriptBackend* backen
 
 static PangeaScriptStatus call_due_timers(PangeaScriptBackend* backend, char* error, int errorCapacity)
 {
+	int lastTimerId = backend->nextTimerId;
 	for (int i = 0; i < (int)(sizeof(backend->timers) / sizeof(backend->timers[0])); i++)
 	{
-		if (!backend->timers[i].active || backend->timers[i].dueTimeSeconds > backend->currentLevelTimeSeconds) continue;
+		if (!backend->timers[i].active || backend->timers[i].id > lastTimerId || backend->timers[i].dueTimeSeconds > backend->currentLevelTimeSeconds) continue;
 		int callbackReference = backend->timers[i].callbackReference;
+		int timerId = backend->timers[i].id;
 		bool repeating = backend->timers[i].repeating;
 		if (repeating)
 		{
-			do backend->timers[i].dueTimeSeconds += backend->timers[i].intervalSeconds;
-			while (backend->timers[i].dueTimeSeconds <= backend->currentLevelTimeSeconds);
+			/* Skip missed intervals in constant time. Tiny intervals can fail to
+			   advance a float clock, so always select a representable future time. */
+			double now = backend->currentLevelTimeSeconds;
+			double interval = backend->timers[i].intervalSeconds;
+			double remaining = interval - fmod(now - backend->timers[i].dueTimeSeconds, interval);
+			float next = (float)(now + remaining);
+			backend->timers[i].dueTimeSeconds = next > now ? next : nextafterf((float)now, INFINITY);
 		}
 		else backend->timers[i].active = false;
 		lua_rawgeti(backend->lua, LUA_REGISTRYINDEX, callbackReference);
@@ -3313,7 +3334,7 @@ static PangeaScriptStatus call_due_timers(PangeaScriptBackend* backend, char* er
 		backend->currentObject = previousObject;
 		if (status != PANGEA_SCRIPT_OK)
 		{
-			if (repeating && backend->timers[i].active)
+			if (repeating && backend->timers[i].active && backend->timers[i].id == timerId)
 			{
 				luaL_unref(backend->lua, LUA_REGISTRYINDEX, callbackReference);
 				backend->timers[i].active = false;
@@ -3486,12 +3507,13 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 	PangeaScriptStatus status = protected_call(backend->lua, 1, 1, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity);
 	backend->hasCurrentObject = previousHasObject;
 	backend->currentObject = previousObject;
-	if (status == PANGEA_SCRIPT_OK && !lua_isnil(backend->lua, -1))
+	if (status != PANGEA_SCRIPT_OK) return status;
+	if (!lua_isnil(backend->lua, -1))
 	{
 		copy_error(error, errorCapacity, "onObjectFrame must return nil; use pangea.object commands for mutations");
 		status = PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
-	if (status == PANGEA_SCRIPT_OK) lua_pop(backend->lua, 1);
+	lua_pop(backend->lua, 1);
 	return status;
 }
 

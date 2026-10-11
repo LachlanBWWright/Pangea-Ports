@@ -178,13 +178,14 @@ float	realSpeed;
 				float damage = hitObj->Damage;
 				Boolean destroyTarget = false;
 #ifdef PANGEA_ENABLE_SCRIPTING
-				if (!BugdomScript_OnWeaponHit(hitObj, theEnemy, damage, &damage, &destroyTarget))
-					continue;
+				Boolean applyDamage = BugdomScript_OnWeaponHit(hitObj, theEnemy, damage, &damage, &destroyTarget);
 				if (destroyTarget)
 				{
-					DeleteObject(theEnemy);
+					DeleteEnemy(theEnemy);
 					return(true);
 				}
+				if (!applyDamage)
+					continue;
 #endif
 				if (EnemyGotHurt(theEnemy,damage))		// handle hit (returns true if was deleted)
 					return(true);

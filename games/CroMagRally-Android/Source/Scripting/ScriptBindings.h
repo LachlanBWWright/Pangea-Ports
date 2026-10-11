@@ -25,6 +25,7 @@ void CroMagScript_ResetObjectRegistry(void);
 void CroMagScript_RegisterPlayerObject(ObjNode* playerObj, short playerNum);
 void CroMagScript_UnregisterPlayerObject(ObjNode* playerObj);
 Boolean CroMagScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
+Boolean CroMagScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, short owner, short weaponType, float damage, float* outDamage, Boolean* outDestroyTarget);
 Boolean CroMagScript_OnDamage(short playerNum, float damage, int cause, float* outDamage);
 void CroMagScript_OnDamageApplied(short playerNum, float damage, int cause);
 void CroMagScript_OnDeath(short playerNum, int eventValue);

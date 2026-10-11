@@ -979,7 +979,7 @@ short					p;
 	else
 		p = -1;
 
-	BlastCars(p, where.x, where.y, where.z, BONEBOMB_BLAST_RADIUS);
+	BlastCarsWithWeapon(p, where.x, where.y, where.z, BONEBOMB_BLAST_RADIUS, theBomb, POW_TYPE_BONE);
 
 }
 

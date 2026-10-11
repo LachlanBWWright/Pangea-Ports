@@ -1,6 +1,7 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "ScriptBindings.h"
+#include "pangea_script_platform_sdl.h"
 
 #include "externs.h"
 #include "main.h"
@@ -798,7 +799,7 @@ void MikeScript_OnPlayerSpawn(ObjNode* playerObj)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = GetAreaLevelNum(gSceneNum, gAreaNum),
 		.playerNum = 0,
 		.eventValue = 0,
 		.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
@@ -818,7 +819,7 @@ void MikeScript_OnDeath(ObjNode* playerObj, int eventValue)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = GetAreaLevelNum(gSceneNum, gAreaNum),
 		.playerNum = 0,
 		.eventValue = eventValue,
 		.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
@@ -838,7 +839,7 @@ void MikeScript_OnPlayerRespawn(ObjNode* playerObj)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = GetAreaLevelNum(gSceneNum, gAreaNum),
 		.playerNum = 0,
 		.eventValue = 0,
 		.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
@@ -864,7 +865,7 @@ Boolean MikeScript_OnDamage(float damage, float* outDamage)
 		return true;
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = GetAreaLevelNum(gSceneNum, gAreaNum),
 		.playerNum = 0,
 		.cause = 0,
 		.damage = damage,
@@ -908,7 +909,7 @@ Boolean MikeScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int picku
 	}
 	context = (PangeaScriptPickupContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = GetAreaLevelNum(gSceneNum, gAreaNum),
 		.playerNum = 0,
 		.pickupType = pickupType,
 		.amount = amount,
@@ -953,7 +954,7 @@ Boolean MikeScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, f
 	*outDestroyTarget = false;
 	context = (PangeaScriptWeaponHitContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = GetAreaLevelNum(gSceneNum, gAreaNum),
 		.playerNum = 0,
 		.weaponType = weapon ? weapon->Type : -1,
 		.targetType = target ? target->Type : -1,
@@ -998,7 +999,7 @@ void MikeScript_OnDamageApplied(float damage)
 		return;
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = GetAreaLevelNum(gSceneNum, gAreaNum),
 		.playerNum = 0,
 		.cause = 0,
 		.damage = damage,
@@ -1356,7 +1357,7 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 
 void MikeScript_Init(void)
 {
-	const PangeaScriptGameInfo gameInfo =
+	PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "MightyMike-Android",
 		.gameName = "Mighty Mike",
@@ -1375,6 +1376,7 @@ void MikeScript_Init(void)
 		.capabilities = PANGEA_SCRIPT_MIGHTY_MIKE_CAPABILITIES,
 	};
 
+	PangeaScriptPlatform_Configure(&gameInfo);
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	LogScriptStatus("init", status);
 

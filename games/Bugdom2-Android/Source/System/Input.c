@@ -4,6 +4,43 @@
 
 #include "game.h"
 
+#define PANGEA_TOUCH_IMPLEMENTATION
+#include "../../../../shared/android/TouchControls.h"
+
+static const TouchControlButton kTouchButtons[] =
+{
+	{"JUMP", kNeed_Jump},
+	{"KICK", kNeed_Kick},
+	{"GRAB", kNeed_PickupDrop},
+	{"BUDDY", kNeed_LaunchBuddy},
+	{"CAMERA", kNeed_CameraMode},
+	{"CAM L", kNeed_CameraLeft},
+	{"CAM R", kNeed_CameraRight},
+};
+static const TouchControlProfile kTouchProfile =
+{
+	.leftNeed = kNeed_TurnLeft,
+	.rightNeed = kNeed_TurnRight,
+	.upNeed = kNeed_Forward,
+	.downNeed = kNeed_Backward,
+	.confirmNeed = kNeed_UIConfirm,
+	.backNeed = kNeed_UIBack,
+	.pauseNeed = kNeed_UIPause,
+	.uiLeftNeed = kNeed_UIPrev,
+	.uiRightNeed = kNeed_UINext,
+	.uiUpNeed = kNeed_UIUp,
+	.uiDownNeed = kNeed_UIDown,
+	.buttons = kTouchButtons,
+	.buttonCount = sizeof(kTouchButtons) / sizeof(kTouchButtons[0]),
+};
+
+static bool IsTouchMovementNeed(int need)
+{
+	return need == kTouchProfile.leftNeed || need == kTouchProfile.rightNeed
+		|| need == kTouchProfile.upNeed || need == kTouchProfile.downNeed;
+}
+
+
 /***************/
 /* CONSTANTS   */
 /***************/
@@ -132,6 +169,7 @@ void InvalidateNeedState(int need)
 
 void InvalidateAllInputs(void)
 {
+	TouchControls_Reset();
 	_Static_assert(1 == sizeof(KeyState), "sizeof(KeyState) has changed -- Rewrite this function without memset()!");
 
 	SDL_memset(gNeedStates, KEYSTATE_IGNOREHELD, NUM_CONTROL_NEEDS);
@@ -188,7 +226,7 @@ static void ProcessCmdQ(void)
 
 static void UpdateMouseButtonStates(int mouseWheelDeltaX, int mouseWheelDeltaY)
 {
-	uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
+	uint32_t mouseButtons = TouchControls_GetMouseState(NULL, NULL);
 
 	for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
 	{
@@ -222,6 +260,7 @@ static void UpdateKeyboardMouseInputNeeds(void)
 
 		pressed |= gMouseButtonStates[kb->mouseButton] & KEYSTATE_ACTIVE_BIT;
 
+		pressed |= TouchControls_NeedPressed(need);
 		UpdateKeyState(&gNeedStates[need], pressed);
 	}
 }
@@ -299,6 +338,7 @@ static void UpdateControllerInputNeeds(void)
 
 void UpdateInput(void)		// Also called DoSDLMaintenance in other ports
 {
+	TouchControls_BeginFrame(gSDLWindow, &kTouchProfile);
 	gTextInput[0] = '\0';
 	gMouseMotionNow = false;
 	int mouseWheelDeltaX = 0;
@@ -319,6 +359,8 @@ void UpdateInput(void)		// Also called DoSDLMaintenance in other ports
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+		if (TouchControls_HandleEvent(&event))
+			continue;
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:
@@ -430,6 +472,9 @@ int GetNeedState(int needID)
 
 static float GetAnalogValue(int needID, bool raw)
 {
+	if (TouchControls_StickActive() && IsTouchMovementNeed(needID))
+		return TouchControls_NeedAnalog(needID);
+
 	GAME_ASSERT(needID >= 0);
 	GAME_ASSERT(needID < NUM_CONTROL_NEEDS);
 
@@ -478,6 +523,16 @@ float GetNeedAxis1D(int negativeNeedID, int positiveNeedID)
 
 OGLPolar2D GetNeedAxis2D(int negXID, int posXID, int negYID, int posYID)
 {
+	/* Touch input already has radial clamping and must bypass pad deadzones. */
+	if (TouchControls_StickActive()
+		&& negXID == kTouchProfile.leftNeed && posXID == kTouchProfile.rightNeed
+		&& negYID == kTouchProfile.upNeed && posYID == kTouchProfile.downNeed)
+	{
+		float x = TouchControls_GetStickX();
+		float y = TouchControls_GetStickY();
+		return (OGLPolar2D){.a = atan2f(y, x), .r = fminf(1.0f, hypotf(x, y))};
+	}
+
 	float deadZone = negXID < NUM_REMAPPABLE_NEEDS ? kJoystickDeadZoneFrac : kJoystickDeadZoneFrac_UI;
 
 	float negX = GetAnalogValue(negXID, true);
@@ -858,7 +913,7 @@ OGLPoint2D GetMouseCoordsIn2DLogicalRect(void)
 	// On macOS, the mouse position is relative to the window's "point size" on Retina screens.
 	float mx, my;
 	int ww, wh;
-	SDL_GetMouseState(&mx, &my);
+	TouchControls_GetMouseState(&mx, &my);
 	SDL_GetWindowSize(gSDLWindow, &ww, &wh);		// IMPORTANT: Do NOT use SDL_GetWindowSizeInPixels here
 
 //	OGLRect r = Get2DLogicalRect(GetOverlayPaneNumber(), 1);
@@ -988,7 +1043,8 @@ static void SetPlayerAxisControls(void)
 	GAME_DEBUGASSERT(magnitude >= 0);
 	GAME_DEBUGASSERT(magnitude <= 1);
 
-	angle = SnapAngle(angle, OGLMath_DegreesToRadians(10));
+	if (!TouchControls_StickActive())
+		angle = SnapAngle(angle, OGLMath_DegreesToRadians(10));
 	float x = magnitude * SDL_cosf(angle);
 	float z = magnitude * SDL_sinf(angle);
 

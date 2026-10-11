@@ -20,6 +20,35 @@
 #include "structures.h"
 #include "externs.h"
 
+#if defined(__ANDROID__)
+#define PANGEA_TOUCH_IMPLEMENTATION
+#include "../../../../shared/android/TouchControls.h"
+#define SDL_GetMouseState TouchControls_GetMouseState
+static const TouchControlButton kTouchButtons[] =
+{
+    {"Fire", kNeed_Attack},
+    {"Weapon", kNeed_NextWeapon},
+    {"Radar", kNeed_Radar},
+};
+static const TouchControlProfile kTouchProfile =
+{
+    .upNeed = kNeed_Up,
+    .downNeed = kNeed_Down,
+    .leftNeed = kNeed_Left,
+    .rightNeed = kNeed_Right,
+    .confirmNeed = kNeed_UIConfirm,
+    .backNeed = kNeed_UIBack,
+    .pauseNeed = kNeed_UIPause,
+    .buttons = kTouchButtons,
+    .buttonCount = sizeof(kTouchButtons) / sizeof(kTouchButtons[0]),
+    .uiUpNeed = kNeed_UIUp,
+    .uiDownNeed = kNeed_UIDown,
+    .uiLeftNeed = kNeed_UILeft,
+    .uiRightNeed = kNeed_UIRight,
+};
+#endif
+
+
 /**********************/
 /*     PROTOTYPES     */
 /**********************/
@@ -108,9 +137,15 @@ void UpdateInput(void)
 	int mouseWheelDelta = 0;
 
 	SDL_PumpEvents();
+#if defined(__ANDROID__)
+	TouchControls_BeginFrame(gSDLWindow, &kTouchProfile);
+#endif
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+#if defined(__ANDROID__)
+		if (TouchControls_HandleEvent(&event)) continue;
+#endif
 		switch (event.type)
 		{
 		case SDL_EVENT_QUIT:
@@ -237,6 +272,9 @@ void UpdateInput(void)
 			}
 		}
 
+#if defined(__ANDROID__)
+		downNow |= TouchControls_NeedPressed(i);
+#endif
 		UpdateKeyState(&gNeedStates[i], downNow);
 	}
 }
@@ -419,6 +457,13 @@ static void OnJoystickRemoved(SDL_JoystickID which)
 
 int32_t GetLeftStickMagnitude_Fix32(void)
 {
+#if defined(__ANDROID__)
+	float touchX = TouchControls_NeedAnalog(kNeed_Right) - TouchControls_NeedAnalog(kNeed_Left);
+	float touchY = TouchControls_NeedAnalog(kNeed_Down) - TouchControls_NeedAnalog(kNeed_Up);
+	if (touchX != 0 || touchY != 0)
+		return (int32_t)(65536.0f * sqrtf(touchX * touchX + touchY * touchY));
+#endif
+
 	if (!gSDLGamepad)
 	{
 		return 0;

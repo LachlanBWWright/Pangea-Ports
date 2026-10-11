@@ -1017,13 +1017,19 @@ void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean o
 		if (gMyShield)															// see if shielded
 			return;
 		
-	StopJetPack(theNode);													// make sure this is stopped when get hit
 
 	if (gPlayerGotKilledFlag)												// cant get hurt if already dead
 		return;
 		
 	if (theNode->InvincibleTimer > 0)										// cant be harmed if invincible
 		return;
+
+	#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!NanosaurScript_OnDamage(theNode, damage, 0, &damage))
+		return;
+	#endif
+
+	StopJetPack(theNode);													// make sure this is stopped when get hit
 
 	if (doHurtAnim)
 	{
@@ -1041,10 +1047,7 @@ void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean o
 	if (theNode->InvincibleTimer < INVINCIBILITY_DURATION_SHORT)
 		theNode->InvincibleTimer = INVINCIBILITY_DURATION_SHORT;	// make me invincible for a shorter while
 	
-	#ifdef PANGEA_ENABLE_SCRIPTING
-	if (!NanosaurScript_OnDamage(theNode, damage, 0, &damage))
-		return;
-	#endif
+
 	
 	gMyHealth -= damage;										// take damage
 	#ifdef PANGEA_ENABLE_SCRIPTING

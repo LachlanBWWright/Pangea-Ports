@@ -70,7 +70,12 @@ export interface ObjectFrameContext extends FrameContext {
   readonly objectType: string;
   readonly position: Vector3;
   readonly tags: readonly string[];
-  readonly event: ObjectEvent;
+  readonly event: ObjectEvent | "frame";
+  readonly velocity?: Vector3;
+  readonly collisionEnabled?: boolean;
+  readonly other?: ObjectHandle;
+  readonly sideBits?: number;
+  readonly eventValue?: number;
 }
 
 export interface ObjectEventContext extends FrameContext {
@@ -90,6 +95,8 @@ export type ObjectEvent =
   | "spawn"
   | "update"
   | "triggerEnter"
+  | "triggerStay"
+  | "triggerExit"
   | "animationEvent"
   | "animationComplete"
   | "activate"
@@ -317,10 +324,9 @@ export interface PangeaCapabilities {
   readonly playerInvulnerability: boolean;
   readonly weaponScoreEffects: boolean;
   readonly playerForm: boolean;
-  readonly raceMetadata: boolean;
-  readonly objectiveMetadata: boolean;
-  readonly checkpointEvents: boolean;
-  readonly levelMetadata: boolean;
+  readonly playerScore: boolean;
+  readonly playerLives: boolean;
+  readonly playerInventory: boolean;
 }
 
 export interface PlayerWeapon {
@@ -544,7 +550,7 @@ export interface PangeaApi {
   };
   readonly spawn: {
     native(
-      id: string,
+      id: string | number,
       position: Vector3,
       options?: NativeSpawnOptions,
     ): ObjectHandle | undefined;
@@ -605,8 +611,8 @@ export interface PangeaApi {
     setWeaponQuantityResult(playerNum: number, weaponType: number, quantity: number): PlayerCommandResult;
     setKey(playerNum: number, keyId: number, enabled: boolean): boolean;
     setKeyResult(playerNum: number, keyId: number, enabled: boolean): PlayerCommandResult;
-    setCloverCount(playerNum: number, color: 0 | 1 | 2, count: number): boolean;
-    setCloverCountResult(playerNum: number, color: 0 | 1 | 2, count: number): PlayerCommandResult;
+    setCloverCount(playerNum: number, color: "green" | "blue" | "gold", count: number): boolean;
+    setCloverCountResult(playerNum: number, color: "green" | "blue" | "gold", count: number): PlayerCommandResult;
     setShieldActive(playerNum: number, active: boolean): boolean;
     setShieldActiveResult(playerNum: number, active: boolean): PlayerCommandResult;
     heal(playerNum: number, amount: number): boolean;

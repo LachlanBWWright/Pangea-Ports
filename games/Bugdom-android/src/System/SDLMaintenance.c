@@ -3,6 +3,10 @@
 // This file is part of Bugdom. https://github.com/jorio/bugdom
 
 #include "game.h"
+#if defined(__ANDROID__)
+#include "../../../../shared/android/TouchControls.h"
+extern void Bugdom_BeginTouchFrame(void);
+#endif
 #include "../Headers/profiling.h"
 
 char					gTypedAsciiKey = '\0';
@@ -96,6 +100,9 @@ static void UpdateDebugStats(void)
 
 void DoSDLMaintenance(void)
 {
+#if defined(__ANDROID__)
+	Bugdom_BeginTouchFrame();
+#endif
 	switch (gDebugMode)
 	{
 		case DEBUG_MODE_OFF:
@@ -113,6 +120,9 @@ void DoSDLMaintenance(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+#if defined(__ANDROID__)
+		if (TouchControls_HandleEvent(&event)) continue;
+#endif
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:

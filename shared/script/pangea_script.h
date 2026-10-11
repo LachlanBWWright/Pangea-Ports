@@ -270,6 +270,9 @@ typedef struct PangeaScriptGameInfo
 	PangeaScriptStatus (*loadPersistent)(const char* key, unsigned char* outData, int capacity, int* outSize);
 	PangeaScriptStatus (*savePersistent)(const char* key, const unsigned char* data, int size);
 	PangeaScriptGameCapabilities capabilities;
+	/* Optional packaged-asset fallback: return malloc-owned, NUL-terminated text.
+	 * outSize excludes the terminator; the host frees the returned allocation. */
+	char* (*readTextFile)(const char* path, long* outSize);
 } PangeaScriptGameInfo;
 
 typedef struct PangeaScriptLevelContext

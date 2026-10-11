@@ -1205,7 +1205,7 @@ ObjNode					*whoThrew;
 		/* SEE IF IT HIT ANY CARS */
 
 	whoThrew = (ObjNode *)theBullet->WhoThrew;
-	BlastCars(whoThrew->PlayerNum, where->x, where->y, where->z, BOTTLEROCKET_BLAST_RADIUS);
+	BlastCarsWithWeapon(whoThrew->PlayerNum, where->x, where->y, where->z, BOTTLEROCKET_BLAST_RADIUS, theBullet, POW_TYPE_BOTTLEROCKET);
 
 }
 
@@ -1524,7 +1524,7 @@ ObjNode					*whoThrew;
 		/* SEE IF IT HIT ANY CARS */
 
 	whoThrew = (ObjNode *)theBullet->WhoThrew;
-	BlastCars(whoThrew->PlayerNum, where->x, where->y, where->z, BOTTLEROCKET_BLAST_RADIUS);
+	BlastCarsWithWeapon(whoThrew->PlayerNum, where->x, where->y, where->z, BOTTLEROCKET_BLAST_RADIUS, theBullet, POW_TYPE_BOTTLEROCKET);
 
 }
 
@@ -1796,7 +1796,7 @@ ObjNode					*whoThrew;
 		/* SEE IF IT HIT ANY CARS */
 
 	whoThrew = (ObjNode *)theBullet->WhoThrew;
-	BlastCars(whoThrew->PlayerNum, where->x, where->y, where->z, TORPEDO_BLAST_RADIUS);
+	BlastCarsWithWeapon(whoThrew->PlayerNum, where->x, where->y, where->z, TORPEDO_BLAST_RADIUS, theBullet, POW_TYPE_TORPEDO);
 
 }
 

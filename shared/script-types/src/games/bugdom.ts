@@ -18,9 +18,9 @@ export interface BugdomSplineItemContext extends SplineItemContext {
 }
 
 export type BugdomLifecycleModule =
-  AdventureLifecycleModule<BugdomLevelContext, BugdomFrameContext> &
+  Omit<AdventureLifecycleModule<BugdomLevelContext, BugdomFrameContext> &
   Partial<{
     onTerrainItem(ctx: BugdomTerrainItemContext): ItemSpawnResult | void;
     onSplineItem(ctx: BugdomSplineItemContext): ItemSpawnResult | void;
-  }>;
-
+  }>,
+    "onLapComplete" | "onRaceFinish">;

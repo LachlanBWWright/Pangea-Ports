@@ -357,6 +357,18 @@ ObjNode		*thisNodePtr;
 	{
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+			thisNodePtr = gNextNode;
+			continue;
+		}
+#endif
+
 			
 	
 		KeepOldCollisionBoxes(thisNodePtr);					// keep old box
@@ -376,6 +388,13 @@ ObjNode		*thisNodePtr;
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+		}
 		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
 			BugdomScript_RunObjectFrame(thisNodePtr);
 #endif

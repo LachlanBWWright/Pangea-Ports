@@ -323,6 +323,18 @@ ObjNode		*thisNodePtr;
 	{
 		gNextNode = thisNodePtr->NextNode;
 		gCurrentNode = thisNodePtr;						// set current object node
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+			thisNodePtr = gNextNode;
+			continue;
+		}
+#endif
+
 		
 		KeepOldCollisionBoxes(thisNodePtr);					// keep old box
 		
@@ -342,6 +354,13 @@ ObjNode		*thisNodePtr;
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptDeleteRequested)
+		{
+			if ((thisNodePtr->CType & CTYPE_ENEMY) && !thisNodePtr->ScriptDefinitionID[0])
+				DeleteEnemy(thisNodePtr);
+			else
+				DeleteObject(thisNodePtr);
+		}
 		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
 			NanosaurScript_RunObjectFrame(thisNodePtr);
 #endif

@@ -256,13 +256,14 @@ int		i;
 			float hitDamage = hitObj->Damage;
 			Boolean destroyTarget = false;
 #ifdef PANGEA_ENABLE_SCRIPTING
-			if (!Bugdom2Script_OnWeaponHit(hitObj, theEnemy, hitDamage, &hitDamage, &destroyTarget))
-				continue;
+			Boolean applyDamage = Bugdom2Script_OnWeaponHit(hitObj, theEnemy, hitDamage, &hitDamage, &destroyTarget);
 			if (destroyTarget)
 			{
 				DeleteEnemy(theEnemy);
 				return(true);
 			}
+			if (!applyDamage)
+				continue;
 #endif
 			if (theEnemy->HurtCallback != nil)							// if has a hurt callback
 				if (theEnemy->HurtCallback(theEnemy, hitDamage))	// handle hit (returns true if was deleted)

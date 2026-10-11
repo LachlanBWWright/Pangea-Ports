@@ -174,3 +174,81 @@ Preview VFS files and exported script-package files are generated from the
 same validated byte records. Invalid or missing native assets return a typed
 incompatible-item result and are cleaned from the adapter registry before the
 next load attempt.
+
+## Adapter-safe mutations and callback payloads
+
+Capabilities describe support from the active native adapter, not a guarantee
+that every object or player can be mutated. Check the structured command result
+before depending on a change. Clover colors are named strings, never numeric
+color indexes:
+
+```lua
+function onPlayerSpawn(ctx)
+    local player = pangea.player.get(ctx.playerNum)
+    if player and player.greenCloverCount ~= nil then
+        local result = pangea.player.setCloverCountResult(ctx.playerNum, "green", 3)
+        if not result.ok then pangea.log.warn(result.message) end
+    end
+end
+```
+
+`onObjectFrame` receives `object`, `objectType`, `position`, `tags`, timing,
+`event`, and `sideBits`. `velocity`, `collisionEnabled`, `eventValue`, and `other`
+are optional: they depend on object adapter support and the dispatched event.
+The fallback event name is `"frame"`. Lifecycle events include `triggerStay`
+and `triggerExit`; only use data present in the current callback.
+
+Native spawn IDs accept a symbolic string or an integer native type. Native
+spawn options are integer bytes from 0 through 255: `subtype` aliases `param0`
+and `amount` aliases `param1`; explicit `param0` and `param1` override the
+aliases when both are supplied. A valid type still requires a compatible,
+loaded native asset. Scripted spawn options instead accept `scale`, `animation`,
+`animationSpeed`, and `blendSeconds`.
+
+The capability table exposes `playerScore`, `playerLives`, and `playerInventory`
+as adapter flags alongside `playerCommands` and `playerInvulnerability`.
+It does not expose `raceMetadata`, `objectiveMetadata`, `checkpointEvents`, or
+`levelMetadata` flags. Inspect optional snapshot fields and query return values
+for metadata availability instead.
+
+`spawn.nativeResult` returns structured status for native adapter failures,
+including incompatible types/assets. Malformed Lua argument types, non-finite
+positions, and out-of-range parameter bytes raise a Lua argument error instead
+of returning a result; validate inputs or wrap the call in `pcall` when consuming
+untrusted configuration.
+
+Successful hook executions reset the consecutive-failure counter. Argument
+errors and deferred timer/task processing do not independently trip that hook
+counter. Persistent storage accepts an entry that exactly fits its configured
+byte capacity; a write beyond that capacity fails without partially replacing
+existing state.
+
+Local Cro-Mag Rally advertises `onSplineItem` and `onWeaponHit` in addition to
+terrain and race hooks. Billy Frontier also supports `onWeaponHit`. The weapon
+callback receives the common `WeaponHitContext` and may return `WeaponHitResult`;
+it uses the same validation and native default behavior as the other ports.
+Race callbacks are `onRaceLoad`, `onRaceStart`, `onRaceFrame`, `onRaceComplete`,
+and `onRaceUnload`. Lap and finish callbacks receive one player-event context,
+not positional player/lap/result arguments. Billy's mode is context data;
+`onAreaStart` is shared across duel, shootout, stampede, and target practice.
+
+## Android assets, persistence, and native lifetime
+
+Each Android Gradle build enables scripting explicitly. Script and configuration
+text uses the adapter's SDL-backed loader: a runtime `Data/Scripts/...` path maps
+to the APK's `Scripts/...` asset path. Native builds also try the
+executable-relative data location. The `GameInfo.readTextFile` callback is
+internal adapter plumbing; it does not add a Lua file-reading API.
+
+Android persistence lives under the app-writable directory returned by
+`SDL_GetPrefPath("PangeaSoftware", gameId)`. Writes use a temporary file and
+atomic replacement so the APK's read-only asset directory is never the save
+destination.
+
+`pangea.object.delete` intentionally returns `false` for native player objects:
+the engine retains global references to those players. Use player commands for
+supported player changes. Other accepted native deletions invalidate the script
+handle and defer native memory release to a safe engine boundary. The `destroy`
+lifecycle callback runs before that deferred release. A successful deletion
+therefore means the script object has been removed, not that native memory was
+freed during the Lua call.

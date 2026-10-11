@@ -1,6 +1,7 @@
 #if !(GLRENDER)
 
 #include <SDL3/SDL.h>
+#include "../../../../shared/android/TouchControlsDraw.h"
 #include "myglobals.h"
 #include "externs.h"
 #include "misc.h"
@@ -165,6 +166,7 @@ void SDLRender_PresentFramebuffer(void)
 	gFramebufferRenderTextureMs = SDLRender_ElapsedMs(startTicks, endTicks);
 	CHECK_SDL_ERROR(success);
 	startTicks = SDL_GetPerformanceCounter();
+	TouchControls_DrawSDL(gSDLRenderer);
 	SDL_RenderPresent(gSDLRenderer);
 	endTicks = SDL_GetPerformanceCounter();
 	gFramebufferPresentMs = SDLRender_ElapsedMs(startTicks, endTicks);

@@ -297,6 +297,7 @@ void CreateCarWheelsAndHead(ObjNode *theCar, short playerNum);
 void AlignWheelsAndHeadOnCar(ObjNode *theCar);
 void UpdateCarAttachmentTransforms(ObjNode *theCar);
 void BlastCars(short whoThrew, float x, float y, float z, float radius);
+void BlastCarsWithWeapon(short whoThrew, float x, float y, float z, float radius, ObjNode* weapon, short weaponType);
 void SetTractionPhysics(CarStatsType *carStats, float p);
 void SetSuspensionPhysics(CarStatsType *carStats, float n);
 void RotateCarXZ(ObjNode *theNode);

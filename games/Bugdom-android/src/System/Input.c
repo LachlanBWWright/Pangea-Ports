@@ -12,6 +12,43 @@
 
 #include "game.h"
 
+#if defined(__ANDROID__)
+#define PANGEA_TOUCH_IMPLEMENTATION
+#include "../../../../shared/android/TouchControls.h"
+#define SDL_GetMouseState TouchControls_GetMouseState
+static const TouchControlButton kTouchButtons[] =
+{
+    {"Jump", kKey_Jump},
+    {"Kick", kKey_Kick},
+    {"Morph", kKey_MorphPlayer},
+    {"Buddy", kKey_BuddyAttack},
+    {"Cam L", kKey_SwivelCameraLeft},
+    {"Cam R", kKey_SwivelCameraRight},
+};
+static const TouchControlProfile kTouchProfile =
+{
+    .upNeed = kKey_Forward,
+    .downNeed = kKey_Backward,
+    .leftNeed = kKey_Left,
+    .rightNeed = kKey_Right,
+    .confirmNeed = kKey_UI_Confirm,
+    .backNeed = kKey_UI_Cancel,
+    .pauseNeed = kKey_Pause,
+    .buttons = kTouchButtons,
+    .buttonCount = sizeof(kTouchButtons) / sizeof(kTouchButtons[0]),
+    .uiUpNeed = kKey_UI_CharMM,
+    .uiDownNeed = kKey_UI_CharPP,
+    .uiLeftNeed = kKey_UI_CharLeft,
+    .uiRightNeed = kKey_UI_CharRight,
+};
+void Bugdom_BeginTouchFrame(void)
+{
+	TouchControls_BeginFrame(gSDLWindow, &kTouchProfile);
+}
+
+#endif
+
+
 
 /**********************/
 /*     PROTOTYPES     */
@@ -220,6 +257,7 @@ void UpdateInput(void)
 {
 	SDL_PumpEvents();
 
+
 		/* CHECK FOR NEW MOUSE BUTTONS */
 
 	if (gEatMouse)
@@ -341,6 +379,9 @@ void UpdateKeyMap(void)
 		if (gSDLGamepad && kb->gamepadButton != SDL_GAMEPAD_BUTTON_INVALID)
 			downNow |= 0 != SDL_GetGamepadButton(gSDLGamepad, kb->gamepadButton);
 
+#if defined(__ANDROID__)
+		downNow |= TouchControls_NeedPressed(i);
+#endif
 		UpdateKeyState(&gKeyStates[i], downNow);
 	}
 
@@ -455,6 +496,17 @@ void CaptureMouse(Boolean doCapture)
 
 void GetMouseDelta(float *dx, float *dy)
 {
+#if defined(__ANDROID__)
+	float touchX = TouchControls_NeedAnalog(kKey_Right) - TouchControls_NeedAnalog(kKey_Left);
+	float touchY = TouchControls_NeedAnalog(kKey_Backward) - TouchControls_NeedAnalog(kKey_Forward);
+	if (touchX != 0 || touchY != 0)
+	{
+		*dx = touchX * 1600.0f * gFramesPerSecondFrac;
+		*dy = touchY * 1600.0f * gFramesPerSecondFrac;
+		return;
+	}
+#endif
+
 	
 		/* SEE IF OVERRIDE MOUSE WITH KEY MOVEMENT */
 			

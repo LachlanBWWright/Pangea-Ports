@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/android/TouchControlsDraw.h"
 #include "scene_depth.h"
 #include "profiling.h"
 
@@ -442,6 +443,7 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(QD3DSetu
 	StartProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 	Render_EndFrame();
 
+	TouchControls_DrawGL(gSDLWindow);
 	SDL_GL_SwapWindow(gSDLWindow);
 	EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 }

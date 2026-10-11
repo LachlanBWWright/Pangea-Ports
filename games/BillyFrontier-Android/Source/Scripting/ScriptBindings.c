@@ -2,6 +2,7 @@
 
 #include "game.h"
 #include "ScriptBindings.h"
+#include "pangea_script_platform_sdl.h"
 
 #include "structs.h"
 #include "splineitems.h"
@@ -64,6 +65,7 @@ static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, floa
 }
 
 static PangeaScriptFrameContext gScriptFrameContext;
+static float gScriptElapsedTime;
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE int BillyScript_ProbeAreaCompletionJS(void)
@@ -563,7 +565,7 @@ void BillyScript_RegisterPlayerObject(ObjNode* playerObj)
 	if (playerObj && playerObj->ScriptObjectID > 0)
 	{
 		PangeaScriptPlayerEventContext context = {
-			.levelNum = gScriptFrameContext.levelNum,
+			.levelNum = gCurrentArea,
 			.playerNum = 0,
 			.player = {playerObj->ScriptObjectID, playerObj->ScriptObjectGeneration},
 			.position = {playerObj->Coord.x, playerObj->Coord.y, playerObj->Coord.z},
@@ -596,7 +598,7 @@ Boolean BillyScript_OnDamage(ObjNode* source, float damage, int cause, float* ou
 
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gCurrentArea,
 		.playerNum = 0,
 		.cause = cause,
 		.damage = damage,
@@ -632,7 +634,7 @@ Boolean BillyScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, 
 	*outDestroyTarget = false;
 	context = (PangeaScriptWeaponHitContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gCurrentArea,
 		.playerNum = 0,
 		.weaponType = weapon ? weapon->Type : -1,
 		.targetType = target ? target->Type : -1,
@@ -678,7 +680,7 @@ void BillyScript_OnDamageApplied(ObjNode* player, float damage, int cause)
 		return;
 	context = (PangeaScriptDamageContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gCurrentArea,
 		.playerNum = 0,
 		.cause = cause,
 		.damage = damage,
@@ -706,7 +708,7 @@ Boolean BillyScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pick
 		return true;
 	context = (PangeaScriptPickupContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gCurrentArea,
 		.playerNum = 0,
 		.pickupType = pickupType,
 		.amount = amount,
@@ -744,7 +746,7 @@ void BillyScript_OnDeath(ObjNode* player, int eventValue)
 		return;
 	context = (PangeaScriptPlayerEventContext)
 	{
-		.levelNum = gScriptFrameContext.levelNum,
+		.levelNum = gCurrentArea,
 		.playerNum = 0,
 		.eventValue = eventValue,
 		.player = {player->ScriptObjectID, (uint32_t)player->ScriptObjectGeneration},
@@ -1192,7 +1194,7 @@ static PangeaScriptStatus SetScriptPlayerInvulnerable(int playerNum, float durat
 
 void BillyScript_Init(void)
 {
-	const PangeaScriptGameInfo gameInfo =
+	PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "BillyFrontier-Android",
 		.gameName = "Billy Frontier",
@@ -1211,6 +1213,7 @@ void BillyScript_Init(void)
 		.capabilities = PANGEA_SCRIPT_BILLY_FRONTIER_CAPABILITIES,
 	};
 
+	PangeaScriptPlatform_Configure(&gameInfo);
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	LogScriptStatus("init", status);
 
@@ -1328,11 +1331,14 @@ void BillyScript_OnAreaLoad(int areaNum)
 
 void BillyScript_OnAreaStart(int areaNum)
 {
+    gScriptElapsedTime = 0.0f;
 	CallAreaHook(PANGEA_SCRIPT_HOOK_LEVEL_START, areaNum, "onAreaStart");
 }
 
 void BillyScript_OnAreaFrame(int areaNum, unsigned int frameNum, float deltaSeconds, float areaTimeSeconds)
 {
+    (void)areaTimeSeconds;
+    if (isfinite(deltaSeconds) && deltaSeconds > 0.0f) gScriptElapsedTime += deltaSeconds;
 	int modePhase, modeWave, modeSequenceIndex, modeSequenceLength, modeEnemyCount, modeReflex;
 	float modeTimer;
 	bool modeCanAdvance;
@@ -1342,7 +1348,7 @@ void BillyScript_OnAreaFrame(int areaNum, unsigned int frameNum, float deltaSeco
 		.levelNum = areaNum,
 		.frameNum = frameNum,
 		.deltaSeconds = deltaSeconds,
-		.levelTimeSeconds = areaTimeSeconds,
+		.levelTimeSeconds = gScriptElapsedTime,
 		.mode = BillyScript_AreaMode(areaNum),
 		.networked = false,
 		.modePhase = modePhase,

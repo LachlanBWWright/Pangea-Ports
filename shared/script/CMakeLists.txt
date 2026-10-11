@@ -15,7 +15,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pangea_lua)
 
 file(GLOB LUA_SOURCES CONFIGURE_DEPENDS "${pangea_lua_SOURCE_DIR}/src/*.c")
-list(REMOVE_ITEM LUA_SOURCES "${pangea_lua_SOURCE_DIR}/src/lua.c" "${pangea_lua_SOURCE_DIR}/src/luac.c")
+list(REMOVE_ITEM LUA_SOURCES "${pangea_lua_SOURCE_DIR}/src/lua.c" "${pangea_lua_SOURCE_DIR}/src/luac.c" "${pangea_lua_SOURCE_DIR}/src/onelua.c")
 add_library(PangeaLua STATIC ${LUA_SOURCES})
 target_include_directories(PangeaLua PUBLIC "${pangea_lua_SOURCE_DIR}/src")
 target_compile_features(PangeaLua PUBLIC c_std_17)
@@ -35,6 +35,18 @@ if(UNIX AND NOT EMSCRIPTEN)
 endif()
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
+	# Exercise the runtime independently of Lua using the controllable mock backend.
+	add_executable(PangeaScriptCoreTests ../../tests/test_pangea_script.c
+		pangea_script.c pangea_script_config.c)
+	target_include_directories(PangeaScriptCoreTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+	target_compile_features(PangeaScriptCoreTests PRIVATE c_std_17)
+	if(UNIX AND NOT EMSCRIPTEN)
+		target_link_libraries(PangeaScriptCoreTests PRIVATE m)
+	endif()
+	file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/core-tests")
+	add_test(NAME PangeaScriptCoreTests COMMAND PangeaScriptCoreTests)
+	set_tests_properties(PangeaScriptCoreTests PROPERTIES
+		WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/core-tests")
 	add_executable(PangeaScriptLuaTests ../../tests/test_pangea_script_lua.c)
 	target_link_libraries(PangeaScriptLuaTests PRIVATE PangeaScript)
 	target_compile_features(PangeaScriptLuaTests PRIVATE c_std_17)

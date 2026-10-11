@@ -2,6 +2,7 @@
 
 #include "game.h"
 #include "ScriptBindings.h"
+#include "pangea_script_platform_sdl.h"
 
 #include "splineitems.h"
 #include <stdio.h>
@@ -1063,25 +1064,12 @@ static bool OttoObjectSetAnimationNamed(void* nativeObject, const char* animatio
 static bool OttoObjectDelete(void* nativeObject)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
-	if (!node)
+	if (!node || node->CType == INVALID_NODE_FLAG || node == gPlayerInfo.objNode)
 		return false;
-	if (node == gCurrentScriptObject || (node->CType & CTYPE_TRIGGER) || node->TerrainItemPtr || node->SplineItemPtr)
-	{
-		if ((node->TerrainItemPtr || node->SplineItemPtr) && !node->ScriptStreamOutSent)
-		{
-			PangeaScriptObjectHandle handle = { node->ScriptObjectID, node->ScriptObjectGeneration };
-			if (PangeaScript_ObjectExists(handle))
-				(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_STREAM_OUT);
-			node->ScriptStreamOutSent = true;
-		}
-		node->ScriptDeleteRequested = true;
-		return true;
-	}
 
-	PangeaScriptObjectHandle handle = { node->ScriptObjectID, node->ScriptObjectGeneration };
-	(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
-	OttoScript_UnregisterObjectNode(node);
-	DeleteObject(node);
+	// Hooks can delete their source or target. Keep native memory and collision
+	// references valid until the object loop reaches a safe boundary.
+	node->ScriptDeleteRequested = true;
 	return true;
 }
 
@@ -1304,7 +1292,7 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 
 void OttoScript_Init(void)
 {
-	const PangeaScriptGameInfo gameInfo =
+	PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "OttoMatic-Android",
 		.gameName = "Otto Matic",
@@ -1322,6 +1310,7 @@ void OttoScript_Init(void)
 		.capabilities = PANGEA_SCRIPT_OTTO_MATIC_CAPABILITIES,
 	};
 
+	PangeaScriptPlatform_Configure(&gameInfo);
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	memset(gScriptTerrainItemOccupied, 0, sizeof(gScriptTerrainItemOccupied));
 	memset(gScriptTerrainItemReclaimable, 0, sizeof(gScriptTerrainItemReclaimable));
@@ -1776,6 +1765,16 @@ void OttoScript_UnregisterObjectNode(ObjNode* theNode)
 
 void OttoScript_OnObjectDeleted(ObjNode* theNode)
 {
+	// Registered native objects have lifecycle callbacks too, even when they
+	// were not created from a custom object definition.
+	if (theNode && !theNode->ScriptDefinitionID[0] && theNode->ScriptObjectID > 0)
+	{
+		PangeaScriptObjectHandle handle = {theNode->ScriptObjectID, (uint32_t)theNode->ScriptObjectGeneration};
+		if (PangeaScript_ObjectExists(handle))
+			(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+		return;
+	}
+
 	if (theNode && theNode->ScriptDefinitionID[0] && theNode->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {theNode->ScriptObjectID, theNode->ScriptObjectGeneration};
@@ -1795,8 +1794,9 @@ void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals)
 	PangeaScriptObjectFrameResult result = {0};
 	PangeaScriptStatus status;
 
-	if (!theNode)
+	if (!theNode || theNode->CType == INVALID_NODE_FLAG || theNode->ScriptDeleteRequested)
 		return;
+	theNode->ScriptFrameCalled = true;
 
 	theNode->ScriptVisualOffset.x = 0.0f;
 	theNode->ScriptVisualOffset.y = 0.0f;
@@ -1871,6 +1871,14 @@ void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals)
 		theNode->ScriptVisualOffset.x = result.positionOffset.x;
 		theNode->ScriptVisualOffset.y = result.positionOffset.y;
 		theNode->ScriptVisualOffset.z = result.positionOffset.z;
+	}
+
+	if (!theNode->ScriptDeleteRequested && theNode->Skeleton
+		&& theNode->Skeleton->AnimHasStopped && !theNode->ScriptAnimationCompletionSent)
+	{
+		theNode->ScriptAnimationCompletionSent = true;
+		if (PangeaScript_ObjectExists(handle))
+			(void) PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "animationComplete");
 	}
 
 	LogScriptStatus("onObjectFrame", status);
@@ -2012,7 +2020,8 @@ Boolean OttoScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, f
 		gScore = (uint32_t)score;
 	}
 	*outDamage = result.damage;
-	*outDestroyTarget = result.destroyTarget;
+	*outDestroyTarget = result.destroyTarget || (target && target->ScriptDeleteRequested);
+	if (weapon && weapon->ScriptDeleteRequested) return false;
 	return result.hasApplyDamage ? result.applyDamage : true;
 }
 
@@ -2044,6 +2053,8 @@ Boolean OttoScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int picku
 	};
 	status = PangeaScript_CallPickupHook(&context, &result);
 	LogScriptStatus("onPickupCollected", status);
+	if (pickup->ScriptDeleteRequested || pickup->CType == INVALID_NODE_FLAG)
+		return false;
 	if (status != PANGEA_SCRIPT_OK)
 		return true;
 	if (isfinite(result.healthDelta))

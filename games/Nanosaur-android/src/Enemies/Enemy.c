@@ -151,13 +151,14 @@ Boolean EnemyGotHurt(ObjNode *theEnemy, ObjNode *theHurter, float damage)
 {
 #ifdef PANGEA_ENABLE_SCRIPTING
 	Boolean destroyTarget = false;
-	if (!NanosaurScript_OnWeaponHit(theHurter, theEnemy, damage, &damage, &destroyTarget))
-		return(false);
+	Boolean applyDamage = NanosaurScript_OnWeaponHit(theHurter, theEnemy, damage, &damage, &destroyTarget);
 	if (destroyTarget)
 	{
 		KillEnemy(theEnemy);
 		return(true);
 	}
+	if (!applyDamage)
+		return(false);
 #else
 	(void) theHurter;
 #endif

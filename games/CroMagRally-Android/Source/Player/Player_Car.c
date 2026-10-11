@@ -3256,6 +3256,15 @@ static const OGLPoint3D	wheelOffset[4] =
 
 void BlastCars(short whoThrew, float x, float y, float z, float radius)
 {
+    BlastCarsWithWeapon(whoThrew, x, y, z, radius, NULL, -1);
+}
+
+void BlastCarsWithWeapon(short whoThrew, float x, float y, float z, float radius, ObjNode* weapon, short weaponType)
+{
+#ifndef PANGEA_ENABLE_SCRIPTING
+    (void)weapon;
+    (void)weaponType;
+#endif
 short	i;
 float	d,x2,y2,z2,dx,dy,dz,d2;
 ObjNode	*obj;
@@ -3279,10 +3288,16 @@ ObjNode	*obj;
 
 				/* CAUSE HEALTH DAMAGE */
 
-			if (gGameMode == GAME_MODE_SURVIVAL)
-			{
-				PlayerLoseHealth(i, d2 / BLAST_DAMAGE);
-			}
+            float damage = gGameMode == GAME_MODE_SURVIVAL ? d2 / BLAST_DAMAGE : 0.0f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+            Boolean destroyTarget = false;
+            if (whoThrew >= 0 && !CroMagScript_OnWeaponHit(weapon, obj, whoThrew,
+                weaponType, damage, &damage, &destroyTarget))
+                continue;
+            if (destroyTarget) damage = gPlayerInfo[i].health;
+#endif
+            if (damage > 0.0f)
+                PlayerLoseHealth(i, damage);
 
 				/* CAUSE DROP TORCH */
 
