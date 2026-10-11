@@ -39,14 +39,15 @@ export interface ScriptConfigParseError {
   readonly issues: readonly string[];
 }
 
+const nativeInteger = z.number().int().min(-2147483648).max(2147483647);
 const itemOverrideSchema: z.ZodType<ItemOverrideV1> = z.object({
-  from: z.number().int().nonnegative(),
-  to: z.number().int().nonnegative(),
+  from: nativeInteger.nonnegative(),
+  to: nativeInteger.nonnegative(),
 });
 
 const assetDependencySchema: z.ZodType<AssetDependencyV1> = z.object({
-  kind: z.string().min(1),
-  id: z.string().min(1),
+  kind: z.string().min(1).max(31),
+  id: z.string().min(1).max(95),
 });
 
 const coordinate = z.number().finite().min(-3.402823466e38).max(3.402823466e38);
@@ -57,12 +58,13 @@ const levelSettingsSchema: z.ZodType<LevelSettingsV1> = z
   })
   .catchall(z.union([z.string().max(255), coordinate, z.boolean()]))
   .superRefine((settings, ctx) => {
+    if (Object.keys(settings).filter(key => key !== "assetDependencies").length > 64)
+      ctx.addIssue({code: "custom", message: "At most 64 scalar level settings are supported"});
     for (const key of Object.keys(settings))
       if (key.length > 63) ctx.addIssue({code: "custom", message: "Setting keys must fit 63 characters", path: [key]});
   });
 
 // Native configuration fields are retained instead of being silently stripped.
-const nativeInteger = z.number().int().min(-2147483648).max(2147483647);
 const nativeId = z.string().min(1).max(95);
 function safeAssetPath(path: string | undefined, prefix: string): boolean {
   if (!path?.startsWith(prefix)) return false;

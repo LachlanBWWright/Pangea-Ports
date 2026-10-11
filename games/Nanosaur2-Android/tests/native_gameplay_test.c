@@ -44,12 +44,24 @@ int main(void)
  PangeaScriptObjectRegistration registration={.nativeObject=&player,.ops=&ops,.objectType="player",.capabilityLevel=PANGEA_SCRIPT_CAPABILITY_FULL};
  PangeaScriptObjectHandle handle;assert(PangeaScript_RegisterObject(&registration,&handle)==PANGEA_SCRIPT_OK);player.ScriptObjectID=handle.id;player.ScriptObjectGeneration=handle.generation;
  Nanosaur2Script_ApplyObjectScripting(&player); /* Decorative objects may have no collision boxes. */
+ gPlayerInfo[0].invincibilityTimer=1;
+ assert(!PlayerLoseHealth(0,.9f,0,NULL,false));assert(gPlayerInfo[0].health==1);
+ gPlayerInfo[0].invincibilityTimer=0;
  assert(!PlayerLoseHealth(0,.1f,0,NULL,false));assert(gPlayerInfo[0].health==1);
  assert(!PlayerLoseHealth(0,.2f,0,NULL,false));assert(gPlayerInfo[0].health==.75f);
  assert(PlayerLoseHealth(0,2,PLAYER_DEATH_TYPE_DEATHDIVE,NULL,false));assert(gPlayerIsDead[0] && gPlayerInfo[0].health==0 && gCameraInDeathDiveMode[0]);
  KillPlayer(0,PLAYER_DEATH_TYPE_DEATHDIVE,NULL);
+ /* No lives must produce game over without checkpoint reset or respawn hooks. */
+ gPlayerInfo[0].numFreeLives=0;ResetPlayerAtBestCheckpoint(0);
+ assert(gGameOver && gPlayerIsDead[0] && gPlayerInfo[0].health==0);gGameOver=false;
+ ObjNode decorative={0};PangeaScriptObjectHandle decorativeHandle;
+ PangeaScriptObjectRegistration decorativeRegistration={.nativeObject=&decorative,.ops=&ops,.objectType="decorative",.capabilityLevel=PANGEA_SCRIPT_CAPABILITY_FULL};
+ assert(PangeaScript_RegisterObject(&decorativeRegistration,&decorativeHandle)==PANGEA_SCRIPT_OK);
  gPlayerInfo[0].numFreeLives=2;gBestCheckpointCoord[0]=(OGLPoint3D){100,200,300};
  ResetPlayerAtBestCheckpoint(0);assert(!gPlayerIsDead[0] && gPlayerInfo[0].health==1 && gPlayerInfo[0].numFreeLives==1 && player.Coord.x==100 && player.Coord.z==300);
  assert(PangeaScript_CallFrameHook(&(PangeaScriptFrameContext){.levelNum=4})==PANGEA_SCRIPT_OK);
+ /* Respawn invincibility must suppress damage and all Lua damage hooks. */
+ assert(!PlayerLoseHealth(0,.5f,0,NULL,false));assert(gPlayerInfo[0].health==1);
+ assert(PangeaScript_CallFrameHook(&(PangeaScriptFrameContext){.levelNum=4,.frameNum=1})==PANGEA_SCRIPT_OK);
  assert(PangeaScript_GetStatusErrorCount()==0);PangeaScript_Shutdown();puts("native Nanosaur2 Lua damage, death and checkpoint respawn passed");return 0;
 }

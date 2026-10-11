@@ -43,6 +43,14 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
 		COMMAND ${Python3_EXECUTABLE} -m unittest discover -s tests -p test_script_coverage.py -v)
 	set_tests_properties(ScriptCoverageCheckerTests PROPERTIES
 		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+	add_test(NAME NativeScriptSmokeHarnessTests
+		COMMAND ${Python3_EXECUTABLE} -m unittest discover -s tests -p test_native_script_smoke.py -v)
+	set_tests_properties(NativeScriptSmokeHarnessTests PROPERTIES
+		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+	add_test(NAME NativeScriptRunnerTests
+		COMMAND ${Python3_EXECUTABLE} -m unittest discover -s tests -p test_native_script_runners.py -v)
+	set_tests_properties(NativeScriptRunnerTests PROPERTIES
+		WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 	# Exercise the runtime independently of Lua using the controllable mock backend.
 	add_executable(PangeaScriptCoreTests ../../tests/test_pangea_script.c
 		pangea_script.c pangea_script_config.c)

@@ -627,12 +627,22 @@ static void test_player_event_sample(const GameSampleCase* game, PangeaScriptBac
 
 static void test_error_isolation(const GameSampleCase* game, PangeaScriptBackend* backend, char* error, int errorCapacity)
 {
-	char failingSource[256];
-	snprintf(failingSource, sizeof(failingSource), "return {%s=function() error('per-game failure') end}", game->frameHook);
-	assert(PangeaScriptBackend_Load(backend, failingSource, error, errorCapacity) == PANGEA_SCRIPT_OK);
-	PangeaScriptFrameContext frame = {.levelNum = 4};
+	char failingSource[2048];
+	snprintf(failingSource, sizeof(failingSource),
+		"local failed=false\nreturn {%s=function(ctx)\n"
+		" if not failed then failed=true; error('per-game failure') end\n"
+		" local e=pangea.api.diagnostics().lastError; assert(e)\n"
+		" assert(e.status==%d and e.gameId=='%s' and e.levelNum==4 and e.frameNum==27)\n"
+		" assert(e.source=='Data/Scripts/error-isolation.lua' and e.line==3 and e.hook=='%s')\n"
+		" assert(string.find(e.message,'per-game failure',1,true) and string.find(e.traceback,'stack traceback',1,true))\n"
+		" assert(e.object==nil)\nend}",
+		game->frameHook, PANGEA_SCRIPT_RUNTIME_ERROR, game->gameId, game->frameHook);
+	assert(PangeaScriptBackend_LoadNamed(backend, failingSource, "Data/Scripts/error-isolation.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptFrameContext frame = {.levelNum = 4, .frameNum = 27};
 	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_RUNTIME_ERROR);
 	assert(strstr(error, "per-game failure") != NULL && strstr(error, "stack traceback") != NULL);
+	frame.frameNum++;
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	char recoveredSource[128];
 	snprintf(recoveredSource, sizeof(recoveredSource), "return {%s=function() end}", game->frameHook);
 	assert(PangeaScriptBackend_Load(backend, recoveredSource, error, errorCapacity) == PANGEA_SCRIPT_OK);

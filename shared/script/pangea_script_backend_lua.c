@@ -530,9 +530,10 @@ static int lua_spawn_native(lua_State* lua)
 	{
 		if (read_optional_native_byte(lua, 3, "subtype", &params[0]) < 0 || read_optional_native_byte(lua, 3, "amount", &params[1]) < 0)
 			return luaL_error(lua, "native spawn subtype and amount must be integers from 0 through 255");
+		static const char* const paramKeys[] = {"param0", "param1", "param2", "param3"};
 		for (int i = 0; i < 4; i++)
 		{
-			char key[8]; snprintf(key, sizeof(key), "param%d", i);
+			const char* key = paramKeys[i];
 			if (read_optional_native_byte(lua, 3, key, &params[i]) < 0)
 				return luaL_error(lua, "%s must be an integer from 0 through 255", key);
 		}
@@ -3585,8 +3586,20 @@ PangeaScriptStatus PangeaScriptBackend_LoadNamed(PangeaScriptBackend* backend, c
 	if (loadStatus != LUA_OK)
 	{
 		const char* message = lua_tostring(backend->lua, -1);
-		const char* colon = message ? strchr(message, ':') : NULL;
-		backend->failureLine = colon ? atoi(colon+1) : 0;
+		/* Lua renders syntax errors as source:line: message. The source may
+		   itself contain colons, and Lua may abbreviate long source names. */
+		for (const char* colon = message ? strchr(message, ':') : NULL;
+			colon; colon = strchr(colon + 1, ':'))
+		{
+			if (colon[1] < '0' || colon[1] > '9') continue;
+			char* end;
+			long line = strtol(colon + 1, &end, 10);
+			if (end[0] == ':' && end[1] == ' ' && line > 0 && line <= INT_MAX)
+			{
+				backend->failureLine = (int)line;
+				break;
+			}
+		}
 		PangeaScriptStatus status = loadStatus == LUA_ERRMEM ? PANGEA_SCRIPT_BUDGET_EXCEEDED : PANGEA_SCRIPT_PARSE_ERROR;
 		record_failure(backend, status, message, error, errorCapacity);
 		lua_pop(backend->lua, 1);

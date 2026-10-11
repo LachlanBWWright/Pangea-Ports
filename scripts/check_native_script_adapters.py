@@ -46,7 +46,11 @@ def main():
             if build.returncode:
                 print(f"FAIL {game_name}: compile\n{build.stderr}")
                 continue
-            run = subprocess.run([str(binary)], capture_output=True, text=True, timeout=15)
+            try:
+                run = subprocess.run([str(binary)], capture_output=True, text=True, timeout=15)
+            except subprocess.TimeoutExpired as error:
+                print(f"FAIL {game_name}: native adapter timed out after {error.timeout} seconds")
+                continue
             if run.returncode:
                 print(f"FAIL {game_name}: regression\n{run.stdout}{run.stderr}")
                 continue

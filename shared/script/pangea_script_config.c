@@ -359,12 +359,14 @@ static bool parse_level_settings_object(Parser* p, PangeaConfigLevel* level)
 					}
 				}
 
-				if (level->assetDependencyCount < PANGEA_CONFIG_MAX_ASSET_DEPENDENCIES)
+				if (level->assetDependencyCount >= PANGEA_CONFIG_MAX_ASSET_DEPENDENCIES)
 				{
-					PangeaScriptAssetDependency* dep = &level->assetDependencies[level->assetDependencyCount++];
-					snprintf(dep->kind, sizeof(dep->kind), "%s", depKind);
-					snprintf(dep->id, sizeof(dep->id), "%s", depId);
+					snprintf(p->errorMsg, p->errorCapacity, "assetDependencies exceeds the supported limit of %d entries", PANGEA_CONFIG_MAX_ASSET_DEPENDENCIES);
+					return false;
 				}
+				PangeaScriptAssetDependency* dep = &level->assetDependencies[level->assetDependencyCount++];
+				snprintf(dep->kind, sizeof(dep->kind), "%s", depKind);
+				snprintf(dep->id, sizeof(dep->id), "%s", depId);
 
 				skip_whitespace(p);
 				if (match_char(p, ','))
@@ -382,6 +384,12 @@ static bool parse_level_settings_object(Parser* p, PangeaConfigLevel* level)
 		{
 			// Normal level setting
 			char c = *p->cursor;
+			if ((c == '"' || c == 't' || c == 'f' || (c >= '0' && c <= '9') || c == '-' || c == '.')
+				&& level->levelSettingCount >= PANGEA_CONFIG_MAX_LEVEL_SETTINGS)
+			{
+				snprintf(p->errorMsg, p->errorCapacity, "levelSettings exceeds the supported limit of %d scalar entries", PANGEA_CONFIG_MAX_LEVEL_SETTINGS);
+				return false;
+			}
 			if (c == '"')
 			{
 				char strVal[256];

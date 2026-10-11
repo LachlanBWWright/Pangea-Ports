@@ -40,10 +40,12 @@ def validate_apk(path):
             if selection["script"] != name or selection["levelSettings"]["smokeModule"] != level:
                 raise ValueError("APK does not select the smoke modules")
             source = apk.read("assets/" + name.removeprefix("Data/")).decode()
-            if "android_smoke_events" not in source or "onLevelUnload" not in source:
+            required_hooks = ("onLevelLoad", "onLevelStart", "onFrame", "onLevelComplete", "onLevelUnload")
+            if "android_smoke_events" not in source or any(
+                    "function module." + hook + "(" not in source for hook in required_hooks):
                 raise ValueError("APK does not contain the full Lua fixture")
-        if not any(name.startswith("lib/x86_64/") for name in apk.namelist()):
-            raise ValueError("Smoke APK must include x86_64 emulator libraries")
+        if "lib/x86_64/libBugdom2.so" not in apk.namelist():
+            raise ValueError("Smoke APK must include the x86_64 Bugdom2 library")
 
 
 def wait_for_events(read, runs, timeout, process=None):

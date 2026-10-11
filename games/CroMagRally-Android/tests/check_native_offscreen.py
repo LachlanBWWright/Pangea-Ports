@@ -2,6 +2,7 @@
 """Run the full scripting-enabled game with SDL offscreen rendering and real assets."""
 import argparse
 import os
+import signal
 from pathlib import Path
 import shutil
 import subprocess
@@ -32,9 +33,11 @@ with tempfile.TemporaryDirectory(prefix='cromag-native-lua-') as temporary:
         env['LD_LIBRARY_PATH'] = str(args.library_dir) + ':' + env.get('LD_LIBRARY_PATH', '')
     with (root / 'run.log').open('w+') as log:
         process = subprocess.Popen([str(executable), '--track', '1', '--no-vsync'], cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT)
+        timed_out = False
         try:
             process.wait(timeout=args.seconds)
         except subprocess.TimeoutExpired:
+            timed_out = True
             process.terminate()
             try:
                 process.wait(timeout=3)
@@ -46,6 +49,7 @@ with tempfile.TemporaryDirectory(prefix='cromag-native-lua-') as temporary:
     required = ['NATIVE_LUA_SMOKE_START', 'NATIVE_LUA_SMOKE_ADAPTER', 'NATIVE_LUA_SMOKE_FRAMES']
     missing = [marker for marker in required if marker not in output]
     errors = [line for line in output.splitlines() if '[PangeaScript ERROR]' in line or ('Script' in line and 'failed' in line)]
-    if missing or errors:
-        raise SystemExit(f'Native offscreen Lua smoke failed: missing={missing}, errors={errors}\n{chr(10).join(line for line in output.splitlines() if 'Script' in line or 'stack' in line or 'lua:' in line)}')
+    expected_exit = process.returncode == 0 or (timed_out and process.returncode in (-signal.SIGTERM, -signal.SIGKILL))
+    if missing or errors or not expected_exit:
+        raise SystemExit(f'Native offscreen Lua smoke failed: exit={process.returncode}, missing={missing}, errors={errors}\n{chr(10).join(line for line in output.splitlines() if 'Script' in line or 'stack' in line or 'lua:' in line)}')
     print('Cro-Mag full native offscreen game: Lua startup, real player setters/objects, 120 race frames passed')

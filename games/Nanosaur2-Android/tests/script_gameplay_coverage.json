@@ -3,7 +3,8 @@
     "onDamage",
     "onDamageApplied",
     "onDeath",
-    "onPlayerRespawn"
+    "onPlayerRespawn",
+    "onObjectFrame"
   ],
   "consumer_sources": [
     "Source/Player/Player.c"

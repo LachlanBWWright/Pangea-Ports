@@ -180,6 +180,7 @@ def ts_hooks(common, game):
 
 
 def api_surface(backend, types):
+    backend, types = strip_comments(backend), strip_comments(types)
     api = {}
     start = types.index("export interface PangeaApi")
     body, _ = block(types, types.index("{", start))
@@ -198,7 +199,7 @@ def api_surface(backend, types):
         pending.update(re.findall(r'set_(?:backend_)?function\(lua,\s*"(\w+)"', line))
         fields = re.findall(r'lua_setfield\(lua,\s*-2,\s*"(\w+)"\)', line)
         pending_fields.update(fields)
-        if fields and fields[-1] in api:
+        if fields and (fields[-1] in api or pending):
             namespace = fields[-1]
             if namespace == "log":
                 pending.update(re.findall(r'"(info|warn|error)"', body))
@@ -211,8 +212,8 @@ def api_surface(backend, types):
 
 
 def check(root=ROOT):
-    contract = (root / "shared/script/pangea_script_contract.h").read_text()
-    backend = (root / "shared/script/pangea_script_backend_lua.c").read_text()
+    contract = strip_comments((root / "shared/script/pangea_script_contract.h").read_text())
+    backend = strip_comments((root / "shared/script/pangea_script_backend_lua.c").read_text())
     types = (root / "shared/script-types/src/pangea.ts").read_text()
     common = (root / "shared/script-types/src/games/common.ts").read_text()
     advertised = contract_hooks(contract)
@@ -247,18 +248,24 @@ def check(root=ROOT):
             errors.append(f"{game}: native gameplay fixture claims unsupported {hook}")
         if manifest_path.exists():
             test_path = root / "games" / game / "tests/native_gameplay_test.c"
-            fixture = masked(strip_comments(test_path.read_text())) if test_path.exists() else ""
+            fixture = test_path.read_text() if test_path.exists() else ""
             production_functions = functions(sources)
-            invoked = set(re.findall(r"\b(\w+)\s*\(", fixture))
+            fixture_functions = functions({str(test_path): fixture})
+            fixture_names = {function.name for function in fixture_functions}
+            # Definitions, declarations and unreachable fixture helpers are not
+            # evidence that a production consumer was actually invoked.
+            invoked = {"main"} if "main" in fixture_names else set()
+            callable_functions = fixture_functions + [function for function in production_functions
+                                                       if function.name not in fixture_names]
             while True:
-                expanded = invoked | {call for function in production_functions
+                expanded = invoked | {call for function in callable_functions
                                       if function.name in invoked for call in function.calls}
                 if expanded == invoked:
                     break
                 invoked = expanded
             production_names = {function.name for function in production_functions}
             for call in exercised.get("native_calls", []):
-                if call not in production_names or call not in invoked:
+                if call not in production_names or call not in invoked or call in fixture_names:
                     errors.append(f"{game}: runtime fixture native call {call} lacks production definition or test invocation")
             for source in exercised.get("consumer_sources", []):
                 if source not in sources:

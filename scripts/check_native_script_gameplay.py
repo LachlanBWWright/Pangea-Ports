@@ -78,7 +78,12 @@ def main():
                 shutil.copy(lua, destination / lua.name)
             env = dict(os.environ)
             env["LD_LIBRARY_PATH"] = str(libdir) + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
-            run = subprocess.run([str(binary)], cwd=work, env=env, capture_output=True, text=True, timeout=20)
+            try:
+                run = subprocess.run([str(binary)], cwd=work, env=env, capture_output=True, text=True, timeout=20)
+            except subprocess.TimeoutExpired as error:
+                print(f"FAIL {name}: native gameplay timed out after {error.timeout} seconds")
+                results[name] = {"passed": False, "reason": "timeout", "runtime_fixture": coverage}
+                continue
             passed = run.returncode == 0
             results[name] = {"passed": passed, "runtime_fixture": coverage}
             print(f"{'PASS' if passed else 'FAIL'} {name}: actual native consumers -> Lua ({', '.join(coverage['hooks'])})")

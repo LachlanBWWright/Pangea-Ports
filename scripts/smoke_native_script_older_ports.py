@@ -7,6 +7,7 @@ checks real level/frame/object dispatch and player bindings, not collision cover
 """
 import argparse
 import os
+import signal
 from pathlib import Path
 import shutil
 import subprocess
@@ -36,6 +37,14 @@ return {
 """
 
 
+def validate_output(output, returncode, timed_out):
+    """Reject crashes and Lua failures even when startup markers were emitted."""
+    markers = ("NATIVE_SMOKE_START", "NATIVE_SMOKE_OBJECT", "NATIVE_SMOKE_FRAME_PLAYER")
+    errors = ("assertion failed", "assertion failure", "[pangeascript error]", "scripting on")
+    expected_exit = returncode == 0 or (timed_out and returncode in (-signal.SIGTERM, -signal.SIGKILL))
+    return expected_exit and all(marker in output for marker in markers) and not any(error in output.lower() for error in errors)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-root',type=Path,required=True,help='Directory with lua-native-GAME CMake builds')
@@ -56,14 +65,16 @@ def main():
             env=dict(os.environ,SDL_VIDEODRIVER='offscreen',SDL_AUDIODRIVER='dummy')
             if args.sdl_lib_dir:env['LD_LIBRARY_PATH']=str(args.sdl_lib_dir.resolve())+(':'+env['LD_LIBRARY_PATH'] if env.get('LD_LIBRARY_PATH') else '')
             process=subprocess.Popen([str(work/name),'--level','0'],cwd=work,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+            timed_out = False
             try:output,_=process.communicate(timeout=args.timeout)
             except subprocess.TimeoutExpired:
+                timed_out = True
                 process.terminate()
                 try:output,_=process.communicate(timeout=5)
                 except subprocess.TimeoutExpired:process.kill();output,_=process.communicate()
             (args.logs/(game+'.log')).write_text(output)
             markers=('NATIVE_SMOKE_START','NATIVE_SMOKE_OBJECT','NATIVE_SMOKE_FRAME_PLAYER')
-            passed=all(marker in output for marker in markers) and 'assertion failed' not in output and 'scripting on' not in output
+            passed=validate_output(output, process.returncode, timed_out)
             print(('PASS ' if passed else 'FAIL ')+game+': '+', '.join(marker for marker in markers if marker in output),flush=True)
             return passed
     with ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(run,args.game or GAMES))

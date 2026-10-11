@@ -10,6 +10,7 @@
 
 static const char* gGameDirectory;
 static const char* gFixtureScriptPath;
+static const char* gFixtureSettings = "{\"scriptBobHeight\":12,\"scriptBobSpeed\":1}";
 
 /* Exercise packaged transport against the repository's real authored files. */
 static char* read_shipped_file(const char* path, long* outSize)
@@ -18,7 +19,7 @@ static char* read_shipped_file(const char* path, long* outSize)
 	{
 		char fixture[1024];
 		int length = snprintf(fixture, sizeof fixture,
-			"{\"version\":1,\"levels\":{\"0\":{\"script\":\"%s\",\"levelSettings\":{\"scriptBobHeight\":12,\"scriptBobSpeed\":1}}}}", gFixtureScriptPath);
+			"{\"version\":1,\"levels\":{\"0\":{\"script\":\"%s\",\"levelSettings\":%s}}}", gFixtureScriptPath, gFixtureSettings);
 		assert(length > 0 && length < (int)sizeof fixture);
 		char* copy = malloc((size_t)length + 1);
 		assert(copy);
@@ -157,6 +158,22 @@ int main(int argc, char** argv)
 		PangeaScriptLevelContext context = {.levelNum = 0};
 		assert(PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, &context) == PANGEA_SCRIPT_OK);
 		check_bob_result(true);
+		/* Reloading the same authored module must discard its former private height. */
+		const char* disabledSettings[] = {
+			"{}", "{\"scriptBobHeight\":-12}",
+			"{\"scriptBobHeight\":\"12\"}", "{\"scriptBobHeight\":true}",
+		};
+		for (size_t i = 0; i < sizeof disabledSettings / sizeof disabledSettings[0]; i++)
+		{
+			gFixtureSettings = disabledSettings[i];
+			assert(PangeaScript_LoadLevelConfig(0) == PANGEA_SCRIPT_OK);
+			assert(PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, &context) == PANGEA_SCRIPT_OK);
+			check_bob_result(false);
+			gFixtureSettings = "{\"scriptBobHeight\":12,\"scriptBobSpeed\":1}";
+			assert(PangeaScript_LoadLevelConfig(0) == PANGEA_SCRIPT_OK);
+			assert(PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, &context) == PANGEA_SCRIPT_OK);
+			check_bob_result(true);
+		}
 		PangeaScript_Shutdown();
 	}
 	free(config);

@@ -478,6 +478,8 @@ export interface PangeaDiagnostics {
 
 export interface PangeaCommandTraceEntry {
   readonly id: string;
+  readonly applicationPhase: string;
+  readonly order: number;
   readonly objectId: number;
   readonly generation: number;
   readonly status: number;
@@ -485,6 +487,8 @@ export interface PangeaCommandTraceEntry {
 
 export interface PangeaLifecycleTraceEntry {
   readonly id: string;
+  readonly applicationPhase: string;
+  readonly order: number;
   readonly objectId: number;
   readonly generation: number;
   readonly status: number;

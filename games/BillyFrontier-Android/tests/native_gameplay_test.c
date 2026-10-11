@@ -18,5 +18,10 @@ int main(void)
     KillPlayer(PLAYER_DEATH_TYPE_TRAMPLED);assert(gPlayerIsDead && player.Health==0 && gDeathTimer==3 && morphs==1);
     KillPlayer(PLAYER_DEATH_TYPE_TRAMPLED);assert(morphs==1); /* Native guard suppresses duplicate death. */
     assert(PangeaScript_CallFrameHook(&(PangeaScriptFrameContext){.levelNum=3})==PANGEA_SCRIPT_OK);
+    /* A subsequent life must dispatch one new death with the new position. */
+    gPlayerIsDead=false;player.Health=1;player.Coord.x=40;
+    KillPlayer(PLAYER_DEATH_TYPE_TRAMPLED);assert(gPlayerIsDead && player.Health==0 && morphs==2);
+    KillPlayer(PLAYER_DEATH_TYPE_TRAMPLED);assert(morphs==2);
+    assert(PangeaScript_CallFrameHook(&(PangeaScriptFrameContext){.levelNum=3,.frameNum=1})==PANGEA_SCRIPT_OK);
     assert(PangeaScript_GetStatusErrorCount()==0);PangeaScript_Shutdown();puts("native Billy death/duplicate guard through Lua passed");return 0;
 }

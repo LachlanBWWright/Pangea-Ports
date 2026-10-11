@@ -1,4 +1,5 @@
 #include "pangea_script.h"
+#include "pangea_script_config.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,6 +133,85 @@ int main(void)
     frame.frameNum++;
     assert(PangeaScript_CallFrameHook(&frame) == PANGEA_SCRIPT_OK);
     assert(position.x == (float)frame.frameNum);
+
+    /* Capacity overflow must reject the entire config, preserving the live world. */
+    char boundaryConfig[16384];
+    for (int assets = 0; assets < 2; assets++)
+    {
+        for (int count = 64; count <= 65; count++)
+        {
+            int used = snprintf(boundaryConfig, sizeof boundaryConfig,
+                "{\"version\":1,\"levels\":{\"1\":{\"levelSettings\":{");
+            if (assets) used += snprintf(boundaryConfig + used, sizeof boundaryConfig - used, "\"assetDependencies\":[");
+            for (int i = 0; i < count; i++)
+            {
+                used += snprintf(boundaryConfig + used, sizeof boundaryConfig - used,
+                    assets ? "%s{\"kind\":\"model\",\"id\":\"asset%d\"}" : "%s\"value%d\":7", i ? "," : "", i);
+            }
+            snprintf(boundaryConfig + used, sizeof boundaryConfig - used, assets ? "]}}}}" : "}}}}");
+            PangeaConfig parsed;
+            char error[256];
+            PangeaScriptStatus status = PangeaScript_ParseConfig(boundaryConfig, 1, &parsed, error, sizeof error);
+            if (count == 64)
+            {
+                assert(status == PANGEA_SCRIPT_OK);
+                assert((assets ? parsed.level.assetDependencyCount : parsed.level.levelSettingCount) == 64);
+            }
+            else
+            {
+                assert(status == PANGEA_SCRIPT_CONFIG_ERROR && strstr(error, "limit of 64"));
+                configText = boundaryConfig;
+                writes = nativeWrites;
+                assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_CONFIG_ERROR);
+                assert_unchanged(object, fingerprint, writes);
+                frame.frameNum++;
+                frame.mode = NULL;
+                assert(PangeaScript_CallFrameHook(&frame) == PANGEA_SCRIPT_OK);
+                assert(position.x == (float)frame.frameNum);
+            }
+        }
+    }
+    /* Asset identifier limits are byte limits and must never silently truncate. */
+    for (int field = 0; field < 2; field++)
+    {
+        int capacity = field ? 96 : 32;
+        char text[97];
+        memset(text, 'x', sizeof text);
+        for (int length = capacity - 1; length <= capacity; length++)
+        {
+            text[length] = '\0';
+            snprintf(boundaryConfig, sizeof boundaryConfig,
+                "{\"version\":1,\"levels\":{\"1\":{\"levelSettings\":{\"assetDependencies\":[{\"kind\":\"%s\",\"id\":\"%s\"}]}}}}",
+                field ? "model" : text, field ? text : "asset");
+            PangeaConfig parsed;
+            char error[256];
+            PangeaScriptStatus status = PangeaScript_ParseConfig(boundaryConfig, 1, &parsed, error, sizeof error);
+            if (length < capacity)
+            {
+                assert(status == PANGEA_SCRIPT_OK && parsed.level.assetDependencyCount == 1);
+                assert(strlen(field ? parsed.level.assetDependencies[0].id : parsed.level.assetDependencies[0].kind) == (size_t)length);
+            }
+            else
+            {
+                assert(status == PANGEA_SCRIPT_CONFIG_ERROR);
+                configText = boundaryConfig;
+                assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_CONFIG_ERROR);
+                assert_unchanged(object, fingerprint, nativeWrites);
+            }
+            text[length] = 'x';
+        }
+    }
+    /* Missing files and malformed JSON also leave the live module runnable. */
+    replacementText = NULL;
+    assert(PangeaScript_SetStartupScript("Data/Scripts/replacement.lua") == PANGEA_SCRIPT_FILE_NOT_FOUND);
+    assert_unchanged(object, fingerprint, nativeWrites);
+    configText = NULL;
+    assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_FILE_NOT_FOUND);
+    assert_unchanged(object, fingerprint, nativeWrites);
+    configText = "{\"version\":1,\"levels\":";
+    assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_CONFIG_ERROR);
+    assert_unchanged(object, fingerprint, nativeWrites);
+    configText = "{\"version\":1,\"levels\":{\"1\":{\"script\":\"Data/Scripts/replacement.lua\",\"levelSettings\":{\"value\":99}}}}";
 
     /* Accepted replacement initialization reads the incoming, not previous, settings. */
     replacementText =

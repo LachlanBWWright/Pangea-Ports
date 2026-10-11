@@ -582,6 +582,73 @@ static void test_scheduler_failure_diagnostics(PangeaScriptBackend* backend, cha
 	}
 }
 
+static void test_diagnostic_edge_cases(PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+	/* Source names may contain colons (Windows drives, or virtual module IDs).
+	   Syntax diagnostics must identify the line, rather than parse the drive. */
+	const char* parseSourceNames[] = {
+		"C:/Scripts/virtual:module.lua",
+		"Data/Scripts/virtual:123:module.lua",
+		"Data/Scripts/a-very-long-source-name-that-Lua-abbreviates-in-its-error-message/virtual:module.lua",
+	};
+	for (int i = 0; i < 3; i++)
+	{
+		assert(PangeaScriptBackend_LoadNamed(backend, "return {\n onFrame = function(\n}",
+			parseSourceNames[i], error, errorCapacity) == PANGEA_SCRIPT_PARSE_ERROR);
+		char inspectSource[512];
+		snprintf(inspectSource, sizeof inspectSource,
+			"local d=pangea.api.diagnostics().lastError; assert(d.hook=='load' and d.line==3);"
+			"assert(d.source=='%s'); return {}", parseSourceNames[i]);
+		assert(PangeaScriptBackend_LoadNamed(backend, inspectSource,
+			"Data/Scripts/dist/inspect-parse.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	}
+
+	/* Lua errors need not be strings. Never invoke an error object's hostile
+	   __tostring, and retain usable location metadata and a working Lua stack. */
+	const char* source =
+		"return {onFrame=function(ctx)\n"
+		" if ctx.frameNum==1 then error(setmetatable({}, {__tostring=function() while true do end end})) end\n"
+		" local d=pangea.api.diagnostics().lastError; assert(d.hook=='onFrame' and d.line==2 and d.object==nil)\n"
+		" assert(string.find(d.traceback,'stack traceback:',1,true)); assert(d.frameNum==1)\n"
+		"end}";
+	assert(PangeaScriptBackend_LoadNamed(backend, source, "Data/Scripts/dist/error-object.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptFrameContext frame = {.levelNum=4,.frameNum=1};
+	char shortError[8];
+	memset(shortError, 'x', sizeof shortError);
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, shortError, sizeof shortError) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	assert(shortError[sizeof shortError - 1] == '\0');
+	/* Repeated non-string failures must not leak values on the Lua stack. */
+	for (int i = 0; i < 128; i++)
+		assert(PangeaScriptBackend_CallFrameHook(backend, &frame, NULL, 0) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	frame.frameNum=2;
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, NULL, 0) == PANGEA_SCRIPT_OK);
+
+	/* Trace output stays bounded even when the script supplies a very long
+	   message and recurses past the maximum number of retained frames. */
+	assert(PangeaScriptBackend_LoadNamed(backend,
+		"local function fail(n) if n==0 then error(string.rep('x',100000)) end; fail(n-1); return n end;"
+		"return {onFrame=function(ctx) if ctx.frameNum==1 then fail(32) end;"
+		"local d=pangea.api.diagnostics().lastError; assert(#d.message<512 and #d.traceback<=2047);"
+		"assert(string.find(d.traceback,'stack traceback:',1,true)) end}",
+		"Data/Scripts/dist/bounded-diagnostic.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	frame.frameNum=1;
+	char oneByteError[2] = {'x', 'y'};
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, oneByteError, 1) == PANGEA_SCRIPT_RUNTIME_ERROR);
+	assert(oneByteError[0] == '\0' && oneByteError[1] == 'y');
+	frame.frameNum=2;
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+
+	/* A tripped instruction budget must not poison later calls. */
+	assert(PangeaScriptBackend_LoadNamed(backend,
+		"return {onFrame=function(ctx) if ctx.frameNum==1 then while true do end end;"
+		"local d=pangea.api.diagnostics().lastError; assert(d.frameNum==1 and d.hook=='onFrame') end}",
+		"Data/Scripts/dist/budget-recovery.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
+	frame.frameNum=1;
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, NULL, 0) == PANGEA_SCRIPT_BUDGET_EXCEEDED);
+	frame.frameNum=2;
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+}
+
 static void test_backend_staging_and_relative_clock(PangeaScriptBackend* backend, char* error, int errorCapacity)
 {
 	assert(PangeaScriptBackend_LoadNamed(backend, "return {}", "Data/Scripts/dist/live.lua", error, errorCapacity) == PANGEA_SCRIPT_OK);
@@ -2386,6 +2453,7 @@ int main(void)
 	test_zero_wait_started_during_frame(backend, error, sizeof(error));
 	test_actionable_failure_diagnostics(backend, error, sizeof(error));
 	test_scheduler_failure_diagnostics(backend, error, sizeof(error));
+	test_diagnostic_edge_cases(backend, error, sizeof(error));
 	test_backend_staging_and_relative_clock(backend, error, sizeof(error));
 	test_coroutine_tasks(backend, error, sizeof(error));
 	test_object_queries_and_events(backend, error, sizeof(error));

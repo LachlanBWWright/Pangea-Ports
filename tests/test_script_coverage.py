@@ -97,6 +97,42 @@ class ScriptCoverageTests(unittest.TestCase):
         hooks = coverage.native_hooks({k: v for k, v in self.files.items() if k.endswith(".c")})
         self.assertIn("onDamage", hooks)
 
+    def test_commented_registration_does_not_hide_missing_method(self):
+        name = "shared/script/pangea_script_backend_lua.c"
+        self.files[name] = self.files[name].replace(
+            'set_function(lua, "exists", lua_exists);',
+            '/* set_function(lua, "exists", lua_exists); */')
+        self.assertIn("pangea.object.exists: Lua/TypeScript API mismatch", self.report()["errors"])
+
+    def test_undeclared_lua_namespace_is_reported(self):
+        name = "shared/script-types/src/pangea.ts"
+        self.files[name] = "export interface PangeaApi {}"
+        self.assertIn("pangea.object.exists: Lua/TypeScript API mismatch", self.report()["errors"])
+
+    def test_commented_typescript_method_does_not_count(self):
+        name = "shared/script-types/src/pangea.ts"
+        self.files[name] = self.files[name].replace("exists(): boolean;", "// exists(): boolean;")
+        self.assertIn("pangea.object.exists: Lua/TypeScript API mismatch", self.report()["errors"])
+
+    def test_fixture_declaration_dead_helper_and_stub_are_not_invocations(self):
+        self.files["games/Bugdom-android/src/System/Main.c"] += "\nvoid NativeChild(void) { }"
+        self.files["games/Bugdom-android/tests/script_gameplay_coverage.json"] = json.dumps({"native_calls": ["NativeChild"]})
+        path = "games/Bugdom-android/tests/native_gameplay_test.c"
+        for fixture in (
+            "void NativeChild(void); int main(void) { }",
+            "void DeadHelper(void) { NativeChild(); } int main(void) { }",
+            "void NativeChild(void) { } int main(void) { NativeChild(); }",
+        ):
+            with self.subTest(fixture=fixture):
+                self.files[path] = fixture
+                self.assertTrue(any("NativeChild lacks" in error for error in self.report()["errors"]))
+
+    def test_fixture_reachable_helper_is_an_invocation(self):
+        self.files["games/Bugdom-android/src/System/Main.c"] += "\nvoid NativeChild(void) { }"
+        self.files["games/Bugdom-android/tests/script_gameplay_coverage.json"] = json.dumps({"native_calls": ["NativeChild"]})
+        self.files["games/Bugdom-android/tests/native_gameplay_test.c"] = "void Helper(void) { NativeChild(); } int main(void) { Helper(); }"
+        self.assertEqual(self.report()["errors"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
