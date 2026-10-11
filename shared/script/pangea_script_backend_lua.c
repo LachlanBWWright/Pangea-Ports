@@ -101,6 +101,16 @@ struct PangeaScriptBackend
 };
 
 static PangeaScriptBackend* current_backend(lua_State* lua);
+static bool capture_object_checkpoint_state(PangeaScriptBackend*, PangeaScriptObjectHandle);
+
+/* Callback entries and return values are data records. Native dispatch must
+   not execute script metamethods outside a protected Lua call. */
+static void raw_get_field(lua_State* lua, int index, const char* field)
+{
+	index = lua_absindex(lua, index);
+	lua_pushstring(lua, field);
+	lua_rawget(lua, index);
+}
 
 enum
 {
@@ -254,7 +264,7 @@ static PangeaScriptStatus validate_result_fields(lua_State* lua, const char* hoo
 	if (lua_isnil(lua, -1)) return PANGEA_SCRIPT_OK;
 	for (int i = 0; i < fieldCount; i++)
 	{
-		lua_getfield(lua, -1, fields[i].name);
+		raw_get_field(lua, -1, fields[i].name);
 		int actualType = lua_type(lua, -1);
 		double number = actualType == LUA_TNUMBER ? (double)lua_tonumber(lua, -1) : 0;
 		bool finiteNumber = actualType != LUA_TNUMBER || (isfinite(number) && fabs(number) <= FLT_MAX);
@@ -964,8 +974,7 @@ static int lua_object_capture_checkpoint(lua_State* lua)
 		lua_pushboolean(lua, false);
 		return 1;
 	}
-	PangeaScriptBackend_CaptureObjectCheckpointState(backend, handle);
-	lua_pushboolean(lua, true);
+	lua_pushboolean(lua, capture_object_checkpoint_state(backend, handle));
 	return 1;
 }
 
@@ -995,7 +1004,12 @@ static bool clone_checkpoint_value(lua_State* lua, int index, int depth)
 		lua_pushboolean(lua, lua_toboolean(lua, index));
 		return true;
 	}
-	if (lua_isnumber(lua, index))
+	if (lua_isinteger(lua, index))
+	{
+		lua_pushinteger(lua, lua_tointeger(lua, index));
+		return true;
+	}
+	if (lua_type(lua, index) == LUA_TNUMBER)
 	{
 		lua_pushnumber(lua, lua_tonumber(lua, index));
 		return true;
@@ -1122,10 +1136,10 @@ static void clear_lua_table(lua_State* lua, int index)
 	}
 }
 
-void PangeaScriptBackend_CaptureObjectCheckpointState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
+static bool capture_object_checkpoint_state(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
 {
 	if (!backend || !backend->lua || !push_object_registry_table(backend->lua, "PangeaObjectStates", handle, false))
-		return;
+		return false;
 	int stateIndex = lua_absindex(backend->lua, -1);
 
 	/* Build the snapshot off to the side so unsupported values cannot publish
@@ -1148,7 +1162,7 @@ void PangeaScriptBackend_CaptureObjectCheckpointState(PangeaScriptBackend* backe
 		if (!clone_checkpoint_value(backend->lua, -2, 0) || !clone_checkpoint_value(backend->lua, -2, 0))
 		{
 			lua_settop(backend->lua, stackBase);
-			return;
+			return false;
 		}
 		lua_rawset(backend->lua, snapshotIndex);
 		lua_pop(backend->lua, 1);
@@ -1158,6 +1172,12 @@ void PangeaScriptBackend_CaptureObjectCheckpointState(PangeaScriptBackend* backe
 	lua_pushvalue(backend->lua, snapshotIndex);
 	lua_setfield(backend->lua, checkpointRegistryIndex, key);
 	lua_settop(backend->lua, stackBase);
+	return true;
+}
+
+void PangeaScriptBackend_CaptureObjectCheckpointState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
+{
+	(void)capture_object_checkpoint_state(backend, handle);
 }
 
 bool PangeaScriptBackend_RestoreObjectCheckpointState(PangeaScriptBackend* backend, PangeaScriptObjectHandle handle)
@@ -3180,7 +3200,7 @@ static bool push_hook(PangeaScriptBackend* backend, const char* name)
 {
 	backend->didExecuteHook = false;
 	lua_rawgeti(backend->lua, LUA_REGISTRYINDEX, backend->entryReference);
-	lua_getfield(backend->lua, -1, name);
+	raw_get_field(backend->lua, -1, name);
 	lua_remove(backend->lua, -2);
 	if (lua_isfunction(backend->lua, -1)) { backend->didExecuteHook = true; return true; }
 	lua_pop(backend->lua, 1); return false;
@@ -3345,11 +3365,11 @@ static PangeaScriptStatus call_due_timers(PangeaScriptBackend* backend, char* er
 	return PANGEA_SCRIPT_OK;
 }
 
-static PangeaScriptStatus call_due_tasks(PangeaScriptBackend* backend, char* error, int errorCapacity)
+static PangeaScriptStatus call_due_tasks(PangeaScriptBackend* backend, int lastTaskId, char* error, int errorCapacity)
 {
 	for (int i = 0; i < (int)(sizeof(backend->tasks) / sizeof(backend->tasks[0])); i++)
 	{
-		if (!backend->tasks[i].active || backend->tasks[i].dueTimeSeconds > backend->currentLevelTimeSeconds) continue;
+		if (!backend->tasks[i].active || backend->tasks[i].id > lastTaskId || backend->tasks[i].dueTimeSeconds > backend->currentLevelTimeSeconds) continue;
 		bool previousHasObject = backend->hasCurrentObject;
 		PangeaScriptObjectHandle previousObject = backend->currentObject;
 		backend->hasCurrentObject = backend->tasks[i].hasOwner;
@@ -3367,9 +3387,12 @@ PangeaScriptStatus PangeaScriptBackend_CallFrameHook(PangeaScriptBackend* backen
 	if (!backend || !context) return PANGEA_SCRIPT_BAD_ARGUMENT;
 	backend->currentFrameNum = context->frameNum; backend->currentDeltaSeconds = context->deltaSeconds; backend->currentLevelTimeSeconds = context->levelTimeSeconds;
 	backend->currentLevelNum = context->levelNum;
+	/* Newly started tasks already run immediately. A wait(0) in a timer or
+	   another task must yield until the next frame, not run twice this frame. */
+	int lastTaskId = backend->nextTaskId;
 	PangeaScriptStatus timerStatus = call_due_timers(backend, error, errorCapacity);
 	if (timerStatus != PANGEA_SCRIPT_OK) return timerStatus;
-	PangeaScriptStatus taskStatus = call_due_tasks(backend, error, errorCapacity);
+	PangeaScriptStatus taskStatus = call_due_tasks(backend, lastTaskId, error, errorCapacity);
 	if (taskStatus != PANGEA_SCRIPT_OK) return taskStatus;
 	if (!push_hook(backend, hook_name(backend, PANGEA_SCRIPT_HOOK_FRAME))) return PANGEA_SCRIPT_OK;
 	push_base_context(backend, context->levelNum); if (context->levelName) { lua_pushstring(backend->lua, context->levelName); lua_setfield(backend->lua, -2, "levelName"); } if (context->playerMode) { lua_pushstring(backend->lua, context->playerMode); lua_setfield(backend->lua, -2, "playerMode"); } push_mode_context(backend->lua, context->mode, context->networked, context->trackName); push_area_names(backend->lua, context->sceneName, context->areaName); lua_pushinteger(backend->lua, context->frameNum); lua_setfield(backend->lua, -2, "frameNum"); lua_pushnumber(backend->lua, context->deltaSeconds); lua_setfield(backend->lua, -2, "deltaSeconds"); lua_pushnumber(backend->lua, context->levelTimeSeconds); lua_setfield(backend->lua, -2, "levelTimeSeconds"); if (context->hasModeState) { lua_pushinteger(backend->lua, context->modePhase); lua_setfield(backend->lua, -2, "modePhase"); lua_pushinteger(backend->lua, context->modeWave); lua_setfield(backend->lua, -2, "modeWave"); lua_pushnumber(backend->lua, context->modeTimer); lua_setfield(backend->lua, -2, "modeTimer"); } if (context->hasModeDetails) { lua_pushinteger(backend->lua, context->modeSequenceIndex); lua_setfield(backend->lua, -2, "modeSequenceIndex"); lua_pushinteger(backend->lua, context->modeSequenceLength); lua_setfield(backend->lua, -2, "modeSequenceLength"); lua_pushinteger(backend->lua, context->modeEnemyCount); lua_setfield(backend->lua, -2, "modeEnemyCount"); lua_pushinteger(backend->lua, context->modeReflex); lua_setfield(backend->lua, -2, "modeReflex"); lua_pushboolean(backend->lua, context->modeCanAdvance); lua_setfield(backend->lua, -2, "modeCanAdvance"); } return protected_call(backend->lua, 1, 0, PANGEA_LUA_FRAME_BUDGET, error, errorCapacity);
@@ -3383,7 +3406,7 @@ PangeaScriptStatus PangeaScriptBackend_CallTerrainItemHook(PangeaScriptBackend* 
 	PangeaScriptStatus status = protected_call(backend->lua, 1, 1, PANGEA_LUA_EVENT_BUDGET, error, errorCapacity); if (status != PANGEA_SCRIPT_OK) return status;
 	status = validate_hook_result(backend->lua, "onTerrainItem", error, errorCapacity); if (status != PANGEA_SCRIPT_OK) return status;
 	status = validate_result_fields(backend->lua, "onTerrainItem", kItemResultFields, 3, error, errorCapacity); if (status != PANGEA_SCRIPT_OK) return status;
-	if (lua_istable(backend->lua, -1)) { lua_getfield(backend->lua, -1, "handled"); context->handled = lua_toboolean(backend->lua, -1); lua_pop(backend->lua, 1); lua_getfield(backend->lua, -1, "markInUse"); context->markInUse = lua_toboolean(backend->lua, -1); lua_pop(backend->lua, 1); lua_getfield(backend->lua, -1, "remappedItemType"); if (lua_isinteger(backend->lua, -1)) context->remappedItemType = (int) lua_tointeger(backend->lua, -1); lua_pop(backend->lua, 1); } lua_pop(backend->lua, 1); return status;
+	if (lua_istable(backend->lua, -1)) { raw_get_field(backend->lua, -1, "handled"); context->handled = lua_toboolean(backend->lua, -1); lua_pop(backend->lua, 1); raw_get_field(backend->lua, -1, "markInUse"); context->markInUse = lua_toboolean(backend->lua, -1); lua_pop(backend->lua, 1); raw_get_field(backend->lua, -1, "remappedItemType"); if (lua_isinteger(backend->lua, -1)) context->remappedItemType = (int) lua_tointeger(backend->lua, -1); lua_pop(backend->lua, 1); } lua_pop(backend->lua, 1); return status;
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallSplineItemHook(PangeaScriptBackend* backend, PangeaScriptSplineItemContext* context, char* error, int errorCapacity)
@@ -3404,10 +3427,10 @@ PangeaScriptStatus PangeaScriptBackend_CallSplineItemHook(PangeaScriptBackend* b
 	if (status == PANGEA_SCRIPT_OK) status = validate_result_fields(backend->lua, "onSplineItem", kItemResultFields, 2, error, errorCapacity);
 	if (status == PANGEA_SCRIPT_OK && lua_istable(backend->lua, -1))
 	{
-		lua_getfield(backend->lua, -1, "handled");
+		raw_get_field(backend->lua, -1, "handled");
 		context->handled = lua_toboolean(backend->lua, -1);
 		lua_pop(backend->lua, 1);
-		lua_getfield(backend->lua, -1, "markInUse");
+		raw_get_field(backend->lua, -1, "markInUse");
 		context->markInUse = lua_toboolean(backend->lua, -1);
 		lua_pop(backend->lua, 1);
 	}
@@ -3435,10 +3458,10 @@ PangeaScriptStatus PangeaScriptBackend_CallMapItemHook(PangeaScriptBackend* back
 	if (status == PANGEA_SCRIPT_OK) status = validate_result_fields(backend->lua, "onMapItem", kItemResultFields, 2, error, errorCapacity);
 	if (status == PANGEA_SCRIPT_OK && lua_istable(backend->lua, -1))
 	{
-		lua_getfield(backend->lua, -1, "handled");
+		raw_get_field(backend->lua, -1, "handled");
 		context->handled = lua_toboolean(backend->lua, -1);
 		lua_pop(backend->lua, 1);
-		lua_getfield(backend->lua, -1, "markInUse");
+		raw_get_field(backend->lua, -1, "markInUse");
 		context->markInUse = lua_toboolean(backend->lua, -1);
 		lua_pop(backend->lua, 1);
 	}
@@ -3508,10 +3531,39 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 	backend->hasCurrentObject = previousHasObject;
 	backend->currentObject = previousObject;
 	if (status != PANGEA_SCRIPT_OK) return status;
-	if (!lua_isnil(backend->lua, -1))
+	if (!lua_isnil(backend->lua, -1) && !lua_istable(backend->lua, -1))
 	{
-		copy_error(error, errorCapacity, "onObjectFrame must return nil; use pangea.object commands for mutations");
+		copy_error(error, errorCapacity, "onObjectFrame must return a table or nil");
 		status = PANGEA_SCRIPT_BAD_ARGUMENT;
+	}
+	else if (lua_istable(backend->lua, -1))
+	{
+		raw_get_field(backend->lua, -1, "positionOffset");
+		if (!lua_isnil(backend->lua, -1))
+		{
+			bool valid = lua_istable(backend->lua, -1);
+			float values[3] = {0};
+			const char* fields[3] = {"x", "y", "z"};
+			for (int i = 0; valid && i < 3; i++)
+			{
+				raw_get_field(backend->lua, -1, fields[i]);
+				double value = lua_tonumber(backend->lua, -1);
+				valid = lua_type(backend->lua, -1) == LUA_TNUMBER && isfinite(value) && fabs(value) <= FLT_MAX;
+				values[i] = valid ? (float)value : 0;
+				lua_pop(backend->lua, 1);
+			}
+			if (valid)
+			{
+				result->hasPositionOffset = true;
+				result->positionOffset = (PangeaScriptVector3){values[0], values[1], values[2]};
+			}
+			else
+			{
+				copy_error(error, errorCapacity, "onObjectFrame positionOffset must be a finite Vector3");
+				status = PANGEA_SCRIPT_BAD_ARGUMENT;
+			}
+		}
+		lua_pop(backend->lua, 1);
 	}
 	lua_pop(backend->lua, 1);
 	return status;
@@ -3519,7 +3571,7 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 
 static bool read_optional_boolean(lua_State* lua, int tableIndex, const char* field, bool* value)
 {
-	lua_getfield(lua, tableIndex, field);
+	raw_get_field(lua, tableIndex, field);
 	bool present = lua_isboolean(lua, -1);
 	if (present) *value = lua_toboolean(lua, -1);
 	lua_pop(lua, 1);
@@ -3529,7 +3581,7 @@ static bool read_optional_boolean(lua_State* lua, int tableIndex, const char* fi
 static void read_common_result(lua_State* lua, bool* handled, int* scoreDelta)
 {
 	read_optional_boolean(lua, -1, "handled", handled);
-	lua_getfield(lua, -1, "scoreDelta");
+	raw_get_field(lua, -1, "scoreDelta");
 	if (lua_isinteger(lua, -1)) *scoreDelta = (int) lua_tointeger(lua, -1);
 	lua_pop(lua, 1);
 }
@@ -3558,8 +3610,8 @@ PangeaScriptStatus PangeaScriptBackend_CallTriggerHook(PangeaScriptBackend* back
 		result->hasSolid = read_optional_boolean(backend->lua, -1, "solid", &result->solid);
 		read_optional_boolean(backend->lua, -1, "deleteSelf", &result->deleteSelf);
 		read_optional_boolean(backend->lua, -1, "deleteOther", &result->deleteOther);
-		lua_getfield(backend->lua, -1, "damagePlayer"); if (lua_isnumber(backend->lua, -1)) result->damagePlayer = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
-		lua_getfield(backend->lua, -1, "healthDelta"); if (lua_isnumber(backend->lua, -1)) result->healthDelta = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
+		raw_get_field(backend->lua, -1, "damagePlayer"); if (lua_isnumber(backend->lua, -1)) result->damagePlayer = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
+		raw_get_field(backend->lua, -1, "healthDelta"); if (lua_isnumber(backend->lua, -1)) result->healthDelta = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
 	}
 	lua_pop(backend->lua, 1);
 	return status;
@@ -3586,7 +3638,7 @@ PangeaScriptStatus PangeaScriptBackend_CallPickupHook(PangeaScriptBackend* backe
 	{
 		read_common_result(backend->lua, &result->handled, &result->scoreDelta);
 		result->hasConsumePickup = read_optional_boolean(backend->lua, -1, "consumePickup", &result->consumePickup);
-		lua_getfield(backend->lua, -1, "healthDelta"); if (lua_isnumber(backend->lua, -1)) result->healthDelta = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
+		raw_get_field(backend->lua, -1, "healthDelta"); if (lua_isnumber(backend->lua, -1)) result->healthDelta = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
 	}
 	lua_pop(backend->lua, 1);
 	return status;
@@ -3616,7 +3668,7 @@ PangeaScriptStatus PangeaScriptBackend_CallWeaponHitHook(PangeaScriptBackend* ba
 		read_common_result(backend->lua, &result->handled, &result->scoreDelta);
 		result->hasApplyDamage = read_optional_boolean(backend->lua, -1, "applyDamage", &result->applyDamage);
 		read_optional_boolean(backend->lua, -1, "destroyTarget", &result->destroyTarget);
-		lua_getfield(backend->lua, -1, "damage"); if (lua_isnumber(backend->lua, -1)) result->damage = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
+		raw_get_field(backend->lua, -1, "damage"); if (lua_isnumber(backend->lua, -1)) result->damage = (float) lua_tonumber(backend->lua, -1); lua_pop(backend->lua, 1);
 	}
 	if (status == PANGEA_SCRIPT_OK && (!isfinite(result->damage) || result->damage < 0.0f))
 	{
@@ -3646,7 +3698,7 @@ PangeaScriptStatus PangeaScriptBackend_CallDamageHook(PangeaScriptBackend* backe
 	{
 		read_optional_boolean(backend->lua, -1, "handled", &result->handled);
 		result->hasApplyDamage = read_optional_boolean(backend->lua, -1, "applyDamage", &result->applyDamage);
-		lua_getfield(backend->lua, -1, "damage");
+		raw_get_field(backend->lua, -1, "damage");
 		if (lua_isnumber(backend->lua, -1))
 		{
 			result->hasDamage = true;

@@ -346,6 +346,7 @@ struct ObjNode
 		Boolean		ScriptStreamOutSent;
 		Boolean		ScriptAnimationCompletionSent;
 		Boolean		ScriptActiveStateInitialized;
+	uint32_t ScriptInactiveStatusBits;
 		Boolean		ScriptActive;
 };
 typedef struct ObjNode ObjNode;

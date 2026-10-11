@@ -423,6 +423,11 @@ ObjNode	*theNode;
 		theNode = gSplineObjectList[i];
 		if (theNode)
 		{
+#ifdef PANGEA_ENABLE_SCRIPTING
+            if (theNode->ScriptDeleteRequested) { DeleteObject(theNode); continue; }
+            if (theNode->ScriptActiveStateInitialized && !theNode->ScriptActive) continue;
+#endif
+
 					/* UPDATE SKELETON ANIMATION */
 
 			if (theNode->Skeleton)

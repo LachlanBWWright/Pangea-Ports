@@ -950,8 +950,13 @@ static bool OttoObjectSetScale(void* nativeObject, float scale)
 static bool OttoObjectSetCollisionEnabled(void* nativeObject, bool enabled)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
-	if (!node) return false;
-	if (enabled && (!node->ScriptActiveStateInitialized || node->ScriptActive)) node->StatusBits &= ~STATUS_BIT_NOCOLLISION;
+	if (!node || node->CType == INVALID_NODE_FLAG || node->ScriptDeleteRequested) return false;
+	if (node->ScriptActiveStateInitialized && !node->ScriptActive)
+	{
+		if (enabled) node->ScriptInactiveStatusBits &= ~STATUS_BIT_NOCOLLISION;
+		else node->ScriptInactiveStatusBits |= STATUS_BIT_NOCOLLISION;
+	}
+	else if (enabled) node->StatusBits &= ~STATUS_BIT_NOCOLLISION;
 	else node->StatusBits |= STATUS_BIT_NOCOLLISION;
 	return true;
 }
@@ -995,12 +1000,20 @@ static bool OttoObjectGetDamage(void* nativeObject, float* outDamage)
 static bool OttoObjectSetActive(void* nativeObject, bool active)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
-	if (!node) return false;
-	if (!node->ScriptDefinitionID[0]) return true;
+	const uint32_t mask = STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE;
+	if (!node || node->CType == INVALID_NODE_FLAG || node->ScriptDeleteRequested) return false;
+	if (node->ScriptActiveStateInitialized && node->ScriptActive == active) return true;
+	if (!active)
+	{
+		node->ScriptInactiveStatusBits = node->StatusBits & mask;
+		node->StatusBits |= mask;
+	}
+	else if (node->ScriptActiveStateInitialized)
+	{
+		node->StatusBits = (node->StatusBits & ~mask) | node->ScriptInactiveStatusBits;
+	}
 	node->ScriptActiveStateInitialized = true;
 	node->ScriptActive = active;
-	if (active) node->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else node->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
 	return true;
 }
 
@@ -1231,7 +1244,7 @@ static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 
 static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
 {
-	if (playerNum != 0 || lives < 0 || !gPlayerInfo.objNode)
+	if (playerNum != 0 || lives < 0 || lives > UINT8_MAX || !gPlayerInfo.objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerInfo.lives = lives;
 	return PANGEA_SCRIPT_OK;

@@ -9,8 +9,7 @@ Script config files live under `Data/Scripts/config`.
   "version": 1,
   "levels": {
     "0": {
-      "script": "Data/Scripts/dist/main.lua",
-      "extraNativeItems": ["bugdom2.powerup"],
+      "script": "Data/Scripts/main.lua",
       "itemOverrides": [
         { "from": 12, "to": 240 }
       ],
@@ -28,13 +27,14 @@ Script config files live under `Data/Scripts/config`.
 }
 ```
 
-V1 config support starts with:
+The native V1 parser supports:
 
 | Field | Status |
 |-------|--------|
-| `script` | Bugdom 2 per-level startup script selection is wired |
-| `extraNativeItems` | native whitelist registration exists; dependency enforcement still pending |
-| `itemOverrides` | Bugdom 2 terrain item type remapping is wired |
+| `script` | Per-level Lua module selection |
+| `customObjects` | Native/custom visual definitions and collision presets |
+| `terrainReplacements`, `mapReplacements`, `splineReplacements` | Index/type matching against declared custom object IDs |
+| `itemOverrides` | Terrain item type remapping in adapters with terrain support |
 | `levelSettings` | optional per-level primitive settings exposed through typed native accessors |
 
 `levelSettings` accepts string, number, and boolean scalar values. Native game
@@ -61,3 +61,20 @@ Editor and packaging tools should validate unknown JSON with
 `parseScriptConfigV1` from `@pangea-ports/script-types/config` before writing it
 into `Data/Scripts/config`. The parser uses the same versioned V1 shape shown
 above and returns a typed `Result` instead of throwing.
+
+The retained TypeScript validator preserves `customObjects` and all three
+replacement arrays when parsing configuration. It validates required item/type
+indexes, known custom-object references, duplicate IDs, safe custom asset paths,
+complete collision bounds, and native capacities (64 custom definitions, 128
+replacements per kind). Arbitrary level-setting arrays are rejected: only
+`assetDependencies` accepts an array. Numbers must fit native float storage.
+
+`extraNativeItems`, `skipIntro`, and `rules` remain compatibility fields in the
+historical TypeScript package; the shared native parser skips them. Put adapter
+settings in `levelSettings` and loaded asset declarations in `assetDependencies`.
+
+Bugdom 2, Otto Matic, and Mighty Mike ship a level-zero `Data/Scripts/main.lua`
+starter. Its visual bobbing is opt-in: set `levelSettings.scriptBobHeight` to a
+positive number; `scriptBobSpeed` defaults to 5. The starter handles only
+`onObjectFrame` update events for the native player and applies a visual position
+offset, preserving gameplay coordinates. Other games retain valid empty configs.

@@ -41,6 +41,7 @@ typedef struct RegisteredObject
 	bool active;
 	bool enabled;
 	bool destroying;
+	bool removing;
 	uint32_t generation;
 	void* nativeObject;
 	const PangeaScriptObjectOps* ops;
@@ -57,6 +58,8 @@ typedef struct RegisteredObject
 
 static PangeaScriptGameInfo gGameInfo;
 static char gStartupScriptPath[PANGEA_SCRIPT_PATH_CAPACITY];
+static char gBaseStartupScriptPath[PANGEA_SCRIPT_PATH_CAPACITY];
+static bool gLevelScriptOverride;
 static char gConfigPath[PANGEA_SCRIPT_PATH_CAPACITY] = "Data/Scripts/config/levels.json";
 static char gLastError[PANGEA_SCRIPT_ERROR_CAPACITY];
 static char gLastRuntimeError[PANGEA_SCRIPT_ERROR_CAPACITY];
@@ -610,6 +613,7 @@ static void clear_registered_object(RegisteredObject* object)
 	object->active = false;
 	object->enabled = false;
 	object->destroying = false;
+	object->removing = false;
 	object->nativeObject = NULL;
 	object->ops = NULL;
 	object->source = (PangeaScriptObjectSource){0};
@@ -764,7 +768,14 @@ static void cleanup_owned_children(PangeaScriptObjectHandle ownerHandle)
 	}
 
 	for (int i = 0; i < childCount; i++)
-		(void)PangeaScript_ApplyObjectLifecycle(children[i], &frameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+	{
+		RegisteredObject* child = resolve_registered_object(children[i]);
+		if (!child) continue;
+		if (child->capabilityLevel >= PANGEA_SCRIPT_CAPABILITY_FULL && child->ops && child->ops->deleteObject)
+			(void)PangeaScript_DeleteObject(children[i]);
+		else
+			(void)PangeaScript_ApplyObjectLifecycle(children[i], &frameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
+	}
 }
 
 static void set_error(PangeaScriptStatus status, const char* message)
@@ -978,8 +989,11 @@ static bool copy_string(char* dest, size_t destSize, const char* source)
 	if (!dest || destSize == 0 || !source || !source[0])
 		return false;
 
-	int written = snprintf(dest, destSize, "%s", source);
-	return written >= 0 && (size_t)written < destSize;
+	const size_t length = strlen(source);
+	if (length >= destSize)
+		return false;
+	memmove(dest, source, length + 1);
+	return true;
 }
 
 static char* read_text_file(const char* path, long* outSize)
@@ -1054,6 +1068,13 @@ static char* read_text_file(const char* path, long* outSize)
 
 // Custom JSON parser functions removed. Config parsing is handled in pangea_script_config.c.
 
+static void restore_base_startup_script(void)
+{
+	if (!gLevelScriptOverride) return;
+	memcpy(gStartupScriptPath, gBaseStartupScriptPath, sizeof(gStartupScriptPath));
+	gLevelScriptOverride = false;
+}
+
 PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 {
 	PangeaScriptFrameContext shutdownFrame = {0};
@@ -1064,6 +1085,7 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "PangeaScript_Init received incomplete game info");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
+	restore_base_startup_script();
 	effectiveGameInfo = *gameInfo;
 	if (!effectiveGameInfo.loadPersistent)
 		effectiveGameInfo.loadPersistent = default_load_persistent;
@@ -1120,6 +1142,7 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 
 void PangeaScript_Shutdown(void)
 {
+	restore_base_startup_script();
 	PangeaScriptFrameContext shutdownFrame = {0};
 	(void)PangeaScript_ApplyObjectLifecycleToAll(&shutdownFrame, PANGEA_SCRIPT_OBJECT_DESTROY);
 	gInitialized = false;
@@ -1156,7 +1179,7 @@ bool PangeaScript_IsEnabled(void)
 
 bool PangeaScript_HasRunnableModule(void)
 {
-	return gScriptLoaded && gBackend != NULL && !gNetworkedMode;
+	return gInitialized && gScriptLoaded && gBackend != NULL && !gScriptsDisabled && !gNetworkedMode;
 }
 
 #ifdef __EMSCRIPTEN__
@@ -1189,9 +1212,10 @@ PangeaScriptStatus PangeaScript_SetStartupScript(const char* path)
 	}
 	if (!copy_string(gStartupScriptPath, sizeof(gStartupScriptPath), path))
 	{
-		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Startup script path is empty");
+		set_error(PANGEA_SCRIPT_BAD_ARGUMENT, "Startup script path is too long");
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	}
+	gLevelScriptOverride = false;
 	if (!gInitialized)
 		return PANGEA_SCRIPT_OK;
 
@@ -1343,6 +1367,20 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 		return PANGEA_SCRIPT_CONFIG_ERROR;
 	}
 
+	if (found && scriptPath[0])
+	{
+		long moduleSize = 0;
+		char* module = read_text_file(scriptPath, &moduleSize);
+		if (!module)
+		{
+			free(parsedConfig);
+			free(config);
+			set_error(PANGEA_SCRIPT_FILE_NOT_FOUND, "Configured level script file not found");
+			return PANGEA_SCRIPT_FILE_NOT_FOUND;
+		}
+		free(module);
+	}
+
 	PangeaScriptFrameContext resetFrame = {
 		.levelNum = levelNum,
 		.frameNum = 0,
@@ -1393,13 +1431,23 @@ PangeaScriptStatus PangeaScript_LoadLevelConfig(int levelNum)
 			gSplineReplacements[i] = gParsedConfig.level.splineReplacements[i];
 	}
 
+	const bool needsModuleReload = (found && scriptPath[0]) || gLevelScriptOverride;
 	if (found && scriptPath[0])
 	{
+		if (!gLevelScriptOverride)
+			memcpy(gBaseStartupScriptPath, gStartupScriptPath, sizeof(gBaseStartupScriptPath));
+		gLevelScriptOverride = true;
 		copy_string(gStartupScriptPath, sizeof(gStartupScriptPath), scriptPath);
+	}
+	else
+		restore_base_startup_script();
+	if (needsModuleReload)
+	{
 		PangeaScriptStatus reloadStatus = PangeaScript_Reload();
-		if (reloadStatus != PANGEA_SCRIPT_OK && reloadStatus != PANGEA_SCRIPT_FILE_NOT_FOUND)
+		if (reloadStatus != PANGEA_SCRIPT_OK)
 		{
 			free(config);
+			gItemRemapCount = 0;
 			clear_level_settings();
 			return reloadStatus;
 		}
@@ -2660,6 +2708,9 @@ bool PangeaScript_UnregisterObject(PangeaScriptObjectHandle handle)
 		return false;
 	}
 
+	if (object->removing) return true;
+	object->removing = true;
+
 	cleanup_owned_children(handle);
 	/* Child destruction callbacks can unregister and reuse the owner's slot. */
 	object = resolve_registered_object(handle);
@@ -2951,13 +3002,18 @@ bool PangeaScript_GetObjectAnimationFrame(PangeaScriptObjectHandle handle, int* 
 
 bool PangeaScript_GetObjectActive(PangeaScriptObjectHandle handle, bool* outActive)
 {
-	RegisteredObject* object = resolve_object(handle);
+	RegisteredObject* object = resolve_registered_object(handle);
 	if (!object || !outActive || !object->ops || !object->ops->getActive)
 		return false;
 	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_READ_ONLY)
 	{
 		set_error(PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks read capability level");
 		return false;
+	}
+	if (!object->enabled)
+	{
+		*outActive = false;
+		return true;
 	}
 	return object->ops->getActive(object->nativeObject, outActive);
 }
@@ -2992,7 +3048,7 @@ bool PangeaScript_GetObjectDamage(PangeaScriptObjectHandle handle, float* outDam
 
 bool PangeaScript_GetObjectCollisionEnabled(PangeaScriptObjectHandle handle, bool* outEnabled)
 {
-	RegisteredObject* object = resolve_object(handle);
+	RegisteredObject* object = resolve_registered_object(handle);
 	if (!object || !outEnabled || !object->ops || !object->ops->getCollisionEnabled)
 		return false;
 	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_READ_ONLY)
@@ -3110,7 +3166,7 @@ bool PangeaScript_SetObjectAnimationNamed(PangeaScriptObjectHandle handle, const
 
 bool PangeaScript_SetObjectCollisionEnabled(PangeaScriptObjectHandle handle, bool enabled)
 {
-	RegisteredObject* object = resolve_object(handle);
+	RegisteredObject* object = resolve_registered_object(handle);
 	if (!object)
 		return finish_object_command("pangea.object.setCollisionEnabled", handle, false, PANGEA_SCRIPT_BAD_ARGUMENT, "Object handle is unknown or stale");
 	if (!object->ops || !object->ops->setCollisionEnabled)
@@ -3126,6 +3182,8 @@ bool PangeaScript_SetObjectActive(PangeaScriptObjectHandle handle, bool active)
 	bool nativeApplied = false;
 	if (!object)
 		return finish_object_command("pangea.object.setActive", handle, false, PANGEA_SCRIPT_BAD_ARGUMENT, "Object handle is unknown or stale");
+	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_BASE)
+		return finish_object_command("pangea.object.setActive", handle, false, PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks activation capability level");
 	if (object->enabled == active)
 		return finish_object_command("pangea.object.setActive", handle, true, PANGEA_SCRIPT_RUNTIME_ERROR, "");
 	if (object->ops && object->ops->setActive)
@@ -3142,7 +3200,8 @@ bool PangeaScript_SetObjectActive(PangeaScriptObjectHandle handle, bool active)
 			active ? PANGEA_SCRIPT_OBJECT_ACTIVATE : PANGEA_SCRIPT_OBJECT_DEACTIVATE);
 		if (status != PANGEA_SCRIPT_OK)
 		{
-			if (nativeApplied && object->ops && object->ops->setActive)
+			object = resolve_registered_object(handle);
+			if (nativeApplied && object && object->ops && object->ops->setActive)
 				(void)object->ops->setActive(object->nativeObject, !active);
 			char lifecycleError[PANGEA_SCRIPT_ERROR_CAPACITY];
 			snprintf(lifecycleError, sizeof(lifecycleError), "%s", PangeaScript_GetLastError());
@@ -3158,7 +3217,7 @@ bool PangeaScript_SetObjectActive(PangeaScriptObjectHandle handle, bool active)
 
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
 {
-	RegisteredObject* object = resolve_object(handle);
+	RegisteredObject* object = resolve_registered_object(handle);
 	if (!object)
 		return finish_object_command("pangea.object.delete", handle, false, PANGEA_SCRIPT_BAD_ARGUMENT, "Object handle is unknown or stale");
 	if (!object->ops || !object->ops->deleteObject)
@@ -3166,6 +3225,9 @@ bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
 
 	if (object->capabilityLevel < PANGEA_SCRIPT_CAPABILITY_FULL)
 		return finish_object_command("pangea.object.delete", handle, false, PANGEA_SCRIPT_RUNTIME_ERROR, "Permission denied: object lacks deletion/cleanup-safe capability level");
+
+	if (object->removing) return true;
+	object->removing = true;
 
 	if (!object->destroying && gBackend && gScriptLoaded)
 	{
@@ -3193,6 +3255,8 @@ bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
 			PangeaScriptBackend_ClearObjectState(gBackend, handle);
 		clear_registered_object(object);
 	}
+	object = resolve_registered_object(handle);
+	if (object) object->removing = false;
 	return finish_object_command("pangea.object.delete", handle, deleted, PANGEA_SCRIPT_RUNTIME_ERROR, "Native object rejected the deletion command");
 }
 
@@ -3367,8 +3431,8 @@ PangeaScriptStatus PangeaScript_CompareLifecycleTrace(
 		if (outComparison->firstMismatchIndex == UINT32_MAX)
 		{
 			outComparison->firstMismatchIndex = index;
-			snprintf(outComparison->expectedEventId, sizeof(outComparison->expectedEventId), "%s", expected->eventId);
-			snprintf(outComparison->actualEventId, sizeof(outComparison->actualEventId), "%s", actual->eventId);
+			snprintf(outComparison->expectedEventId, sizeof(outComparison->expectedEventId), "%.*s", (int)sizeof(outComparison->expectedEventId) - 1, expected->eventId);
+			snprintf(outComparison->actualEventId, sizeof(outComparison->actualEventId), "%.*s", (int)sizeof(outComparison->actualEventId) - 1, actual->eventId);
 			outComparison->expectedTarget = expected->target;
 			outComparison->actualTarget = actual->target;
 			outComparison->expectedStatus = expected->status;
@@ -3443,8 +3507,8 @@ PangeaScriptStatus PangeaScript_CompareNormalizedLifecycleTrace(
 		if (outComparison->firstMismatchIndex == UINT32_MAX)
 		{
 			outComparison->firstMismatchIndex = index;
-			snprintf(outComparison->expectedEventId, sizeof(outComparison->expectedEventId), "%s", expected->eventId);
-			snprintf(outComparison->actualEventId, sizeof(outComparison->actualEventId), "%s", actual->eventId);
+			snprintf(outComparison->expectedEventId, sizeof(outComparison->expectedEventId), "%.*s", (int)sizeof(outComparison->expectedEventId) - 1, expected->eventId);
+			snprintf(outComparison->actualEventId, sizeof(outComparison->actualEventId), "%.*s", (int)sizeof(outComparison->actualEventId) - 1, actual->eventId);
 			outComparison->expectedTarget = expected->target;
 			outComparison->actualTarget = actual->target;
 			outComparison->expectedStatus = expected->status;
@@ -3519,8 +3583,8 @@ PangeaScriptStatus PangeaScript_CompareCommandTrace(
 		if (outComparison->firstMismatchIndex == UINT32_MAX)
 		{
 			outComparison->firstMismatchIndex = index;
-			snprintf(outComparison->expectedCommandId, sizeof(outComparison->expectedCommandId), "%s", expected->commandId);
-			snprintf(outComparison->actualCommandId, sizeof(outComparison->actualCommandId), "%s", actual->commandId);
+			snprintf(outComparison->expectedCommandId, sizeof(outComparison->expectedCommandId), "%.*s", (int)sizeof(outComparison->expectedCommandId) - 1, expected->commandId);
+			snprintf(outComparison->actualCommandId, sizeof(outComparison->actualCommandId), "%.*s", (int)sizeof(outComparison->actualCommandId) - 1, actual->commandId);
 			outComparison->expectedTarget = expected->target;
 			outComparison->actualTarget = actual->target;
 			outComparison->expectedStatus = expected->status;

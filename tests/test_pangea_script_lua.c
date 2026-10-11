@@ -499,6 +499,35 @@ static void test_context_immutability_and_finite_numbers(PangeaScriptBackend* ba
 	assert(PangeaScriptBackend_CallTerrainItemHook(backend, &item, error, errorCapacity) == PANGEA_SCRIPT_OK);
 }
 
+static void test_plain_callback_and_result_records(PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+	const char* source =
+		"local mt={__index=function() error('unexpected metamethod') end}\n"
+		"return setmetatable({onTriggerEnter=function() return setmetatable({handled=true,scoreDelta=7},mt) end},mt)";
+	assert(PangeaScriptBackend_Load(backend, source, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	PangeaScriptFrameContext frame = {0};
+	assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(!PangeaScriptBackend_DidExecuteHook(backend));
+	PangeaScriptTriggerContext trigger = {0};
+	PangeaScriptTriggerResult result = {0};
+	assert(PangeaScriptBackend_CallTriggerHook(backend, &trigger, &result, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(result.handled && result.scoreDelta == 7 && !result.hasSolid);
+	assert(PangeaScriptBackend_DidExecuteHook(backend));
+}
+
+static void test_zero_wait_started_during_frame(PangeaScriptBackend* backend, char* error, int errorCapacity)
+{
+	const char* source =
+		"local phase=0; pangea.time.after(0,function() pangea.task.start(function() phase=1; pangea.task.wait(0); phase=2 end) end)\n"
+		"return {onFrame=function(ctx) assert(phase==ctx.frameNum) end}";
+	assert(PangeaScriptBackend_Load(backend, source, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	for (int i = 1; i <= 2; i++)
+	{
+		PangeaScriptFrameContext frame = {.frameNum = (unsigned int)i};
+		assert(PangeaScriptBackend_CallFrameHook(backend, &frame, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	}
+}
+
 static void test_coroutine_tasks(PangeaScriptBackend* backend, char* error, int errorCapacity)
 {
 	const char* source =
@@ -578,13 +607,17 @@ static void test_object_command_results(PangeaScriptBackend* backend, char* erro
 	};
 	PangeaScriptObjectHandle handle;
 	assert(PangeaScript_RegisterObject(&registration, &handle) == PANGEA_SCRIPT_OK);
-	char source[2048];
+	char source[4096];
 	snprintf(source, sizeof(source),
 		"local handle={id=%d,generation=%u}\n"
 		"local moved=pangea.object.setPositionResult(handle,{x=4,y=5,z=6})\n"
 		"assert(moved.ok and moved.code==0 and moved.reason=='ok' and moved.primary.id==handle.id)\n"
 		"local state=pangea.object.state(handle); state.health=10; state.nested={value=3}; assert(pangea.object.captureCheckpoint(handle), 'capture')\n"
 		"state.health=20; state.nested.value=9; assert(pangea.object.restoreCheckpoint(handle), 'restore'); assert(state.health==10 and state.nested.value==3, 'state')\n"
+		"state.text='001'; state.large=math.maxinteger; state.nested['002']='003'; assert(pangea.object.captureCheckpoint(handle))\n"
+		"state.text='changed'; state.large=0; state.nested['002']='changed'; assert(pangea.object.restoreCheckpoint(handle))\n"
+		"assert(state.text=='001' and state.large==math.maxinteger and math.type(state.large)=='integer' and state.nested['002']=='003')\n"
+		"state.unsupported=function() end; assert(not pangea.object.captureCheckpoint(handle)); state.large=0; assert(pangea.object.restoreCheckpoint(handle)); assert(state.large==math.maxinteger and state.unsupported==nil)\n"
 		"local unsupported=pangea.object.setVelocityResult(handle,{x=1,y=2,z=3})\n"
 		"assert(not unsupported.ok and unsupported.reason=='runtime-error' and string.find(unsupported.message,'velocity',1,true))\n"
 		"local stale=pangea.object.deleteResult({id=999,generation=1})\n"
@@ -863,8 +896,13 @@ static void test_otto_humans_jump_sample(PangeaScriptBackend* backend, char* err
 	const char* legacySource =
 		"return { onObjectFrame = function() return { positionOffset = { x=0, y=1, z=0 } } end }";
 	assert(PangeaScriptBackend_Load(backend, legacySource, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(PangeaScriptBackend_CallObjectFrameHook(backend, &scientist, &result, error, errorCapacity) == PANGEA_SCRIPT_OK);
+	assert(result.hasPositionOffset && result.positionOffset.y == 1);
+	const char* invalidSource =
+		"return { onObjectFrame = function() return { positionOffset = { x=0, y=1e100, z=0 } } end }";
+	assert(PangeaScriptBackend_Load(backend, invalidSource, error, errorCapacity) == PANGEA_SCRIPT_OK);
 	assert(PangeaScriptBackend_CallObjectFrameHook(backend, &scientist, &result, error, errorCapacity) == PANGEA_SCRIPT_BAD_ARGUMENT);
-	assert(strstr(error, "must return nil") != NULL);
+	assert(strstr(error, "finite Vector3") != NULL);
 	/* Repeated rejected result tables must not accumulate on the Lua stack. */
 	for (int i = 0; i < 2000; i++)
 		assert(PangeaScriptBackend_CallObjectFrameHook(backend, &scientist, &result, error, errorCapacity) == PANGEA_SCRIPT_BAD_ARGUMENT);
@@ -2250,6 +2288,8 @@ int main(void)
 	test_timers(backend, error, sizeof(error));
 	test_repeating_timers_and_api_version(backend, error, sizeof(error));
 	test_context_immutability_and_finite_numbers(backend, error, sizeof(error));
+	test_plain_callback_and_result_records(backend, error, sizeof(error));
+	test_zero_wait_started_during_frame(backend, error, sizeof(error));
 	test_coroutine_tasks(backend, error, sizeof(error));
 	test_object_queries_and_events(backend, error, sizeof(error));
 	test_object_command_results(backend, error, sizeof(error));

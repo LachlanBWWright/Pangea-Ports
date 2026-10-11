@@ -236,6 +236,11 @@ int numNodesToMove = 0;
 		if (node->CType == INVALID_NODE_FLAG)		// node was deleted by another node's move routine
 			continue;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+        if (node->ScriptDeleteRequested) { DeleteObject(node); continue; }
+        if (node->ScriptActiveStateInitialized && !node->ScriptActive) continue;
+#endif
+
 		if (node->MoveFlag && node->MoveCall != nil)
 		{
 			gThisNodePtr = node;					// set current object node

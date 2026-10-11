@@ -312,11 +312,13 @@ static bool Nanosaur2Script_SetObjectScale(void* nativeObject, float scale)
 
 static bool Nanosaur2Script_SetObjectCollisionEnabled(void* nativeObject, bool enabled)
 {
-	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive)) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
-	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
-	return true;
+    ObjNode* obj = (ObjNode*)nativeObject;
+    if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+    uint32_t* bits = obj->ScriptActiveStateInitialized && !obj->ScriptActive
+        ? &obj->ScriptInactiveStatusBits : &obj->StatusBits;
+    if (enabled) *bits &= ~STATUS_BIT_NOCOLLISION;
+    else *bits |= STATUS_BIT_NOCOLLISION;
+    return true;
 }
 
 static bool Nanosaur2Script_GetObjectCollisionEnabled(void* nativeObject, bool* outEnabled)
@@ -356,14 +358,24 @@ static bool Nanosaur2Script_GetObjectDamage(void* nativeObject, float* outDamage
 
 static bool Nanosaur2Script_SetObjectActive(void* nativeObject, bool active)
 {
-	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (!obj->ScriptDefinitionID[0]) return true;
-	obj->ScriptActiveStateInitialized = true;
-	obj->ScriptActive = active;
-	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
-	return true;
+    ObjNode* obj = (ObjNode*)nativeObject;
+    if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+    const uint32_t mask = STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE;
+    if (!obj->ScriptActiveStateInitialized)
+    {
+        obj->ScriptActiveStateInitialized = true;
+        obj->ScriptActive = true;
+    }
+    if (active == obj->ScriptActive) return true;
+    if (!active)
+    {
+        obj->ScriptInactiveStatusBits = obj->StatusBits & mask;
+        obj->StatusBits |= mask;
+    }
+    else
+        obj->StatusBits = (obj->StatusBits & ~mask) | obj->ScriptInactiveStatusBits;
+    obj->ScriptActive = active;
+    return true;
 }
 
 static int ResolveNamedAnimation(const ObjNode* obj, const char* animation)
@@ -1469,7 +1481,7 @@ static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 
 static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
 {
-	if (playerNum < 0 || playerNum >= gNumPlayers || lives < 0 || !gPlayerInfo[playerNum].objNode)
+	if (playerNum < 0 || playerNum >= gNumPlayers || lives < 0 || lives > INT16_MAX || !gPlayerInfo[playerNum].objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerInfo[playerNum].numFreeLives = (short) lives;
 	return PANGEA_SCRIPT_OK;
@@ -1480,6 +1492,8 @@ static PangeaScriptStatus SetScriptPlayerWeaponQuantity(int playerNum, int weapo
 	if (playerNum < 0 || playerNum >= gNumPlayers || weaponType < 0 || weaponType >= NUM_WEAPON_TYPES || quantity < 0 || quantity > 999 || !gPlayerInfo[playerNum].objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerInfo[playerNum].weaponQuantity[weaponType] = (short) quantity;
+    if (quantity == 0 && gPlayerInfo[playerNum].currentWeapon == weaponType)
+        SelectNextWeapon((short)playerNum, true, 1);
 	if (quantity > 0 && gPlayerInfo[playerNum].currentWeapon == WEAPON_TYPE_NONE)
 		gPlayerInfo[playerNum].currentWeapon = weaponType;
 	return PANGEA_SCRIPT_OK;

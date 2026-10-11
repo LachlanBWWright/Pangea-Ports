@@ -440,6 +440,8 @@ ObjNode	*theNode;
 					DeleteObject(theNode);
 				continue;
 			}
+			if (theNode->ScriptActiveStateInitialized && !theNode->ScriptActive) continue;
+
 #endif
 			if (theNode->SplineMoveCall)
 			{

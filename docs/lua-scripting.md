@@ -252,3 +252,37 @@ handle and defer native memory release to a safe engine boundary. The `destroy`
 lifecycle callback runs before that deferred release. A successful deletion
 therefore means the script object has been removed, not that native memory was
 freed during the Lua call.
+
+Callback lookup and hook-result parsing use fields stored directly in the table.
+An `__index` metamethod does not supply callbacks or result fields. Declare these
+fields explicitly so validation cannot execute unprotected inherited Lua code.
+`onObjectFrame` may return `nil` to use mutation commands, or a table containing
+an optional finite `positionOffset` vector for the native visual-offset pipeline.
+If both a command and a returned offset are supplied, the returned offset wins.
+
+Owned native objects spawned during an object callback follow that owner's
+cleanup. Destroying the owner deletes its owned native children as well as
+invalidating their handles; cleanup can delete inactive children and recursion
+is guarded against duplicate deletion. A module disabled after repeated hook
+failures is no longer reported as runnable.
+
+## Regression checks
+
+Run the shared runtime and shipped game tests, including Release assertions:
+
+```sh
+cmake -S shared/script -B build-lua-tests -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build-lua-tests --parallel 2
+ctest --test-dir build-lua-tests --output-on-failure --parallel 8
+```
+
+The PR workflow runs this suite and `npm test` from `shared/script-types`.
+Native adapter regressions compile the actual game bindings without launching
+the games. With Pomme submodules and SDL3 headers available, run:
+
+```sh
+python3 scripts/check_native_script_adapters.py --sysroot-include /path/to/include
+```
+
+The include directory must contain `SDL3/SDL.h`; no SDL library or game assets
+are needed by these adapter tests.

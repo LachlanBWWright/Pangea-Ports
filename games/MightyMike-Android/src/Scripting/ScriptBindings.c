@@ -88,9 +88,19 @@ static void MikeScript_ReleaseCustomShapes(void)
 	}
 }
 
+static bool MikeScript_FitsFixed(float value)
+{
+    return isfinite(value) && value >= -32768.0f && value < 32768.0f;
+}
+
 static int32_t MikeScript_FloatToFixed(float value)
 {
-	return (int32_t) SDL_roundf(value * 65536.0f);
+    /* Double precision avoids rounding the largest positive fixed value to 2^31. */
+    if (!isfinite(value)) return 0;
+    double fixed = round((double)value * 65536.0);
+    if (fixed > INT32_MAX) return INT32_MAX;
+    if (fixed < INT32_MIN) return INT32_MIN;
+    return (int32_t)fixed;
 }
 
 static float MikeScript_FixedToFloat(int32_t value)
@@ -185,7 +195,8 @@ static bool MikeScript_GetObjectPosition(void* nativeObject, PangeaScriptVector3
 static bool MikeScript_SetObjectPosition(void* nativeObject, const PangeaScriptVector3* position)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !position || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || !position || !MikeScript_FitsFixed(position->x) || !MikeScript_FitsFixed(position->y)
+        || obj->CType == INVALID_NODE_FLAG)
 		return false;
 
 	obj->X.L = MikeScript_FloatToFixed(position->x);
@@ -209,7 +220,8 @@ static bool MikeScript_GetObjectVelocity(void* nativeObject, PangeaScriptVector3
 static bool MikeScript_SetObjectVelocity(void* nativeObject, const PangeaScriptVector3* velocity)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !velocity || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || !velocity || !MikeScript_FitsFixed(velocity->x) || !MikeScript_FitsFixed(velocity->y)
+        || obj->CType == INVALID_NODE_FLAG)
 		return false;
 
 	obj->DX = MikeScript_FloatToFixed(velocity->x);
@@ -295,6 +307,7 @@ static bool MikeScript_SetObjectCollisionEnabled(void* nativeObject, bool enable
 		obj->ScriptCollisionBits = obj->CBits;
 		obj->ScriptCollisionStateInitialized = true;
 	}
+    obj->ScriptCollisionEnabled = enabled;
 	obj->CBits = enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive) ? obj->ScriptCollisionBits : 0;
 	return true;
 }
@@ -313,8 +326,6 @@ static bool MikeScript_SetObjectActive(void* nativeObject, bool active)
 	ObjNode* obj = (ObjNode*)nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
 		return false;
-	if (!obj->ScriptDefinitionID[0])
-		return true;
 	if (!obj->ScriptActiveStateInitialized)
 	{
 		obj->ScriptActiveDrawFlag = obj->DrawFlag;
@@ -325,13 +336,14 @@ static bool MikeScript_SetObjectActive(void* nativeObject, bool active)
 	if (!obj->ScriptCollisionStateInitialized)
 	{
 		obj->ScriptCollisionBits = obj->CBits;
+        obj->ScriptCollisionEnabled = obj->CBits != 0;
 		obj->ScriptCollisionStateInitialized = true;
 	}
 	if (active)
 	{
 		obj->DrawFlag = obj->ScriptActiveDrawFlag;
 		obj->MoveFlag = obj->ScriptActiveMoveFlag;
-		obj->CBits = obj->ScriptCollisionBits;
+		obj->CBits = obj->ScriptCollisionEnabled ? obj->ScriptCollisionBits : 0;
 		obj->ScriptActive = true;
 	}
 	else
@@ -1202,7 +1214,7 @@ static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 
 static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
 {
-	if (playerNum != 0 || lives < 0 || !gMyNodePtr)
+	if (playerNum != 0 || lives < 0 || lives > INT16_MAX || !gMyNodePtr)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gNumLives = (short) lives;
 	ShowLives();
@@ -1233,11 +1245,14 @@ static PangeaScriptStatus SetScriptPlayerWeaponQuantity(int playerNum, int weapo
 		for (int moveIndex = weaponIndex; moveIndex + 1 < gNumWeaponsIHave; moveIndex++)
 			gMyWeapons[moveIndex] = gMyWeapons[moveIndex + 1];
 		gNumWeaponsIHave--;
+        gMyWeapons[gNumWeaponsIHave] = (WeaponType){0};
+        if (weaponIndex < gCurrentWeaponIndex) gCurrentWeaponIndex--;
 		if (gCurrentWeaponIndex >= gNumWeaponsIHave) gCurrentWeaponIndex = gNumWeaponsIHave > 0 ? (Byte)(gNumWeaponsIHave - 1) : 0;
 		gCurrentWeaponType = gNumWeaponsIHave > 0 ? gMyWeapons[gCurrentWeaponIndex].type : NO_WEAPON;
 		return PANGEA_SCRIPT_OK;
 	}
-	if (quantity == 0 || gNumWeaponsIHave >= MAX_WEAPONS) return PANGEA_SCRIPT_BAD_ARGUMENT;
+    if (quantity == 0) return PANGEA_SCRIPT_OK;
+    if (gNumWeaponsIHave >= MAX_WEAPONS) return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gMyWeapons[gNumWeaponsIHave++] = (WeaponType){(uint8_t) weaponType, (uint16_t) quantity};
 	if (gCurrentWeaponType == NO_WEAPON)
 	{

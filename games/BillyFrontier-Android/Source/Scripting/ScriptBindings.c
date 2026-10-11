@@ -313,11 +313,13 @@ static bool BillyScript_SetObjectScale(void* nativeObject, float scale)
 
 static bool BillyScript_SetObjectCollisionEnabled(void* nativeObject, bool enabled)
 {
-	ObjNode* obj = (ObjNode*)nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (enabled) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
-	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
-	return true;
+    ObjNode* obj = (ObjNode*)nativeObject;
+    if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+    uint32_t* bits = obj->ScriptActiveStateInitialized && !obj->ScriptActive
+        ? &obj->ScriptInactiveStatusBits : &obj->StatusBits;
+    if (enabled) *bits &= ~STATUS_BIT_NOCOLLISION;
+    else *bits |= STATUS_BIT_NOCOLLISION;
+    return true;
 }
 
 static bool BillyScript_GetObjectCollisionEnabled(void* nativeObject, bool* outEnabled)
@@ -407,7 +409,7 @@ static bool BillyScript_GetObjectActive(void* nativeObject, bool* outActive)
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || !outActive || obj->CType == INVALID_NODE_FLAG)
 		return false;
-	*outActive = !obj->ScriptActiveStateInitialized || obj->CType != 0;
+	*outActive = !obj->ScriptActiveStateInitialized || obj->ScriptActive;
 	return true;
 }
 
@@ -431,30 +433,24 @@ static bool BillyScript_GetObjectDamage(void* nativeObject, float* outDamage)
 
 static bool BillyScript_SetObjectActive(void* nativeObject, bool active)
 {
-	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG)
-		return false;
-	if (!obj->ScriptDefinitionID[0])
-		return true;
-	if (!obj->ScriptActiveStateInitialized)
-	{
-		obj->ScriptActiveCType = obj->CType;
-		obj->ScriptActiveCBits = obj->CBits;
-		obj->ScriptActiveStateInitialized = true;
-	}
-	if (active)
-	{
-		obj->CType = obj->ScriptActiveCType;
-		obj->CBits = obj->ScriptActiveCBits;
-		ShowObject(obj);
-	}
-	else
-	{
-		obj->CType = 0;
-		obj->CBits = 0;
-		HideObject(obj);
-	}
-	return true;
+    ObjNode* obj = (ObjNode*)nativeObject;
+    if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+    const uint32_t mask = STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE;
+    if (!obj->ScriptActiveStateInitialized)
+    {
+        obj->ScriptActiveStateInitialized = true;
+        obj->ScriptActive = true;
+    }
+    if (active == obj->ScriptActive) return true;
+    if (!active)
+    {
+        obj->ScriptInactiveStatusBits = obj->StatusBits & mask;
+        obj->StatusBits |= mask;
+    }
+    else
+        obj->StatusBits = (obj->StatusBits & ~mask) | obj->ScriptInactiveStatusBits;
+    obj->ScriptActive = active;
+    return true;
 }
 
 static const PangeaScriptObjectOps kBillyPlayerObjectOps =
@@ -1155,9 +1151,9 @@ static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 
 static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
 {
-	if (playerNum != 0 || lives < 0 || lives > 255 || !gPlayerInfo.objNode)
+	if (playerNum != 0 || lives < 0 || lives > INT8_MAX || !gPlayerInfo.objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gPlayerInfo.lives = (Byte) lives;
+	gPlayerInfo.lives = (SInt8) lives;
 	return PANGEA_SCRIPT_OK;
 }
 

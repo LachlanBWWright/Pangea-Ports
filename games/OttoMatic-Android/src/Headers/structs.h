@@ -312,6 +312,7 @@ struct ObjNode
 	Boolean			ScriptActiveStateInitialized;
 	Boolean			ScriptActive;
 	Boolean			ScriptDeleteRequested;
+	uint32_t		ScriptInactiveStatusBits;
 	Boolean			ScriptFrameCalled;
 	Boolean			ScriptStreamOutSent;
 	

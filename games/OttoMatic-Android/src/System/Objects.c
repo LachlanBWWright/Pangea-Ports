@@ -409,6 +409,12 @@ ObjNode		*thisNodePtr;
 			thisNodePtr = gNextNode;
 			continue;
 		}
+		if (thisNodePtr->ScriptActiveStateInitialized && !thisNodePtr->ScriptActive)
+		{
+			thisNodePtr = gNextNode;
+			continue;
+		}
+
 #endif
 
 

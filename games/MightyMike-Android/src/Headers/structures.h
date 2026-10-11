@@ -138,6 +138,7 @@ struct ObjNode
 	uint32_t		ScriptObjectGeneration;
 	unsigned long		ScriptCollisionBits;
 	Boolean			ScriptCollisionStateInitialized;
+	Boolean ScriptCollisionEnabled;
 	Boolean			ScriptActiveDrawFlag;
 	Boolean			ScriptActiveMoveFlag;
 	Boolean			ScriptActiveStateInitialized;

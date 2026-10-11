@@ -309,8 +309,13 @@ static bool Bugdom2Script_SetObjectScale(void* nativeObject, float scale)
 static bool Bugdom2Script_SetObjectCollisionEnabled(void* nativeObject, bool enabled)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive)) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || obj->ScriptDeleteRequested) return false;
+	if (obj->ScriptActiveStateInitialized && !obj->ScriptActive)
+	{
+		if (enabled) obj->ScriptInactiveStatusBits &= ~STATUS_BIT_NOCOLLISION;
+		else obj->ScriptInactiveStatusBits |= STATUS_BIT_NOCOLLISION;
+	}
+	else if (enabled) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
 	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
 	return true;
 }
@@ -353,12 +358,20 @@ static bool Bugdom2Script_GetObjectDamage(void* nativeObject, float* outDamage)
 static bool Bugdom2Script_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (!obj->ScriptDefinitionID[0]) return true;
+	const uint32_t mask = STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || obj->ScriptDeleteRequested) return false;
+	if (obj->ScriptActiveStateInitialized && obj->ScriptActive == active) return true;
+	if (!active)
+	{
+		obj->ScriptInactiveStatusBits = obj->StatusBits & mask;
+		obj->StatusBits |= mask;
+	}
+	else if (obj->ScriptActiveStateInitialized)
+	{
+		obj->StatusBits = (obj->StatusBits & ~mask) | obj->ScriptInactiveStatusBits;
+	}
 	obj->ScriptActiveStateInitialized = true;
 	obj->ScriptActive = active;
-	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
 	return true;
 }
 

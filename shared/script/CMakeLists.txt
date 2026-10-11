@@ -71,4 +71,44 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
 	add_test(NAME Nanosaur2ScriptSamples COMMAND PangeaGameScriptSampleTests nanosaur2)
 	add_test(NAME BillyFrontierScriptSamples COMMAND PangeaGameScriptSampleTests billy)
 	add_test(NAME MightyMikeScriptSamples COMMAND PangeaGameScriptSampleTests mightymike)
+	# These fixtures create modules with shared filenames; parallel CTest runs
+	# need separate working directories for each game.
+	foreach(sample_test IN ITEMS OttoMaticScriptSamples BugdomScriptSamples
+		Bugdom2ScriptSamples CroMagRallyScriptSamples NanosaurScriptSamples
+		Nanosaur2ScriptSamples BillyFrontierScriptSamples MightyMikeScriptSamples)
+		file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${sample_test}")
+		set_tests_properties(${sample_test} PROPERTIES
+			WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${sample_test}")
+	endforeach()
+	if(NOT EMSCRIPTEN)
+		add_executable(PangeaShippedGameScriptTests ../../tests/test_shipped_game_scripts.c)
+		target_link_libraries(PangeaShippedGameScriptTests PRIVATE PangeaScript)
+		target_compile_definitions(PangeaShippedGameScriptTests PRIVATE
+			PANGEA_SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../..")
+		if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+			target_compile_options(PangeaShippedGameScriptTests PRIVATE -Wall -Wextra -Werror)
+		endif()
+		foreach(game IN ITEMS OttoMatic-Android Bugdom-android Bugdom2-Android
+			CroMagRally-Android Nanosaur-android Nanosaur2-Android
+			BillyFrontier-Android MightyMike-Android)
+			file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shipped-${game}")
+			add_test(NAME ShippedScripts-${game} COMMAND PangeaShippedGameScriptTests ${game})
+			set_tests_properties(ShippedScripts-${game} PROPERTIES
+				WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/shipped-${game}")
+		endforeach()
+	endif()
+	# Assertions are executable conformance checks, including in Release builds.
+	foreach(test_target IN ITEMS PangeaScriptCoreTests PangeaScriptLuaTests
+		PangeaGameScriptSampleTests PangeaShippedGameScriptTests)
+		if(TARGET ${test_target})
+			if(MSVC)
+				target_compile_options(${test_target} PRIVATE /UNDEBUG)
+			else()
+				target_compile_options(${test_target} PRIVATE -UNDEBUG)
+			endif()
+			if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+				target_compile_options(${test_target} PRIVATE -Wall -Wextra -Werror)
+			endif()
+		endif()
+	endforeach()
 endif()

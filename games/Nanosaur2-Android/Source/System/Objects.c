@@ -481,6 +481,20 @@ ObjNode		*thisNodePtr;
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+        if (thisNodePtr->ScriptDeleteRequested)
+        {
+            DeleteObject(thisNodePtr);
+            thisNodePtr = gNextNode;
+            continue;
+        }
+        if (thisNodePtr->ScriptActiveStateInitialized && !thisNodePtr->ScriptActive)
+        {
+            thisNodePtr = gNextNode;
+            continue;
+        }
+#endif
+
 
 				/* SEE IF SHOULD SKIP WHEN PAUSED */
 

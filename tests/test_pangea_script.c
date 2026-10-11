@@ -15,6 +15,9 @@ static PangeaScriptStatus g_mock_load_status = PANGEA_SCRIPT_OK;
 static PangeaScriptStatus g_mock_hook_status = PANGEA_SCRIPT_OK;
 static int g_mock_scripted_spawn_count;
 static int g_mock_native_spawn_count;
+static char g_mock_loaded_source[128];
+static int g_native_delete_count;
+static PangeaScriptStatus (*g_object_hook)(const PangeaScriptObjectFrameContext*);
 static bool g_mock_executed_hook = true;
 static PangeaScriptGameInfo g_mock_effective_info;
 bool PangeaScriptBackend_DidExecuteHook(PangeaScriptBackend* backend)
@@ -54,6 +57,7 @@ PangeaScriptStatus PangeaScriptBackend_Load(PangeaScriptBackend* backend, const 
 	(void) source;
 	(void) error;
 	(void) errorCapacity;
+	snprintf(g_mock_loaded_source, sizeof(g_mock_loaded_source), "%s", source);
 	return g_mock_load_status;
 }
 
@@ -110,7 +114,7 @@ PangeaScriptStatus PangeaScriptBackend_CallObjectFrameHook(PangeaScriptBackend* 
 	(void) result;
 	(void) error;
 	(void) errorCapacity;
-	return g_mock_hook_status;
+	return g_object_hook ? g_object_hook(context) : g_mock_hook_status;
 }
 
 PangeaScriptStatus PangeaScriptBackend_CallTriggerHook(PangeaScriptBackend* backend, const PangeaScriptTriggerContext* context, PangeaScriptTriggerResult* result, char* error, int errorCapacity)
@@ -177,6 +181,7 @@ static bool DummySetVelocity(void* nativeObject, const PangeaScriptVector3* velo
 static bool DummyDeleteObject(void* nativeObject)
 {
 	DummyObject* obj = (DummyObject*) nativeObject;
+	g_native_delete_count++;
 	obj->deleted = true;
 	return true;
 }
@@ -439,6 +444,7 @@ void test_level_settings_accessors(void)
 	system("mkdir -p Data/Scripts/config");
 	system("mkdir -p Data/Scripts/dist");
 	write_temp_file("Data/Scripts/dist/main.lua", "return {}");
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/main.lua") == PANGEA_SCRIPT_OK);
 
 	const char* valid_config =
 		"{\n"
@@ -755,12 +761,227 @@ static void test_large_native_item_registry(void)
 	PangeaScript_Shutdown();
 }
 
+static PangeaScriptObjectHandle g_cleanup_owner, g_cleanup_child;
+static bool g_cleanup_spawn_child;
+
+static PangeaScriptStatus owned_cleanup_hook(const PangeaScriptObjectFrameContext* context)
+{
+	if (strcmp(context->event, "update") == 0 && g_cleanup_spawn_child)
+	{
+		g_cleanup_spawn_child = false;
+		return PangeaScript_RegisterScriptedObject("custom.test", 10, 20, 30, &g_cleanup_child);
+	}
+	if (strcmp(context->event, "destroy") == 0)
+	{
+		/* A destroy callback may request deletion of itself or its owner. */
+		assert(PangeaScript_DeleteObject(context->object));
+		if (context->object.id == g_cleanup_child.id)
+			assert(PangeaScript_UnregisterObject(g_cleanup_owner));
+	}
+	return PANGEA_SCRIPT_OK;
+}
+
+static void test_owned_native_cleanup(void)
+{
+	const PangeaScriptGameInfo game = {
+		.gameId = "cleanup", .gameName = "Cleanup", .spawnScripted = mock_spawn_scripted,
+	};
+	g_mock_hook_status = PANGEA_SCRIPT_OK;
+	assert(PangeaScript_Init(&game) == PANGEA_SCRIPT_OK);
+	system("mkdir -p Data/Scripts/dist");
+	write_temp_file("Data/Scripts/dist/cleanup.lua", "return {}");
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/cleanup.lua") == PANGEA_SCRIPT_OK);
+	const PangeaScriptFrameContext frame = {.levelNum = 1};
+	g_object_hook = owned_cleanup_hook;
+	for (int unregisterOnly = 0; unregisterOnly < 2; unregisterOnly++)
+	{
+		DummyObject owner = {0};
+		const PangeaScriptObjectRegistration registration = {
+			.nativeObject = &owner, .ops = &kDummyOps, .objectType = "owner",
+			.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL,
+		};
+		assert(PangeaScript_RegisterObject(&registration, &g_cleanup_owner) == PANGEA_SCRIPT_OK);
+		g_cleanup_spawn_child = true;
+		PangeaScriptObjectFrameResult result;
+		assert(PangeaScript_CallObjectFrame(g_cleanup_owner, &frame, &result) == PANGEA_SCRIPT_OK);
+		assert(PangeaScript_ObjectExists(g_cleanup_child));
+		assert(PangeaScript_ApplyObjectLifecycle(g_cleanup_child, &frame, PANGEA_SCRIPT_OBJECT_DEACTIVATE) == PANGEA_SCRIPT_OK);
+		g_native_delete_count = 0;
+		if (unregisterOnly)
+			assert(PangeaScript_UnregisterObject(g_cleanup_owner));
+		else
+			assert(PangeaScript_DeleteObject(g_cleanup_owner));
+		assert(g_native_delete_count == (unregisterOnly ? 1 : 2));
+		assert(owner.deleted == !unregisterOnly);
+		assert(!PangeaScript_ObjectExists(g_cleanup_owner));
+		assert(!PangeaScript_ObjectExists(g_cleanup_child));
+	}
+	g_object_hook = NULL;
+	PangeaScript_Shutdown();
+	system("rm -rf Data");
+}
+
+static void test_rejected_path_preserves_transport(void)
+{
+	const PangeaScriptGameInfo game = {
+		.gameId = "paths", .gameName = "Paths", .readTextFile = mock_packaged_text,
+	};
+	g_mock_invalid_asset_size = false;
+	assert(PangeaScript_Init(&game) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/packaged-only.lua") == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SetConfigPath("Data/Scripts/config/packaged-only.json") == PANGEA_SCRIPT_OK);
+	char oversized[300];
+	memset(oversized, 'x', sizeof(oversized));
+	oversized[sizeof(oversized) - 1] = '\0';
+	assert(PangeaScript_SetStartupScript(oversized) == PANGEA_SCRIPT_BAD_ARGUMENT);
+	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SetConfigPath(oversized) == PANGEA_SCRIPT_BAD_ARGUMENT);
+	assert(PangeaScript_LoadLevelConfig(7) == PANGEA_SCRIPT_OK);
+	int gravity = 0;
+	assert(PangeaScript_GetLevelIntSetting("gravity", &gravity) && gravity == 321);
+	PangeaScript_Shutdown();
+}
+
+static void test_level_module_selection(void)
+{
+	const PangeaScriptGameInfo game = {.gameId = "modules", .gameName = "Modules"};
+	assert(PangeaScript_Init(&game) == PANGEA_SCRIPT_OK);
+	system("mkdir -p Data/Scripts/dist Data/Scripts/config");
+	write_temp_file("Data/Scripts/dist/base.lua", "return { marker = 'base' }");
+	write_temp_file("Data/Scripts/dist/level.lua", "return { marker = 'level' }");
+	write_temp_file("Data/Scripts/dist/other.lua", "return { marker = 'other' }");
+	write_temp_file("Data/Scripts/config/modules.json",
+		"{\"version\":1,\"levels\":{"
+		"\"1\":{\"script\":\"Data/Scripts/dist/level.lua\",\"levelSettings\":{\"gravity\":111}},"
+		"\"2\":{\"levelSettings\":{\"gravity\":222}},"
+		"\"3\":{\"script\":\"Data/Scripts/dist/missing.lua\",\"levelSettings\":{\"gravity\":333}}}}");
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/base.lua") == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SetConfigPath("Data/Scripts/config/modules.json") == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_OK);
+	assert(strstr(g_mock_loaded_source, "'level'"));
+	DummyObject object = {0};
+	PangeaScriptObjectHandle handle;
+	const PangeaScriptObjectRegistration registration = {
+		.nativeObject = &object, .ops = &kDummyOps,
+		.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL,
+	};
+	assert(PangeaScript_RegisterObject(&registration, &handle) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_LoadLevelConfig(3) == PANGEA_SCRIPT_FILE_NOT_FOUND);
+	assert(PangeaScript_GetLastStatus() == PANGEA_SCRIPT_FILE_NOT_FOUND);
+	assert(strstr(PangeaScript_GetLastError(), "Configured level script"));
+	int gravity = 0;
+	assert(PangeaScript_GetLevelIntSetting("gravity", &gravity) && gravity == 111);
+	assert(PangeaScript_ObjectExists(handle) && PangeaScript_HasRunnableModule());
+	assert(strstr(g_mock_loaded_source, "'level'"));
+	assert(PangeaScript_LoadLevelConfig(2) == PANGEA_SCRIPT_OK);
+	assert(strstr(g_mock_loaded_source, "'base'"));
+	assert(PangeaScript_GetLevelIntSetting("gravity", &gravity) && gravity == 222);
+	assert(!PangeaScript_ObjectExists(handle));
+	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
+	assert(strstr(g_mock_loaded_source, "'base'"));
+	assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SetStartupScript("Data/Scripts/dist/other.lua") == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_LoadLevelConfig(2) == PANGEA_SCRIPT_OK);
+	assert(strstr(g_mock_loaded_source, "'other'"));
+	assert(PangeaScript_LoadLevelConfig(1) == PANGEA_SCRIPT_OK);
+	assert(remove("Data/Scripts/dist/other.lua") == 0);
+	assert(PangeaScript_LoadLevelConfig(2) == PANGEA_SCRIPT_FILE_NOT_FOUND);
+	assert(!PangeaScript_HasRunnableModule());
+	assert(!PangeaScript_GetLevelIntSetting("gravity", &gravity));
+	PangeaScript_Shutdown();
+	system("rm -rf Data");
+}
+
+typedef struct ActivationObject
+{
+	bool active;
+	bool collisionRequested;
+	int changes;
+} ActivationObject;
+
+static bool activation_get_position(void* nativeObject, PangeaScriptVector3* outPosition)
+{
+	(void)nativeObject;
+	*outPosition = (PangeaScriptVector3){0};
+	return true;
+}
+
+static bool activation_get_active(void* nativeObject, bool* outActive)
+{
+	*outActive = ((ActivationObject*)nativeObject)->active;
+	return true;
+}
+
+static bool activation_set_active(void* nativeObject, bool active)
+{
+	ActivationObject* object = nativeObject;
+	object->active = active;
+	object->changes++;
+	return true;
+}
+
+static bool activation_get_collision(void* nativeObject, bool* outEnabled)
+{
+	ActivationObject* object = nativeObject;
+	*outEnabled = object->active && object->collisionRequested;
+	return true;
+}
+
+static bool activation_set_collision(void* nativeObject, bool enabled)
+{
+	((ActivationObject*)nativeObject)->collisionRequested = enabled;
+	return true;
+}
+
+static void test_inactive_collision_and_activation_capabilities(void)
+{
+	const PangeaScriptGameInfo game = {.gameId = "activation", .gameName = "Activation"};
+	assert(PangeaScript_Init(&game) == PANGEA_SCRIPT_OK);
+	ActivationObject object = {.active = true, .collisionRequested = true};
+	const PangeaScriptObjectOps ops = {
+		.getPosition = activation_get_position,
+		.getActive = activation_get_active, .setActive = activation_set_active,
+		.getCollisionEnabled = activation_get_collision, .setCollisionEnabled = activation_set_collision,
+	};
+	PangeaScriptObjectRegistration registration = {
+		.nativeObject = &object, .ops = &ops, .capabilityLevel = PANGEA_SCRIPT_CAPABILITY_READ_ONLY,
+	};
+	PangeaScriptObjectHandle handle;
+	assert(PangeaScript_RegisterObject(&registration, &handle) == PANGEA_SCRIPT_OK);
+	assert(!PangeaScript_SetObjectActive(handle, false));
+	assert(!PangeaScript_SetObjectActive(handle, true));
+	assert(object.active && object.changes == 0);
+	registration.capabilityLevel = PANGEA_SCRIPT_CAPABILITY_BASE;
+	assert(PangeaScript_RegisterObject(&registration, &handle) == PANGEA_SCRIPT_OK);
+	bool active = false, collision = false;
+	assert(PangeaScript_SetObjectActive(handle, false));
+	assert(PangeaScript_GetObjectActive(handle, &active) && !active);
+	assert(PangeaScript_GetObjectCollisionEnabled(handle, &collision) && !collision);
+	assert(PangeaScript_SetObjectCollisionEnabled(handle, false));
+	assert(PangeaScript_SetObjectActive(handle, true));
+	assert(PangeaScript_GetObjectActive(handle, &active) && active);
+	assert(PangeaScript_GetObjectCollisionEnabled(handle, &collision) && !collision);
+	assert(PangeaScript_SetObjectActive(handle, false));
+	assert(PangeaScript_SetObjectCollisionEnabled(handle, true));
+	assert(PangeaScript_GetObjectCollisionEnabled(handle, &collision) && !collision);
+	assert(PangeaScript_SetObjectActive(handle, true));
+	assert(PangeaScript_GetObjectCollisionEnabled(handle, &collision) && collision);
+	assert(PangeaScript_UnregisterObject(handle));
+	assert(!PangeaScript_GetObjectActive(handle, &active));
+	assert(!PangeaScript_SetObjectCollisionEnabled(handle, true));
+	PangeaScript_Shutdown();
+}
+
 int main(void)
 {
 	printf("========================================\n");
 	printf(" Running Native PangeaScript Unit Tests \n");
 	printf("========================================\n");
 
+	test_inactive_collision_and_activation_capabilities();
+	test_level_module_selection();
+	test_rejected_path_preserves_transport();
+	test_owned_native_cleanup();
 	test_large_native_item_registry();
 	test_capability_gates();
 	test_config_parsing_and_sandbox();

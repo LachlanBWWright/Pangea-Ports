@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <limits.h>
 #include <string.h>
 
 #ifdef __EMSCRIPTEN__
@@ -349,8 +350,13 @@ static bool BugdomScript_SetObjectScale(void* nativeObject, float scale)
 static bool BugdomScript_SetObjectCollisionEnabled(void* nativeObject, bool enabled)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive)) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || obj->ScriptDeleteRequested) return false;
+	if (obj->ScriptActiveStateInitialized && !obj->ScriptActive)
+	{
+		if (enabled) obj->ScriptInactiveStatusBits &= ~STATUS_BIT_NOCOLLISION;
+		else obj->ScriptInactiveStatusBits |= STATUS_BIT_NOCOLLISION;
+	}
+	else if (enabled) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
 	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
 	return true;
 }
@@ -393,12 +399,20 @@ static bool BugdomScript_GetObjectDamage(void* nativeObject, float* outDamage)
 static bool BugdomScript_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (!obj->ScriptDefinitionID[0]) return true;
+	const uint32_t mask = STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || obj->ScriptDeleteRequested) return false;
+	if (obj->ScriptActiveStateInitialized && obj->ScriptActive == active) return true;
+	if (!active)
+	{
+		obj->ScriptInactiveStatusBits = obj->StatusBits & mask;
+		obj->StatusBits |= mask;
+	}
+	else if (obj->ScriptActiveStateInitialized)
+	{
+		obj->StatusBits = (obj->StatusBits & ~mask) | obj->ScriptInactiveStatusBits;
+	}
 	obj->ScriptActiveStateInitialized = true;
 	obj->ScriptActive = active;
-	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
 	return true;
 }
 
@@ -1375,7 +1389,7 @@ static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 
 static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
 {
-	if (playerNum != 0 || lives < 0 || !gPlayerObj)
+	if (playerNum != 0 || lives < 0 || lives > SHRT_MAX || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gNumLives = (short) lives;
 	return PANGEA_SCRIPT_OK;
