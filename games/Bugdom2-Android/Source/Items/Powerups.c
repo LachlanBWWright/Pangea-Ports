@@ -438,6 +438,7 @@ Boolean DoTrig_Powerup(ObjNode *pow, ObjNode *who, Byte sideBits)
 	if (!Bugdom2Script_OnPickupCollected(pow, who, pow->POWKind, pow->POWKind == POW_KIND_HEALTH ? .15f : 1.0f, "bugdom2.powerup"))
 		return(false);
 #endif
+	if (!AllowNativeGameplayRules()) return false;
 
 	switch(pow->POWKind)
 	{

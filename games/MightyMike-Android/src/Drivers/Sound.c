@@ -11,6 +11,7 @@
 #include "myglobals.h"
 #include "misc.h"
 #include "sound2.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include "io.h"
 #include "input.h"
 #include "externs.h"
@@ -123,6 +124,54 @@ static long GetSoundChannelInitializationParameters(void)
 
 	return initBits;
 }
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+static bool ScriptEffectLoaded(int effect)
+{
+	return effect>=0 && effect<gNumEffectsLoaded && EffectHandles[effect];
+}
+
+static int PlayScriptSound(int effect, const PangeaPresentationOptions* options)
+{
+	if (!gGamePrefs.soundEffects || !ScriptEffectLoaded(effect)) return -1;
+	long offset;
+	if (GetSoundHeaderOffset(EffectHandles[effect],&offset)!=noErr) return -1;
+	int channel;
+	for (channel=1; channel<gMaxChannels; channel++)
+	{
+		SCStatus status;
+		if (SndChannelStatus(gSndChannel[channel],sizeof(status),&status)==noErr && !status.scChannelBusy) break;
+	}
+	if (channel>=gMaxChannels) return -1;
+
+	SndCommand commands[]={
+		{.cmd=flushCmd},
+		{.cmd=quietCmd},
+		{.cmd=soundCmd,.ptr=(Ptr)*EffectHandles[effect]+offset},
+		{.cmd=rateMultiplierCmd,.param2=(long)(65536.0f*options->pitch)},
+		{.cmd=ampCmd,.param1=(short)(gVolume*options->volume)},
+		{.cmd=freqCmd,.param2=kMiddleC},
+	};
+	for (size_t i=0; i<sizeof(commands)/sizeof(commands[0]); i++)
+	{
+		if (SndDoImmediate(gSndChannel[channel],&commands[i])==noErr) continue;
+		SndCommand quiet={.cmd=quietCmd};
+		SndDoImmediate(gSndChannel[channel],&quiet);
+		gSndLastEffectInChannel[channel]=-1;
+		return -1;
+	}
+	// Script voices never replace an active native effect or the music channel.
+	gSndLastEffectInChannel[channel]=(short)effect;
+	ScriptPresentation_ChannelStarted(channel);
+	return channel;
+}
+
+#define SCRIPT_AUDIO_PLAY_CUSTOM(effect, options) PlayScriptSound(effect, options)
+#define SCRIPT_AUDIO_EFFECT_LOADED(effect) ScriptEffectLoaded(effect)
+#define SCRIPT_CHANNEL_EFFECT(channel) gSndLastEffectInChannel[channel]
+#define SCRIPT_STOP_CHANNEL(channel) StopAChannel(channel)
+#include "pangea_presentation_audio.inc"
+#endif
 
 void InitSoundTools(void)
 {
@@ -397,6 +446,9 @@ OSErr	myErr;
 got_chan:
 	gSndEffectLastPlayedInChannel[soundNum] = theChan;
 	gSndLastEffectInChannel[theChan] = soundNum;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	ScriptPresentation_ChannelStarted(theChan);
+#endif
 
 					/* GET IT GOING */
 
@@ -421,6 +473,14 @@ got_chan:
 	mySndCmd.cmd = soundCmd;								// install sample in the channel
 	mySndCmd.param1 = 0;
 	mySndCmd.ptr = (Ptr)*EffectHandles[soundNum]+offset;	// pointer to SoundHeader
+	myErr = SndDoImmediate(chanPtr, &mySndCmd);
+	if (myErr)
+		ShowSystemErr(myErr);
+
+	// A native effect may reuse a channel whose scripted voice changed its pitch.
+	mySndCmd.cmd = rateMultiplierCmd;
+	mySndCmd.param1 = 0;
+	mySndCmd.param2 = 0x10000;
 	myErr = SndDoImmediate(chanPtr, &mySndCmd);
 	if (myErr)
 		ShowSystemErr(myErr);

@@ -17,6 +17,12 @@ extern "C"
 
 #include "version.h"
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool BugdomScript_NativeRulesEnabled(void);
+#else
+static inline bool BugdomScript_NativeRulesEnabled(void) { return true; }
+#endif
+
 #ifndef PANGEA_ENABLE_SCRIPTING
 void BugdomScript_RegisterObject(void* obj, const char* nativeId, const char* category);
 #endif
@@ -214,6 +220,7 @@ extern	short						gNumEnemyOfKind[];
 extern	short						gNumGoldClovers;
 extern	short						gNumGreenClovers;
 extern	short						gNumLadyBugsThisArea;
+extern short gNumLadyBugsOnThisLevel;
 extern	short						gNumLives;
 extern	short						gNumObjectsInGroupList[MAX_3DMF_GROUPS];
 extern	short						gNumTerrainItems;
@@ -237,6 +244,22 @@ extern	Boolean					GetLevelMetadataBool(const char *key, Boolean fallback);
 extern	Boolean					LevelMetadataProfileIs(const char *key, const char *profile, Boolean fallback);
 extern	int						LevelMetadataCaseFor(const char *key, int fallback);
 extern	void					PrepareLevelMetadata(void);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool BugdomScript_CompleteNativeObjective(void);
+bool BugdomScript_OwnedRuleTrigger(ObjNode* object, ObjNode* player, Byte sides, const char* id);
+#else
+static inline bool BugdomScript_OwnedRuleTrigger(ObjNode* object, ObjNode* player, Byte sides, const char* id)
+{
+	(void)object; (void)player; (void)sides; (void)id;
+	return false;
+}
+static inline bool BugdomScript_CompleteNativeObjective(void)
+{
+	gAreaCompleted = true;
+	return true;
+}
+#endif
 
 #ifdef __cplusplus
 };

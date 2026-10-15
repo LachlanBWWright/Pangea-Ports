@@ -135,14 +135,18 @@ static void MoveMyBuddy(ObjNode *theNode)
 
 void SeeIfLaunchBuddyBug(void)
 {
-ObjNode	*buddy;
-int		i;
-
 	if (!IsNeedDown(kNeed_LaunchBuddy))							// see if do it
 		return;
+	(void)LaunchBuddyBug();
+}
+
+Boolean LaunchBuddyBug(void)
+{
+ObjNode* buddy;
+int i;
 
 	if (gPlayerInfo.numBuddyBugs == 0)								// see if have any buddies
-		return;
+		return false;
 
 	i = --gPlayerInfo.numBuddyBugs;									// dec count
 
@@ -154,6 +158,7 @@ int		i;
 		buddy->Mode = BUDDY_MODE_ATTACK;
 		PlayEffect3D(EFFECT_BUDDYLAUNCH, &buddy->Coord);
 	}
+	return buddy != nil;
 }
 
 

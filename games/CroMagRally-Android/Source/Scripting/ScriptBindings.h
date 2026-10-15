@@ -1,4 +1,5 @@
 #pragma once
+#include <stdbool.h>
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 
@@ -46,3 +47,12 @@ void CroMagScript_OnCustomTrigger(ObjNode* trigger, ObjNode* who, Byte sideBits)
 
 
 #endif
+
+static inline bool CroMagScript_NativeRulesEnabled(void)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	return !PangeaScript_RulesAreScriptControlled();
+#else
+	return true;
+#endif
+}

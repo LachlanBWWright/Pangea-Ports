@@ -129,7 +129,7 @@ ObjNode	*hitObj;
 			else
 			if (ctype & CTYPE_PLAYER)
 			{
-				PlayerGotHurt(hitObj,theEnemy->Damage, true, false);
+				PlayerGotHurtFromSource(hitObj, theEnemy, PLAYER_DAMAGE_CONTACT, theEnemy->Damage, true, false);
 			}
 		}
 	}

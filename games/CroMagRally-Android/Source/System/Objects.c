@@ -396,6 +396,20 @@ MOMatrixObject			*transObject;
 
 /*******************************  MOVE OBJECTS **************************/
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+static bool IsDispatchObjectLive(ObjNode* object, PangeaScriptObjectHandle handle)
+{
+	if (handle.id)
+	{
+		void* native = NULL;
+		return PangeaScript_GetObjectNativeObject(handle, &native) && native == object;
+	}
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+		if (node == object) return true;
+	return false;
+}
+#endif
+
 void MoveObjects(void)
 {
 ObjNode		*thisNodePtr;
@@ -418,22 +432,36 @@ ObjNode		*thisNodePtr;
 
 		KeepOldCollisionBoxes(thisNodePtr);					// keep old boxes & other stuff
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScriptObjectHandle scriptHandle = {thisNodePtr->ScriptObjectID, (uint32_t)thisNodePtr->ScriptObjectGeneration};
+#endif
 
 				/* UPDATE ANIMATION */
 
 		if (thisNodePtr->Skeleton != nil)
 			UpdateSkeletonAnimation(thisNodePtr);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!IsDispatchObjectLive(thisNodePtr, scriptHandle))
+			goto next;
+#endif
+
 
 					/* NEXT TRY TO MOVE IT */
 
-		if ((!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE)) &&	(thisNodePtr->MoveCall != nil))
+		Boolean scriptControlled = false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+		scriptControlled = PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){
+			thisNodePtr->ScriptObjectID, (uint32_t)thisNodePtr->ScriptObjectGeneration});
+#endif
+		if (!scriptControlled && (!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE)) && (thisNodePtr->MoveCall != nil))
 		{
 			thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+		if (IsDispatchObjectLive(thisNodePtr, scriptHandle) && thisNodePtr->ScriptObjectID &&
+			!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE))
 			CroMagScript_RunObjectFrame(thisNodePtr);
 #endif
 

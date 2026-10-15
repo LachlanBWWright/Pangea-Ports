@@ -79,6 +79,7 @@ OGLRect TextMesh_GetExtents(ObjNode* textNode);
 void TextMesh_DrawExtents(ObjNode* textNode);
 
 void Atlas_ImmediateDraw(int groupNum, const char* text, uint32_t flags);
+bool Atlas_MeasureString(int groupNum, const char* text, uint32_t flags, float* width, float* height);
 
 void Atlas_DrawString2(
 	int groupNum,

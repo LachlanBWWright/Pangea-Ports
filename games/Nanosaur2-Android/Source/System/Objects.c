@@ -462,6 +462,25 @@ MOMatrixObject			*transObject;
 
 /*******************************  MOVE OBJECTS **************************/
 
+static Boolean IsLiveObject(ObjNode* object, uint32_t cookie, uint32_t scriptID, uint32_t generation)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (scriptID)
+	{
+		void* nativeObject = NULL;
+		if (!PangeaScript_GetObjectNativeObject((PangeaScriptObjectHandle){scriptID, generation}, &nativeObject) || nativeObject != object)
+			return false;
+		return object->Cookie == cookie && object->CType != INVALID_NODE_FLAG;
+	}
+#else
+	(void)scriptID;
+	(void)generation;
+#endif
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+		if (node == object) return node->Cookie == cookie && node->CType != INVALID_NODE_FLAG;
+	return false;
+}
+
 void MoveObjects(void)
 {
 ObjNode		*thisNodePtr;
@@ -475,6 +494,8 @@ ObjNode		*thisNodePtr;
 	{
 				/* VERIFY NODE */
 
+		uint32_t cookie = thisNodePtr->Cookie;
+		uint32_t scriptID = thisNodePtr->ScriptObjectID, generation = thisNodePtr->ScriptObjectGeneration;
 		if (thisNodePtr->CType == INVALID_NODE_FLAG)
 			DoFatalAlert("MoveObjects: CType == INVALID_NODE_FLAG");
 
@@ -486,6 +507,14 @@ ObjNode		*thisNodePtr;
 
 		if (gGamePaused && !(thisNodePtr->StatusBits & STATUS_BIT_MOVEINPAUSE))
 			goto next;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->ScriptActiveStateInitialized && !thisNodePtr->ScriptActive)
+		{
+			if (thisNodePtr->ScriptDeleteRequested) DeleteObject(thisNodePtr);
+			goto next;
+		}
+#endif
 
 
 				/* UPDATE SKELETON ANIMATION */
@@ -501,14 +530,19 @@ ObjNode		*thisNodePtr;
 			if ((!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE)) &&	(thisNodePtr->MoveCall != nil))
 			{
 				KeepOldCollisionBoxes(thisNodePtr);					// keep old boxes & other stuff
-				thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){thisNodePtr->ScriptObjectID, thisNodePtr->ScriptObjectGeneration}))
+#endif
+					thisNodePtr->MoveCall(thisNodePtr);
 			}
 		}
 
+		if (!IsLiveObject(thisNodePtr, cookie, scriptID, generation)) goto next;
 #ifdef PANGEA_ENABLE_SCRIPTING
 		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
 			Nanosaur2Script_RunObjectFrame(thisNodePtr);
 #endif
+		if (!IsLiveObject(thisNodePtr, cookie, scriptID, generation)) goto next;
 
 
 				/* UPDATE SKELETON'S MESH */
@@ -1409,6 +1443,7 @@ int		i;
 
 	if (theNode->Destructor)
 		theNode->Destructor(theNode);
+	ClearEggObjectReferences(theNode);
 
 			/* RECURSIVE DELETE OF CHAIN NODE & SHADOW NODE */
 			//

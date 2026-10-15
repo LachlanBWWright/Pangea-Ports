@@ -245,8 +245,6 @@ exit:
 
 void CheckFireWeapon(void)
 {
-Boolean		shotFlag;
-
 
 				/* CHECK WEAPON SELECTION */
 
@@ -256,10 +254,16 @@ Boolean		shotFlag;
 		SelectNextWeapon(-1);
 
 
-	if (gCurrentWeaponType != NO_WEAPON)
-		shotFlag = gWeaponShootTable[gCurrentWeaponType]();	// call shoot routine
-	else
-		shotFlag = false;
+	MikeWeapon_Fire();
+}
+
+Boolean MikeWeapon_Fire(void)
+{
+	if (gCurrentWeaponType >= NUM_WEAPON_TYPES || gCurrentWeaponIndex >= gNumWeaponsIHave
+		|| gMyWeapons[gCurrentWeaponIndex].type != gCurrentWeaponType
+		|| gMyWeapons[gCurrentWeaponIndex].life == 0)
+		return false;
+	Boolean shotFlag = gWeaponShootTable[gCurrentWeaponType]();
 
 
 				/* DECREASE WEAPON LIFE */
@@ -271,7 +275,25 @@ Boolean		shotFlag;
 		else														// weapon is empty
 			RemoveCurrentWeaponFromInventory();
 	}
+	return shotFlag;
 }
+
+static Boolean gScriptAttackRequested;
+
+Boolean MikeWeapon_AttackRequested(Boolean edge)
+{
+	return gScriptAttackRequested || (edge ? GetNewNeedState(kNeed_Attack) : GetNeedState(kNeed_Attack));
+}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+Boolean MikeWeapon_FireFromScript(void)
+{
+	gScriptAttackRequested = true;
+	Boolean fired = MikeWeapon_Fire();
+	gScriptAttackRequested = false;
+	return fired;
+}
+#endif
 
 
 /***************** SELECT NEXT WEAPON *****************/
@@ -627,7 +649,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 			/* SEE WHICH WAY TO MAKE IT GO */
@@ -695,7 +717,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 
@@ -816,7 +838,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNeedState(kNeed_Attack))						// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(false))
 		return(false);
 
 	if (gFrames & 0b1)								// see if good interval
@@ -891,7 +913,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 	
@@ -971,7 +993,7 @@ Byte	animNum;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNeedState(kNeed_Attack))						// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(false))
 		return(false);
 
 			/* SEE WHICH WAY TO MAKE IT GO */

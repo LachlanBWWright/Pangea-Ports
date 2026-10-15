@@ -11,6 +11,9 @@
 
 #include "game.h"
 #include "profiling.h"
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "ScriptBindings.h"
+#endif
 
 
 /****************************/
@@ -84,6 +87,7 @@ float			gFuel;
 float			gTimeRemaining;
 ObjNode			*gCompassObj = nil;
 short			gRecoveredEggs[NUM_EGG_SPECIES];
+short			gRequiredEggs[NUM_EGG_SPECIES] = {1, 1, 1, 1, 1};
 
 static GWorldPtr gGPSGWorld = nil,gGPSFullImage = nil;
 static	ObjNode 	*gGPSObj;
@@ -105,7 +109,10 @@ short	i;
 	gOldTime = 1000000000;
 	
 	for (i=0; i < NUM_EGG_SPECIES; i++)
+	{
 		gRecoveredEggs[i] = 0;
+		gRequiredEggs[i] = 1;
+	}
 }
 
 
@@ -837,6 +844,9 @@ Boolean					forceUpdate = false;
 
 void DecAsteroidTimer(void)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (PangeaScript_RulesAreScriptControlled()) return;
+#endif
 			/* DEC TIMER & SEE IF DONE */
 			
 	if (gTimeRemaining <= 0.0f)								// see if done

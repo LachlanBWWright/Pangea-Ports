@@ -20,6 +20,17 @@ typedef struct
 static GLuint gFontTexture = 0;
 static float gLineHeight = 0;
 static AtlasGlyph gAtlasGlyphs[MAX_CODEPOINTS];
+static bool gAtlasGlyphAvailable[MAX_CODEPOINTS];
+
+static unsigned char ResolveGlyph(unsigned char character)
+{
+	return gAtlasGlyphAvailable[character] ? character : '?';
+}
+
+bool TextMesh_IsAvailable(void)
+{
+	return gFontTexture != 0 && gAtlasGlyphAvailable['?'];
+}
 
 static const TextMeshDef gDefaultTextMeshDef =
 {
@@ -67,7 +78,7 @@ TQ3TriMeshData* TextMesh_SetMesh(const TextMeshDef* def, const char* text, TQ3Tr
 		if (*c == '\n')		// TODO: line widths for strings containing line breaks aren't supported yet
 			continue;
 
-		const AtlasGlyph g = gAtlasGlyphs[(uint8_t) *c];
+		const AtlasGlyph g = gAtlasGlyphs[ResolveGlyph((uint8_t) *c)];
 		lineWidth += g.xadv + spacing;
 		if (*c != ' ')
 			numQuads++;
@@ -114,7 +125,7 @@ TQ3TriMeshData* TextMesh_SetMesh(const TextMeshDef* def, const char* text, TQ3Tr
 			continue;
 		}
 
-		const AtlasGlyph g = gAtlasGlyphs[(uint8_t) *c];
+		const AtlasGlyph g = gAtlasGlyphs[ResolveGlyph((uint8_t) *c)];
 
 		if (*c == ' ')
 		{
@@ -223,6 +234,7 @@ static void ParseSFL(const char* data)
 		GAME_ASSERT(codepoint < MAX_CODEPOINTS);
 
 		gAtlasGlyphs[codepoint] = g;
+		gAtlasGlyphAvailable[codepoint] = true;
 
 		SkipLine(&data);
 	}
@@ -231,6 +243,8 @@ static void ParseSFL(const char* data)
 void TextMesh_Init(void)
 {
 	OSErr err;
+	SDL_memset(gAtlasGlyphs, 0, sizeof(gAtlasGlyphs));
+	SDL_memset(gAtlasGlyphAvailable, 0, sizeof(gAtlasGlyphAvailable));
 
 	gFontTexture = QD3D_LoadTextureFile(3000, kRendererTextureFlags_GrayscaleIsAlpha);
 

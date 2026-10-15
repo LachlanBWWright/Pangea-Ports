@@ -311,6 +311,7 @@ struct ObjNode
 	Boolean			ScriptAnimationCompletionSent;
 	Boolean			ScriptActiveStateInitialized;
 	Boolean			ScriptActive;
+	uint32_t		ScriptSuspendedStatusBits;
 	Boolean			ScriptDeleteRequested;
 	Boolean			ScriptStreamOutSent;
 	

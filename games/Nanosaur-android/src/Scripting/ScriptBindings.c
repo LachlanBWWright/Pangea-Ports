@@ -1,6 +1,7 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "game.h"
+#include "pangea_presentation_game.h"
 #include "ScriptBindings.h"
 
 #include "structs.h"
@@ -8,6 +9,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <limits.h>
 
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
@@ -17,6 +19,7 @@ static TerrainItemEntryType gScriptTerrainItems[256];
 static bool gScriptTerrainItemOccupied[256];
 static bool gScriptTerrainItemReclaimable[256];
 static int gScriptStartupRetryFrames;
+static float gScriptLevelTime;
 
 static TerrainItemEntryType* AcquireScriptTerrainItem(void)
 {
@@ -50,6 +53,7 @@ static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, floa
 }
 
 static PangeaScriptFrameContext gScriptFrameContext;
+#include "ScriptNativeTransition.inc"
 
 static PangeaScriptStatus gLastTerrainReplacementStatus = PANGEA_SCRIPT_OK;
 
@@ -225,12 +229,48 @@ static bool NanosaurScript_GetObjectPosition(void* nativeObject, PangeaScriptVec
 static bool NanosaurScript_SetObjectPosition(void* nativeObject, const PangeaScriptVector3* position)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !position || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || !position || obj->CType == INVALID_NODE_FLAG || obj->NumCollisionBoxes > MAX_BOXES_PER_OBJNODE
+		|| !isfinite(position->x) || !isfinite(position->y) || !isfinite(position->z)
+		|| !isfinite(obj->Coord.x) || !isfinite(obj->Coord.y) || !isfinite(obj->Coord.z))
 		return false;
-
+	CollisionBoxType movedBoxes[MAX_BOXES_PER_OBJNODE];
+	for (int i = 0; i < obj->NumCollisionBoxes; i++)
+	{
+		const CollisionBoxType* box = &obj->CollisionBoxes[i];
+		// Native collision boxes use integer coordinates; preserve accumulated sub-unit motion.
+		double dx = trunc(position->x) - trunc(obj->Coord.x), dy = trunc(position->y) - trunc(obj->Coord.y), dz = trunc(position->z) - trunc(obj->Coord.z);
+		double coordinates[] = {box->left + dx, box->right + dx, box->bottom + dy, box->top + dy, box->back + dz, box->front + dz};
+		for (int side = 0; side < 6; side++)
+			if (!isfinite(coordinates[side]) || coordinates[side] <= (double)LONG_MIN || coordinates[side] >= (double)LONG_MAX) return false;
+		movedBoxes[i] = *box;
+		movedBoxes[i].left = (long)coordinates[0]; movedBoxes[i].right = (long)coordinates[1];
+		movedBoxes[i].bottom = (long)coordinates[2]; movedBoxes[i].top = (long)coordinates[3];
+		movedBoxes[i].back = (long)coordinates[4]; movedBoxes[i].front = (long)coordinates[5];
+	}
 	obj->Coord.x = position->x;
 	obj->Coord.y = position->y;
 	obj->Coord.z = position->z;
+	if (obj == gPlayerObj) gMyCoord = obj->Coord;
+	memcpy(obj->CollisionBoxes, movedBoxes, obj->NumCollisionBoxes * sizeof(movedBoxes[0]));
+	UpdateObjectTransforms(obj);
+	return true;
+}
+
+static bool NanosaurScript_GetObjectBounds(void* nativeObject, PangeaScriptBounds* output)
+{
+	const ObjNode* obj = nativeObject;
+	if (!obj || !output || obj->CType == INVALID_NODE_FLAG || obj->NumCollisionBoxes == 0 || obj->NumCollisionBoxes > MAX_BOXES_PER_OBJNODE) return false;
+	PangeaScriptBounds bounds = {.min = {INFINITY, INFINITY, INFINITY}, .max = {-INFINITY, -INFINITY, -INFINITY}};
+	for (int i = 0; i < obj->NumCollisionBoxes; i++)
+	{
+		const CollisionBoxType* box = &obj->CollisionBoxes[i];
+		if (box->left > box->right || box->bottom > box->top || box->back > box->front) return false;
+		bounds.min.x = fminf(bounds.min.x, box->left); bounds.max.x = fmaxf(bounds.max.x, box->right);
+		bounds.min.y = fminf(bounds.min.y, box->bottom); bounds.max.y = fmaxf(bounds.max.y, box->top);
+		bounds.min.z = fminf(bounds.min.z, box->back); bounds.max.z = fmaxf(bounds.max.z, box->front);
+	}
+	if (!isfinite(bounds.min.x) || !isfinite(bounds.min.y) || !isfinite(bounds.min.z) || !isfinite(bounds.max.x) || !isfinite(bounds.max.y) || !isfinite(bounds.max.z)) return false;
+	*output = bounds;
 	return true;
 }
 
@@ -297,6 +337,11 @@ static bool NanosaurScript_SetObjectCollisionEnabled(void* nativeObject, bool en
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+	if (obj->ScriptActiveStateInitialized && !obj->ScriptActive)
+	{
+		if (enabled) obj->ScriptInactiveSavedStatus &= ~STATUS_BIT_NOCOLLISION;
+		else obj->ScriptInactiveSavedStatus |= STATUS_BIT_NOCOLLISION;
+	}
 	if (enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive)) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
 	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
 	return true;
@@ -324,7 +369,7 @@ static bool NanosaurScript_GetObjectHealth(void* nativeObject, float* outHealth)
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
 		return false;
-	*outHealth = obj->Health;
+	*outHealth = obj == gPlayerObj ? gMyHealth : obj->Health;
 	return true;
 }
 
@@ -337,15 +382,34 @@ static bool NanosaurScript_GetObjectDamage(void* nativeObject, float* outDamage)
 	return true;
 }
 
+static bool NanosaurScript_SetObjectHealth(void* nativeObject, float health)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(health) || health < 0.0f) return false;
+	obj->Health = health;
+	if (obj == gPlayerObj) { gMyHealth = health; gInfobarUpdateBits |= UPDATE_HEALTH; }
+	return true;
+}
+
+static bool NanosaurScript_SetObjectDamage(void* nativeObject, float damage)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(damage) || damage < 0.0f) return false;
+	obj->Damage = damage;
+	return true;
+}
+
 static bool NanosaurScript_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (!obj->ScriptDefinitionID[0]) return true;
+	if (active && !obj->ScriptActiveStateInitialized) return true;
+	if (obj->ScriptActiveStateInitialized && obj->ScriptActive == active) return true;
+	if (!active) obj->ScriptInactiveSavedStatus = obj->StatusBits & (STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE);
 	obj->ScriptActiveStateInitialized = true;
 	obj->ScriptActive = active;
-	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	if (active) obj->StatusBits = (obj->StatusBits & ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE)) | obj->ScriptInactiveSavedStatus;
+	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE;
 	return true;
 }
 
@@ -434,6 +498,16 @@ static bool NanosaurScript_DeleteObject(void* nativeObject)
 	return true;
 }
 
+static bool NanosaurScript_GetJointPosition(void* nativeObject, int joint, PangeaScriptVector3* output)
+{
+	ObjNode* node = nativeObject;
+	if (!node || !output || !node->Skeleton || !node->Skeleton->skeletonDefinition || joint < 0 || joint >= node->Skeleton->skeletonDefinition->NumBones) return false;
+	TQ3Point3D origin = {0}, position;
+	FindCoordOnJoint(node, joint, &origin, &position);
+	*output = (PangeaScriptVector3){position.x, position.y, position.z};
+	return true;
+}
+
 static const PangeaScriptObjectOps kNanosaurPlayerObjectOps =
 {
 	.getPosition = NanosaurScript_GetObjectPosition,
@@ -443,9 +517,13 @@ static const PangeaScriptObjectOps kNanosaurPlayerObjectOps =
 	.getAnimation = NanosaurScript_GetObjectAnimation,
 	.getAnimationSpeed = NanosaurScript_GetObjectAnimationSpeed,
 	.getAnimationFrame = NanosaurScript_GetObjectAnimationFrame,
+	.getJointPosition = NanosaurScript_GetJointPosition,
+	.getBounds = NanosaurScript_GetObjectBounds,
 	.getActive = NanosaurScript_GetObjectActive,
 	.getHealth = NanosaurScript_GetObjectHealth,
 	.getDamage = NanosaurScript_GetObjectDamage,
+	.setHealth = NanosaurScript_SetObjectHealth,
+	.setDamage = NanosaurScript_SetObjectDamage,
 	.setPosition = NanosaurScript_SetObjectPosition,
 	.setVelocity = NanosaurScript_SetObjectVelocity,
 	.setRotation = NanosaurScript_SetObjectRotation,
@@ -484,8 +562,10 @@ void NanosaurScript_RegisterObject(ObjNode* obj, const char* nativeId, const cha
 	if (!obj)
 		return;
 
-	if (obj->ScriptObjectID > 0)
+	if (obj->ScriptObjectID > 0 && PangeaScript_ObjectExists((PangeaScriptObjectHandle){obj->ScriptObjectID, obj->ScriptObjectGeneration}))
 		return;
+	obj->ScriptObjectID = 0;
+	obj->ScriptObjectGeneration = 0;
 
 	if (category)
 	{
@@ -742,6 +822,7 @@ void NanosaurScript_OnDamageApplied(float damage, int cause)
 
 void NanosaurScript_OnDeath(int eventValue)
 {
+	ClearExitTransition();
 	PangeaScriptPlayerEventContext context;
 
 	if (!gPlayerObj || gPlayerObj->ScriptObjectID <= 0 || gPlayerObj->ScriptObjectGeneration <= 0)
@@ -796,7 +877,9 @@ void NanosaurScript_ApplyObjectScripting(ObjNode* obj)
 	}
 
 	UpdateObjectTransforms(obj);
-	CalcObjectBoxFromNode(obj);
+	// This native helper asserts for compound and non-colliding objects.
+	if (obj->NumCollisionBoxes == 1)
+		CalcObjectBoxFromNode(obj);
 	obj->ScriptVisualOffset = (TQ3Vector3D){0};
 	if (!result.hasPositionOffset)
 		return;
@@ -814,6 +897,14 @@ void NanosaurScript_ApplyObjectScripting(ObjNode* obj)
 
 void NanosaurScript_RunObjectFrame(ObjNode* obj)
 {
+	bool scriptControlled = PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){obj->ScriptObjectID, obj->ScriptObjectGeneration});
+	if ((obj->ScriptDefinitionID[0] || scriptControlled) && obj->TerrainItemPtr && TrackTerrainItem(obj))
+	{
+		DeleteObject(obj);
+		return;
+	}
+	if (obj->ScriptActiveStateInitialized && !obj->ScriptActive && !obj->ScriptDeleteRequested)
+		return;
 	NanosaurScript_ApplyObjectScripting(obj);
 	if (obj->CType == INVALID_NODE_FLAG)
 		return;
@@ -840,7 +931,9 @@ void NanosaurScript_RunObjectFrame(ObjNode* obj)
 
 void NanosaurScript_OnObjectDeleted(ObjNode* obj)
 {
-	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID > 0)
+	if (obj && obj->ScriptObjectID == gExitTransition.id) ClearExitTransition();
+	if (obj && obj->ScriptObjectID > 0 && (obj->ScriptDefinitionID[0] ||
+		PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){obj->ScriptObjectID, obj->ScriptObjectGeneration})))
 	{
 		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
 		if (!PangeaScript_ObjectExists(handle))
@@ -1539,7 +1632,7 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 	for (int eggType = 0; eggType < outPlayer->eggCount; eggType++)
 	{
 		outPlayer->eggs[eggType] = gRecoveredEggs[eggType];
-		outPlayer->eggRequired[eggType] = 1;
+		outPlayer->eggRequired[eggType] = gRequiredEggs[eggType];
 	}
 	outPlayer->hasEggState = true;
 	return true;
@@ -1549,9 +1642,7 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 {
 	if (playerNum != 0 || !position || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gPlayerObj->Coord = (TQ3Point3D){position->x, position->y, position->z};
-	UpdateObjectTransforms(gPlayerObj);
-	return PANGEA_SCRIPT_OK;
+	return NanosaurScript_SetObjectPosition(gPlayerObj, position) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_BAD_ARGUMENT;
 }
 
 static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScriptVector3* velocity)
@@ -1565,15 +1656,15 @@ static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 {
 	if (playerNum != 0 || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gMyHealth = health;
-	return PANGEA_SCRIPT_OK;
+	return NanosaurScript_SetObjectHealth(gPlayerObj, health) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_BAD_ARGUMENT;
 }
 
 static PangeaScriptStatus SetScriptPlayerLives(int playerNum, int lives)
 {
-	if (playerNum != 0 || lives < 0 || !gPlayerObj)
+	if (playerNum != 0 || lives < 0 || lives > SHRT_MAX || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gNumLives = (short) lives;
+	gInfobarUpdateBits |= UPDATE_LIVES;
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -1584,6 +1675,7 @@ static PangeaScriptStatus SetScriptPlayerWeaponQuantity(int playerNum, int weapo
 	gWeaponInventory[weaponType] = (short) quantity;
 	if (quantity > 0)
 		gCurrentAttackMode = (Byte) weaponType;
+	gInfobarUpdateBits |= UPDATE_WEAPONICON;
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -1592,6 +1684,7 @@ static PangeaScriptStatus SetScriptPlayerScore(int playerNum, int64_t score)
 	if (playerNum != 0 || score < 0 || score > UINT32_MAX || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gScore = (uint32_t) score;
+	gInfobarUpdateBits |= UPDATE_SCORE;
 	return PANGEA_SCRIPT_OK;
 }
 
@@ -1604,18 +1697,114 @@ static PangeaScriptStatus SetScriptPlayerShieldActive(int playerNum, bool active
 
 static PangeaScriptStatus SetScriptPlayerInvulnerable(int playerNum, float durationSeconds)
 {
-	if (playerNum != 0 || durationSeconds < 0.0f || !gPlayerObj)
+	if (playerNum != 0 || !isfinite(durationSeconds) || durationSeconds < 0.0f || !gPlayerObj)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	gPlayerObj->InvincibleTimer = durationSeconds;
 	return PANGEA_SCRIPT_OK;
 }
 
+static bool GetScriptInput(int playerNum, PangeaScriptInputSnapshot* output)
+{
+	static const struct { const char* name; int need; } actions[] = {
+		{"forward", kNeed_Forward}, {"backward", kNeed_Backward},
+		{"turnLeft", kNeed_TurnLeft}, {"turnRight", kNeed_TurnRight},
+		{"jump", kNeed_Jump}, {"attack", kNeed_Attack},
+		{"previousWeapon", kNeed_PrevWeapon}, {"nextWeapon", kNeed_NextWeapon},
+		{"pickUp", kNeed_PickUp}, {"jetUp", kNeed_JetUp}, {"jetDown", kNeed_JetDown},
+		{"cameraLeft", kNeed_CameraLeft}, {"cameraRight", kNeed_CameraRight},
+		{"zoomIn", kNeed_ZoomIn}, {"zoomOut", kNeed_ZoomOut}, {"cameraMode", kNeed_CameraMode},
+	};
+	if (playerNum != 0 || !output || !gPlayerObj) return false;
+	*output = (PangeaScriptInputSnapshot){0};
+	output->actionCount = sizeof(actions) / sizeof(actions[0]);
+	for (int i = 0; i < output->actionCount; i++)
+		output->actions[i] = (PangeaScriptInputAction){actions[i].name, GetNeedState(actions[i].need), GetNewNeedState(actions[i].need), GetReleasedNeedState(actions[i].need)};
+	output->moveX = (float)GetNeedState(kNeed_TurnRight) - (float)GetNeedState(kNeed_TurnLeft);
+	output->moveY = (float)GetNeedState(kNeed_Forward) - (float)GetNeedState(kNeed_Backward);
+	output->lookX = (float)GetNeedState(kNeed_CameraRight) - (float)GetNeedState(kNeed_CameraLeft);
+	output->aim = (PangeaScriptVector3){-sinf(gPlayerObj->Rot.y), 0.0f, -cosf(gPlayerObj->Rot.y)};
+	output->hasAim = true;
+	return true;
+}
+
+static bool SampleScriptTerrain(float x, float z, PangeaScriptTerrainSample* output)
+{
+	if (!output || !isfinite(x) || !isfinite(z) || x < 0.0f || z < 0.0f || x >= gTerrainUnitWidth || z >= gTerrainUnitDepth) return false;
+	TQ3Vector3D savedNormal = gRecentTerrainNormal;
+	gRecentTerrainNormal = (TQ3Vector3D){0.0f, 1.0f, 0.0f};
+	float height = GetTerrainHeightAtCoord_Planar(x, z);
+	*output = (PangeaScriptTerrainSample){
+		.height = height,
+		.normal = {gRecentTerrainNormal.x, gRecentTerrainNormal.y, gRecentTerrainNormal.z},
+		.surfaceType = GetTileAttribs((long)x, (long)z),
+	};
+	gRecentTerrainNormal = savedNormal;
+	return true;
+}
+
+static bool ScriptBoundsOverlapCollisionBox(const PangeaScriptBounds* bounds, const CollisionBoxType* box)
+{
+	return box->right >= bounds->min.x && box->left <= bounds->max.x
+		&& box->top >= bounds->min.y && box->bottom <= bounds->max.y
+		&& box->front >= bounds->min.z && box->back <= bounds->max.z;
+}
+
+static bool OverlapScriptBox(const PangeaScriptBounds* bounds, unsigned int mask, PangeaScriptObjectHandle* results, int capacity, int* count)
+{
+	if (!bounds || !count || capacity < 0 || (capacity && !results)) return false;
+	*count = 0;
+	for (ObjNode* node = gFirstNodePtr; node && *count < capacity; node = node->NextNode)
+	{
+		if (!(node->CType & mask) || (node->StatusBits & STATUS_BIT_NOCOLLISION) || node->ScriptDeleteRequested) continue;
+		for (int i = 0; i < node->NumCollisionBoxes; i++)
+		{
+			const CollisionBoxType* box = &node->CollisionBoxes[i];
+			if (!ScriptBoundsOverlapCollisionBox(bounds, box)) continue;
+			if (!node->ScriptObjectID) NanosaurScript_RegisterObject(node, "nanosaur.collision-object", "collision-object");
+			if (node->ScriptObjectID) results[(*count)++] = (PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration};
+			break;
+		}
+	}
+	return true;
+}
+
+static const PangeaScriptCollisionCategory kScriptCollisionCategories[] = {
+	{"player", CTYPE_PLAYER}, {"enemy", CTYPE_ENEMY}, {"projectile", CTYPE_MYBULLET},
+	{"pickup", CTYPE_PICKUP | CTYPE_BONUS}, {"trigger", CTYPE_TRIGGER},
+	{"solid", CTYPE_MISC}, {"hazard", CTYPE_HURTME | CTYPE_HURTIFTOUCH},
+	{"portal", CTYPE_PORTAL}, {"crystal", CTYPE_CRYSTAL},
+};
+
+#include "ScriptGameplayState.inc"
+#include "ScriptPlayerOperations.inc"
+
+static const PangeaScriptGameplayOps kScriptGameplay = {
+	.getInput = GetScriptInput,
+	.sampleTerrain = SampleScriptTerrain,
+	.overlapBox = OverlapScriptBox,
+	.collisionCategories = kScriptCollisionCategories,
+	.collisionCategoryCount = sizeof(kScriptCollisionCategories) / sizeof(kScriptCollisionCategories[0]),
+	.getState = GetScriptState,
+	.setState = SetScriptState,
+	.stateFields = kScriptStateFields,
+	.stateFieldCount = sizeof(kScriptStateFields) / sizeof(kScriptStateFields[0]),
+	.complete = CompleteScriptMission,
+	.operationMask = (1u << PANGEA_SCRIPT_OP_CARRY) | (1u << PANGEA_SCRIPT_OP_DROP)
+		| (1u << PANGEA_SCRIPT_OP_FIRE) | (1u << PANGEA_SCRIPT_OP_RESPAWN)
+		| (1u << PANGEA_SCRIPT_OP_DELIVER) | (1u << PANGEA_SCRIPT_OP_RESET_CARRIED)
+		| (1u << PANGEA_SCRIPT_OP_INTERACT),
+	.runOperation = RunScriptOperation,
+	.getRelations = GetScriptRelations,
+};
+
 void NanosaurScript_Init(void)
 {
+	ScriptPresentation_Configure();
 	const PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "Nanosaur-android",
 		.gameName = "Nanosaur",
+		.gameplay = &kScriptGameplay,
 		.spawnNative = SpawnNativeItem,
 		.spawnScripted = SpawnScriptedObject,
 		.getPlayerCount = GetScriptPlayerCount,
@@ -1672,6 +1861,8 @@ static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* actio
 
 void NanosaurScript_OnLevelLoad(int levelNum)
 {
+	ClearExitTransition();
+	gScriptLevelTime = 0.0f;
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, levelNum, "onLevelLoad");
 }
 
@@ -1688,6 +1879,10 @@ void NanosaurScript_OnCheckpointReset(void)
 
 void NanosaurScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds)
 {
+	if (isfinite(deltaSeconds) && deltaSeconds > 0.0f)
+		gScriptLevelTime += deltaSeconds;
+	if (isfinite(levelTimeSeconds) && levelTimeSeconds > gScriptLevelTime)
+		gScriptLevelTime = levelTimeSeconds;
 	if (gScriptStartupRetryFrames < 120 && PangeaScript_IsEnabled() && !PangeaScript_GetStatusBundleLoaded())
 	{
 		gScriptStartupRetryFrames++;
@@ -1699,7 +1894,7 @@ void NanosaurScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSeco
 		.levelName = levelNum == LEVEL_NUM_0 ? "level1" : NULL,
 		.frameNum = frameNum,
 		.deltaSeconds = deltaSeconds,
-		.levelTimeSeconds = levelTimeSeconds,
+		.levelTimeSeconds = gScriptLevelTime,
 	};
 	NanosaurScript_CacheFrameContext(&context);
 	PangeaScript_ExpireTriggerContacts(&context);
@@ -1716,6 +1911,7 @@ void NanosaurScript_OnLevelComplete(int levelNum)
 
 void NanosaurScript_OnLevelUnload(int levelNum)
 {
+	ClearExitTransition();
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, levelNum, "onLevelUnload");
 	(void) PangeaScript_ApplyObjectLifecycleToAll(&gScriptFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	NanosaurScript_ReleaseCustomAssets();

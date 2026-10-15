@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 
 
 /****************************/
@@ -94,6 +95,13 @@ short	gAmbientEffect = -1;
 
 
 /********************* INIT SOUND TOOLS ********************/
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+#define SCRIPT_AUDIO_NANOSAUR
+#define SCRIPT_CHANNEL_EFFECT(channel) gChannelInfo[channel].effectNum
+#define SCRIPT_STOP_CHANNEL(channel) StopAChannel(&(channel))
+#include "pangea_presentation_audio.inc"
+#endif
 
 void InitSoundTools(void)
 {
@@ -544,6 +552,9 @@ OSErr	myErr;
 			/* SET MY INFO */
 			
 	gChannelInfo[theChan].effectNum = effectNum;		// remember what effect is playing on this channel
+#ifdef PANGEA_ENABLE_SCRIPTING
+	ScriptPresentation_ChannelStarted(theChan);
+#endif
 
 	return(theChan);									// return channel #	
 }

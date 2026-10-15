@@ -16,9 +16,10 @@
 #include "pangea_net.h"
 #include "pickup_sync.h"
 #include <SDL3/SDL.h>
+#include "../Scripting/ScriptBindings.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-#include "ScriptBindings.h"
+#include "pangea_presentation.h"
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -900,6 +901,22 @@ ObjNode* bigArrowhead = NULL;
 
 /**************** PLAY AREA ************************/
 
+static Boolean ShouldPauseRace(void)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	for (int player = 0; player < gNumLocalPlayers; player++)
+	{
+		if (!GetNewNeedState(kNeed_UIPause, player)) continue;
+		// A shared Escape binding belongs to the conversation until it is dismissed.
+		if (PangeaDialogue_IsActiveForPlayer(player) && GetNewNeedState(kNeed_UIBack, player)) continue;
+		return true;
+	}
+	return false;
+#else
+	return GetNewNeedStateAnyP(kNeed_UIPause);
+#endif
+}
+
 static void PlayArea(void)
 {
 	/* IF DOING NET GAME THEN WAIT FOR SYNC */
@@ -971,6 +988,9 @@ static void PlayArea(void)
 				/****************/
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, 0);
+#endif
 		MoveEverything();
 
 		if (gIsNetworkHost)
@@ -1039,7 +1059,7 @@ static void PlayArea(void)
 
 			/* SEE IF PAUSED */
 
-		if (GetNewNeedStateAnyP(kNeed_UIPause) || IsCmdQPressed())
+		if (ShouldPauseRace() || IsCmdQPressed())
 		{
 			DoPaused();
 		}
@@ -1076,7 +1096,7 @@ static void PlayArea(void)
 
 		if (!gIsSelfRunningDemo)
 		{
-			if (GetNewNeedStateAnyP(kNeed_UIPause))
+			if (ShouldPauseRace())
 				DoPaused();
 		}
 
@@ -1118,10 +1138,6 @@ static void PlayArea(void)
 #endif
 
 		gGameFrameNum++;
-#ifdef PANGEA_ENABLE_SCRIPTING
-		if (PangeaScript_IsEnabled() && !PangeaScript_IsNetworkedMode())
-			CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, (float)gGameFrameNum * gFramesPerSecondFrac);
-#endif
 
 
 				/* SEE IF TRACK IS COMPLETED */
@@ -1179,6 +1195,9 @@ void MoveEverything(void)
 
 	MoveObjects();
 	MoveSplineObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	PangeaScript_UpdateAttachments();
+#endif
 	MoveParticleGroups();
 	UpdateCameras(false, false);				// update cameras for ALL players
 	CalcPlayerPlaces();							// determinw who is in what place
@@ -1317,7 +1336,8 @@ OGLSetupInputType	viewDef;
 short				numPanes;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	if (!gNetGameInProgress)
+	PangeaScript_SetNetworkedMode(gNetGameInProgress || PangeaNetBridge_IsEnabled());
+	if (!PangeaScript_IsNetworkedMode())
 	{
 		CroMagScript_LoadTrackConfig(gTrackNum);
 		CroMagScript_OnRaceLoad(gTrackNum);
@@ -1483,6 +1503,7 @@ static void CleanupLevel(void)
 static void UpdateGameModeSpecifics(void)
 {
 short	i,t,winner;
+	if (!CroMagScript_NativeRulesEnabled()) return;
 
 	if (gTrackCompleted)										// if track is done then dont do anything
 		return;
@@ -1963,6 +1984,9 @@ void GameMain_RunFrame(void)
 
 			/* MOVE */
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, 0);
+#endif
 	MoveEverything();
 	UpdateGameModeSpecifics();
 	DoPlayerTerrainUpdate();
@@ -2007,10 +2031,6 @@ void GameMain_RunFrame(void)
 
 	CalcFramesPerSecond();
 	gGameFrameNum++;
-#ifdef PANGEA_ENABLE_SCRIPTING
-	if (PangeaScript_IsEnabled() && !PangeaScript_IsNetworkedMode())
-		CroMagScript_OnRaceFrame(gTrackNum, gGameFrameNum, gFramesPerSecondFrac, (float)gGameFrameNum * gFramesPerSecondFrac);
-#endif
 	gDisableHiccupTimer = false;
 
 			/* CHECK EXIT CONDITIONS */

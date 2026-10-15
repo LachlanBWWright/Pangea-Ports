@@ -15,10 +15,6 @@
 #include "ScriptBindings.h"
 #endif
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-#include "ScriptBindings.h"
-#endif
-
 
 /*******************/
 /*   PROTOTYPES    */
@@ -197,6 +193,9 @@ TQ3Vector3D		delta;
 
 	(void) whoNode;
 	(void) sideBits;
+
+	if (BugdomScript_OwnedRuleTrigger(theNode, whoNode, sideBits, "bugdom.checkpoint"))
+		return false;
 
 				/* TAG THE CHECKPOINT */
 
@@ -445,7 +444,9 @@ Boolean DoTrig_ExitLog(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	(void) whoNode;
 	(void) sideBits;
 
-	gAreaCompleted = true;
+	if (BugdomScript_OwnedRuleTrigger(theNode, whoNode, sideBits, "bugdom.exit-log"))
+		return false;
+	(void) BugdomScript_CompleteNativeObjective();
 	return(false);
 }
 
@@ -599,6 +600,8 @@ new_group:
 
 Boolean DoTrig_KingWaterPipe(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 {
+	if (BugdomScript_OwnedRuleTrigger(theNode, whoNode, sideBits, "bugdom.king-water-pipe"))
+		return true;
 	(void) sideBits;
 	
 	if (whoNode->Speed < 500.0f)					// must hit it with reasonable speed
@@ -753,6 +756,9 @@ static void MoveLadyBugBonus(ObjNode *box)
 Boolean KickLadyBugBox(ObjNode *cage)
 {
 ObjNode	*bug,*p0,*p1,*p2,*p3;
+
+	if (BugdomScript_OwnedRuleTrigger(cage, gPlayerObj, 0, "bugdom.ladybug-cage"))
+		return true;
 
 		/* RELEASE THE LADY BUG */
 		

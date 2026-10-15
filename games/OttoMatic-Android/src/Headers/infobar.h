@@ -51,3 +51,4 @@ void DisableHelpType(short messNum);
 void DrawInfobarSprite2(float x, float y, float size, short group, short texNum);
 
 void SetInfobarSpriteState(bool setOriginToCenterOfScreen);
+float GetUIScale(void);

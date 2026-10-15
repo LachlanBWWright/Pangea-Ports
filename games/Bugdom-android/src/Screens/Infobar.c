@@ -816,6 +816,8 @@ float	amount;
 
 void LoseBallTime(float amount)
 {
+	if (!BugdomScript_NativeRulesEnabled())
+		return;
 	gBallTimer -= amount;
 	if (gBallTimer <= 0.0f)
 	{
@@ -966,6 +968,22 @@ void UseMoney(void)
 	gInfobarUpdateBits |= UPDATE_HANDS;	
 }
 
+void BugdomScript_SetMoney(short amount)
+{
+	gMoney = amount;
+	if (amount == 0)
+	{
+		if (gLeftArmType == SPRITE_MONEY_L) gLeftArmType = SPRITE_EMPTYHAND_L;
+		if (gRightArmType == SPRITE_MONEY_R) gRightArmType = SPRITE_EMPTYHAND_R;
+	}
+	else if (gLeftArmType != SPRITE_MONEY_L && gRightArmType != SPRITE_MONEY_R)
+	{
+		if (gLeftArmType == SPRITE_EMPTYHAND_L) gLeftArmType = SPRITE_MONEY_L;
+		else if (gRightArmType == SPRITE_EMPTYHAND_R) gRightArmType = SPRITE_MONEY_R;
+	}
+	gInfobarUpdateBits |= UPDATE_HANDS;
+}
+
 
 
 /******************* DO WE HAVE ENOUGH MONEY ************************/
@@ -991,6 +1009,8 @@ Boolean DoWeHaveEnoughMoney(void)
 
 void GetLadyBug(void)
 {
+	if (!BugdomScript_NativeRulesEnabled())
+		return;
 	gNumLadyBugsThisArea++;
 	gInfobarUpdateBits |= UPDATE_LADYBUGS;
 }

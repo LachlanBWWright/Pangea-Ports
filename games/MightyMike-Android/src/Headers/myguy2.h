@@ -3,6 +3,7 @@
 //
 
 void	TurnMeIntoFrog(void);
+Boolean TryTurnMeIntoFrog(void);
 void	DisposeFrog(void);
 void	MoveMeFrog(void);
 void	MoveMeFrog_Jump(void);

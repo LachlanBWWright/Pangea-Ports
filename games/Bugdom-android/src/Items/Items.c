@@ -756,7 +756,7 @@ int		i,n;
 			
 		hive->HiveOnFire -= fps;
 		if (hive->HiveOnFire < 0.0f)
-			gAreaCompleted = true;
+			(void) BugdomScript_CompleteNativeObjective();
 	
 		n = 0;
 

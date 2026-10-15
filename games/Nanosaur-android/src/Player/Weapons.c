@@ -221,6 +221,25 @@ void CheckIfMeAttack(ObjNode *theNode)
 	
 	
 /************************** DO BULLET COLLISION DETECT ************************/
+Boolean FirePlayerWeapon(ObjNode *theNode)
+{
+	if (!theNode || !theNode->Skeleton || gPlayerGotKilledFlag || gGameOverFlag
+		|| gCurrentAttackMode >= NUM_ATTACK_MODES || gWeaponInventory[gCurrentAttackMode] <= 0)
+		return false;
+	KeyControlType previousControls = gMyControlBits;
+	TQ3Point3D previousCoord = gCoord;
+	TQ3Vector3D previousDelta = gDelta;
+	short previousAmmo = gWeaponInventory[gCurrentAttackMode];
+	gMyControlBits |= KEYCONTROL_ATTACK;
+	gCoord = theNode->Coord;
+	gDelta = theNode->Delta;
+	CheckIfMeAttack(theNode);
+	gMyControlBits = previousControls;
+	gCoord = previousCoord;
+	gDelta = previousDelta;
+	return gWeaponInventory[gCurrentAttackMode] < previousAmmo;
+}
+
 //
 // OUTPUT: true = hit something
 //

@@ -24,6 +24,7 @@ typedef struct
 } TextMeshDef;
 
 void TextMesh_Init(void);
+bool TextMesh_IsAvailable(void);
 void TextMesh_Shutdown(void);
 void TextMesh_FillDef(TextMeshDef* def);
 TQ3TriMeshData* TextMesh_CreateMesh(const TextMeshDef* def, const char* text);

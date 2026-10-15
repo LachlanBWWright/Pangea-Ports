@@ -310,6 +310,10 @@ TQ3Matrix4x4			transMatrix,scaleMatrix,rotMatrix;
 
 /*******************************  MOVE OBJECTS **************************/
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "../Scripting/ScriptObjectLifetime.inc"
+#endif
+
 void MoveObjects(void)
 {
 ObjNode		*thisNodePtr;
@@ -323,27 +327,45 @@ ObjNode		*thisNodePtr;
 	{
 		gNextNode = thisNodePtr->NextNode;
 		gCurrentNode = thisNodePtr;						// set current object node
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScriptObjectHandle frameHandle = {thisNodePtr->ScriptObjectID, thisNodePtr->ScriptObjectGeneration};
+#endif
 		
 		KeepOldCollisionBoxes(thisNodePtr);					// keep old box
 		
 			
 				/* UPDATE ANIMATION */
 				
-		if (thisNodePtr->StatusBits & STATUS_BIT_ANIM)
+		if ((thisNodePtr->StatusBits & STATUS_BIT_ANIM)
+#ifdef PANGEA_ENABLE_SCRIPTING
+			&& (!thisNodePtr->ScriptActiveStateInitialized || thisNodePtr->ScriptActive)
+#endif
+			)
 			UpdateSkeletonAnimation(thisNodePtr);
 
 
 					/* NEXT TRY TO MOVE IT */
 					
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!ObjectRemainsLive(thisNodePtr, frameHandle)) goto nextObject;
+		bool nativeTransition = NanosaurScript_RunNativeTransition(thisNodePtr);
+		if (PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){thisNodePtr->ScriptObjectID, thisNodePtr->ScriptObjectGeneration}))
+			UpdateCarriedEgg(thisNodePtr);
+#endif
 		if ((!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE)) &&
-			(thisNodePtr->MoveCall != nil))
+			(thisNodePtr->MoveCall != nil)
+#ifdef PANGEA_ENABLE_SCRIPTING
+			&& !nativeTransition && !PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){thisNodePtr->ScriptObjectID, thisNodePtr->ScriptObjectGeneration})
+#endif
+			)
 		{
 			thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+		if (frameHandle.id && ObjectRemainsLive(thisNodePtr, frameHandle))
 			NanosaurScript_RunObjectFrame(thisNodePtr);
+nextObject:
 #endif
 			
 					
@@ -469,6 +491,7 @@ ObjNode *tempNode;
 
 	if (theNode == nil)								// see if passed a bogus node
 		return;
+	ReleasePickupRelationships(theNode);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (theNode->ScriptObjectID != 0)

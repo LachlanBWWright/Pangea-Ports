@@ -21,6 +21,7 @@ Boolean BillyScript_OnSplineItem(SplineItemType* itemPtr, int areaNum, int splin
 typedef struct ObjNode ObjNode;
 Boolean BillyScript_OnDamage(ObjNode* source, float damage, int cause, float* outDamage);
 Boolean BillyScript_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);
+Boolean BillyScript_DispatchBulletHit(ObjNode* weapon, ObjNode* target, const OGLPoint3D* impact);
 void BillyScript_OnDamageApplied(ObjNode* player, float damage, int cause);
 void BillyScript_OnDeath(ObjNode* player, int eventValue);
 void BillyScript_ResetObjectRegistry(void);
@@ -33,6 +34,8 @@ void BillyScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void BillyScript_ApplyObjectScripting(ObjNode* obj);
 // Utility for MoveObjects loop
 void BillyScript_RunObjectFrame(ObjNode* obj);
+bool BillyScript_ObjectStillAlive(const ObjNode* obj, PangeaScriptObjectHandle handle);
+Boolean BillyScript_CanRunNativeBehavior(const ObjNode* obj);
 void BillyScript_OnAnimationEvent(ObjNode* obj, int eventValue);
 void BillyScript_OnObjectDeleted(ObjNode* obj);
 Boolean BillyScript_TryReplaceTerrainItem(TerrainItemEntryType* itemPtr, int itemIndex, int nativeType, float x, float z);

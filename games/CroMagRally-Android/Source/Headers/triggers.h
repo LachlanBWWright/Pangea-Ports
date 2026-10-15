@@ -73,6 +73,9 @@ Boolean AddCampFire(TerrainItemEntryType *itemPtr, long  x, long z);
 Boolean AddTeamTorch(TerrainItemEntryType *itemPtr, long  x, long z);
 Boolean AddTeamBase(TerrainItemEntryType *itemPtr, long  x, long z);
 void PlayerDropFlag(ObjNode *theCar);
+Boolean PlayerCaptureFlag(ObjNode* car, ObjNode* flag);
+Boolean PlayerDeliverFlag(ObjNode* car, ObjNode* base);
+Boolean PlayerResetCarriedFlag(ObjNode* car);
 
 Boolean AddInvisibilityPOW(TerrainItemEntryType *itemPtr, long  x, long z);
 

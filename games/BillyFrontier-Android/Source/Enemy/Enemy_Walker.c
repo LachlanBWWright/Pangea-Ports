@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -598,8 +599,11 @@ ObjNode	*walker;
 		{
 			MorphToSkeletonAnim(walker->Skeleton, WALKER_ANIM_DEATH, 4);
 			walker->Skeleton->AnimSpeed = .2f;
-			StartLevelCompletion(5.0);
-			MarkLevelWon(gCurrentArea / 2);
+			if (BillyScript_NativeRulesAllowed())
+			{
+				StartLevelCompletion(5.0);
+				MarkLevelWon(gCurrentArea / 2);
+			}
 		}	
 	}	
 }

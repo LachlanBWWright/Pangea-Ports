@@ -21,6 +21,7 @@ enum
 
 
 extern void CheckIfMeAttack(ObjNode *theNode);
+Boolean FirePlayerWeapon(ObjNode *theNode);
 extern	void InitWeaponManager(void);
 extern	void GetWeaponPowerUp(short kind, short quantity);
 extern	void GetCheatWeapons(void);

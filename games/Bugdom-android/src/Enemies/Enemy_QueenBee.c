@@ -458,7 +458,7 @@ float	fps = gFramesPerSecondFrac;
 
 	theNode->DeathTimer -= fps;
 	if (theNode->DeathTimer <= 0.0f)
-		gAreaCompleted = true;
+		(void) BugdomScript_CompleteNativeObjective();
 
 
 				/* MOVE IT */

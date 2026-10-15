@@ -11,6 +11,7 @@
 /***************/
 
 #include "game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 
 
 /****************************/
@@ -175,6 +176,15 @@ static const EffectDef kEffectsTable[NUM_EFFECTS] =
 
 
 /********************* INIT SOUND TOOLS ********************/
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+#define SCRIPT_AUDIO_POSITIONAL
+#define SCRIPT_AUDIO_POINT OGLPoint3D
+#define SCRIPT_CHANNEL_EFFECT(channel) gChannelInfo[channel].effectNum
+#define SCRIPT_STOP_CHANNEL(channel) StopAChannel(&(channel))
+#define SCRIPT_AUDIO_EFFECT_LOADED(effect) ((effect) >= 0 && (effect) < NUM_EFFECTS && gLoadedEffects[effect].sndHandle)
+#include "pangea_presentation_audio.inc"
+#endif
 
 void InitSoundTools(void)
 {
@@ -923,6 +933,9 @@ uint32_t		lv2,rv2;
 			/* SET MY INFO */
 
 	gChannelInfo[theChan].effectNum 	= effectNum;		// remember what effect is playing on this channel
+#ifdef PANGEA_ENABLE_SCRIPTING
+	ScriptPresentation_ChannelStarted(theChan);
+#endif
 	gChannelInfo[theChan].leftVolume 	= leftVolume;		// remember requested volume (not the adjusted volume!)
 	gChannelInfo[theChan].rightVolume 	= rightVolume;
 	return(theChan);										// return channel #

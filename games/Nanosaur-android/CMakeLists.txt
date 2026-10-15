@@ -26,6 +26,7 @@ if(PANGEA_SAFE_ITEM_LOADING)
 	add_compile_definitions(PANGEA_SAFE_ITEM_LOADING=1)
 endif()
 option(PANGEA_ENABLE_SCRIPTING "Enable Lua scripting support" OFF)
+option(PANGEA_BUILD_NATIVE_SCRIPT_TESTS "Build headless native scripting regression tests" OFF)
 option(PANGEA_ENABLE_LEVEL_METADATA "Enable optional level metadata overrides" ON)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
@@ -397,6 +398,11 @@ configure_file(${CMAKE_SOURCE_DIR}/packaging/ReadMe.txt.in ${CMAKE_CURRENT_BINAR
 #------------------------------------------------------------------------------
 # EMSCRIPTEN / WEBASSEMBLY
 #------------------------------------------------------------------------------
+
+if(PANGEA_ENABLE_SCRIPTING AND PANGEA_BUILD_NATIVE_SCRIPT_TESTS AND UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+	enable_testing()
+	include(tests/CMakeLists.txt)
+endif()
 
 if(EMSCRIPTEN)
 	# Disable visual fades in WebAssembly builds (they use blocking loops)

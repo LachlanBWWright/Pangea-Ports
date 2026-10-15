@@ -232,7 +232,11 @@ long	row,col;
 	row = theNode->Coord.z * (1.0f/TERRAIN_SUPERTILE_UNIT_SIZE);	// calc supertile row,col
 	col = theNode->Coord.x * (1.0f/TERRAIN_SUPERTILE_UNIT_SIZE);
 	
-	if (gTerrainScrollBuffer[row][col] == EMPTY_SUPERTILE)
+	if (theNode->Coord.x < 0 || theNode->Coord.z < 0
+		|| theNode->Coord.x >= gTerrainTileWidth * TERRAIN_POLYGON_SIZE
+		|| theNode->Coord.z >= gTerrainTileDepth * TERRAIN_POLYGON_SIZE)
+		visible = false;
+	else if (gTerrainScrollBuffer[row][col] == EMPTY_SUPERTILE)
 		visible = false;
 	else
 		visible = true;
@@ -339,7 +343,32 @@ ObjNode	*theNode;
 		theNode = gSplineObjectList[i];
 		if (theNode)
 		{
-			if (theNode->SplineMoveCall)
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (theNode->ScriptDeleteRequested)
+			{
+				DeleteObject(theNode);
+				continue;
+			}
+			if (PangeaScript_ObjectIsScriptControlled(
+				(PangeaScriptObjectHandle){theNode->ScriptObjectID, theNode->ScriptObjectGeneration}))
+			{
+				Boolean wasDetached = (theNode->StatusBits & STATUS_BIT_DETACHED) != 0;
+				(void) IsSplineItemVisible(theNode);
+				if (wasDetached && theNode->CType != INVALID_NODE_FLAG)
+				{
+					if ((theNode->StatusBits & STATUS_BIT_ANIM)
+						&& (!theNode->ScriptActiveStateInitialized || theNode->ScriptActive))
+						UpdateSkeletonAnimation(theNode);
+					BugdomScript_RunObjectFrame(theNode);
+				}
+				continue;
+			}
+#endif
+			if (theNode->SplineMoveCall
+#ifdef PANGEA_ENABLE_SCRIPTING
+				&& BugdomScript_ShouldRunNativeMovement(theNode)
+#endif
+			)
 				theNode->SplineMoveCall(theNode);				// call object's spline move routine
 		}
 	}

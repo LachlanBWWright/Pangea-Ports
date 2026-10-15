@@ -11,9 +11,7 @@
 
 #include "game.h"
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-#include "ScriptBindings.h"
-#endif
+#include "../Scripting/ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -697,7 +695,7 @@ void PlayerLoseHealth(short p, float damage)
 
 			/* SEE IF DEAD */
 
-	if (gPlayerInfo[p].health <= 0.0f)
+	if (gPlayerInfo[p].health <= 0.0f && CroMagScript_NativeRulesEnabled())
 	{
 		gPlayerInfo[p].health = 0;
 		gPlayerInfo[p].isEliminated = true;

@@ -310,6 +310,7 @@ struct ObjNode
 		Boolean		ScriptAnimationCompletionSent;
 		Boolean		ScriptActiveStateInitialized;
 		Boolean		ScriptActive;
+		unsigned long ScriptInactiveStatusBits;
 };
 typedef struct ObjNode ObjNode;
 

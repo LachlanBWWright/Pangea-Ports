@@ -411,6 +411,7 @@ ObjNode	*pow = theNode->ChainNode;
 static Boolean DoTrig_Chipmunk(ObjNode *chipmunk, ObjNode *who, Byte sideBits)
 {
 ObjNode	*acorn;
+	if (!AllowNativeGameplayRules()) return true;
 
 	(void) sideBits;
 

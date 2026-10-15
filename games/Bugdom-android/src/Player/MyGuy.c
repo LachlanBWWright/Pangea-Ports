@@ -429,7 +429,7 @@ TQ3Vector3D	delta;
 	if (damage == 0.0f)
 		return;
 		
-	if (!overrideShield)
+	if (!overrideShield && BugdomScript_NativeRulesEnabled())
 		if (gShieldTimer > 0.0f)								// see if shielded
 			return;
 		
@@ -437,11 +437,13 @@ TQ3Vector3D	delta;
 		return;
 		
 	
-	if (gPlayerObj->InvincibleTimer > 0.0f)						// cant be harmed if invincible
+	if (gPlayerObj->InvincibleTimer > 0.0f && BugdomScript_NativeRulesEnabled())
 		return;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (!BugdomScript_OnDamage(what, damage, 0, &damage))
+		return;
+	if (damage <= 0.0f)
 		return;
 #endif
 
@@ -499,6 +501,13 @@ TQ3Vector3D	delta;
 
 void KillPlayer(Boolean changeAnims)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!BugdomScript_NativeRulesEnabled())
+	{
+		BugdomScript_OnDeath(changeAnims ? 1 : 0);
+		return;
+	}
+#endif
 	if (!gPlayerGotKilledFlag)
 	{
 		if (changeAnims)
@@ -615,6 +624,22 @@ static void MoveMyBuddy(ObjNode *theNode)
 
 	UpdateObject(theNode);
 }
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool BugdomScript_CommandBuddy(ObjNode* buddy, bool attack)
+{
+	if (!buddy || !buddy->Skeleton || buddy->Type != SKELETON_TYPE_BUDDY
+		|| buddy->MoveCall != MoveMyBuddy || !gPlayerObj || gPlayerGotKilledFlag)
+		return false;
+	if (!attack && gMyBuddy && gMyBuddy != buddy)
+		return false;
+	buddy->Mode = attack ? BUDDY_MODE_ATTACK : BUDDY_MODE_LIKESME;
+	gMyBuddy = attack ? NULL : buddy;
+	if (attack)
+		PlayEffect3D(EFFECT_BUDDYLAUNCH, &buddy->Coord);
+	return true;
+}
+#endif
 
 
 /****************** BUDDY FOLLOWS ME ***********************/
@@ -795,8 +820,8 @@ explode:
 	if (gNumCollisions)
 	{
 		float damage = 1.1f;
-		Boolean destroyTarget = false;
 #ifdef PANGEA_ENABLE_SCRIPTING
+		Boolean destroyTarget = false;
 		if (BugdomScript_OnWeaponHit(theNode, gCollisionList[0].objectPtr, damage, &damage, &destroyTarget))
 #endif
 		{
@@ -889,7 +914,8 @@ float		r;
 	
 			/* DEC TIMER */
 			
-	gShieldTimer -= gFramesPerSecondFrac;
+	if (BugdomScript_NativeRulesEnabled())
+		gShieldTimer -= gFramesPerSecondFrac;
 	if (gShieldTimer < 0.0f)
 	{
 		gShieldTimer = 0.0f;

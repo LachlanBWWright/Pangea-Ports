@@ -1029,6 +1029,11 @@ OGLPoint2D	pl[4];
 				if (IntersectLineSegments(edge[i].x, edge[i].z, edge[i+1].x, edge[i+1].z,	// if intersect, then lift this
 					                     pl[j].x, pl[j].y, pl[j+1].x, pl[j+1].y, &ix, &iz))
 			  	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+					if (!Bugdom2Script_OnMouseRescued(mouse, player, thisNode->Drowning))
+						return;
+#endif
+					if (!AllowNativeGameplayRules()) return;
 					thisNode->TerrainItemPtr->flags |= ITEM_FLAGS_USER1;			// set user flag so we'll always know this mouse was freed
 			  		thisNode->ChainNode = nil;										// detach mouse from trap
 			  		mouse->MoveCall = MoveMouse_Freed;								// set move call
@@ -1041,9 +1046,6 @@ OGLPoint2D	pl[4];
 			gPlayerInfo.numMiceRescued++;
 			if (thisNode->Drowning)                    // was that a special garbage can drowning mouse?
 				gNumDrowningMiceRescued++;
-#ifdef PANGEA_ENABLE_SCRIPTING
-			Bugdom2Script_OnMouseRescued(mouse, player, thisNode->Drowning);
-#endif
 					return;
 			  	}
 			  }

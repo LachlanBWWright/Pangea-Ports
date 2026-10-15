@@ -11,9 +11,7 @@
 
 #include "game.h"
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-#include "ScriptBindings.h"
-#endif
+#include "../Scripting/ScriptBindings.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -545,6 +543,9 @@ static void MovePlayer_Car_Multipass(ObjNode *theNode)
 	DoVehicleCollisionDetect(theNode);
 	DoFenceCollision(theNode);
 	UpdatePlayerCheckpoints(playerNum);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	theNode->ScriptContactStateInvalidated = false;
+#endif
 }
 
 
@@ -1828,6 +1829,7 @@ Boolean		tagTransferred = false;
 Boolean		onlineTagMode = gIsNetworkHost || gIsNetworkClient;
 short		fromPlayer = -1;
 short		toPlayer = -1;
+	if (!CroMagScript_NativeRulesEnabled()) return false;
 
 	if (gGameMode != GAME_MODE_TAG1 && gGameMode != GAME_MODE_TAG2)
 		return false;
@@ -1933,7 +1935,7 @@ short		p1 = car1->PlayerNum;
 short		p2 = car2->PlayerNum;
 
 
-	switch(gGameMode)
+	if (CroMagScript_NativeRulesEnabled()) switch(gGameMode)
 	{
 		/**********************/
 		/* SEE IF PLAYING TAG */
@@ -2214,7 +2216,7 @@ Boolean			onWater;
 		/* SEE IF NOT MOVING OR IS STUCK */
 		/*********************************/
 
-	if (!gNoCarControls)													// see if control is allowed
+	if (!gNoCarControls || !CroMagScript_NativeRulesEnabled())
 	{
 		gPlayerInfo[player].oldPositionTimer -= fps;
 		if (gPlayerInfo[player].oldPositionTimer <= 0.0f)					// see if time to do the check
@@ -2953,7 +2955,7 @@ uint16_t			playerNum = theNode->PlayerNum;
 float			thrust,speed;
 float			fps = gFramesPerSecondFrac;
 
-	if (gNoCarControls || (gPlayerInfo[playerNum].frozenTimer > 0.0f) || (gPlayerInfo[playerNum].isEliminated))		// see if no control
+	if ((gNoCarControls && CroMagScript_NativeRulesEnabled()) || (gPlayerInfo[playerNum].frozenTimer > 0.0f) || (gPlayerInfo[playerNum].isEliminated))
 	{
 		gPlayerInfo[playerNum].braking	 		= false;
 		gPlayerInfo[playerNum].gasPedalDown 	= false;
@@ -3052,7 +3054,7 @@ float			fps = gFramesPerSecondFrac;
 	/***************************************/
 
 
-	if ((theNode->StatusBits & STATUS_BIT_ONGROUND)	&& (!gNoCarControls))	// must be on the ground for most controls to have an effect
+	if ((theNode->StatusBits & STATUS_BIT_ONGROUND) && (!gNoCarControls || !CroMagScript_NativeRulesEnabled()))
 	{
 		if ((speed < 400.0f) && (thrust != 0.0f))				// give a little boost if going too slow
 		{

@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -1493,6 +1494,7 @@ void AddPowerupToInventory(ObjNode *pow)
 	if (!OttoScript_OnPickupCollected(pow, gPlayerInfo.objNode, pow->POWType, pow->POWType == POW_TYPE_HEALTH ? .1f : 1.0f, "ottomatic.powerupPod"))
 		return;
 #endif
+	if (!OttoScript_UsesNativeRules()) return;
 
 	switch(pow->POWType)
 	{

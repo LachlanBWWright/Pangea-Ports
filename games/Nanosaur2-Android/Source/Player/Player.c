@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../Scripting/ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -251,7 +252,15 @@ short	playerNum = player->PlayerNum;
 
 Boolean PlayerLoseHealth(short playerNum, float damage, Byte deathType, OGLPoint3D *where, Boolean disorient)
 {
+	return PlayerLoseHealthFromObject(playerNum, nil, damage, deathType, where, disorient);
+}
+
+Boolean PlayerLoseHealthFromObject(short playerNum, ObjNode* source, float damage, Byte deathType, OGLPoint3D *where, Boolean disorient)
+{
 Boolean	killed = false;
+#ifndef PANGEA_ENABLE_SCRIPTING
+	(void) source;
+#endif
 
 
 
@@ -263,7 +272,7 @@ Boolean	killed = false;
 		return(true);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	if (!Nanosaur2Script_OnDamage(playerNum, nil, damage, deathType, &damage))
+	if (!Nanosaur2Script_OnDamage(playerNum, source, damage, deathType, &damage))
 		return(false);
 #endif
 
@@ -366,7 +375,7 @@ ObjNode	*player = gPlayerInfo[playerNum].objNode;
 
 			/* SPECIAL STUFF FOR BATTLE MODE */
 
-	if (gVSMode == VS_MODE_BATTLE && !gBattleCollisionResolution)
+	if (Nanosaur2Script_UsesNativeRules() && gVSMode == VS_MODE_BATTLE && !gBattleCollisionResolution)
 	{
 		if (gPlayerInfo[playerNum].numFreeLives <= 0)	// is this player out of lives?
 		{
@@ -472,6 +481,7 @@ ObjNode	*player = gPlayerInfo[playerNum].objNode;
 			/* FIRST TAKE AWAY A LIFE AND SEE IF IT'S ALL OVER */
 			/***************************************************/
 
+	if (Nanosaur2Script_UsesNativeRules())
 	switch(gVSMode)								// not all game modes have lives
 	{
 		case	VS_MODE_RACE:					// infinite lives in racing & flag modes
@@ -887,7 +897,7 @@ Boolean	playerKilled = false;
 
 	else
 	{
-		playerKilled = PlayerLoseHealth(p, weapon->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
+		playerKilled = PlayerLoseHealthFromObject(p, weapon, weapon->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
 	}
 
 
@@ -923,10 +933,10 @@ short   p1,p2;
 	p2 = theNode->PlayerNum;
 
 	gBattleCollisionResolution = true;
-	p1Dead = PlayerLoseHealth(p1, damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
+	p1Dead = PlayerLoseHealthFromObject(p1, theNode, damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
 	gPlayerInfo[p1].invincibilityTimer = .5f;
 
-	p2Dead = PlayerLoseHealth(p2, damage, PLAYER_DEATH_TYPE_DEATHDIVE, &gCoord, true);
+	p2Dead = PlayerLoseHealthFromObject(p2, trigger, damage, PLAYER_DEATH_TYPE_DEATHDIVE, &gCoord, true);
 	gPlayerInfo[p2].invincibilityTimer = .5f;
 	gBattleCollisionResolution = false;
 
@@ -940,7 +950,7 @@ short   p1,p2;
 			// We need to check if both players lost simultaneously
 			//
 
-	if (gVSMode == VS_MODE_BATTLE)
+	if (Nanosaur2Script_UsesNativeRules() && gVSMode == VS_MODE_BATTLE)
 	{
 				/* DID BOTH PLAYERS JUST DIE, AND WERE BOTH OUT OF FREE LIVES?  IF SO, IT'S A DRAW */
 

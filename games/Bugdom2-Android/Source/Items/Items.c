@@ -974,7 +974,7 @@ static Boolean DoTrig_DogHouse(ObjNode *house, ObjNode *who, Byte sideBits)
 	(void) sideBits;
 
 	if (sideBits & SIDE_BITS_FRONT)
-		StartLevelCompletion(0);
+		StartAutomaticLevelCompletion(0);
 
 	return(true);
 }

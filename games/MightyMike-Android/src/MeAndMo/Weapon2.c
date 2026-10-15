@@ -94,7 +94,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 
@@ -205,7 +205,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNeedState(kNeed_Attack))						// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(false))
 		return(false);
 
 	if (gFrames & 0b11)									// see if good interval
@@ -278,7 +278,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNeedState(kNeed_Attack))						// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(false))
 		return(false);
 
 			/* SEE WHICH WAY TO MAKE IT GO */
@@ -404,7 +404,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 
@@ -474,7 +474,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 
@@ -594,7 +594,7 @@ Byte 	sub;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 			/* SEE WHICH WAY TO MAKE IT GO */
@@ -690,7 +690,7 @@ static	unsigned long lastShotFrame = 0;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNeedState(kNeed_Attack))						// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(false))
 		return(false);
 
 	if ((gFrames - lastShotFrame) < 4)					// see if good interval
@@ -787,7 +787,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNeedState(kNeed_Attack))						// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(false))
 	{
 		return(false);
 	}
@@ -912,7 +912,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNewNeedState(kNeed_Attack))					// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(true))
 		return false;
 
 
@@ -1095,7 +1095,7 @@ short		z,y,x;
 
 				/* SEE IF READY TO SHOOT */
 
-	if (!GetNeedState(kNeed_Attack))						// see if fire button pressed
+	if (!MikeWeapon_AttackRequested(false))
 		return(false);
 
 	if ((gFrames - gLastPixieTime) < PIXIE_REFIRE_TIME)	// see if can shoot now

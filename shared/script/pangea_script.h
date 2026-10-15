@@ -248,6 +248,148 @@ typedef struct PangeaScriptGameCapabilities
 	bool playerForm;
 } PangeaScriptGameCapabilities;
 
+#define PANGEA_SCRIPT_INPUT_ACTIONS 32
+typedef struct PangeaScriptInputAction
+{
+	const char* name;
+	bool held, pressed, released;
+} PangeaScriptInputAction;
+
+typedef struct PangeaScriptInputSnapshot
+{
+	PangeaScriptInputAction actions[PANGEA_SCRIPT_INPUT_ACTIONS];
+	int actionCount;
+	float moveX, moveY, lookX, lookY;
+	PangeaScriptVector3 aim;
+	bool hasAim;
+} PangeaScriptInputSnapshot;
+
+typedef struct PangeaScriptTerrainSample
+{
+	float height;
+	PangeaScriptVector3 normal;
+	int surfaceType;
+	bool hasWater;
+	float waterHeight;
+} PangeaScriptTerrainSample;
+
+typedef struct PangeaScriptTileSample
+{
+	int tileType;
+	unsigned int flags;
+	bool solid;
+} PangeaScriptTileSample;
+
+typedef struct PangeaScriptBounds
+{
+	PangeaScriptVector3 min, max;
+} PangeaScriptBounds;
+
+typedef struct PangeaScriptCollisionCategory
+{
+	const char* name;
+	unsigned int mask;
+} PangeaScriptCollisionCategory;
+
+typedef struct PangeaScriptCollisionHit
+{
+	PangeaScriptObjectHandle object;
+	float fraction;
+	PangeaScriptVector3 position, normal;
+} PangeaScriptCollisionHit;
+
+typedef struct PangeaScriptKinematicResult
+{
+	PangeaScriptVector3 position;
+	PangeaScriptCollisionHit contacts[3];
+	int contactCount;
+} PangeaScriptKinematicResult;
+
+typedef enum PangeaScriptStateType
+{
+	PANGEA_SCRIPT_STATE_NUMBER,
+	PANGEA_SCRIPT_STATE_BOOLEAN,
+} PangeaScriptStateType;
+
+typedef struct PangeaScriptStateValue
+{
+	PangeaScriptStateType type;
+	double number;
+	bool boolean;
+} PangeaScriptStateValue;
+
+typedef struct PangeaScriptStateField
+{
+	const char* key;
+	PangeaScriptStateType type;
+	bool writable;
+	double min, max;
+	bool playerScoped;
+} PangeaScriptStateField;
+
+typedef enum PangeaScriptPlayerOperation
+{
+	PANGEA_SCRIPT_OP_CARRY,
+	PANGEA_SCRIPT_OP_DROP,
+	PANGEA_SCRIPT_OP_HANDOVER,
+	PANGEA_SCRIPT_OP_MOUNT,
+	PANGEA_SCRIPT_OP_DISMOUNT,
+	PANGEA_SCRIPT_OP_FIRE,
+	PANGEA_SCRIPT_OP_RELOAD,
+	PANGEA_SCRIPT_OP_TRANSFORM,
+	PANGEA_SCRIPT_OP_RESPAWN,
+	PANGEA_SCRIPT_OP_CAPTURE,
+	PANGEA_SCRIPT_OP_DELIVER,
+	PANGEA_SCRIPT_OP_RESET_CARRIED,
+	PANGEA_SCRIPT_OP_RELEASE_BUDDY,
+	PANGEA_SCRIPT_OP_GRAB,
+	PANGEA_SCRIPT_OP_INTERACT,
+	PANGEA_SCRIPT_OP_COMMAND_BUDDY,
+	PANGEA_SCRIPT_OP_COUNT,
+} PangeaScriptPlayerOperation;
+
+typedef struct PangeaScriptOperationRequest
+{
+	PangeaScriptPlayerOperation operation;
+	int playerNum;
+	bool hasTarget, hasPosition, hasVelocity, hasAim, hasWeapon, hasJoint;
+	PangeaScriptObjectHandle target;
+	PangeaScriptVector3 position, velocity, aim;
+	int weapon, joint;
+	const char* mode;
+	const char* form;
+} PangeaScriptOperationRequest;
+
+typedef struct PangeaScriptOperationResult
+{
+	PangeaScriptObjectHandle object;
+} PangeaScriptOperationResult;
+
+typedef struct PangeaScriptPlayerRelations
+{
+	PangeaScriptObjectHandle carried, mounted, buddy, grabbed;
+	const char* form;
+	int capturedCount;
+} PangeaScriptPlayerRelations;
+
+typedef struct PangeaScriptGameplayOps
+{
+	bool (*getInput)(int playerNum, PangeaScriptInputSnapshot* output);
+	bool (*sampleTerrain)(float x, float z, PangeaScriptTerrainSample* output);
+	bool (*sampleTile)(float x, float y, PangeaScriptTileSample* output);
+	bool (*overlapBox)(const PangeaScriptBounds* bounds, unsigned int mask, PangeaScriptObjectHandle* results, int capacity, int* count);
+	const PangeaScriptCollisionCategory* collisionCategories;
+	int collisionCategoryCount;
+	bool (*getState)(int playerNum, const char* key, PangeaScriptStateValue* output);
+	PangeaScriptStatus (*setState)(int playerNum, const char* key, const PangeaScriptStateValue* value);
+	const PangeaScriptStateField* stateFields;
+	int stateFieldCount;
+	PangeaScriptStatus (*complete)(int playerNum, bool success);
+	unsigned int operationMask;
+	PangeaScriptStatus (*runOperation)(const PangeaScriptOperationRequest* request, PangeaScriptOperationResult* output);
+	bool (*getRelations)(int playerNum, PangeaScriptPlayerRelations* output);
+} PangeaScriptGameplayOps;
+
 typedef struct PangeaScriptGameInfo
 {
 	const char* gameId;
@@ -270,6 +412,7 @@ typedef struct PangeaScriptGameInfo
 	PangeaScriptStatus (*loadPersistent)(const char* key, unsigned char* outData, int capacity, int* outSize);
 	PangeaScriptStatus (*savePersistent)(const char* key, const unsigned char* data, int size);
 	PangeaScriptGameCapabilities capabilities;
+	const PangeaScriptGameplayOps* gameplay;
 } PangeaScriptGameInfo;
 
 typedef struct PangeaScriptLevelContext
@@ -380,6 +523,10 @@ typedef struct PangeaScriptObjectOps
 	bool (*getActive)(void* nativeObject, bool* outActive);
 	bool (*getHealth)(void* nativeObject, float* outHealth);
 	bool (*getDamage)(void* nativeObject, float* outDamage);
+	bool (*setHealth)(void* nativeObject, float health);
+	bool (*setDamage)(void* nativeObject, float damage);
+	bool (*getJointPosition)(void* nativeObject, int joint, PangeaScriptVector3* output);
+	bool (*getBounds)(void* nativeObject, PangeaScriptBounds* output);
 	bool (*getCollisionEnabled)(void* nativeObject, bool* outEnabled);
 	bool (*setPosition)(void* nativeObject, const PangeaScriptVector3* position);
 	bool (*setVelocity)(void* nativeObject, const PangeaScriptVector3* velocity);
@@ -834,6 +981,32 @@ bool PangeaScript_SetObjectAnimation(PangeaScriptObjectHandle handle, int animat
 bool PangeaScript_SetObjectAnimationNamed(PangeaScriptObjectHandle handle, const char* animation, float speed, float blendSeconds);
 bool PangeaScript_SetObjectCollisionEnabled(PangeaScriptObjectHandle handle, bool enabled);
 bool PangeaScript_SetObjectActive(PangeaScriptObjectHandle handle, bool active);
+bool PangeaScript_ObjectIsScriptControlled(PangeaScriptObjectHandle handle);
+bool PangeaScript_SetObjectScriptControlled(PangeaScriptObjectHandle handle, bool controlled);
+bool PangeaScript_SetObjectHealth(PangeaScriptObjectHandle handle, float health);
+bool PangeaScript_SetObjectDamage(PangeaScriptObjectHandle handle, float damage);
+bool PangeaScript_GetInput(int playerNum, PangeaScriptInputSnapshot* output);
+bool PangeaScript_SampleTerrain(float x, float z, PangeaScriptTerrainSample* output);
+bool PangeaScript_SampleTile(float x, float y, PangeaScriptTileSample* output);
+bool PangeaScript_OverlapBox(const PangeaScriptBounds* bounds, const char* category, PangeaScriptObjectHandle* results, int capacity, int* count);
+const PangeaScriptGameplayOps* PangeaScript_GetGameplayOps(void);
+bool PangeaScript_GetState(int playerNum, const char* key, PangeaScriptStateValue* output);
+PangeaScriptStatus PangeaScript_SetState(int playerNum, const char* key, const PangeaScriptStateValue* value);
+PangeaScriptStatus PangeaScript_Complete(int playerNum, bool success);
+bool PangeaScript_RulesAreScriptControlled(void);
+PangeaScriptStatus PangeaScript_SetRulesScriptControlled(bool controlled);
+const char* PangeaScript_GetOperationName(PangeaScriptPlayerOperation operation);
+bool PangeaScript_OperationSupported(PangeaScriptPlayerOperation operation);
+PangeaScriptStatus PangeaScript_RunPlayerOperation(const PangeaScriptOperationRequest* request, PangeaScriptOperationResult* output);
+bool PangeaScript_GetPlayerRelations(int playerNum, PangeaScriptPlayerRelations* output);
+bool PangeaScript_GetJointPosition(PangeaScriptObjectHandle handle, int joint, PangeaScriptVector3* output);
+bool PangeaScript_AttachObject(PangeaScriptObjectHandle child, PangeaScriptObjectHandle parent, int joint, const PangeaScriptVector3* offset);
+bool PangeaScript_DetachObject(PangeaScriptObjectHandle handle);
+void PangeaScript_UpdateAttachments(void);
+bool PangeaScript_GetObjectBounds(PangeaScriptObjectHandle handle, PangeaScriptBounds* output);
+bool PangeaScript_Raycast(const PangeaScriptVector3* from, const PangeaScriptVector3* to, const char* category, PangeaScriptObjectHandle ignore, PangeaScriptCollisionHit* output);
+bool PangeaScript_SweepBox(const PangeaScriptBounds* bounds, const PangeaScriptVector3* delta, const char* category, PangeaScriptObjectHandle ignore, PangeaScriptCollisionHit* output);
+PangeaScriptStatus PangeaScript_MoveKinematic(PangeaScriptObjectHandle handle, const PangeaScriptVector3* delta, const char* category, PangeaScriptKinematicResult* output);
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle);
 
 PangeaScriptStatus PangeaScript_RegisterNativeItems(const PangeaScriptNativeItem* items, int count);

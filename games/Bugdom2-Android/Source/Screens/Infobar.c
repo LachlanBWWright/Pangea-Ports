@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include "profiling.h"
 
 
@@ -296,6 +297,7 @@ void DrawInfobar(ObjNode* theNode)
 	Infobar_DrawKey();
 	Infobar_DrawMap();
 	Infobar_DrawClovers();
+	ScriptPresentation_Draw();
 
 	switch(LevelMetadataCaseFor("level.infobar", gLevelNum))
 	{

@@ -647,6 +647,7 @@ static void SnailDropKey(ObjNode *snail)
 {
 ObjNode	*key;
 OGLPoint3D	where;
+	if (!AllowNativeGameplayRules()) return;
 
 	if (snail->HasDroppedKey)				// make sure we dont do this twice
 		return;

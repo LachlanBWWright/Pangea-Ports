@@ -30,6 +30,7 @@
 #include "version.h"
 #include "externs.h"
 #include "framebufferfilter.h"
+#include "ScriptRulePolicy.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -289,7 +290,13 @@ static void UpdateSimAndRenderFixedFrame(void)
 
 	UpdateShakeyScreen();
 	ReadKeyboard();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_OnAreaFrame(gSceneNum, gAreaNum, (unsigned int)gFrames, 1.0f / GAME_FPS);
+#endif
 	MoveObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	PangeaScript_UpdateAttachments();
+#endif
 	SortObjectsByY();										// sort 'em
 	ScrollPlayfield();										// do playfield updating
 	UpdateTileAnimation();
@@ -336,7 +343,13 @@ static void UpdateSimAndRenderTweenedFrames(void)
 
 	UpdateShakeyScreen();
 	ReadKeyboard();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	MikeScript_OnAreaFrame(gSceneNum, gAreaNum, (unsigned int)gFrames, 1.0f / GAME_FPS);
+#endif
 	MoveObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	PangeaScript_UpdateAttachments();
+#endif
 	SortObjectsByY();										// sort 'em
 	UpdateTileAnimation();
 	UpdateInfoBar();
@@ -393,10 +406,6 @@ void PlayArea(void)
 	{
 				/* UPDATE SIMULATION & RENDER FRAME(S) */
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-		MikeScript_OnAreaFrame(gSceneNum, gAreaNum, (unsigned int)gFrames, 1.0f / 32.0f);
-#endif
-
 		if (gGamePrefs.uncappedFramerate)
 			UpdateSimAndRenderTweenedFrames();
 		else
@@ -418,13 +427,13 @@ void PlayArea(void)
 				PauseAllChannels(false);
 		}
 
-		if (GetSDLKeyState(SDL_SCANCODE_PERIOD) && GetSDLKeyState(SDL_SCANCODE_N))	// see if skip to next level
+		if (MikeScript_NativeRulesEnabled() && GetSDLKeyState(SDL_SCANCODE_PERIOD) && GetSDLKeyState(SDL_SCANCODE_N))	// see if skip to next level
 		{
 			gNumBunnies = 1;
 			DecBunnyCount();
 		}
 
-		if (gNumBunnies <= 0)					// special hack to fix reported bug!?!?
+		if (MikeScript_NativeRulesEnabled() && gNumBunnies <= 0)					// special hack to fix reported bug!?!?
 			DecBunnyCount();
 
 #if _DEBUG

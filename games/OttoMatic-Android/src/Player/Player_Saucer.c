@@ -60,7 +60,7 @@ static void MakeOttoFromSaucer(ObjNode *saucer);
 
 static	Boolean	gBeamIsCharging,gBeamIsDischarging;
 float	gBeamCharge;
-static	short	gBeamChargeEffectChannel;
+static	short	gBeamChargeEffectChannel = -1;
 short	gBeamModeSelected,gBeamMode;
 
 int		gNumHumansInTransit;
@@ -682,6 +682,91 @@ void BlowUpSaucer(ObjNode *saucer)
 
 #pragma mark -
 
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool OttoScript_CaptureNativeHuman(ObjNode* human)
+{
+	if (!gPlayerSaucer || gPlayerInfo.objNode != gPlayerSaucer || gPlayerIsDead || !human ||
+		!(human->CType & CTYPE_HUMAN) || !human->SaucerAbductHandler || !human->Skeleton ||
+		human->HumanType < 0 || human->HumanType >= NUM_HUMAN_TYPES ||
+		gNumHumansInSaucer + gNumHumansInTransit >= MAX_HUMANS_IN_SAUCER ||
+		gPlayerSaucer->MoveCall != MovePlayer_Saucer) return false;
+	if (human->StatusBits & STATUS_BIT_ONSPLINE) DetachObjectFromSpline(human, nil);
+	gHumansInSaucerList[gNumHumansInSaucer++] = human->HumanType;
+	human->MoveCall = nil;
+	human->TerrainItemPtr = nil;
+	DeleteObject(human);
+	return true;
+}
+
+bool OttoScript_DeliverNativeHumans(void)
+{
+	if (!gPlayerSaucer || gPlayerInfo.objNode != gPlayerSaucer || gPlayerIsDead ||
+		!gExitRocket || gNumHumansInTransit || gNumHumansInSaucer <= 0 ||
+		gPlayerSaucer->MoveCall != MovePlayer_Saucer) return false;
+	StopPlayerSaucerBeam(gPlayerSaucer);
+	gPlayerSaucer->MoveCall = MovePlayer_Saucer_ToDropZone;
+	return true;
+}
+
+bool OttoScript_DropNativeHumans(void)
+{
+	if (!gPlayerSaucer || gPlayerInfo.objNode != gPlayerSaucer ||
+		gPlayerSaucer->MoveCall != MovePlayer_Saucer || gNumHumansInSaucer + gNumHumansInTransit <= 0)
+		return false;
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+		if (node->MoveCall == MoveHuman_ToPlayerSaucer) OttoScript_ReleaseNativeHuman(node);
+	gNumHumansInTransit = 0;
+	int count = gNumHumansInSaucer;
+	gNumHumansInSaucer = 0;
+	for (int index = count - 1; index >= 0; index--)
+	{
+		int humanType = gHumansInSaucerList[index];
+		MakeHuman(humanType, gPlayerSaucer->Coord.x, gPlayerSaucer->Coord.z);
+	}
+	StopPlayerSaucerBeam(gPlayerSaucer);
+	return true;
+}
+
+void OttoScript_CancelNativeDelivery(void)
+{
+	if (!gPlayerSaucer || gPlayerInfo.objNode != gPlayerSaucer) return;
+	StopPlayerSaucerBeam(gPlayerSaucer);
+	gPlayerSaucer->MoveCall = MovePlayer_Saucer;
+}
+
+void OttoScript_ClearNativeRelationships(ObjNode* node)
+{
+	if (!node) return;
+	OttoScript_ForgetNativePickup(node);
+	if (gSaucerTarget == node) gSaucerTarget = NULL;
+	if (node == gExitRocket)
+	{
+		OttoScript_CancelNativeDelivery();
+		for (ObjNode* human = gFirstNodePtr; human; human = human->NextNode)
+			OttoScript_ReleaseNativeHuman(human);
+		gNumHumansInTransit = 0;
+		gExitRocket = NULL;
+	}
+	if ((node->MoveCall == MoveHuman_ToPlayerSaucer || node->MoveCall == MoveHuman_BeamDown) &&
+		!(node->CType & CTYPE_PLAYER) && gNumHumansInTransit > 0)
+		gNumHumansInTransit--;
+	if (node == gPlayerSaucer)
+	{
+		for (ObjNode* human = gFirstNodePtr; human; human = human->NextNode)
+			OttoScript_ReleaseNativeHuman(human);
+		gPlayerSaucer = NULL;
+		gNumHumansInSaucer = gNumHumansInTransit = 0;
+		gBeamIsCharging = gBeamIsDischarging = false;
+		StopAChannel(&gBeamChargeEffectChannel);
+	}
+	if (node == gTargetPickup)
+	{
+		gTargetPickup = NULL;
+		if (gPlayerInfo.objNode) gPlayerInfo.objNode->IsHoldingPickup = false;
+	}
+}
+#endif
 
 /********************** CHARGE BEAM ***********************************/
 

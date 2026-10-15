@@ -283,9 +283,9 @@ short   p = player->PlayerNum;
 	if (!gGamePrefs.kiddieMode)							// don't hurt in kiddie mode
 	{
 		if (MyRandomLong() & 1)
-			PlayerLoseHealth(p, tree->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
+			PlayerLoseHealthFromObject(p, tree, tree->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
 		else
-			PlayerLoseHealth(p, tree->Damage, PLAYER_DEATH_TYPE_EXPLODE, nil, true);
+			PlayerLoseHealthFromObject(p, tree, tree->Damage, PLAYER_DEATH_TYPE_EXPLODE, nil, true);
 	}
 
 	gPlayerInfo[p].invincibilityTimer = .5f;

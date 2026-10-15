@@ -11,8 +11,10 @@
 
 #include "game.h"
 #include "profiling.h"
+#include "ScriptRules.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#include "ScriptBespoke.h"
 #endif
 
 /****************************/
@@ -24,7 +26,7 @@ static void CleanupTargetPractice(void);
 static void InitTargetPracticeArea(void);
 
 static void UpdateTargetPracticeCrosshairs(void);
-static Boolean ShootPracticeBullet(void);
+static Boolean ShootPracticeBullet(const OGLVector3D* aim);
 static void MoveCrosshairsBullet(ObjNode *bullet);
 
 static void UpdateOrbLauncher(void);
@@ -113,6 +115,9 @@ void PlayTargetPractice(void)
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_TargetPractice();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScript_UpdateAttachments();
+#endif
 
 		OGL_DrawScene(DefaultDrawCallback);
 
@@ -144,6 +149,8 @@ void PlayTargetPractice(void)
 	}
 
 		/* CLEANUP LEVEL */
+	if (BillyScript_NativeRulesAllowed() && gPepperCount <= 0 && !gPlayerIsDead)
+		MarkLevelWon(gCurrentArea/2);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (gLevelCompleted && !gPlayerIsDead)
@@ -158,8 +165,6 @@ void PlayTargetPractice(void)
 	
 			/* DID WE WIN? */
 			
-	if ((gPepperCount <= 0) && (!gPlayerIsDead))
-		MarkLevelWon(gCurrentArea/2);
 }
 
 
@@ -390,6 +395,7 @@ int		oldTime, newTime;
 	UpdateOrbLauncher();
 	
 	UpdateTargetPracticeCrosshairs();	
+	if (!BillyScript_NativeRulesAllowed()) return;
 
 	
 			/* UPDATE TIMER */
@@ -474,7 +480,7 @@ shoot:
 		
 				/* SHOOT BULLET */
 				
-		if (ShootPracticeBullet())
+		if (ShootPracticeBullet(NULL))
 		{		
 			
 				/* SEE IF HIT ANYTHING */
@@ -485,17 +491,21 @@ shoot:
 			pickedObj = OGL_DoRayCollision(&ray, &worldHitCoord, STATUS_BIT_HIDDEN|STATUS_BIT_ISCULLED, CTYPE_PICKABLE);
 			if (pickedObj)
 			{
+#ifdef PANGEA_ENABLE_SCRIPTING
+				(void)BillyScript_DispatchBulletHit(NULL, pickedObj, &worldHitCoord);
+#else
 				if (pickedObj->HitByBulletCallback)
 				{
 					pickedObj->HitByBulletCallback(nil, pickedObj, &worldHitCoord);
 				}
+#endif
 			}	
 		}
 	
 	
 			/* IF OUT OF AMMO END LEVEL */
 			
-		if (gPlayerInfo.ammoCount <= 0)
+		if (BillyScript_NativeRulesAllowed() && gPlayerInfo.ammoCount <= 0)
 		{
 			PlayEffect(EFFECT_EMPTY);
 			StartLevelCompletion(3.0);
@@ -511,7 +521,7 @@ shoot:
 // returns true if shot bullet
 //
 
-static Boolean ShootPracticeBullet(void)
+static Boolean ShootPracticeBullet(const OGLVector3D* aim)
 {
 OGLPoint2D	screenPt;
 OGLRay		ray;
@@ -540,6 +550,7 @@ float	speed;
 	screenPt = LogicalPointToWindow(gCrosshairsCoord);				// calc screen coords of crosshairs
 
 	OGL_GetWorldRayAtScreenPoint(&screenPt, &ray);								// get bullet direction vector
+	if (aim) ray.direction = *aim;
 	bulletStart.x = gGameViewInfoPtr->cameraPlacement.cameraLocation.x + (ray.direction.x * 300.0f);	// get bullet start coord
 	bulletStart.y = gGameViewInfoPtr->cameraPlacement.cameraLocation.y + (ray.direction.y * 300.0f);
 	bulletStart.z = gGameViewInfoPtr->cameraPlacement.cameraLocation.z + (ray.direction.z * 300.0f);
@@ -584,6 +595,25 @@ float	speed;
 	return(true);		
 }
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool BillyScript_FirePractice(const PangeaScriptVector3* aim)
+{
+	if (GetBillyAreaMode() != BILLY_AREA_MODE_TARGET_PRACTICE || !gGameViewInfoPtr
+		|| gPlayerIsDead || gLevelCompleted || gPlayerInfo.ammoCount <= 0) return false;
+	OGLVector3D direction;
+	if (aim) direction = (OGLVector3D){aim->x, aim->y, aim->z};
+	if (!ShootPracticeBullet(aim ? &direction : NULL)) return false;
+	OGLPoint2D windowPt = LogicalPointToWindow(gCrosshairsCoord);
+	OGLRay ray;
+	OGLPoint3D hit;
+	OGL_GetWorldRayAtScreenPoint(&windowPt, &ray);
+	if (aim) ray.direction = direction;
+	ObjNode* target = OGL_DoRayCollision(&ray, &hit, STATUS_BIT_HIDDEN | STATUS_BIT_ISCULLED, CTYPE_PICKABLE);
+	if (target) (void)BillyScript_DispatchBulletHit(NULL, target, &hit);
+	return true;
+}
+#endif
+
 
 
 /********************* MOVE CROSSHAIRS BULLET ******************************/
@@ -625,12 +655,17 @@ OGLVector3D	impactNormal;
 	{
 				/* THERE WAS AN IMPACT */
 				
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!BillyScript_DispatchBulletHit(bullet, target, &impactCoord))
+			MakePuff(&impactCoord, 10.0, PARTICLE_SObjType_GreySmoke, GL_SRC_ALPHA, GL_ONE, 1.0);
+#else
 		if (target->HitByBulletCallback)
 		{
 			target->HitByBulletCallback(bullet, target, &impactCoord);
 		}
 		else
 			MakePuff(&impactCoord, 10.0, PARTICLE_SObjType_GreySmoke, GL_SRC_ALPHA, GL_ONE, 1.0);			
+#endif
 									
 		DeleteObject(bullet);
 		return;
@@ -651,6 +686,7 @@ OGLVector3D	impactNormal;
 
 static void UpdateOrbLauncher(void)
 {
+	if (!BillyScript_NativeRulesAllowed()) return;
 	if (gTargetPracticeTimer < 2.0f)			// stop launching when we're about done
 		return;
 
@@ -1068,20 +1104,8 @@ static void OrbHitByBulletCallback(ObjNode *bullet, ObjNode *orb, const OGLPoint
 OGLVector3D		splatVec;
 OGLMatrix4x4	m;
 int				i;
-	Boolean		applyDamage = true;
-	Boolean		destroyTarget = false;
-	float			damage = 1.0f;
-
-#ifdef PANGEA_ENABLE_SCRIPTING
-	applyDamage = BillyScript_OnWeaponHit(bullet, orb, damage, &damage, &destroyTarget);
-#endif
-	if (!applyDamage)
-		return;
-	if (destroyTarget)
-	{
-		DeleteObject(orb);
-		return;
-	}
+	(void)bullet;
+	if (!BillyScript_NativeRulesAllowed()) return;
 
 	switch(orb->What)
 	{

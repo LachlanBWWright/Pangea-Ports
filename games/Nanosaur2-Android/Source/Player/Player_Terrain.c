@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "../Scripting/ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -560,7 +561,7 @@ float		dist, s;
 
 			/* FADE OUT */
 
-	if (FadePlayer(player, -.3 * fps))
+	if (FadePlayer(player, -.3 * fps) && Nanosaur2Script_UsesNativeRules())
 		StartLevelCompletion(2.0);
 
 
@@ -570,7 +571,7 @@ float		dist, s;
 	if (s < 0.0f)
 	{
 		s = 0.0f;
-		StartLevelCompletion(2.0);
+		if (Nanosaur2Script_UsesNativeRules()) StartLevelCompletion(2.0);
 	}
 
 	player->Scale.x =

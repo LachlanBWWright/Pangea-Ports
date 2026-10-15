@@ -4,6 +4,25 @@
 
 #include "pangea_script.h"
 #include "structs.h"
+extern const PangeaScriptGameplayOps kBugdom2GameplayOps;
+bool Bugdom2Script_GetObjectBounds(void* nativeObject, PangeaScriptBounds* output);
+bool Bugdom2Script_SetObjectPosition(void* nativeObject, const PangeaScriptVector3* position);
+bool Bugdom2Script_GetJointPosition(void* nativeObject, int joint, PangeaScriptVector3* output);
+void Bugdom2Script_ClearPlayerRelationships(ObjNode* object);
+Boolean Bugdom2Script_MountBall(ObjNode* ball);
+ObjNode* Bugdom2Script_GetMountedPlane(void);
+Boolean Bugdom2Script_MountPlane(ObjNode* plane);
+Boolean Bugdom2Script_CreatePlaneMount(void);
+Boolean Bugdom2Script_DismountPlane(void);
+Boolean Bugdom2Script_FirePlane(Boolean bomb);
+void Bugdom2Script_ClearPlaneRelationship(ObjNode* object);
+void Bugdom2Script_AlignMountedPlane(ObjNode* player);
+void Bugdom2Script_UpdatePlayerRelationships(ObjNode* player);
+bool Bugdom2Script_MountUsesScriptController(ObjNode* object);
+void Bugdom2Script_ReleasePlayerCarry(void);
+bool Bugdom2Script_ObjectStillAlive(ObjNode* object, PangeaScriptObjectHandle handle);
+PangeaScriptStatus Bugdom2Script_RunOperation(const PangeaScriptOperationRequest* request, PangeaScriptOperationResult* output);
+bool Bugdom2Script_GetRelations(int player, PangeaScriptPlayerRelations* output);
 
 void Bugdom2Script_Init(void);
 void Bugdom2Script_Shutdown(void);
@@ -32,10 +51,11 @@ void Bugdom2Script_UnregisterObject(ObjNode* obj);
 void Bugdom2Script_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void Bugdom2Script_ApplyObjectScripting(ObjNode* obj);
 void Bugdom2Script_RunObjectFrame(ObjNode* obj);
+Boolean Bugdom2Script_ShouldRunNativeMovement(ObjNode* obj);
 void Bugdom2Script_OnAnimationEvent(ObjNode* obj, int eventValue);
 Boolean Bugdom2Script_OnDamage(ObjNode* source, float damage, int cause, float* outDamage);
 Boolean Bugdom2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pickupType, float amount, const char* pickupId);
-void Bugdom2Script_OnMouseRescued(ObjNode* mouse, ObjNode* player, Boolean drowning);
+Boolean Bugdom2Script_OnMouseRescued(ObjNode* mouse, ObjNode* player, Boolean drowning);
 void Bugdom2Script_OnObjectiveComplete(int playerNum, int outcome);
 void Bugdom2Script_OnDamageApplied(float damage, int cause);
 Boolean Bugdom2Script_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget);

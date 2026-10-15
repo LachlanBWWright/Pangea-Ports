@@ -558,6 +558,12 @@ static void test_object_command_results(PangeaScriptBackend* backend, char* erro
 	char source[2048];
 	snprintf(source, sizeof(source),
 		"local handle={id=%d,generation=%u}\n"
+		"assert(pangea.object.position(handle)~=nil)\n"
+		"assert(pangea.object.position({id=handle.id,generation=handle.generation+4294967296})==nil)\n"
+		"assert(pangea.object.position({id=handle.id,generation=handle.generation-4294967296})==nil)\n"
+		"assert(pangea.object.position({id=handle.id+4294967296,generation=handle.generation})==nil)\n"
+		"assert(not pangea.object.setPosition(handle,{x='7',y=5,z=6}))\n"
+		"assert(not pangea.object.setPosition(handle,{x=1e300,y=5,z=6}))\n"
 		"local moved=pangea.object.setPositionResult(handle,{x=4,y=5,z=6})\n"
 		"assert(moved.ok and moved.code==0 and moved.reason=='ok' and moved.primary.id==handle.id)\n"
 		"local state=pangea.object.state(handle); state.health=10; state.nested={value=3}; assert(pangea.object.captureCheckpoint(handle), 'capture')\n"
@@ -1600,6 +1606,55 @@ static void test_direct_delete_delivers_destroy(void)
 	assert(remove(path) == 0);
 }
 
+static int gRejectedPlayerDeleteCalls;
+
+static bool delete_protected_player(void* nativeObject)
+{
+	(void)nativeObject;
+	gRejectedPlayerDeleteCalls++;
+	return true;
+}
+
+static void test_player_delete_preflight(void)
+{
+	const char* path = "Data/Scripts/dist/player-delete-preflight-test.lua";
+	write_script(path,
+		"local destroyed=0 return {onObjectFrame=function(ctx)"
+		" if ctx.event=='destroy' then destroyed=destroyed+1 end end,"
+		" onFrame=function() local objects=pangea.object.all(); assert(#objects==1);"
+		" assert(not pangea.object.delete(objects[1])); assert(destroyed==0);"
+		" assert(pangea.object.exists(objects[1])) end}"
+	);
+	assert(PangeaScript_SetStartupScript(path) == PANGEA_SCRIPT_OK);
+	PangeaScriptVector3 position = {0};
+	const PangeaScriptObjectOps ops = {.getPosition = test_object_position, .deleteObject = delete_protected_player};
+	const char* tags[] = {"player"};
+	PangeaScriptObjectRegistration registration = {.nativeObject = &position, .ops = &ops,
+		.objectType = "protected-player", .tags = tags, .tagCount = 1, .capabilityLevel = PANGEA_SCRIPT_CAPABILITY_FULL};
+	PangeaScriptObjectHandle handle;
+	assert(PangeaScript_RegisterObject(&registration, &handle) == PANGEA_SCRIPT_OK);
+	assert(!PangeaScript_DeleteObject(handle));
+	assert(PangeaScript_ObjectExists(handle));
+	PangeaScriptFrameContext frame = {.levelNum = 1, .frameNum = 1};
+	assert(PangeaScript_CallFrameHook(&frame) == PANGEA_SCRIPT_OK);
+	assert(gRejectedPlayerDeleteCalls == 0);
+	assert(PangeaScript_ObjectExists(handle));
+	PangeaScript_UnregisterObject(handle);
+	assert(remove(path) == 0);
+}
+
+static void test_level_load_resets_rule_ownership(void)
+{
+	const char* path = "Data/Scripts/dist/rule-ownership-reset-test.lua";
+	write_script(path, "return {}");
+	assert(PangeaScript_SetStartupScript(path) == PANGEA_SCRIPT_OK);
+	assert(PangeaScript_SetRulesScriptControlled(true) == PANGEA_SCRIPT_OK);
+	PangeaScriptLevelContext context = {.levelNum = 1};
+	assert(PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, &context) == PANGEA_SCRIPT_OK);
+	assert(!PangeaScript_RulesAreScriptControlled());
+	assert(remove(path) == 0);
+}
+
 static void test_public_lifecycle_failure_cleanup(void)
 {
 	const char* path = "Data/Scripts/dist/lifecycle-failure-test.lua";
@@ -1799,6 +1854,19 @@ static void test_startup_script_path_validation(void)
 static void test_command_descriptors(void)
 {
 	static const char* expectedIds[] = {
+		"pangea.player.carry", "pangea.player.drop", "pangea.player.handover", "pangea.player.mount",
+		"pangea.player.dismount", "pangea.player.fire", "pangea.player.reload", "pangea.player.transform",
+		"pangea.player.respawn", "pangea.player.capture", "pangea.player.deliver", "pangea.player.resetCarried",
+		"pangea.player.releaseBuddy", "pangea.player.grab", "pangea.player.interact", "pangea.player.commandBuddy",
+		"pangea.player.setState",
+		"pangea.level.complete",
+		"pangea.level.setRulesControlled",
+		"pangea.object.attach",
+		"pangea.object.detach",
+		"pangea.object.moveKinematic",
+		"pangea.object.setScriptControlled",
+		"pangea.object.setHealth",
+		"pangea.object.setDamage",
 		"pangea.player.setHealth",
 		"pangea.player.setLives",
 		"pangea.player.setScore",
@@ -1822,6 +1890,19 @@ static void test_command_descriptors(void)
 		"pangea.object.delete",
 	};
 	static const char* expectedCapabilities[] = {
+		"player-carry", "player-drop", "player-handover", "player-mount",
+		"player-dismount", "player-fire", "player-reload", "player-transform",
+		"player-respawn", "player-capture", "player-deliver", "player-resetCarried",
+		"player-releaseBuddy", "player-grab", "player-interact", "player-commandBuddy",
+		"player-state",
+		"level-completion",
+		"level-rule-ownership",
+		"object-attachment",
+		"object-detachment",
+		"object-kinematic",
+		"object-setScriptControlled",
+		"object-setHealth",
+		"object-setDamage",
 		"player-health",
 		"player-lives",
 		"player-score",
@@ -1844,7 +1925,9 @@ static void test_command_descriptors(void)
 		"object-activation",
 		"object-delete",
 	};
-	assert(PangeaScript_GetCommandDescriptorCount() == 21);
+	const int expectedCount = sizeof(expectedIds) / sizeof(expectedIds[0]);
+	assert(sizeof(expectedIds) / sizeof(expectedIds[0]) == sizeof(expectedCapabilities) / sizeof(expectedCapabilities[0]));
+	assert(PangeaScript_GetCommandDescriptorCount() == expectedCount);
 	for (int index = 0; index < PangeaScript_GetCommandDescriptorCount(); index++)
 	{
 		const PangeaScriptCommandDescriptor* descriptor = PangeaScript_GetCommandDescriptor(index);
@@ -1856,9 +1939,14 @@ static void test_command_descriptors(void)
 		assert(strcmp(descriptor->authority, "disabled-network") == 0);
 		assert(strcmp(descriptor->applicationPhase, "callback") == 0);
 		assert(descriptor->validation != NULL && descriptor->validation[0] != '\0');
+		if (index < PANGEA_SCRIPT_OP_COUNT)
+		{
+			assert(strstr(descriptor->validation, "advertised native action") != NULL);
+			assert(strstr(descriptor->validation, "valid operation options") != NULL);
+		}
 	}
 	assert(PangeaScript_GetCommandDescriptor(-1) == NULL);
-	assert(PangeaScript_GetCommandDescriptor(21) == NULL);
+	assert(PangeaScript_GetCommandDescriptor(expectedCount) == NULL);
 	static const char* expectedEventIds[] = {
 		"onTriggerEnter", "onPickupCollected", "onWeaponHit", "onDamage", "onDamageApplied", "onDeath", "onPlayerSpawn", "onPlayerRespawn", "onCheckpointReached", "onLapComplete", "onRaceFinish", "onObjectiveComplete", "animationComplete", "destroy"
 	};
@@ -2052,8 +2140,10 @@ static void test_default_persistence_fallback(const PangeaScriptGameInfo* source
 	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.set('fallback', 3, 'native-file'))\nreturn {}\n");
 	PangeaScriptStatus startupStatus = PangeaScript_SetStartupScript("Data/Scripts/dist/default-persistence.lua");
 	assert(startupStatus == PANGEA_SCRIPT_OK);
-	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.get('fallback', 3) == 'native-file')\nassert(pangea.persistence.delete('fallback'))\nreturn {}\n");
+	write_script("Data/Scripts/dist/default-persistence.lua", "local pangea = require('pangea')\nassert(pangea.persistence.get('fallback', 3) == 'native-file')\nreturn {onLevelStart=function() assert(pangea.persistence.delete('fallback')) end}\n");
 	assert(PangeaScript_Reload() == PANGEA_SCRIPT_OK);
+	PangeaScriptLevelContext context = {0};
+	assert(PangeaScript_CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_START, &context) == PANGEA_SCRIPT_OK);
 	(void)error;
 	(void)errorCapacity;
 	assert(PangeaScript_Init(sourceGameInfo) == PANGEA_SCRIPT_OK);
@@ -2250,6 +2340,8 @@ int main(void)
 	test_public_player_gameplay_events();
 	test_public_lifecycle_self_removal();
 	test_direct_delete_delivers_destroy();
+	test_player_delete_preflight();
+	test_level_load_resets_rule_ownership();
 	test_public_lifecycle_failure_cleanup();
 	test_public_spawn_failure_cleanup();
 	test_lifecycle_cleanup_without_position();

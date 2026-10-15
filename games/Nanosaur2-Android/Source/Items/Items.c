@@ -377,7 +377,7 @@ OGLPoint3D			p;
 						PlayRumbleEffect(EFFECT_BODYHIT, i);
 					}
 
-					PlayerLoseHealth(i, fps * .1f, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
+					PlayerLoseHealthFromObject(i, theNode, fps * .1f, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
 				}
 			}
 		}

@@ -28,6 +28,7 @@ extern void PangeaNet_ClientApplySnapshot(void);
 #include "uieffects.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#include "pangea_presentation.h"
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -47,6 +48,7 @@ static void DrawLevelCallback(void);
 static void MoveTimeDemoOnSpline(ObjNode *theNode);
 static void ShowTimeDemoResults(int numFrames, float numSeconds, float averageFPS);
 static Boolean NS2ShouldProcessDeathTimerForPlayer(int playerIndex);
+static bool NS2ShouldPause(void);
 
 #ifdef __EMSCRIPTEN__
 static bool PlayLevelTick(void);
@@ -162,6 +164,22 @@ static const char* Nanosaur2VSModeName(short vsMode)
 	}
 }
 #endif
+
+static bool NS2ShouldPause(void)
+{
+	bool requested=IsNeedDown(kNeed_UIPause,ANY_PLAYER);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!requested || IsNeedDown(kNeed_UIStart,ANY_PLAYER)) return requested;
+	for (int player=0; player<gNumPlayers; player++)
+	{
+		if (!IsNeedDown(kNeed_UIPause,player)) continue;
+		if (!PangeaDialogue_IsActiveForPlayer(player) || !IsNeedDown(kNeed_UIBack,player)) return true;
+	}
+	return false;
+#else
+	return requested;
+#endif
+}
 
 static Boolean NS2ShouldProcessDeathTimerForPlayer(int playerIndex)
 {
@@ -731,6 +749,8 @@ static bool PlayLevelTick(void)
 
 			/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
+		// Capture ownership before Lua consumes Back and closes its conversation.
+	const bool shouldPause=NS2ShouldPause();
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 #ifdef PANGEA_ENABLE_SCRIPTING
 		Nanosaur2Script_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gGameLevelTimer);
@@ -798,7 +818,7 @@ static bool PlayLevelTick(void)
 		/* SEE IF PAUSED */
 		/*****************/
 
-	if (IsNeedDown(kNeed_UIPause, ANY_PLAYER))
+	if (shouldPause)
 	{
 		DoPaused();
 	}
@@ -977,6 +997,8 @@ float	fps;
 
 			/* MOVE OBJECTS & UPDATE TERRAIN & DRAW */
 
+		// Capture ownership before Lua consumes Back and closes its conversation.
+		const bool shouldPause=NS2ShouldPause();
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 #ifdef PANGEA_ENABLE_SCRIPTING
 		Nanosaur2Script_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gGameLevelTimer);
@@ -1045,7 +1067,7 @@ float	fps;
 		/* SEE IF PAUSED */
 		/*****************/
 
-		if (IsNeedDown(kNeed_UIPause, ANY_PLAYER))						// do regular pause mode
+		if (shouldPause)
 		{
 			DoPaused();
 		}
@@ -1276,6 +1298,9 @@ void MoveEverything(void)
 	Nanosaur2Pickup_Update();
 	MoveObjects();
 	MoveSplineObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	PangeaScript_UpdateAttachments();
+#endif
 	UpdateCameras();								// update camera
 	UpdateFences();
 	UpdateDustDevilUVAnimation();

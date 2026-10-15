@@ -190,11 +190,11 @@ else()
 endif()
 
 target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Headers)
+target_include_directories(${GAME_TARGET} PRIVATE ${GAME_SRCDIR}/Scripting)
 target_include_directories(${GAME_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/../../shared/metadata)
 target_include_directories(${GAME_TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/../../shared/render)
 if(PANGEA_ENABLE_SCRIPTING)
 	target_include_directories(${GAME_TARGET} PRIVATE
-		${GAME_SRCDIR}/Scripting
 		${CMAKE_SOURCE_DIR}/../../shared/script
 	)
 endif()
@@ -423,6 +423,33 @@ endif()
 #------------------------------------------------------------------------------
 # EMSCRIPTEN-SPECIFIC CONFIGURATION
 #------------------------------------------------------------------------------
+
+if(PANGEA_ENABLE_SCRIPTING AND NOT EMSCRIPTEN)
+	enable_testing()
+	add_executable(BillyScriptRuntimeTest tests/test_script_runtime_state.c Source/Scripting/ScriptRuntimeState.c)
+	target_include_directories(BillyScriptRuntimeTest PRIVATE Source/Scripting ../../shared/script)
+	target_link_libraries(BillyScriptRuntimeTest PRIVATE m)
+	add_test(NAME BillyScriptRuntimeState COMMAND BillyScriptRuntimeTest)
+	if(UNIX AND NOT APPLE)
+		add_executable(BillyScriptObjectLifetimeTest tests/test_script_object_lifetime.c Source/Scripting/ScriptObjectLifetime.c)
+		target_include_directories(BillyScriptObjectLifetimeTest PRIVATE Source/Headers Source/Scripting ../../shared/script)
+		target_compile_definitions(BillyScriptObjectLifetimeTest PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+		target_link_libraries(BillyScriptObjectLifetimeTest PRIVATE Pomme SDL3::SDL3 m)
+		add_test(NAME BillyScriptObjectLifetime COMMAND BillyScriptObjectLifetimeTest)
+		add_executable(BillyScriptBespokeTest tests/test_script_bespoke.c Source/Scripting/ScriptBespoke.c)
+		target_include_directories(BillyScriptBespokeTest PRIVATE Source/Headers Source/Scripting ../../shared/script)
+		target_compile_definitions(BillyScriptBespokeTest PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+		target_link_libraries(BillyScriptBespokeTest PRIVATE Pomme SDL3::SDL3 m)
+		add_test(NAME BillyScriptBespoke COMMAND BillyScriptBespokeTest)
+		add_executable(BillyScriptRulesTest tests/test_script_rules.c Source/Enemy/Enemy.c)
+		target_include_directories(BillyScriptRulesTest PRIVATE Source/Headers Source/Scripting ../../shared/script)
+		target_compile_definitions(BillyScriptRulesTest PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+		target_compile_options(BillyScriptRulesTest PRIVATE -ffunction-sections -fdata-sections)
+		target_link_options(BillyScriptRulesTest PRIVATE -Wl,--gc-sections)
+		target_link_libraries(BillyScriptRulesTest PRIVATE Pomme SDL3::SDL3 m)
+		add_test(NAME BillyScriptNativeRules COMMAND BillyScriptRulesTest)
+	endif()
+endif()
 
 if(EMSCRIPTEN)
 	set_target_properties(${GAME_TARGET} PROPERTIES

@@ -10,6 +10,7 @@
 /****************************/
 
 #include	"game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include	"profiling.h"
 
 /****************************/
@@ -559,7 +560,11 @@ void DrawInfobar(ObjNode *theNode)
 	}
 #endif
 
-	if (gCurrentDrawPass == 0) return;
+	if (gCurrentDrawPass == 0)
+	{
+		gCurrentSplitScreenPane = originalPane;
+		return;
+	}
 	(void) theNode;
 
 			/* DRAW SOME OTHER GOODIES WHILE WE'RE HERE */
@@ -639,6 +644,7 @@ void DrawInfobar(ObjNode *theNode)
 				break;
 	}
 
+	ScriptPresentation_Draw();
 
 
 			/***********/

@@ -11,6 +11,8 @@
 /****************************/
 
 #include "game.h"
+#include "../Scripting/ScriptBindings.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include <stddef.h>
 #include "profiling.h"
 
@@ -667,6 +669,7 @@ void DrawInfobar(ObjNode* theNode)
 
 	Infobar_DrawMap(gCurrentSplitScreenPane);
 	Infobar_DrawStartingLight(gCurrentSplitScreenPane);
+	ScriptPresentation_Draw();
 
 
 		/* DRAW GAME MODE SPECIFICS */
@@ -1036,6 +1039,7 @@ short	p = objNode->PlayerNum;
 static void Infobar_DrawStartingLight(Byte whichPane)
 {
 int		oldTimer;
+	if (!CroMagScript_NativeRulesEnabled()) return;
 
 	if (gGamePaused)
 		return;
@@ -1803,6 +1807,13 @@ void DecCurrentPOWQuantity(short playerNum)
 //			mode 1 : won
 //			mode 2 : lost
 //
+
+void ClearWinLose(short playerNum)
+{
+	if (playerNum < 0 || playerNum >= MAX_PLAYERS || !gWinLoseString[playerNum]) return;
+	DeleteObject(gWinLoseString[playerNum]);
+	gWinLoseString[playerNum] = nil;
+}
 
 void ShowWinLose(short playerNum, Byte mode, short winner)
 {

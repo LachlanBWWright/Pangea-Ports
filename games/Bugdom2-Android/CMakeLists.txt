@@ -26,6 +26,7 @@ if(PANGEA_SAFE_ITEM_LOADING)
 	add_compile_definitions(PANGEA_SAFE_ITEM_LOADING=1)
 endif()
 option(PANGEA_ENABLE_SCRIPTING "Enable Lua scripting support" OFF)
+option(PANGEA_BUILD_SCRIPT_TESTS "Build native scripting regression tests on Linux" OFF)
 option(PANGEA_ENABLE_LEVEL_METADATA "Enable optional level metadata overrides" ON)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
@@ -277,6 +278,12 @@ endif()
 
 if(PANGEA_ENABLE_SCRIPTING)
 	target_link_libraries(${GAME_TARGET} PRIVATE PangeaScript)
+endif()
+
+if(PANGEA_BUILD_SCRIPT_TESTS AND PANGEA_ENABLE_SCRIPTING
+	AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+	enable_testing()
+	add_subdirectory(tests)
 endif()
 
 # Android-specific libraries

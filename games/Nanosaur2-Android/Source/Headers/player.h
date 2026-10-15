@@ -199,6 +199,7 @@ void InitPlayerAtStartOfLevel(void);
 Boolean DoTrig_Player(ObjNode *trigger, ObjNode *theNode);
 
 Boolean PlayerLoseHealth(short playerNum, float damage, Byte deathType, OGLPoint3D *where, Boolean disorient);
+Boolean PlayerLoseHealthFromObject(short playerNum, ObjNode* source, float damage, Byte deathType, OGLPoint3D *where, Boolean disorient);
 void KillPlayer(short playerNum, Byte deathType, OGLPoint3D *where);
 void ExplodePlayer(ObjNode *player, short playerNum, OGLPoint3D *where);
 void DisorientPlayer(ObjNode *player);

@@ -335,6 +335,12 @@ bool GetNeedState(int needID)
 	return 0 != (gNeedStates[needID] & KEYSTATE_ACTIVE_BIT);
 }
 
+bool GetReleasedNeedState(int needID)
+{
+	SDL_assert(needID >= 0 && needID < NUM_CONTROL_NEEDS);
+	return gNeedStates[needID] == KEYSTATE_UP;
+}
+
 bool GetNewNeedState(int needID)
 {
 	GAME_ASSERT(needID < NUM_CONTROL_NEEDS);

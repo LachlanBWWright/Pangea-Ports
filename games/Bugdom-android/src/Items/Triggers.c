@@ -756,6 +756,8 @@ ObjNode *plunger;
 
 static Boolean DoTrig_Detonator(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 {
+	if (BugdomScript_OwnedRuleTrigger(theNode, whoNode, sideBits, "bugdom.detonator"))
+		return true;
 	(void) whoNode;
 	(void) sideBits;
 	
@@ -911,6 +913,8 @@ static Boolean DoTrig_LawnDoor(ObjNode *theNode, ObjNode *whoNode, Byte sideBits
 {
 int	keyNum;
 
+	if (BugdomScript_OwnedRuleTrigger(theNode, whoNode, sideBits, "bugdom.lawn-door"))
+		return true;
 	(void) whoNode;
 	(void) sideBits;
 
@@ -1239,6 +1243,7 @@ static Boolean DoTrig_Powerup(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 		return(false);
 #endif
 
+	if (BugdomScript_NativeRulesEnabled())
 	switch(theNode->NutContents)
 	{
 		case	NUT_CONTENTS_KEY:
@@ -1466,6 +1471,8 @@ static Boolean DoTrig_WaterValve(ObjNode *theNode, ObjNode *whoNode, Byte sideBi
 short	id;
 ObjNode *handle;
 
+	if (BugdomScript_OwnedRuleTrigger(theNode, whoNode, sideBits, "bugdom.water-valve"))
+		return true;
 	(void) sideBits;
 	(void) whoNode;
 

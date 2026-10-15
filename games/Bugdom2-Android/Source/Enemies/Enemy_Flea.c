@@ -910,7 +910,7 @@ static void KillFlea(ObjNode *enemy)
 				DoDialogMessage(DIALOG_MESSAGE_GOTFLEAS, 1, 8.0, nil);
 			else																// all ticks and fleas dead, so level done
 			{
-				StartLevelCompletion(4.0);
+				StartAutomaticLevelCompletion(4.0);
 				DoDialogMessage(DIALOG_MESSAGE_HAPPYDOG, 1, 4.0, nil);
 			}
 		}

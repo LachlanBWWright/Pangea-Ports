@@ -19,8 +19,34 @@ typedef struct
 } AtlasGlyph;
 
 static GLuint gFontTexture = 0;
+
+bool TextMesh_IsAvailable(void) { return gFontTexture != 0; }
 static float gLineHeight = 0;
 static AtlasGlyph gAtlasGlyphs[MAX_CODEPOINTS];
+static bool gAtlasGlyphLoaded[MAX_CODEPOINTS];
+
+static uint8_t GetUnaccentedGlyph(unsigned char code)
+{
+	bool lowercase = code >= 0xe0;
+	if (lowercase) code -= 0x20;
+	unsigned char base = '?';
+	if (code >= 0xc0 && code <= 0xc5) base = 'A';
+	else if (code == 0xc7) base = 'C';
+	else if (code >= 0xc8 && code <= 0xcb) base = 'E';
+	else if (code >= 0xcc && code <= 0xcf) base = 'I';
+	else if (code == 0xd1) base = 'N';
+	else if (code >= 0xd2 && code <= 0xd6) base = 'O';
+	else if (code >= 0xd9 && code <= 0xdc) base = 'U';
+	else if (code == 0xdd || (lowercase && code == 0xdf)) base = 'Y';
+	return lowercase && base != '?' ? base + 0x20 : base;
+}
+
+static uint8_t GetGlyphCode(unsigned char code)
+{
+	if (code == '\t') code = ' ';
+	if (gAtlasGlyphLoaded[code]) return code;
+	return GetUnaccentedGlyph(code);
+}
 
 static const TextMeshDef gDefaultTextMeshDef =
 {
@@ -68,9 +94,10 @@ TQ3TriMeshData* TextMesh_SetMesh(const TextMeshDef* def, const char* text, TQ3Tr
 		if (*c == '\n')		// TODO: line widths for strings containing line breaks aren't supported yet
 			continue;
 
-		const AtlasGlyph g = gAtlasGlyphs[(uint8_t) *c];
+		uint8_t code = GetGlyphCode((unsigned char) *c);
+		const AtlasGlyph g = gAtlasGlyphs[code];
 		lineWidth += g.xadv + spacing;
-		if (*c != ' ')
+		if (code != ' ')
 			numQuads++;
 	}
 
@@ -87,6 +114,11 @@ TQ3TriMeshData* TextMesh_SetMesh(const TextMeshDef* def, const char* text, TQ3Tr
 
 	// Create the mesh
 	TQ3TriMeshData* mesh;
+	if (recycleMesh && (recycleMesh->numTriangles < numQuads*2 || recycleMesh->numPoints < numQuads*4))
+	{
+		Q3TriMeshData_Dispose(recycleMesh);
+		recycleMesh = NULL;
+	}
 	if (recycleMesh)
 	{
 		mesh = recycleMesh;
@@ -115,9 +147,10 @@ TQ3TriMeshData* TextMesh_SetMesh(const TextMeshDef* def, const char* text, TQ3Tr
 			continue;
 		}
 
-		const AtlasGlyph g = gAtlasGlyphs[(uint8_t) *c];
+		uint8_t code = GetGlyphCode((unsigned char) *c);
+		const AtlasGlyph g = gAtlasGlyphs[code];
 
-		if (*c == ' ')
+		if (code == ' ')
 		{
 			x += g.xadv + spacing;
 			continue;
@@ -223,6 +256,7 @@ static void ParseSFL(const char* data)
 		GAME_ASSERT(codepoint < MAX_CODEPOINTS);
 
 		gAtlasGlyphs[codepoint] = g;
+		gAtlasGlyphLoaded[codepoint] = true;
 
 		SkipLine(&data);
 	}
@@ -233,6 +267,9 @@ void TextMesh_Init(void)
 	OSErr err;
 	short refNum;
 	FSSpec spec;
+	if (TextMesh_IsAvailable()) return;
+	SDL_memset(gAtlasGlyphs, 0, sizeof(gAtlasGlyphs));
+	SDL_memset(gAtlasGlyphLoaded, 0, sizeof(gAtlasGlyphLoaded));
 
 	gFontTexture = QD3D_LoadTextureFile(3000, kRendererTextureFlags_GrayscaleIsAlpha);
 	if (gFontTexture == 0)
@@ -291,6 +328,7 @@ void TextMesh_Shutdown(void)
 		glDeleteTextures(1, &gFontTexture);
 		gFontTexture = 0;
 	}
+	SDL_memset(gAtlasGlyphLoaded, 0, sizeof(gAtlasGlyphLoaded));
 }
 
 void TextMesh_FillDef(TextMeshDef* def)

@@ -408,11 +408,25 @@ ObjNode		*thisNodePtr;
 	
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScriptObjectHandle frameHandle = {thisNodePtr->ScriptObjectID, thisNodePtr->ScriptObjectGeneration};
+#endif
 					
 			
 				/* UPDATE ANIMATION */
 				
-		UpdateSkeletonAnimation(thisNodePtr);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!thisNodePtr->ScriptInactive)
+#endif
+			UpdateSkeletonAnimation(thisNodePtr);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!BillyScript_ObjectStillAlive(thisNodePtr, frameHandle))
+		{
+			thisNodePtr = gNextNode;
+			continue;
+		}
+#endif
 
 
 					/* NEXT TRY TO MOVE IT */
@@ -422,12 +436,15 @@ ObjNode		*thisNodePtr;
 			if ((!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE)) &&	(thisNodePtr->MoveCall != nil))
 			{
 				KeepOldCollisionBoxes(thisNodePtr);					// keep old boxes & other stuff
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (BillyScript_CanRunNativeBehavior(thisNodePtr))
+#endif
 				thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
 			}
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+		if (BillyScript_ObjectStillAlive(thisNodePtr, frameHandle) && thisNodePtr->ScriptObjectID != 0)
 			BillyScript_RunObjectFrame(thisNodePtr);
 #endif
 		thisNodePtr = gNextNode;							// next node

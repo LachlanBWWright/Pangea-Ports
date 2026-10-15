@@ -4,6 +4,7 @@
 /****************************/
 
 #include "game.h"
+#include "../Scripting/ScriptBindings.h"
 #include "menu.h"
 #include <SDL3/SDL_time.h>
 
@@ -64,7 +65,7 @@ char* FormatRaceTime(float t)
 
 void TickLapTimes(int playerNum)
 {
-	if (!IsRaceMode())
+	if (!IsRaceMode() || !CroMagScript_NativeRulesEnabled())
 	{
 		return;
 	}

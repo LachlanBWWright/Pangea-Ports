@@ -27,6 +27,7 @@ void NanosaurScript_UnregisterObject(ObjNode* obj);
 void NanosaurScript_CacheFrameContext(const PangeaScriptFrameContext* ctx);
 void NanosaurScript_ApplyObjectScripting(ObjNode* obj);
 void NanosaurScript_RunObjectFrame(ObjNode* obj);
+bool NanosaurScript_RunNativeTransition(ObjNode* obj);
 void NanosaurScript_OnObjectDeleted(ObjNode* obj);
 void NanosaurScript_OnCustomTrigger(ObjNode* triggerNode, ObjNode* whoNode, Byte sideBits);
 void NanosaurScript_OnAnimationEvent(ObjNode* obj, int eventValue);

@@ -226,6 +226,8 @@ void InitPlayerInfo_Game(void);
 void InitPlayerAtStartOfLevel_Terrain(void);
 void InitPlayerAtStartOfLevel_Tunnel(void);
 Boolean PlayerLoseHealth(float damage, Byte deathType);
+Boolean PlayerApplyDamage(float damage, Byte deathType);
+void ResetPlayerInTunnel(void);
 void PlayerEntersWater(ObjNode *theNode, int patchNum);
 void PlayerGotHit(ObjNode *byWhat, float altDamage, int hitAnim);
 void KillPlayer(Byte deathType);
@@ -271,6 +273,7 @@ void ReleaseHeldObject(ObjNode *player, ObjNode *heldObj);
 
 void CreateMyBuddy(OGLPoint3D *where);
 void SeeIfLaunchBuddyBug(void);
+Boolean LaunchBuddyBug(void);
 
 		/* BALSA */
 

@@ -138,8 +138,10 @@ struct ObjNode
 	uint32_t		ScriptObjectGeneration;
 	unsigned long		ScriptCollisionBits;
 	Boolean			ScriptCollisionStateInitialized;
+	Boolean			ScriptCollisionEnabled;
 	Boolean			ScriptActiveDrawFlag;
 	Boolean			ScriptActiveMoveFlag;
+	Boolean			ScriptActiveAnimFlag;
 	Boolean			ScriptActiveStateInitialized;
 	Boolean			ScriptActive;
 	char			ScriptDefinitionID[96];
@@ -151,6 +153,7 @@ struct ObjNode
 	long		InjuryThreshold;	// threshold for weapon to do damage to enemy
 
 	long			NodeNum;			// node # in array (for internal use)
+	uint32_t AllocationGeneration;
 	struct ObjNode	*PrevNode;		// address of previous node in linked list
 	struct ObjNode	*NextNode;		// address of next node in linked list
 };

@@ -451,6 +451,31 @@ ObjNode	*theNode;
 		theNode = gSplineObjectList[i];
 		if (theNode)
 		{
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (theNode->ScriptDeleteRequested)
+			{
+				DeleteObject(theNode);
+				continue;
+			}
+#endif
+			if (theNode->ScriptActiveStateInitialized && !theNode->ScriptActive)
+				continue;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (OttoScript_UsesControllerOverride(theNode))
+			{
+				OttoScript_RunObjectFrame(theNode, false);
+				if (theNode->ScriptDeleteRequested)
+				{
+					DeleteObject(theNode);
+					continue;
+				}
+				if (theNode->CType != INVALID_NODE_FLAG)
+				{
+					UpdateObjectTransforms(theNode);
+				}
+				continue;
+			}
+#endif
 			if (theNode->SplineMoveCall)
 			{
 				KeepOldCollisionBoxes(theNode);					// keep old boxes & other stuff

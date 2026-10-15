@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "../Scripting/ScriptCombat.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -572,8 +573,7 @@ uint32_t			cType;
 
 		if (hitObj)
 		{
-			if (hitObj->HitByWeaponHandler)											// see if there is a handler for this object
-				hitObj->HitByWeaponHandler(theNode, hitObj, &hitPt, &hitNormal);	// call the handler
+			DispatchProjectileHit(theNode, hitObj, &hitPt, &hitNormal);
 		}
 
 				/**********************/
@@ -1383,8 +1383,7 @@ uint32_t			cType;
 
 		if (hitObj)
 		{
-			if (hitObj->HitByWeaponHandler)											// see if there is a handler for this object
-				hitObj->HitByWeaponHandler(theNode, hitObj, &hitPt, &hitNormal);	// call the handler
+			DispatchProjectileHit(theNode, hitObj, &hitPt, &hitNormal);
 		}
 
 				/**********************/
@@ -1744,8 +1743,7 @@ ObjNode	*hitObj;
 			hitObj = gCollisionList[i].objectPtr;
 			if (hitObj)
 			{
-				if (hitObj->HitByWeaponHandler)								// see if there is a handler for this object
-					hitObj->HitByWeaponHandler(bullet, hitObj, nil, nil);	// call the handler
+				DispatchProjectileHit(bullet, hitObj, nil, nil);
 			}
 		}
 
@@ -2007,8 +2005,7 @@ uint32_t			cType;
 
 		if (hitObj)
 		{
-			if (hitObj->HitByWeaponHandler)											// see if there is a handler for this object
-				hitObj->HitByWeaponHandler(theNode, hitObj, &hitPt, &hitNormal);	// call the handler
+			DispatchProjectileHit(theNode, hitObj, &hitPt, &hitNormal);
 		}
 
 				/**********************/
@@ -2225,8 +2222,7 @@ float	oldDamage;
 			d = CalcDistance3D(x, y, z, thisNodePtr->Coord.x, thisNodePtr->Coord.y, thisNodePtr->Coord.z);
 			if (d < radius)
 			{
-				if (thisNodePtr->HitByWeaponHandler)
-					thisNodePtr->HitByWeaponHandler(wave, thisNodePtr, nil, nil);
+				DispatchProjectileHit(wave, thisNodePtr, nil, nil);
 			}
 		}
 		thisNodePtr = (ObjNode *)thisNodePtr->NextNode;		// next node

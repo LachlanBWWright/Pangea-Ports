@@ -488,6 +488,9 @@ float	fps = gFramesPerSecondFrac;
 	MoveVaporTrails();
 	MoveObjects();
 	MoveSplineObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	PangeaScript_UpdateAttachments();
+#endif
 	MoveShards();
 	UpdateCamera();								// update camera
 

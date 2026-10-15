@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include "profiling.h"
 
 /****************************/
@@ -122,7 +123,7 @@ static	float	gHumanOffsetX[NUM_HUMAN_TYPES];
 
 /*************** ASPECT RATIO-INDEPENDENT ANCHORS ******************/
 
-static inline float GetUIScale(void)
+float GetUIScale(void)
 {
 	// During normal gameplay, Otto may fill up 5 different weapon slots in level 10.
 	// The max scale to be able to fit 5 weapon slots comfortably in a 4:3 aspect ratio is 1.1x.
@@ -345,6 +346,7 @@ void DrawInfobar(void)
 	}
 
 	UpdateHelpMessage();
+	ScriptPresentation_Draw();
 
 			/***********/
 			/* CLEANUP */

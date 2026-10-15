@@ -217,7 +217,8 @@ static void MovePlayer_Bug(ObjNode *theNode)
 			
 	if (theNode->InvincibleTimer > 0.0f)
 	{
-		theNode->InvincibleTimer -= gFramesPerSecondFrac;
+		if (BugdomScript_NativeRulesEnabled())
+			theNode->InvincibleTimer -= gFramesPerSecondFrac;
 		if (theNode->InvincibleTimer < 0.0f)
 			theNode->InvincibleTimer = 0;
 	}
@@ -318,7 +319,7 @@ static void MovePlayerBug_RollUp(void)
 	
 		/* SEE IF DONE */
 		
-	if (gPlayerObj->Skeleton->AnimHasStopped)
+	if (gPlayerObj->Skeleton->AnimHasStopped && BugdomScript_NativeRulesEnabled())
 	{
 		InitPlayer_Ball(gPlayerObj, &gCoord);
 		return;	
@@ -665,7 +666,10 @@ float			s;
 
 			/* DRIVE WATER BUG */
 			
-	DriveWaterBug(gCurrentWaterBug, gPlayerObj);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (BugdomScript_ShouldRunNativeMovement(gCurrentWaterBug))
+#endif
+		DriveWaterBug(gCurrentWaterBug, gPlayerObj);
 
 
 		/**********************************/
@@ -722,7 +726,10 @@ hop_off:
 
 			/* DRIVE BUG */
 			
-	DriveDragonFly(gCurrentDragonFly, gPlayerObj);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (BugdomScript_ShouldRunNativeMovement(gCurrentDragonFly))
+#endif
+		DriveDragonFly(gCurrentDragonFly, gPlayerObj);
 
 
 			/* UPDATE MY PLACEMENT ON THE BUG */
@@ -1397,6 +1404,8 @@ float	minDist,dist,myX,myZ,myY;
 
 void KnockPlayerBugOnButt(TQ3Vector3D *delta, Boolean allowBall, Boolean playerIsCurrent)
 {
+	if (!BugdomScript_NativeRulesEnabled())
+		return;
 	
 			/* IF WAS BALL, NOW ITS A BUG */
 			

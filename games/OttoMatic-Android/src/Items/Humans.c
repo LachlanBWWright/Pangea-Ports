@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -538,8 +539,11 @@ Boolean DoTrig_Human(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 
 	MorphToSkeletonAnim(theNode->Skeleton, 3, 6);
 
-	gNumHumansRescuedTotal++;							// inc rescue counter
-	gNumHumansRescuedOfType[theNode->HumanType]++;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	OttoScript_OnHumanRescued(theNode);
+	if (theNode->CType == INVALID_NODE_FLAG) return true;
+#endif
+	OttoScript_RecordNativeRescue(theNode->HumanType);
 
 	return(true);
 }
@@ -878,6 +882,22 @@ float	fps = gFramesPerSecondFrac;
 
 }
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+void OttoScript_ReleaseNativeHuman(ObjNode* human)
+{
+	if (!human || !human->Skeleton || (human->CType & CTYPE_PLAYER) ||
+		(human->MoveCall != MoveHuman_ToPlayerSaucer && human->MoveCall != MoveHuman_BeamDown &&
+		human->MoveCall != MoveHuman_ToRocketRamp && human->MoveCall != MoveHuman_UpRocketRamp)) return;
+	human->MoveCall = MoveHuman;
+	human->CType = CTYPE_HUMAN | CTYPE_TRIGGER;
+	human->Delta = (OGLVector3D){0};
+	human->Coord.y = FindHighestCollisionAtXZ(human->Coord.x, human->Coord.z,
+		CTYPE_MISC | CTYPE_MPLATFORM | CTYPE_TERRAIN) - human->BBox.min.y + 20.0f;
+	SetSkeletonAnim(human->Skeleton, HUMAN_ANIM_STAND);
+	UpdateObjectTransforms(human);
+}
+#endif
+
 /******************** MOVE HUMAN:  TO PLAYER SAUCER *********************/
 
 void MoveHuman_ToPlayerSaucer(ObjNode *theNode)
@@ -907,6 +927,7 @@ float	fps = gFramesPerSecondFrac;
 		gNumHumansInSaucer++;											// inc count
 		gNumHumansInTransit--;
 
+		theNode->MoveCall = nil;
 		DeleteHumanObject(theNode);
 
 		return;
@@ -1054,12 +1075,16 @@ float	fps = gFramesPerSecondFrac;
 
 			else
 			{
-				gNumHumansRescuedTotal++;								// add to rescued list
-				gNumHumansRescuedOfType[human->HumanType]++;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				OttoScript_OnHumanRescued(human);
+				if (human->CType == INVALID_NODE_FLAG) return;
+#endif
+				bool nativeReward = OttoScript_RecordNativeRescue(human->HumanType);
 
 				PlayEffect3D(EFFECT_TELEPORTHUMAN, &human->Coord);
 
 				DeleteHumanObject(human);
+				if (!nativeReward) return;
 
 				gPlayerInfo.fuel += .05f;								// get fuel for that
 				if (gPlayerInfo.fuel > 1.0f)							// see if we're now full of fuel

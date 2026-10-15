@@ -245,6 +245,7 @@ struct ObjNode
 			Boolean			ScriptAnimationCompletionSent;
 			Boolean			ScriptActiveStateInitialized;
 			Boolean			ScriptActive;
+	UInt32			ScriptInactiveSavedStatus;
 	float			Health;				// health 0..1
 	float			Damage;				// damage
 	

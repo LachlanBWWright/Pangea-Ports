@@ -6,6 +6,7 @@
 #include "pangea_script.h"
 
 void OttoScript_Init(void);
+bool OttoScript_UsesControllerOverride(ObjNode* node);
 void OttoScript_Shutdown(void);
 void OttoScript_LoadLevelConfig(int levelNum);
 void OttoScript_OnLevelLoad(int levelNum);
@@ -35,6 +36,7 @@ int OttoScript_ProbeCheckpointResetJS(void);
 int OttoScript_ProbeDeathJS(void);
 int OttoScript_ProbeLevelCompleteJS(void);
 void OttoScript_RegisterHuman(ObjNode* human);
+void OttoScript_OnHumanRescued(ObjNode* human);
 void OttoScript_UnregisterHuman(ObjNode* human);
 void OttoScript_RegisterPlayerObject(ObjNode* player);
 void OttoScript_RunHumanObjectFrame(ObjNode* human, Boolean usesGlobals);
@@ -54,5 +56,25 @@ void OttoScript_OnDamageApplied(float damage, int cause);
 void OttoScript_OnPlayerSpawn(ObjNode* player);
 void OttoScript_OnPlayerRespawn(ObjNode* player);
 void OttoScript_OnDeath(int eventValue);
+bool OttoScript_FireNativeWeapon(void);
+bool OttoScript_CaptureNativeHuman(ObjNode* human);
+bool OttoScript_DeliverNativeHumans(void);
+bool OttoScript_DropNativeHumans(void);
+void OttoScript_CancelNativeDelivery(void);
+void OttoScript_ReleaseNativeHuman(ObjNode* human);
+bool OttoScript_EnterNativeSaucer(ObjNode* saucer);
+bool OttoScript_ExitNativeSaucer(void);
+void OttoScript_ClearNativeRelationships(ObjNode* node);
+bool OttoScript_MountNativeCar(ObjNode* car);
+bool OttoScript_DismountNativeCar(void);
+ObjNode* OttoScript_GetNativeCar(void);
+void OttoScript_ClearNativeCar(ObjNode* node);
+bool OttoScript_CarryNativePickup(ObjNode* pickup);
+bool OttoScript_DropNativePickup(void);
+bool OttoScript_IsNativeDelegated(ObjNode* node);
+void OttoScript_UpdateNativeCarryPose(ObjNode* player);
+void OttoScript_RestoreNativePickup(ObjNode* pickup);
+void OttoScript_ForgetNativePickup(ObjNode* pickup);
+void OttoScript_CancelNativeWeapon(void);
 
 #endif

@@ -169,7 +169,7 @@ float	fps = gFramesPerSecondFrac;
 
 		if (OGLPoint3D_Distance(&gPlayerInfo.coord, &p) < 50.0f)
 		{
-			StartLevelCompletion(0);
+			StartAutomaticLevelCompletion(0);
 		}
 	}
 }
@@ -509,6 +509,7 @@ static void LetBeesOutOfHive(ObjNode *hive)
 ObjNode	*bee;
 static OGLPoint3D doorOff = {-110, 330, 0};
 float	r;
+	if (!AllowNativeGameplayRules()) return;
 
 	if (gNumFreedBees > NUM_FEE_BEES)
 		return;

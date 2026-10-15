@@ -1,14 +1,18 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "ScriptBindings.h"
+#include "pangea_presentation_game.h"
 
 #include "structs.h"
 #include "splineitems.h"
 #include "checkpoints.h"
 #include "triggers.h"
+#include "pangea_net.h"
 
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+#include <limits.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -22,6 +26,9 @@ static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 
 static PangeaScriptFrameContext gScriptFrameContext;
+static float gScriptSimulationTime;
+static uint32_t gScriptPreviousControlBits[MAX_PLAYERS];
+static uint32_t gScriptReleasedControlBits[MAX_PLAYERS];
 
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE int CroMagScript_ProbeRaceCompletionJS(void)
@@ -244,12 +251,41 @@ static bool CroMagScript_GetObjectPosition(void* nativeObject, PangeaScriptVecto
 static bool CroMagScript_SetObjectPosition(void* nativeObject, const PangeaScriptVector3* position)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !position || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || !position || obj->CType == INVALID_NODE_FLAG ||
+		!isfinite(position->x) || !isfinite(position->y) || !isfinite(position->z))
 		return false;
 
+	PangeaScriptVector3 offset = {position->x - obj->Coord.x, position->y - obj->Coord.y, position->z - obj->Coord.z};
+	if (!isfinite(offset.x) || !isfinite(offset.y) || !isfinite(offset.z)) return false;
+	for (int i = 0; obj->CollisionBoxes && i < obj->NumCollisionBoxes; i++)
+	{
+		const CollisionBoxType* box = &obj->CollisionBoxes[i];
+		long double coordinates[] = {(long double)box->left + offset.x, (long double)box->right + offset.x,
+			(long double)box->bottom + offset.y, (long double)box->top + offset.y,
+			(long double)box->back + offset.z, (long double)box->front + offset.z};
+		for (int axis = 0; axis < 6; axis++)
+			if (coordinates[axis] < LONG_MIN || coordinates[axis] > LONG_MAX) return false;
+	}
+	for (int i = 0; obj->CollisionBoxes && i < obj->NumCollisionBoxes; i++)
+	{
+		CollisionBoxType* box = &obj->CollisionBoxes[i];
+		box->left = (long)((long double)box->left + offset.x);
+		box->right = (long)((long double)box->right + offset.x);
+		box->bottom = (long)((long double)box->bottom + offset.y);
+		box->top = (long)((long double)box->top + offset.y);
+		box->back = (long)((long double)box->back + offset.z);
+		box->front = (long)((long double)box->front + offset.z);
+	}
 	obj->Coord.x = position->x;
 	obj->Coord.y = position->y;
 	obj->Coord.z = position->z;
+	for (int player = 0; player < gNumTotalPlayers; player++)
+	{
+		if (gPlayerInfo[player].objNode != obj) continue;
+		gPlayerInfo[player].coord = obj->Coord;
+		if (offset.x != 0 || offset.y != 0 || offset.z != 0) obj->ScriptContactStateInvalidated = true;
+	}
+	UpdateObjectTransforms(obj);
 	return true;
 }
 
@@ -265,12 +301,18 @@ static bool CroMagScript_GetObjectVelocity(void* nativeObject, PangeaScriptVecto
 static bool CroMagScript_SetObjectVelocity(void* nativeObject, const PangeaScriptVector3* velocity)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !velocity || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || !velocity || obj->CType == INVALID_NODE_FLAG ||
+		!isfinite(velocity->x) || !isfinite(velocity->y) || !isfinite(velocity->z))
 		return false;
+	float speed2D = hypotf(velocity->x, velocity->z);
+	float speed3D = hypotf(speed2D, velocity->y);
+	if (!isfinite(speed3D)) return false;
 
 	obj->Delta.x = velocity->x;
 	obj->Delta.y = velocity->y;
 	obj->Delta.z = velocity->z;
+	obj->Speed2D = speed2D;
+	obj->Speed3D = speed3D;
 	return true;
 }
 
@@ -286,7 +328,8 @@ static bool CroMagScript_GetObjectRotation(void* nativeObject, PangeaScriptVecto
 static bool CroMagScript_SetObjectRotation(void* nativeObject, const PangeaScriptVector3* rotation)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
-	if (!obj || !rotation || obj->CType == INVALID_NODE_FLAG) return false;
+	if (!obj || !rotation || obj->CType == INVALID_NODE_FLAG ||
+		!isfinite(rotation->x) || !isfinite(rotation->y) || !isfinite(rotation->z)) return false;
 	obj->Rot = (OGLVector3D){rotation->x, rotation->y, rotation->z};
 	UpdateObjectTransforms(obj);
 	return true;
@@ -304,7 +347,7 @@ static bool CroMagScript_GetObjectScale(void* nativeObject, float* outScale)
 static bool CroMagScript_SetObjectScale(void* nativeObject, float scale)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG || scale <= 0.0f) return false;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(scale) || scale <= 0.0f) return false;
 	obj->Scale = (OGLVector3D){scale, scale, scale};
 	UpdateObjectTransforms(obj);
 	return true;
@@ -342,6 +385,18 @@ static bool CroMagScript_GetObjectHealth(void* nativeObject, float* outHealth)
 	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
 		return false;
 	*outHealth = obj->Health;
+	for (int i = 0; i < gNumTotalPlayers; i++)
+		if (gPlayerInfo[i].objNode == obj) *outHealth = gPlayerInfo[i].health;
+	return true;
+}
+
+static bool CroMagScript_SetObjectHealth(void* nativeObject, float health)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(health) || health < 0) return false;
+	obj->Health = health;
+	for (int i = 0; i < gNumTotalPlayers; i++)
+		if (gPlayerInfo[i].objNode == obj) gPlayerInfo[i].health = health;
 	return true;
 }
 
@@ -349,11 +404,10 @@ static bool CroMagScript_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (!obj->ScriptDefinitionID[0]) return true;
 	obj->ScriptActiveStateInitialized = true;
 	obj->ScriptActive = active;
-	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE);
+	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION | STATUS_BIT_NOMOVE;
 	return true;
 }
 
@@ -396,7 +450,10 @@ static bool CroMagScript_GetObjectAnimationFrame(void* nativeObject, int* outFra
 static bool CroMagScript_SetObjectAnimation(void* nativeObject, int animation, float speed, float blendSeconds)
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
-	if (!obj || !obj->Skeleton || obj->CType == INVALID_NODE_FLAG || animation < 0) return false;
+	if (!obj || !obj->Skeleton || !obj->Skeleton->skeletonDefinition ||
+		obj->CType == INVALID_NODE_FLAG || animation < 0 ||
+		animation >= obj->Skeleton->skeletonDefinition->NumAnims ||
+		!isfinite(speed) || speed < 0 || !isfinite(blendSeconds) || blendSeconds < 0) return false;
 	if (blendSeconds > 0.0f) MorphToSkeletonAnim(obj->Skeleton, animation, 1.0f / blendSeconds);
 	else SetSkeletonAnim(obj->Skeleton, animation);
 	obj->Skeleton->AnimSpeed = speed;
@@ -431,6 +488,42 @@ static bool CroMagScript_DeleteObject(void* nativeObject)
 	return true;
 }
 
+static bool GetScriptJointPosition(void* nativeObject, int joint, PangeaScriptVector3* output)
+{
+	ObjNode* node = nativeObject;
+	if (!node || !output || node->CType == INVALID_NODE_FLAG || !node->Skeleton ||
+		!node->Skeleton->skeletonDefinition || joint < 0 ||
+		joint >= node->Skeleton->skeletonDefinition->NumBones) return false;
+	OGLPoint3D local = {0, 0, 0}, world;
+	FindCoordOnJoint(node, joint, &local, &world);
+	*output = (PangeaScriptVector3){world.x, world.y, world.z};
+	return true;
+}
+
+static bool GetScriptObjectBounds(void* nativeObject, PangeaScriptBounds* output)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || !output || obj->CType == INVALID_NODE_FLAG || !obj->CollisionBoxes || obj->NumCollisionBoxes <= 0)
+		return false;
+	for (int i = 0; i < obj->NumCollisionBoxes; i++)
+	{
+		const CollisionBoxType* box = &obj->CollisionBoxes[i];
+		if (box->left > box->right || box->bottom > box->top || box->back > box->front) return false;
+		if (i == 0)
+			*output = (PangeaScriptBounds){{box->left, box->bottom, box->back}, {box->right, box->top, box->front}};
+		else
+		{
+			output->min.x = fminf(output->min.x, box->left);
+			output->min.y = fminf(output->min.y, box->bottom);
+			output->min.z = fminf(output->min.z, box->back);
+			output->max.x = fmaxf(output->max.x, box->right);
+			output->max.y = fmaxf(output->max.y, box->top);
+			output->max.z = fmaxf(output->max.z, box->front);
+		}
+	}
+	return true;
+}
+
 static const PangeaScriptObjectOps kCroMagPlayerObjectOps =
 {
 	.getPosition = CroMagScript_GetObjectPosition,
@@ -442,6 +535,9 @@ static const PangeaScriptObjectOps kCroMagPlayerObjectOps =
 	.getAnimationFrame = CroMagScript_GetObjectAnimationFrame,
 	.getActive = CroMagScript_GetObjectActive,
 	.getHealth = CroMagScript_GetObjectHealth,
+	.getJointPosition = GetScriptJointPosition,
+	.getBounds = GetScriptObjectBounds,
+	.setHealth = CroMagScript_SetObjectHealth,
 	.setPosition = CroMagScript_SetObjectPosition,
 	.setVelocity = CroMagScript_SetObjectVelocity,
 	.setRotation = CroMagScript_SetObjectRotation,
@@ -517,7 +613,14 @@ void CroMagScript_UnregisterObject(ObjNode* obj)
 {
 	PangeaScriptObjectHandle handle;
 
-	if (!obj || obj->ScriptObjectID == 0)
+	if (!obj) return;
+	for (int i = 0; i < gNumTotalPlayers; i++)
+	{
+		ObjNode* car = gPlayerInfo[i].objNode;
+		if (car && (ObjNode*)car->CapturedFlag == obj) car->CapturedFlag = nil;
+		if (car == obj && car->CapturedFlag) PlayerResetCarriedFlag(car);
+	}
+	if (obj->ScriptObjectID == 0)
 		return;
 
 	handle = (PangeaScriptObjectHandle)
@@ -561,11 +664,11 @@ Boolean CroMagScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pic
 	PangeaScriptObjectHandle playerHandle;
 	if (!pickup || !player || pickup->ScriptObjectID <= 0 || pickup->ScriptObjectGeneration <= 0 ||
 		player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
-		return true;
+		return CroMagScript_NativeRulesEnabled();
 	pickupHandle = (PangeaScriptObjectHandle){pickup->ScriptObjectID, (uint32_t) pickup->ScriptObjectGeneration};
 	playerHandle = (PangeaScriptObjectHandle){player->ScriptObjectID, (uint32_t) player->ScriptObjectGeneration};
 	if (!PangeaScript_ObjectExists(pickupHandle) || !PangeaScript_ObjectExists(playerHandle))
-		return true;
+		return CroMagScript_NativeRulesEnabled();
 	context = (PangeaScriptPickupContext)
 	{
 		.levelNum = gScriptFrameContext.levelNum,
@@ -581,8 +684,8 @@ Boolean CroMagScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pic
 	(void) result;
 	LogScriptStatus("onPickupCollected", status);
 	if (status != PANGEA_SCRIPT_OK)
-		return true;
-	return result.hasConsumePickup ? result.consumePickup : true;
+		return CroMagScript_NativeRulesEnabled();
+	return CroMagScript_NativeRulesEnabled() && (result.hasConsumePickup ? result.consumePickup : true);
 }
 
 Boolean CroMagScript_OnDamage(short playerNum, float damage, int cause, float* outDamage)
@@ -746,11 +849,9 @@ void CroMagScript_ApplyObjectScripting(ObjNode* obj)
 	}
 
 	status = PangeaScript_CallObjectFrame(handle, &gScriptFrameContext, &result);
-	if (!PangeaScript_ObjectExists(handle))
+	void* liveObject = NULL;
+	if (!PangeaScript_GetObjectNativeObject(handle, &liveObject) || liveObject != obj)
 	{
-		obj->ScriptObjectID = 0;
-		obj->ScriptObjectGeneration = 0;
-		obj->ScriptVisualOffset = (OGLVector3D){0};
 		PangeaScript_ClearLastError();
 		return;
 	}
@@ -762,7 +863,7 @@ void CroMagScript_ApplyObjectScripting(ObjNode* obj)
 	}
 
 	UpdateObjectTransforms(obj);
-	CalcObjectBoxFromNode(obj);
+	if (obj->CollisionBoxes && obj->NumCollisionBoxes == 1) CalcObjectBoxFromNode(obj);
 	obj->ScriptVisualOffset = (OGLVector3D){0};
 	if (!result.hasPositionOffset)
 		return;
@@ -780,21 +881,43 @@ void CroMagScript_ApplyObjectScripting(ObjNode* obj)
 
 void CroMagScript_RunObjectFrame(ObjNode* obj)
 {
+	PangeaScriptObjectHandle saved = {obj->ScriptObjectID, (uint32_t)obj->ScriptObjectGeneration};
 	if (!obj->ScriptDeleteRequested)
 		CroMagScript_ApplyObjectScripting(obj);
+	void* liveObject = NULL;
+	if (!PangeaScript_GetObjectNativeObject(saved, &liveObject) || liveObject != obj) return;
 	if (obj->CType == INVALID_NODE_FLAG) return;
 	if (obj->ScriptDeleteRequested) { DeleteObject(obj); return; }
 	if (obj->Skeleton && obj->Skeleton->AnimHasStopped && !obj->ScriptAnimationCompletionSent)
 	{
 		PangeaScriptObjectHandle handle = {obj->ScriptObjectID, (uint32_t)obj->ScriptObjectGeneration};
+		obj->ScriptAnimationCompletionSent = true;
 		if (PangeaScript_ObjectExists(handle))
 			(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "animationComplete");
-		obj->ScriptAnimationCompletionSent = true;
 	}
 }
 
 void CroMagScript_OnObjectDeleted(ObjNode* obj)
 {
+	if (!obj) return;
+	for (int i = 0; i < gNumTotalPlayers; i++)
+	{
+		if (gPlayerInfo[i].objNode == obj)
+		{
+			if (obj->CapturedFlag) PlayerResetCarriedFlag(obj);
+			gPlayerInfo[i].objNode = NULL;
+		}
+		if (gPlayerInfo[i].headObj == obj) gPlayerInfo[i].headObj = NULL;
+		for (int wheel = 0; wheel < 4; wheel++)
+			if (gPlayerInfo[i].wheelObj[wheel] == obj) gPlayerInfo[i].wheelObj[wheel] = NULL;
+	}
+	for (int i = 0; i < gNumTorches; i++)
+	{
+		if (gTorchObjs[i] != obj) continue;
+		for (int next = i + 1; next < gNumTorches; next++) gTorchObjs[next - 1] = gTorchObjs[next];
+		gTorchObjs[--gNumTorches] = NULL;
+		break;
+	}
 	if (obj && obj->ScriptDefinitionID[0] && obj->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {obj->ScriptObjectID, (uint32_t)obj->ScriptObjectGeneration};
@@ -851,18 +974,23 @@ static ObjNode* MakeScriptedVisual(const PangeaScriptCustomObjectDefinition* def
 	return nil;
 }
 
-static void ApplyScriptedCollision(ObjNode* object, const PangeaScriptCustomObjectDefinition* definition)
+static bool GetScriptCollisionExtent(float value, short* output)
+{
+	if (!isfinite(value) || value <= 0 || value > SHRT_MAX) return false;
+	*output = (short)ceilf(value);
+	return true;
+}
+
+static bool ApplyScriptedCollision(ObjNode* object, const PangeaScriptCustomObjectDefinition* definition)
 {
 	PangeaScriptCollisionPreset preset = definition->collisionPreset;
-	short radius;
 	short halfWidth;
 	short halfHeight;
 	short halfDepth;
-	if (preset == PANGEA_SCRIPT_COLLISION_NONE) return;
-	radius = (short)object->BoundingSphereRadius;
-	halfWidth = definition->collisionBoundsSet ? (short)(definition->collisionWidth * 0.5f) : radius;
-	halfHeight = definition->collisionBoundsSet ? (short)(definition->collisionHeight * 0.5f) : radius;
-	halfDepth = definition->collisionBoundsSet ? (short)(definition->collisionDepth * 0.5f) : radius;
+	if (preset == PANGEA_SCRIPT_COLLISION_NONE) return true;
+	if (!GetScriptCollisionExtent(definition->collisionBoundsSet ? definition->collisionWidth * 0.5f : object->BoundingSphereRadius, &halfWidth) ||
+		!GetScriptCollisionExtent(definition->collisionBoundsSet ? definition->collisionHeight * 0.5f : object->BoundingSphereRadius, &halfHeight) ||
+		!GetScriptCollisionExtent(definition->collisionBoundsSet ? definition->collisionDepth * 0.5f : object->BoundingSphereRadius, &halfDepth)) return false;
 	SetObjectCollisionBounds(object, halfHeight, -halfHeight, -halfWidth, halfWidth, halfDepth, -halfDepth);
 	object->CBits = CBITS_ALLSOLID;
 	if (preset == PANGEA_SCRIPT_COLLISION_ENEMY) object->CType = CTYPE_AVOID | CTYPE_AUTOTARGET | CTYPE_MISC;
@@ -873,6 +1001,7 @@ static void ApplyScriptedCollision(ObjNode* object, const PangeaScriptCustomObje
 		object->TriggerSides = ALL_SOLID_SIDES;
 	}
 	else object->CType = CTYPE_MISC;
+	return true;
 }
 
 void CroMagScript_OnCustomTrigger(ObjNode* trigger, ObjNode* who, Byte sideBits)
@@ -909,7 +1038,7 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 	if (!definition) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
 	object = MakeScriptedVisual(definition, x, y, z);
 	if (!object) return PANGEA_SCRIPT_RUNTIME_ERROR;
-	ApplyScriptedCollision(object, definition);
+	if (!ApplyScriptedCollision(object, definition)) { DeleteObject(object); return PANGEA_SCRIPT_BAD_ARGUMENT; }
 	snprintf(object->ScriptDefinitionID, sizeof(object->ScriptDefinitionID), "%s", definition->id);
 	CroMagScript_RegisterObject(object, definition->id, "customObject");
 	if (!object->ScriptObjectID) { DeleteObject(object); return PANGEA_SCRIPT_RUNTIME_ERROR; }
@@ -1019,11 +1148,11 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.velocity = {gPlayerInfo[playerNum].objNode->Delta.x, gPlayerInfo[playerNum].objNode->Delta.y, gPlayerInfo[playerNum].objNode->Delta.z},
 		.hasVelocity = true,
 		.grounded = (gPlayerInfo[playerNum].objNode->StatusBits & STATUS_BIT_ONGROUND) != 0,
-		.hasGroundedState = true,
+		.hasGroundedState = !gPlayerInfo[playerNum].objNode->ScriptContactStateInvalidated,
 		.heightOffGround = gPlayerInfo[playerNum].distToFloor,
-		.hasTerrainHeightState = true,
+		.hasTerrainHeightState = !gPlayerInfo[playerNum].objNode->ScriptContactStateInvalidated,
 		.onWater = gPlayerInfo[playerNum].onWater,
-		.hasWaterState = true,
+		.hasWaterState = !gPlayerInfo[playerNum].objNode->ScriptContactStateInvalidated,
 		.collisionEnabled = gPlayerInfo[playerNum].objNode->CType != 0 && (gPlayerInfo[playerNum].objNode->StatusBits & STATUS_BIT_NOCOLLISION) == 0,
 		.hasCollisionEnabled = true,
 		.health = gPlayerInfo[playerNum].health,
@@ -1047,8 +1176,8 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.groundSteering = gPlayerInfo[playerNum].groundSteering,
 		.groundAcceleration = gPlayerInfo[playerNum].groundAcceleration,
 		.hasVehicleState = true,
-		.hasGroundPhysicsState = true,
-		.hasGroundSteeringState = true,
+		.hasGroundPhysicsState = !gPlayerInfo[playerNum].objNode->ScriptContactStateInvalidated,
+		.hasGroundSteeringState = !gPlayerInfo[playerNum].objNode->ScriptContactStateInvalidated,
 		.nitroActive = gPlayerInfo[playerNum].nitroTimer > 0.0f,
 		.nitroTimeRemaining = gPlayerInfo[playerNum].nitroTimer,
 		.greasedTiresActive = gPlayerInfo[playerNum].greasedTiresTimer > 0.0f,
@@ -1086,7 +1215,7 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 		.hasInvulnerabilityTimerState = true,
 		.tokenCount = gPlayerInfo[playerNum].numTokens,
 		.hasTokenState = true,
-		.active = true,
+		.active = !gPlayerInfo[playerNum].objNode->ScriptActiveStateInitialized || gPlayerInfo[playerNum].objNode->ScriptActive,
 	};
 	outPlayer->rotation = (PangeaScriptVector3){gPlayerInfo[playerNum].objNode->Rot.x, gPlayerInfo[playerNum].objNode->Rot.y, gPlayerInfo[playerNum].objNode->Rot.z};
 	outPlayer->hasRotation = true;
@@ -1135,10 +1264,7 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 {
 	if (playerNum < 0 || playerNum >= gNumTotalPlayers || !position || !gPlayerInfo[playerNum].objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gPlayerInfo[playerNum].coord = (OGLPoint3D){position->x, position->y, position->z};
-	gPlayerInfo[playerNum].objNode->Coord = gPlayerInfo[playerNum].coord;
-	UpdateObjectTransforms(gPlayerInfo[playerNum].objNode);
-	return PANGEA_SCRIPT_OK;
+	return CroMagScript_SetObjectPosition(gPlayerInfo[playerNum].objNode, position) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_BAD_ARGUMENT;
 }
 
 static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScriptVector3* velocity)
@@ -1148,8 +1274,258 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 	return CroMagScript_SetObjectVelocity(gPlayerInfo[playerNum].objNode, velocity) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
+static bool GetScriptInput(int playerNum, PangeaScriptInputSnapshot* output)
+{
+	static const char* names[] = {"throwForward", "throwBackward", "brake", "throttle", "reverse", "camera", "rearView"};
+	if (!output || playerNum < 0 || playerNum >= gNumRealPlayers) return false;
+	*output = (PangeaScriptInputSnapshot){0};
+	output->actionCount = NUM_CONTROL_BITS;
+	output->moveX = gPlayerInfo[playerNum].analogSteering.x;
+	output->moveY = gPlayerInfo[playerNum].analogSteering.y;
+	for (int i = 0; i < NUM_CONTROL_BITS; i++)
+	{
+		uint32_t mask = 1u << i;
+		output->actions[i] = (PangeaScriptInputAction){names[i],
+			(gPlayerInfo[playerNum].controlBits & mask) != 0,
+			(gPlayerInfo[playerNum].controlBits_New & mask) != 0,
+			(gScriptReleasedControlBits[playerNum] & mask) != 0};
+	}
+	return true;
+}
+
+static bool SampleScriptTerrain(float x, float z, PangeaScriptTerrainSample* output)
+{
+	if (!output || !isfinite(x) || !isfinite(z) || !gMapYCoords ||
+		x < 0 || z < 0 || x >= gTerrainUnitWidth || z >= gTerrainUnitDepth) return false;
+	OGLVector3D savedNormal = gRecentTerrainNormal;
+	float height = GetTerrainY(x, z);
+	*output = (PangeaScriptTerrainSample){.height = height,
+		.normal = {gRecentTerrainNormal.x, gRecentTerrainNormal.y, gRecentTerrainNormal.z},
+		.surfaceType = gTileGrid && gTileAttribList && *gTileAttribList ? GetTileAttribsAtRowCol(x, z) : 0};
+	gRecentTerrainNormal = savedNormal;
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node->CType == INVALID_NODE_FLAG || !(node->CType & CTYPE_LIQUID) ||
+			!node->CollisionBoxes || node->NumCollisionBoxes == 0) continue;
+		CollisionBoxType* box = &node->CollisionBoxes[0];
+		if (x < box->left || x > box->right || z < box->back || z > box->front) continue;
+		output->hasWater = true;
+		output->waterHeight = box->top;
+		break;
+	}
+	return true;
+}
+
+static bool OverlapScriptBox(const PangeaScriptBounds* bounds, unsigned int mask,
+	PangeaScriptObjectHandle* results, int capacity, int* count)
+{
+	if (!bounds || !results || !count || capacity <= 0 || mask == 0) return false;
+	if (!isfinite(bounds->min.x) || !isfinite(bounds->min.y) || !isfinite(bounds->min.z) ||
+		!isfinite(bounds->max.x) || !isfinite(bounds->max.y) || !isfinite(bounds->max.z) ||
+		bounds->min.x > bounds->max.x || bounds->min.y > bounds->max.y || bounds->min.z > bounds->max.z) return false;
+	*count = 0;
+	for (ObjNode* node = gFirstNodePtr; node; node = node->NextNode)
+	{
+		if (node->CType == INVALID_NODE_FLAG || !(node->CType & mask) ||
+			(node->StatusBits & STATUS_BIT_NOCOLLISION) || !node->CollisionBoxes) continue;
+		PangeaScriptObjectHandle handle = {node->ScriptObjectID, (uint32_t)node->ScriptObjectGeneration};
+		if (!PangeaScript_ObjectExists(handle)) continue;
+		for (int boxIndex = 0; boxIndex < node->NumCollisionBoxes; boxIndex++)
+		{
+			const CollisionBoxType* box = &node->CollisionBoxes[boxIndex];
+			if (bounds->max.x < box->left || bounds->min.x > box->right ||
+				bounds->max.y < box->bottom || bounds->min.y > box->top ||
+				bounds->max.z < box->back || bounds->min.z > box->front) continue;
+			results[(*count)++] = handle;
+			break;
+		}
+		if (*count == capacity) break;
+	}
+	return true;
+}
+
+static const PangeaScriptCollisionCategory kScriptCollisionCategories[] =
+{
+	{"player", CTYPE_PLAYER}, {"obstacle", CTYPE_MISC | CTYPE_AVOID},
+	{"trigger", CTYPE_TRIGGER}, {"target", CTYPE_AUTOTARGET},
+	{"liquid", CTYPE_LIQUID}, {"solid", CTYPE_IMPENETRABLE},
+};
+
+static const PangeaScriptStateField kScriptStateFields[] =
+{
+	{"nitroTime", PANGEA_SCRIPT_STATE_NUMBER, true, 0, 3600, true},
+	{"steering", PANGEA_SCRIPT_STATE_NUMBER, true, -1, 1, true},
+	{"thrust", PANGEA_SCRIPT_STATE_NUMBER, true, -100000, 100000, true},
+	{"angularVelocityX", PANGEA_SCRIPT_STATE_NUMBER, true, -100, 100, true},
+	{"angularVelocityY", PANGEA_SCRIPT_STATE_NUMBER, true, -100, 100, true},
+	{"angularVelocityZ", PANGEA_SCRIPT_STATE_NUMBER, true, -100, 100, true},
+	{"braking", PANGEA_SCRIPT_STATE_BOOLEAN, true, 0, 1, true},
+	{"invisibilityTime", PANGEA_SCRIPT_STATE_NUMBER, true, 0, 3600, true},
+	{"frozenTime", PANGEA_SCRIPT_STATE_NUMBER, true, 0, 3600, true},
+	{"flamingTime", PANGEA_SCRIPT_STATE_NUMBER, true, 0, 3600, true},
+	{"greasedTiresTime", PANGEA_SCRIPT_STATE_NUMBER, false, 0, 3600, true},
+	{"stickyTiresTime", PANGEA_SCRIPT_STATE_NUMBER, false, 0, 3600, true},
+	{"superSuspensionTime", PANGEA_SCRIPT_STATE_NUMBER, false, 0, 3600, true},
+	{"lap", PANGEA_SCRIPT_STATE_NUMBER, true, -1, 32767, true},
+	{"checkpoint", PANGEA_SCRIPT_STATE_NUMBER, true, -1, MAX_CHECKPOINTS - 1, true},
+	{"place", PANGEA_SCRIPT_STATE_NUMBER, true, 0, MAX_PLAYERS - 1, true},
+	{"tagTime", PANGEA_SCRIPT_STATE_NUMBER, true, 0, 3600, true},
+	{"captureScore", PANGEA_SCRIPT_STATE_NUMBER, true, 0, 32767, true},
+	{"raceComplete", PANGEA_SCRIPT_STATE_BOOLEAN, false, 0, 1, true},
+	{"eliminated", PANGEA_SCRIPT_STATE_BOOLEAN, false, 0, 1, true},
+	{"tagged", PANGEA_SCRIPT_STATE_BOOLEAN, false, 0, 1, true},
+	{"gameMode", PANGEA_SCRIPT_STATE_NUMBER, false, 0, 32767, false},
+};
+
+static float* GetWritableScriptTimer(int playerNum, const char* key)
+{
+	if (strcmp(key, "nitroTime") == 0) return &gPlayerInfo[playerNum].nitroTimer;
+	if (strcmp(key, "steering") == 0) return &gPlayerInfo[playerNum].steering;
+	if (strcmp(key, "thrust") == 0) return &gPlayerInfo[playerNum].currentThrust;
+	if (strcmp(key, "angularVelocityX") == 0) return &gPlayerInfo[playerNum].objNode->DeltaRot.x;
+	if (strcmp(key, "angularVelocityY") == 0) return &gPlayerInfo[playerNum].objNode->DeltaRot.y;
+	if (strcmp(key, "angularVelocityZ") == 0) return &gPlayerInfo[playerNum].objNode->DeltaRot.z;
+	if (strcmp(key, "invisibilityTime") == 0) return &gPlayerInfo[playerNum].invisibilityTimer;
+	if (strcmp(key, "frozenTime") == 0) return &gPlayerInfo[playerNum].frozenTimer;
+	if (strcmp(key, "flamingTime") == 0) return &gPlayerInfo[playerNum].flamingTimer;
+	if (strcmp(key, "tagTime") == 0) return &gPlayerInfo[playerNum].tagTimer;
+	return NULL;
+}
+
+static bool GetScriptState(int playerNum, const char* key, PangeaScriptStateValue* output)
+{
+	if (!key || !output) return false;
+	*output = (PangeaScriptStateValue){.type = PANGEA_SCRIPT_STATE_NUMBER};
+	if (strcmp(key, "gameMode") == 0) { output->number = gGameMode; return true; }
+	if (playerNum < 0 || playerNum >= gNumTotalPlayers || !gPlayerInfo[playerNum].objNode) return false;
+	float* timer = GetWritableScriptTimer(playerNum, key);
+	if (timer) { output->number = *timer; return true; }
+	if (strcmp(key, "braking") == 0)
+	{
+		output->type = PANGEA_SCRIPT_STATE_BOOLEAN;
+		output->boolean = gPlayerInfo[playerNum].braking;
+		return true;
+	}
+	if (strcmp(key, "greasedTiresTime") == 0) output->number = gPlayerInfo[playerNum].greasedTiresTimer;
+	else if (strcmp(key, "stickyTiresTime") == 0) output->number = gPlayerInfo[playerNum].stickyTiresTimer;
+	else if (strcmp(key, "superSuspensionTime") == 0) output->number = gPlayerInfo[playerNum].superSuspensionTimer;
+	else if (strcmp(key, "lap") == 0) output->number = gPlayerInfo[playerNum].lapNum;
+	else if (strcmp(key, "checkpoint") == 0) output->number = gPlayerInfo[playerNum].checkpointNum;
+	else if (strcmp(key, "place") == 0) output->number = gPlayerInfo[playerNum].place;
+	else if (strcmp(key, "tagTime") == 0) output->number = gPlayerInfo[playerNum].tagTimer;
+	else if (strcmp(key, "captureScore") == 0) output->number = gCapturedFlagCount[gPlayerInfo[playerNum].team & 1];
+	else if (strcmp(key, "raceComplete") == 0) { output->type = PANGEA_SCRIPT_STATE_BOOLEAN; output->boolean = gPlayerInfo[playerNum].raceComplete; }
+	else if (strcmp(key, "eliminated") == 0) { output->type = PANGEA_SCRIPT_STATE_BOOLEAN; output->boolean = gPlayerInfo[playerNum].isEliminated; }
+	else if (strcmp(key, "tagged") == 0) { output->type = PANGEA_SCRIPT_STATE_BOOLEAN; output->boolean = gPlayerInfo[playerNum].isIt; }
+	else return false;
+	return true;
+}
+
+static PangeaScriptStatus SetScriptState(int playerNum, const char* key, const PangeaScriptStateValue* value)
+{
+	if (!key || !value || playerNum < 0 || playerNum >= gNumTotalPlayers || !gPlayerInfo[playerNum].objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	bool physical = strcmp(key, "steering") == 0 || strcmp(key, "thrust") == 0 ||
+		strncmp(key, "angularVelocity", 15) == 0 || strcmp(key, "braking") == 0;
+	if (physical)
+	{
+		ObjNode* car = gPlayerInfo[playerNum].objNode;
+		if (!PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){car->ScriptObjectID, car->ScriptObjectGeneration}) ||
+			!gPlayerInfo[playerNum].onThisMachine)
+			return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+		if (strcmp(key, "braking") == 0)
+		{
+			if (value->type != PANGEA_SCRIPT_STATE_BOOLEAN) return PANGEA_SCRIPT_BAD_ARGUMENT;
+			gPlayerInfo[playerNum].braking = value->boolean;
+			return PANGEA_SCRIPT_OK;
+		}
+		float* field = GetWritableScriptTimer(playerNum, key);
+		double limit = strcmp(key, "steering") == 0 ? 1 : strcmp(key, "thrust") == 0 ? 100000 : 100;
+		if (!field || value->type != PANGEA_SCRIPT_STATE_NUMBER || !isfinite(value->number) || fabs(value->number) > limit)
+			return PANGEA_SCRIPT_BAD_ARGUMENT;
+		*field = (float)value->number;
+		return PANGEA_SCRIPT_OK;
+	}
+	short* raceValue = NULL;
+	int minimum = -1;
+	int maximum = 32767;
+	if (strcmp(key, "lap") == 0) raceValue = &gPlayerInfo[playerNum].lapNum;
+	else if (strcmp(key, "checkpoint") == 0) { raceValue = &gPlayerInfo[playerNum].checkpointNum; maximum = MAX_CHECKPOINTS - 1; }
+	else if (strcmp(key, "place") == 0) { raceValue = &gPlayerInfo[playerNum].place; minimum = 0; maximum = gNumTotalPlayers - 1; }
+	else if (strcmp(key, "captureScore") == 0) { raceValue = &gCapturedFlagCount[gPlayerInfo[playerNum].team & 1]; minimum = 0; }
+	if (raceValue)
+	{
+		if (CroMagScript_NativeRulesEnabled()) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+		if (value->type != PANGEA_SCRIPT_STATE_NUMBER || !isfinite(value->number) ||
+			value->number < minimum || value->number > maximum || trunc(value->number) != value->number)
+			return PANGEA_SCRIPT_BAD_ARGUMENT;
+		*raceValue = (short)value->number;
+		return PANGEA_SCRIPT_OK;
+	}
+	float* timer = GetWritableScriptTimer(playerNum, key);
+	if (!timer) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (strcmp(key, "tagTime") == 0 && CroMagScript_NativeRulesEnabled()) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (value->type != PANGEA_SCRIPT_STATE_NUMBER || !isfinite(value->number) || value->number < 0 || value->number > 3600)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	*timer = (float)value->number;
+	if (strcmp(key, "nitroTime") == 0 || strcmp(key, "tagTime") == 0) return PANGEA_SCRIPT_OK;
+	OGLColorRGBA color = {1, 1, 1, 1};
+	if (gPlayerInfo[playerNum].flamingTimer > 0) color = (OGLColorRGBA){0.7f, 0, 0, 1};
+	if (gPlayerInfo[playerNum].frozenTimer > 0) color = (OGLColorRGBA){0.3f, 0.3f, 1, 0.8f};
+	float invisible = gPlayerInfo[playerNum].invisibilityTimer;
+	if (invisible > 0) color.a = invisible > 1 ? 0.1f : 1 - invisible;
+	for (ObjNode* node = gPlayerInfo[playerNum].objNode; node; node = node->ChainNode)
+		node->ColorFilter = color;
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus CompleteScriptRace(int playerNum, bool success)
+{
+	if (playerNum < 0 || playerNum >= gNumTotalPlayers || !gPlayerInfo[playerNum].objNode)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!success) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (!IsRaceMode())
+	{
+		if (CroMagScript_NativeRulesEnabled()) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+		if (gTrackCompleted) return PANGEA_SCRIPT_OK;
+		gTrackCompleted = true;
+		gTrackCompletedCoolDownTimer = TRACK_COMPLETE_COOLDOWN_TIME;
+		for (short i = 0; i < gNumTotalPlayers; i++)
+		{
+			bool won = i == playerNum || (gGameMode == GAME_MODE_CAPTUREFLAG && gPlayerInfo[i].team == gPlayerInfo[playerNum].team);
+			ShowWinLose(i, won ? 1 : 2, (short)playerNum);
+		}
+		return PANGEA_SCRIPT_OK;
+	}
+	PlayerCompletedRace((short)playerNum);
+	return PANGEA_SCRIPT_OK;
+}
+
+#include "ScriptPlayerOperations.inc"
+
+static const PangeaScriptGameplayOps kScriptGameplayOps =
+{
+	.getInput = GetScriptInput,
+	.sampleTerrain = SampleScriptTerrain,
+	.overlapBox = OverlapScriptBox,
+	.collisionCategories = kScriptCollisionCategories,
+	.collisionCategoryCount = sizeof(kScriptCollisionCategories) / sizeof(kScriptCollisionCategories[0]),
+	.getState = GetScriptState,
+	.setState = SetScriptState,
+	.stateFields = kScriptStateFields,
+	.stateFieldCount = sizeof(kScriptStateFields) / sizeof(kScriptStateFields[0]),
+	.complete = CompleteScriptRace,
+	.operationMask = (1u << PANGEA_SCRIPT_OP_CARRY) | (1u << PANGEA_SCRIPT_OP_CAPTURE) |
+		(1u << PANGEA_SCRIPT_OP_HANDOVER) |
+		(1u << PANGEA_SCRIPT_OP_DROP) | (1u << PANGEA_SCRIPT_OP_DELIVER) |
+		(1u << PANGEA_SCRIPT_OP_RESET_CARRIED) | (1u << PANGEA_SCRIPT_OP_FIRE) | (1u << PANGEA_SCRIPT_OP_RESPAWN),
+	.runOperation = RunScriptPlayerOperation,
+	.getRelations = GetScriptPlayerRelations,
+};
+
 void CroMagScript_Init(void)
 {
+	ScriptPresentation_Configure();
 	const PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "CroMagRally-Android",
@@ -1163,6 +1539,7 @@ void CroMagScript_Init(void)
 		.setPlayerPosition = SetScriptPlayerPosition,
 		.setPlayerVelocity = SetScriptPlayerVelocity,
 		.capabilities = PANGEA_SCRIPT_CRO_MAG_RALLY_CAPABILITIES,
+		.gameplay = &kScriptGameplayOps,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
@@ -1205,7 +1582,8 @@ static const char* CroMagScript_TrackName(int trackNum)
 static const char* CroMagScript_ModeName(void)
 {
 	if (gGameMode == GAME_MODE_PRACTICE) return "practice";
-	if (gGameMode == GAME_MODE_MULTIPLAYERRACE || gNetGameInProgress) return "network";
+	if (gNetGameInProgress || PangeaNetBridge_IsEnabled()) return "network";
+	if (gGameMode == GAME_MODE_MULTIPLAYERRACE) return "multiplayerRace";
 	if (gGameMode == GAME_MODE_TAG1) return "tag1";
 	if (gGameMode == GAME_MODE_TAG2) return "tag2";
 	if (gGameMode == GAME_MODE_SURVIVAL) return "survival";
@@ -1215,7 +1593,7 @@ static const char* CroMagScript_ModeName(void)
 
 static bool CroMagScript_IsNetworked(void)
 {
-	return gGameMode == GAME_MODE_MULTIPLAYERRACE || gNetGameInProgress;
+	return gNetGameInProgress || PangeaNetBridge_IsEnabled();
 }
 
 static void CallRaceHook(PangeaScriptHook hook, int trackNum, const char* action)
@@ -1235,6 +1613,10 @@ static void CallRaceHook(PangeaScriptHook hook, int trackNum, const char* action
 
 void CroMagScript_OnRaceLoad(int trackNum)
 {
+	gScriptSimulationTime = 0;
+	memset(gScriptPreviousControlBits, 0, sizeof(gScriptPreviousControlBits));
+	memset(gScriptReleasedControlBits, 0, sizeof(gScriptReleasedControlBits));
+	PangeaScript_SetNetworkedMode(CroMagScript_IsNetworked());
 	CallRaceHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, trackNum, "onRaceLoad");
 }
 
@@ -1245,12 +1627,21 @@ void CroMagScript_OnRaceStart(int trackNum)
 
 void CroMagScript_OnRaceFrame(int trackNum, unsigned int frameNum, float deltaSeconds, float raceTimeSeconds)
 {
+	(void)raceTimeSeconds;
+	PangeaScript_SetNetworkedMode(CroMagScript_IsNetworked());
+	if (gGamePaused) return;
+	gScriptSimulationTime += deltaSeconds;
+	for (int i = 0; i < gNumRealPlayers; i++)
+	{
+		gScriptReleasedControlBits[i] = gScriptPreviousControlBits[i] & ~gPlayerInfo[i].controlBits;
+		gScriptPreviousControlBits[i] = gPlayerInfo[i].controlBits;
+	}
 	const PangeaScriptFrameContext context =
 	{
 		.levelNum = trackNum,
 		.frameNum = frameNum,
 		.deltaSeconds = deltaSeconds,
-		.levelTimeSeconds = raceTimeSeconds,
+		.levelTimeSeconds = gScriptSimulationTime,
 		.mode = CroMagScript_ModeName(),
 		.networked = CroMagScript_IsNetworked(),
 		.trackName = CroMagScript_TrackName(trackNum),

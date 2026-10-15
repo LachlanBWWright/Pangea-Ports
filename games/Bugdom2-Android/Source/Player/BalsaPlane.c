@@ -54,8 +54,72 @@ static void MoveBullet(ObjNode *theNode);
 
 static ObjNode *gPlane;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+ObjNode* Bugdom2Script_GetMountedPlane(void)
+{
+	return gPlane && gPlayerInfo.objNode &&
+		gPlayerInfo.objNode->MoveCall == MovePlayerOnBalsaPlane ? gPlane : nil;
+}
+
+Boolean Bugdom2Script_MountPlane(ObjNode* plane)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!plane || plane != gPlane || plane->MoveCall != MoveBalsaPlane || !player ||
+		!player->Skeleton || gPlayerIsDead || gPlayerInfo.heldObject || gPlayerInfo.ridingBall ||
+		gCurrentCarryingMoth || OGLPoint3D_Distance(&player->Coord, &plane->Coord) > 300.0f)
+		return false;
+	SetSkeletonAnim(player->Skeleton, PLAYER_ANIM_FLYBALSAPLANE);
+	player->MoveCall = MovePlayerOnBalsaPlane;
+	return true;
+}
+
+Boolean Bugdom2Script_CreatePlaneMount(void)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (gLevelNum != LEVEL_NUM_BALSA || gPlane || !player || !player->Skeleton ||
+		gPlayerIsDead || gPlayerInfo.heldObject || gPlayerInfo.ridingBall || gCurrentCarryingMoth)
+		return false;
+	PutPlayerInBalsaPlane(player);
+	return Bugdom2Script_GetMountedPlane() != nil;
+}
+
+void Bugdom2Script_ClearPlaneRelationship(ObjNode* object)
+{
+	if (!gPlane || (object != gPlane && object != gPlayerInfo.objNode)) return;
+	ObjNode* plane = gPlane;
+	Boolean mounted = Bugdom2Script_GetMountedPlane() != nil;
+	gPlane = nil;
+	if (mounted && object != gPlayerInfo.objNode && !gPlayerIsDead)
+	{
+		gPlayerInfo.objNode->MoveCall = MovePlayer_Terrain;
+		SetPlayerFallAnim(gPlayerInfo.objNode);
+	}
+	if (object != plane) DeleteObject(plane);
+}
+
+Boolean Bugdom2Script_DismountPlane(void)
+{
+	ObjNode* plane = Bugdom2Script_GetMountedPlane();
+	if (!plane) return false;
+	DeleteObject(plane);
+	return true;
+}
+#endif
+
 static	int		gNumBombs, gNumBullets;
 int				gNumAntHills, gNumAntHillsDestroyed;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+Boolean Bugdom2Script_FirePlane(Boolean bomb)
+{
+	ObjNode* plane = Bugdom2Script_GetMountedPlane();
+	if (!plane || plane->MoveCall != MoveBalsaPlane || gPlayerIsDead) return false;
+	int before = bomb ? gNumBombs : gNumBullets;
+	if (bomb) PlaneDropBomb(plane);
+	else PlaneShootBullet(plane);
+	return (bomb ? gNumBombs : gNumBullets) > before;
+}
+#endif
 
 
 
@@ -326,7 +390,7 @@ const float	fps = gFramesPerSecondFrac;
 // Basically just keeps Skip aligned on the plane.
 //
 
-static void MovePlayerOnBalsaPlane(ObjNode *player)
+static void AlignPlayerOnBalsaPlane(ObjNode *player)
 {
 OGLMatrix4x4	sm;
 
@@ -343,6 +407,20 @@ OGLMatrix4x4	sm;
 	player->Coord.y = player->BaseTransformMatrix.value[M13];
 	player->Coord.z = player->BaseTransformMatrix.value[M23];
 	gPlayerInfo.coord = player->Coord;
+	CalcObjectBoxFromNode(player);
+}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+void Bugdom2Script_AlignMountedPlane(ObjNode* player)
+{
+	if (player == gPlayerInfo.objNode && Bugdom2Script_GetMountedPlane())
+		AlignPlayerOnBalsaPlane(player);
+}
+#endif
+
+static void MovePlayerOnBalsaPlane(ObjNode *player)
+{
+	AlignPlayerOnBalsaPlane(player);
 
 	gPlayerInfo.invincibilityTimer -= gFramesPerSecondFrac;
 }
@@ -738,7 +816,7 @@ float	x,z;
 
 	if (gNumAntHillsDestroyed >= gNumAntHills)
 	{
-		StartLevelCompletion(5.0);
+		StartAutomaticLevelCompletion(5.0);
 		DoDialogMessage(DIALOG_MESSAGE_HILLSDONE, 1, 5.0, nil);
 	}
 }

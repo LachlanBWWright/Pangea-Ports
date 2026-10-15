@@ -11,8 +11,10 @@
 
 #include "game.h"
 #include "profiling.h"
+#include "ScriptRules.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#include "ScriptBespoke.h"
 #endif
 
 /****************************/
@@ -33,7 +35,7 @@ static void MoveShootoutSaloon(ObjNode *theNode);
 
 static void UpdateCrosshairs(void);
 static void UpdatePlayerRotation(void);
-static void ShootBulletThruCrosshairs(void);
+static void ShootBulletThruCrosshairs(const OGLVector3D* aim);
 static void MoveCrosshairsBullet(ObjNode *bullet);
 
 
@@ -127,6 +129,9 @@ void PlayShootout(void)
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_Shootout();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScript_UpdateAttachments();
+#endif
 		KeepTerrainAlive();
 		gTimeSinceLastEnemyShot += gFramesPerSecondFrac;
 
@@ -136,7 +141,7 @@ void PlayShootout(void)
 								
 				/* MISC STUFF */
 		
-		if (IsCheatKeyComboDown())											// see if cheat to next stop-point		
+		if (BillyScript_NativeRulesAllowed() && IsCheatKeyComboDown())											// see if cheat to next stop-point
 			gShootoutCanProceedToNextStopPoint = true;
 
 		
@@ -397,6 +402,7 @@ static void MoveEverything_Shootout(void)
 	
 	
 		/* SEE IF OUT OF AMMO */
+	if (!BillyScript_NativeRulesAllowed()) return;
 		
 	if (gPlayerInfo.ammoCount <= 0)
 	{
@@ -533,7 +539,7 @@ static void UpdateCrosshairs(void)
 
 	if (GetNewNeedState(kNeed_Shoot) && (!gNeedToReloadNextAmmoClip))
 	{
-		ShootBulletThruCrosshairs();
+		ShootBulletThruCrosshairs(NULL);
 	}
 }
 
@@ -648,7 +654,7 @@ static void UpdatePlayerRotation(void)
 
 /************************* SHOOT BULLET THRU CROSSHAIRS ***************************/
 
-static void ShootBulletThruCrosshairs(void)
+static void ShootBulletThruCrosshairs(const OGLVector3D* aim)
 {
 OGLPoint2D	screenPt;
 OGLRay		ray;
@@ -683,6 +689,7 @@ int		i, numBulletsInClip;
 	screenPt = LogicalPointToWindow(gCrosshairsCoord);
 
 	OGL_GetWorldRayAtScreenPoint(&screenPt, &ray);								// get bullet direction vector
+	if (aim) ray.direction = *aim;
 	bulletStart.x = gPlayerInfo.camera.cameraLocation.x + (ray.direction.x * 40.0f);	// get bullet start coord
 	bulletStart.y = gPlayerInfo.camera.cameraLocation.y + (ray.direction.y * 40.0f);
 	bulletStart.z = gPlayerInfo.camera.cameraLocation.z + (ray.direction.z * 40.0f);
@@ -750,6 +757,19 @@ int		i, numBulletsInClip;
 	PlayEffect(EFFECT_GUNSHOT1);
 }
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool BillyScript_FireShootout(const PangeaScriptVector3* aim)
+{
+	if (GetBillyAreaMode() != BILLY_AREA_MODE_SHOOTOUT || !gGameViewInfoPtr
+		|| !gPlayerInfo.objNode || gPlayerIsDead || gLevelCompleted
+		|| gNeedToReloadNextAmmoClip || gPlayerInfo.ammoCount <= 0) return false;
+	OGLVector3D direction;
+	if (aim) direction = (OGLVector3D){aim->x, aim->y, aim->z};
+	ShootBulletThruCrosshairs(aim ? &direction : NULL);
+	return true;
+}
+#endif
+
 
 
 /********************* MOVE CROSSHAIRS BULLET ******************************/
@@ -790,6 +810,13 @@ OGLVector3D	impactNormal;
 	{
 				/* THERE WAS AN IMPACT */
 				
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!BillyScript_DispatchBulletHit(bullet, target, &impactCoord))
+		{
+			MakePuff(&impactCoord, 10.0, PARTICLE_SObjType_GreySmoke, GL_SRC_ALPHA, GL_ONE, 1.0);
+			PlayEffect3D(EFFECT_RICOCHET, &impactCoord);
+		}
+#else
 		if (target->HitByBulletCallback)
 		{
 			target->HitByBulletCallback(bullet, target, &impactCoord);
@@ -799,6 +826,7 @@ OGLVector3D	impactNormal;
 			MakePuff(&impactCoord, 10.0, PARTICLE_SObjType_GreySmoke, GL_SRC_ALPHA, GL_ONE, 1.0);			
 			PlayEffect3D(EFFECT_RICOCHET, &impactCoord);
 		}
+#endif
 									
 		DeleteObject(bullet);
 		return;
@@ -907,7 +935,7 @@ float	fps = gFramesPerSecondFrac;
 	
 			/* SEE IF REACHED STOP POINT */
 			
-	if (DidBillyCrossStopMarker(player))
+	if (BillyScript_NativeRulesAllowed() && DidBillyCrossStopMarker(player))
 	{
 		gShootoutMode = SHOOTOUT_MODE_BATTLE;								// do battle here now	
 		
@@ -979,7 +1007,7 @@ static void MovePlayer_Shootout_Battle(ObjNode *player)
 	
 	}
 	
-	if (gShootoutCanProceedToNextStopPoint)				// are we just waiting for the player to press TAB?
+	if (BillyScript_NativeRulesAllowed() && gShootoutCanProceedToNextStopPoint)				// are we just waiting for the player to press TAB?
 	{
 		if (GetNewNeedState(kNeed_Continue))
 		{
@@ -1048,7 +1076,7 @@ OGLVector3D	splatVec;
 				/* PLAYER HAS BEEN SHOT DEAD */
 				/*****************************/
 	else
-	if (gShootoutMode != SHOOTOUT_MODE_PLAYERKILLED)
+	if (BillyScript_NativeRulesAllowed() && gShootoutMode != SHOOTOUT_MODE_PLAYERKILLED)
 	{
 		MorphToSkeletonAnim(player->Skeleton, PLAYER_ANIM_SHOTINCHEST, 2);		
 		StartLevelCompletion(5.0);

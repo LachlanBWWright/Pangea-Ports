@@ -1,6 +1,9 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "ScriptBindings.h"
+#include "ScriptGeometry.h"
+#include "ScriptMechanics.h"
+#include "pangea_presentation_game.h"
 
 #include "externs.h"
 #include "main.h"
@@ -9,6 +12,7 @@
 #include "object.h"
 #include "objecttypes.h"
 #include "infobar.h"
+#include "input.h"
 #include "playfield.h"
 #include "shape.h"
 #include "triggers.h"
@@ -18,6 +22,7 @@
 #include <SDL3/SDL.h>
 
 #include <math.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -51,6 +56,10 @@ static ObjectEntryType* AcquireScriptItem(void)
 static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, float z, const int params[4], PangeaScriptObjectHandle* outHandle)
 {
 	(void) z;
+	if (!MikeScript_CoordinateValid(x) || !MikeScript_CoordinateValid(y) || !params)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	for (int i = 0; i < 4; i++)
+		if (params[i] < 0 || params[i] > UINT8_MAX) return PANGEA_SCRIPT_BAD_ARGUMENT;
 	ObjectEntryType* item = AcquireScriptItem();
 	if (!item) return PANGEA_SCRIPT_RUNTIME_ERROR;
 	item->x = (int32_t) x; item->y = (int32_t) y;
@@ -68,6 +77,8 @@ static PangeaScriptStatus SpawnNativeItem(const char* id, float x, float y, floa
 #include <string.h>
 
 static PangeaScriptFrameContext gScriptFrameContext;
+static float gScriptAreaTime;
+static PangeaScriptInputSnapshot gScriptInput;
 static int gScriptInvulnerableFrames = 0;
 
 #define MIKE_SCRIPT_SHAPE_GROUP_BASE 7
@@ -89,7 +100,9 @@ static void MikeScript_ReleaseCustomShapes(void)
 
 static int32_t MikeScript_FloatToFixed(float value)
 {
-	return (int32_t) SDL_roundf(value * 65536.0f);
+	int32_t output = 0;
+	(void)MikeScript_ToFixed(value, &output);
+	return output;
 }
 
 static float MikeScript_FixedToFloat(int32_t value)
@@ -184,11 +197,14 @@ static bool MikeScript_GetObjectPosition(void* nativeObject, PangeaScriptVector3
 static bool MikeScript_SetObjectPosition(void* nativeObject, const PangeaScriptVector3* position)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
+	int32_t x, y;
 	if (!obj || !position || obj->CType == INVALID_NODE_FLAG)
 		return false;
+	if (!MikeScript_ToFixed(position->x, &x) || !MikeScript_ToFixed(position->y, &y))
+		return false;
 
-	obj->X.L = MikeScript_FloatToFixed(position->x);
-	obj->Y.L = MikeScript_FloatToFixed(position->y);
+	obj->X.L = x;
+	obj->Y.L = y;
 	obj->OldX = obj->X;
 	obj->OldY = obj->Y;
 	CalcObjectBox2(obj);
@@ -208,11 +224,14 @@ static bool MikeScript_GetObjectVelocity(void* nativeObject, PangeaScriptVector3
 static bool MikeScript_SetObjectVelocity(void* nativeObject, const PangeaScriptVector3* velocity)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
+	int32_t x, y;
 	if (!obj || !velocity || obj->CType == INVALID_NODE_FLAG)
 		return false;
+	if (!MikeScript_ToFixed(velocity->x, &x) || !MikeScript_ToFixed(velocity->y, &y))
+		return false;
 
-	obj->DX = MikeScript_FloatToFixed(velocity->x);
-	obj->DY = MikeScript_FloatToFixed(velocity->y);
+	obj->DX = x;
+	obj->DY = y;
 	MikeScript_SyncPlayerGlobals(obj);
 	return true;
 }
@@ -234,7 +253,9 @@ static bool MikeScript_SetObjectAnimation(void* nativeObject, int animation, flo
 {
 	ObjNode* obj = (ObjNode*)nativeObject;
 	(void)blendSeconds;
-	if (!obj || obj->CType == INVALID_NODE_FLAG || animation < 0 || speed <= 0) return false;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || animation < 0 || animation > UINT16_MAX
+		|| !isfinite(speed) || speed <= 0 || (double)speed * 256.0 > UINT32_MAX) return false;
+	if (!MikeScript_AnimationValid(obj->AnimsList, animation)) return false;
 	obj->SubType = animation;
 	obj->AnimLine = 0;
 	obj->CurrentFrame = 0;
@@ -294,6 +315,7 @@ static bool MikeScript_SetObjectCollisionEnabled(void* nativeObject, bool enable
 		obj->ScriptCollisionBits = obj->CBits;
 		obj->ScriptCollisionStateInitialized = true;
 	}
+	obj->ScriptCollisionEnabled = enabled;
 	obj->CBits = enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive) ? obj->ScriptCollisionBits : 0;
 	return true;
 }
@@ -312,12 +334,11 @@ static bool MikeScript_SetObjectActive(void* nativeObject, bool active)
 	ObjNode* obj = (ObjNode*)nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
 		return false;
-	if (!obj->ScriptDefinitionID[0])
-		return true;
 	if (!obj->ScriptActiveStateInitialized)
 	{
 		obj->ScriptActiveDrawFlag = obj->DrawFlag;
 		obj->ScriptActiveMoveFlag = obj->MoveFlag;
+		obj->ScriptActiveAnimFlag = obj->AnimFlag;
 		obj->ScriptActiveStateInitialized = true;
 		obj->ScriptActive = true;
 	}
@@ -325,18 +346,21 @@ static bool MikeScript_SetObjectActive(void* nativeObject, bool active)
 	{
 		obj->ScriptCollisionBits = obj->CBits;
 		obj->ScriptCollisionStateInitialized = true;
+		obj->ScriptCollisionEnabled = obj->CBits != 0;
 	}
 	if (active)
 	{
 		obj->DrawFlag = obj->ScriptActiveDrawFlag;
 		obj->MoveFlag = obj->ScriptActiveMoveFlag;
-		obj->CBits = obj->ScriptCollisionBits;
+		obj->AnimFlag = obj->ScriptActiveAnimFlag;
+		obj->CBits = obj->ScriptCollisionEnabled ? obj->ScriptCollisionBits : 0;
 		obj->ScriptActive = true;
 	}
 	else
 	{
 		obj->DrawFlag = false;
 		obj->MoveFlag = false;
+		obj->AnimFlag = false;
 		obj->CBits = 0;
 		obj->ScriptActive = false;
 	}
@@ -357,7 +381,22 @@ static bool MikeScript_GetObjectHealth(void* nativeObject, float* outHealth)
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
 		return false;
-	*outHealth = obj->Health;
+	*outHealth = obj == gMyNodePtr ? gMyHealth : obj->Health;
+	return true;
+}
+
+static bool MikeScript_SetObjectHealth(void* nativeObject, float health)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(health) || health < 0.0f || (double)health > INT32_MAX)
+		return false;
+	if (obj == gMyNodePtr)
+	{
+		if (health > gMyMaxHealth) return false;
+		gMyHealth = (short)health;
+		ShowHealth();
+	}
+	obj->Health = (long)health;
 	return true;
 }
 
@@ -365,6 +404,8 @@ static bool MikeScript_DeletePlayerObject(void* nativeObject)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG)
+		return false;
+	if (obj == gMyNodePtr || ((gFrogFlag || gSpaceShipFlag) && obj == gRealMePtr))
 		return false;
 
 	if (obj->ScriptDefinitionID[0])
@@ -385,6 +426,7 @@ static bool MikeScript_DeletePlayerObject(void* nativeObject)
 static const PangeaScriptObjectOps kMikePlayerObjectOps =
 {
 	.getPosition = MikeScript_GetObjectPosition,
+	.getBounds = MikeScript_GetObjectBounds,
 	.getVelocity = MikeScript_GetObjectVelocity,
 	.setPosition = MikeScript_SetObjectPosition,
 	.setVelocity = MikeScript_SetObjectVelocity,
@@ -395,6 +437,7 @@ static const PangeaScriptObjectOps kMikePlayerObjectOps =
 	.getAnimationFrame = MikeScript_GetObjectAnimationFrame,
 	.getActive = MikeScript_GetObjectActive,
 	.getHealth = MikeScript_GetObjectHealth,
+	.setHealth = MikeScript_SetObjectHealth,
 	.getCollisionEnabled = MikeScript_GetObjectCollisionEnabled,
 	.setAnimation = MikeScript_SetObjectAnimation,
 	.setAnimationNamed = MikeScript_SetObjectAnimationNamed,
@@ -878,6 +921,8 @@ Boolean MikeScript_OnDamage(float damage, float* outDamage)
 	};
 	status = PangeaScript_CallDamageHook(&context, &result);
 	LogScriptStatus("onDamage", status);
+	if (!gMyNodePtr || gMyNodePtr->CType == INVALID_NODE_FLAG || gMyNodePtr->ScriptDeleteRequested)
+		return false;
 	if (status != PANGEA_SCRIPT_OK)
 		return true;
 	if (result.hasDamage)
@@ -919,18 +964,20 @@ Boolean MikeScript_OnPickupCollected(ObjNode* pickup, ObjNode* player, int picku
 	};
 	status = PangeaScript_CallPickupHook(&context, &result);
 	LogScriptStatus("onPickupCollected", status);
+	if (pickup->CType == INVALID_NODE_FLAG || player->CType == INVALID_NODE_FLAG
+		|| pickup->ScriptDeleteRequested || player->ScriptDeleteRequested)
+		return false;
 	if (status != PANGEA_SCRIPT_OK)
 		return true;
 	if (isfinite(result.healthDelta))
 	{
-		if (result.healthDelta > 0.0f)
-			gMyHealth += (short) SDL_ceilf(result.healthDelta);
-		else if (result.healthDelta < 0.0f)
-			gMyHealth += (short) SDL_floorf(result.healthDelta);
-		if (gMyHealth < 0)
+		double health = gMyHealth + (result.healthDelta > 0 ? ceil((double)result.healthDelta) : floor((double)result.healthDelta));
+		if (health < 0)
 			gMyHealth = 0;
-		else if (gMyHealth > gMyMaxHealth)
+		else if (health > gMyMaxHealth)
 			gMyHealth = gMyMaxHealth;
+		else
+			gMyHealth = (short)health;
 		ShowHealth();
 	}
 	if (result.scoreDelta != 0)
@@ -1049,10 +1096,6 @@ void MikeScript_RunObjectFrame(ObjNode* obj)
 	status = PangeaScript_CallObjectFrame(handle, &gScriptFrameContext, &result);
 	if (!PangeaScript_ObjectExists(handle))
 	{
-		obj->ScriptObjectID = 0;
-		obj->ScriptObjectGeneration = 0;
-		obj->ScriptVisualOffsetX = 0;
-		obj->ScriptVisualOffsetY = 0;
 		PangeaScript_ClearLastError();
 		return;
 	}
@@ -1077,6 +1120,7 @@ void MikeScript_RunObjectFrame(ObjNode* obj)
 	{
 		if (PangeaScript_ObjectExists(handle))
 			(void)PangeaScript_CallObjectEvent(handle, &gScriptFrameContext, "animationComplete");
+		if (!PangeaScript_ObjectExists(handle)) return;
 		obj->ScriptAnimationCompletionSent = true;
 	}
 	if (result.hasPositionOffset)
@@ -1154,18 +1198,19 @@ static void ApplyScriptedCollision(ObjNode* object, const PangeaScriptCustomObje
 	CalcObjectBox2(object);
 }
 
-void MikeScript_OnCustomTrigger(ObjNode* trigger, Byte sideBits)
+Boolean MikeScript_OnCustomTrigger(ObjNode* trigger, Byte sideBits)
 {
 	PangeaScriptObjectHandle player = {0};
-	if (!trigger || !trigger->ScriptObjectID) return;
+	if (!trigger || !trigger->ScriptObjectID) return true;
 	PangeaScriptObjectHandle handle = {(int)trigger->ScriptObjectID, trigger->ScriptObjectGeneration};
-	if (!PangeaScript_ObjectExists(handle)) return;
+	if (!PangeaScript_ObjectExists(handle)) return true;
 	if (gMyNodePtr && gMyNodePtr->ScriptObjectID > 0)
 	{
 		player = (PangeaScriptObjectHandle){(int)gMyNodePtr->ScriptObjectID, gMyNodePtr->ScriptObjectGeneration};
 		if (!PangeaScript_ObjectExists(player)) player = (PangeaScriptObjectHandle){0};
 	}
-	(void)PangeaScript_CallObjectTriggerWithOther(handle, &gScriptFrameContext, sideBits, true, player);
+	bool solid = PangeaScript_CallObjectTriggerWithOther(handle, &gScriptFrameContext, sideBits, true, player);
+	return solid && trigger->CType != INVALID_NODE_FLAG && !trigger->ScriptDeleteRequested;
 }
 
 static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, float z, PangeaScriptObjectHandle* outHandle)
@@ -1174,10 +1219,21 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 	ObjNode* object;
 	int group;
 	int animation;
+	if (!MikeScript_CoordinateValid(x) || !MikeScript_CoordinateValid(y) || !MikeScript_CoordinateValid(z))
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	if (!definition || (definition->visualKind != PANGEA_SCRIPT_VISUAL_NATIVE_DISPLAY_GROUP && definition->visualKind != PANGEA_SCRIPT_VISUAL_CUSTOM_DISPLAY_GROUP)) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
 	group = ResolveShapeGroup(definition);
 	animation = ResolveInitialAnimation(definition);
+	if (definition->collisionBoundsSet && (!isfinite(definition->collisionWidth) || !isfinite(definition->collisionHeight)
+		|| definition->collisionWidth <= 0 || definition->collisionHeight <= 0
+		|| definition->collisionWidth > INT16_MAX * 2.0f || definition->collisionHeight > INT16_MAX * 2.0f))
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	if (group < 0 || definition->modelObject < 0 || definition->modelObject >= MAX_SHAPES_IN_FILE || !gSHAPE_HEADER_Ptrs[group][definition->modelObject]) return PANGEA_SCRIPT_RUNTIME_ERROR;
+	const char* shape = gSHAPE_HEADER_Ptrs[group][definition->modelObject];
+	int32_t animationOffset;
+	memcpy(&animationOffset, shape + SHAPE_HEADER_ANIM_LIST, sizeof(animationOffset));
+	if (!MikeScript_AnimationValid(shape + animationOffset + sizeof(int16_t), animation))
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
 	object = MakeNewShape(group, definition->modelObject, animation, (short)x, (short)y, (short)z, nil, PLAYFIELD_RELATIVE);
 	if (!object) return PANGEA_SCRIPT_RUNTIME_ERROR;
 	ApplyScriptedCollision(object, definition);
@@ -1189,6 +1245,186 @@ static PangeaScriptStatus SpawnScriptedObject(const char* id, float x, float y, 
 }
 
 static int GetScriptPlayerCount(void) { return gMyNodePtr ? 1 : 0; }
+
+static PangeaScriptStatus SetScriptPlayerKey(int playerNum, int keyId, bool enabled)
+{
+	if (playerNum != 0 || !gMyNodePtr || keyId < 0 || keyId >= 6)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	gMyKeys[keyId] = enabled;
+	ShowKeys();
+	return PANGEA_SCRIPT_OK;
+}
+
+static void SampleScriptInput(void)
+{
+	static const int needs[] = {kNeed_Up, kNeed_Down, kNeed_Left, kNeed_Right, kNeed_Attack, kNeed_NextWeapon, kNeed_PrevWeapon, kNeed_Radar};
+	static const char* names[] = {"up", "down", "left", "right", "attack", "nextWeapon", "previousWeapon", "radar"};
+	gScriptInput.actionCount = sizeof(needs) / sizeof(needs[0]);
+	for (int i = 0; i < gScriptInput.actionCount; i++)
+	{
+		bool held = GetNeedState(needs[i]);
+		bool wasHeld = gScriptInput.actions[i].held;
+		gScriptInput.actions[i] = (PangeaScriptInputAction){names[i], held, GetNewNeedState(needs[i]), wasHeld && !held};
+	}
+	gScriptInput.moveX = (float)GetNeedState(kNeed_Right) - (float)GetNeedState(kNeed_Left);
+	gScriptInput.moveY = (float)GetNeedState(kNeed_Down) - (float)GetNeedState(kNeed_Up);
+	float magnitude = (float)GetLeftStickMagnitude_Fix32() / 65536.0f;
+	if (magnitude > 0 && magnitude < 1)
+	{
+		gScriptInput.moveX *= magnitude;
+		gScriptInput.moveY *= magnitude;
+	}
+	int direction = GetRightStick8WayAim();
+	if (direction == AIM_NONE) direction = gMyDirection;
+	gScriptInput.hasAim = direction >= AIM_UP && direction <= AIM_UP_LEFT;
+	if (gScriptInput.hasAim)
+	{
+		float angle = (float)direction * 0.7853981634f;
+		gScriptInput.aim = (PangeaScriptVector3){sinf(angle), -cosf(angle), 0};
+	}
+}
+
+static bool GetScriptInput(int playerNum, PangeaScriptInputSnapshot* output)
+{
+	if (playerNum != 0 || !output || !gMyNodePtr) return false;
+	*output = gScriptInput;
+	return true;
+}
+
+static bool SampleScriptTile(float x, float y, PangeaScriptTileSample* output)
+{
+	if (!output || !isfinite(x) || !isfinite(y) || x < 0 || y < 0 || x >= gPlayfieldWidth || y >= gPlayfieldHeight || !gPlayfield || !gTileAttributes)
+		return false;
+	const TileAttribType* attributes = GetFullMapTileAttribs((uint16_t)x, (uint16_t)y);
+	if (!attributes) return false;
+	*output = (PangeaScriptTileSample){
+		.tileType = gPlayfield[(int)y >> TILE_SIZE_SH][(int)x >> TILE_SIZE_SH] & TILENUM_MASK,
+		.flags = attributes->bits,
+		.solid = (attributes->bits & TILE_ATTRIB_ALLSOLID) != 0,
+	};
+	return true;
+}
+
+static bool OverlapScriptBox(const PangeaScriptBounds* bounds, unsigned int mask,
+	PangeaScriptObjectHandle* results, int capacity, int* count)
+{
+	if (!bounds || !count || capacity < 0 || (capacity > 0 && !results)) return false;
+	*count = 0;
+	for (ObjNode* object = FirstNodePtr; object; object = object->NextNode)
+	{
+		if (!(object->CType & mask) || !object->ScriptObjectID) continue;
+		PangeaScriptBounds objectBounds;
+		if (!MikeScript_GetObjectBounds(object, &objectBounds)) continue;
+		if (objectBounds.max.x < bounds->min.x || objectBounds.min.x > bounds->max.x
+			|| objectBounds.max.y < bounds->min.y || objectBounds.min.y > bounds->max.y) continue;
+		PangeaScriptObjectHandle handle = {(int)object->ScriptObjectID, object->ScriptObjectGeneration};
+		if (!PangeaScript_ObjectExists(handle)) continue;
+		if (*count < capacity) results[(*count)++] = handle;
+	}
+	return true;
+}
+
+static const PangeaScriptCollisionCategory kCollisionCategories[] = {
+	{"player", CTYPE_MYGUY}, {"enemy", CTYPE_ENEMYA},
+	{"projectile", CTYPE_MYBULLET | CTYPE_ENEMYB | CTYPE_ENEMYC},
+	{"pickup", CTYPE_BONUS | CTYPE_KEY | CTYPE_WEAPONPOW | CTYPE_MISCPOW},
+	{"trigger", CTYPE_TRIGGER}, {"platform", CTYPE_MPLATFORM},
+	{"solid", CTYPE_MISC | CTYPE_MPLATFORM | CTYPE_BGROUND},
+};
+
+static const PangeaScriptStateField kStateFields[] = {
+	{"coins", PANGEA_SCRIPT_STATE_NUMBER, true, 0, 999, true},
+	{"remainingRescues", PANGEA_SCRIPT_STATE_NUMBER, true, 0, SHRT_MAX, false},
+	{"activeWeapon", PANGEA_SCRIPT_STATE_NUMBER, true, 0, NO_WEAPON, true},
+	{"shieldSeconds", PANGEA_SCRIPT_STATE_NUMBER, true, 0, (double)SHRT_MAX / GAME_FPS, true},
+	{"speedSeconds", PANGEA_SCRIPT_STATE_NUMBER, true, 0, (double)SHRT_MAX / GAME_FPS, true},
+	{"freezeSeconds", PANGEA_SCRIPT_STATE_NUMBER, true, 0, (double)SHRT_MAX / GAME_FPS, false},
+	{"form", PANGEA_SCRIPT_STATE_NUMBER, false, 0, 2, true},
+	{"formSeconds", PANGEA_SCRIPT_STATE_NUMBER, true, 0, (double)INT32_MAX / GAME_FPS, true},
+	{"spawnX", PANGEA_SCRIPT_STATE_NUMBER, false, 0, SHRT_MAX, true},
+	{"spawnY", PANGEA_SCRIPT_STATE_NUMBER, false, 0, SHRT_MAX, true},
+};
+
+static bool GetScriptState(int playerNum, const char* key, PangeaScriptStateValue* output)
+{
+	if (playerNum != 0 || !gMyNodePtr || !key || !output) return false;
+	double number;
+	if (!strcmp(key, "coins")) number = gNumCoins;
+	else if (!strcmp(key, "remainingRescues")) number = gNumBunnies;
+	else if (!strcmp(key, "activeWeapon")) number = gCurrentWeaponType;
+	else if (!strcmp(key, "shieldSeconds")) number = (double)gShieldTimer / GAME_FPS;
+	else if (!strcmp(key, "speedSeconds")) number = (double)gSpeedyTimer / GAME_FPS;
+	else if (!strcmp(key, "freezeSeconds")) number = (double)gEnemyFreezeTimer / GAME_FPS;
+	else if (!strcmp(key, "form")) number = gSpaceShipFlag ? 2 : gFrogFlag ? 1 : 0;
+	else if (!strcmp(key, "formSeconds")) number = (double)(gSpaceShipFlag ? gSpaceShipTimer : gFrogFlag ? gFrogTimer : 0) / GAME_FPS;
+	else if (!strcmp(key, "spawnX")) number = gMyInitX;
+	else if (!strcmp(key, "spawnY")) number = gMyInitY;
+	else return false;
+	*output = (PangeaScriptStateValue){.type = PANGEA_SCRIPT_STATE_NUMBER, .number = number};
+	return true;
+}
+
+static PangeaScriptStatus SetScriptState(int playerNum, const char* key, const PangeaScriptStateValue* value)
+{
+	if (playerNum != 0 || !gMyNodePtr || !key || !value || value->type != PANGEA_SCRIPT_STATE_NUMBER || !isfinite(value->number))
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	const PangeaScriptStateField* field = NULL;
+	for (unsigned int i = 0; i < sizeof(kStateFields) / sizeof(kStateFields[0]); i++)
+		if (!strcmp(key, kStateFields[i].key)) field = &kStateFields[i];
+	if (!field || !field->writable) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (value->number < field->min || value->number > field->max) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	bool timer = !strcmp(key, "shieldSeconds") || !strcmp(key, "speedSeconds") || !strcmp(key, "freezeSeconds") || !strcmp(key, "formSeconds");
+	if (!timer && floor(value->number) != value->number) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!strcmp(key, "coins")) { gNumCoins = (long)value->number; ShowCoins(); }
+	else if (!strcmp(key, "remainingRescues")) { gNumBunnies = (short)value->number; ShowNumBunnies(); }
+	else if (!strcmp(key, "activeWeapon"))
+	{
+		int index = 0;
+		while (index < gNumWeaponsIHave && gMyWeapons[index].type != (int)value->number) index++;
+		if (index == gNumWeaponsIHave) return PANGEA_SCRIPT_BAD_ARGUMENT;
+		gCurrentWeaponIndex = (Byte)index;
+		gCurrentWeaponType = (Byte)value->number;
+		ShowWeaponIcon();
+		ShowWeaponLife();
+	}
+	else if (!strcmp(key, "formSeconds"))
+	{
+		if (!gFrogFlag && !gSpaceShipFlag) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+		double frames = ceil(value->number * GAME_FPS);
+		if (frames > INT32_MAX) return PANGEA_SCRIPT_BAD_ARGUMENT;
+		if (gFrogFlag) gFrogTimer = (long)frames;
+		else gSpaceShipTimer = (long)frames;
+	}
+	else
+	{
+		int frames = (int)ceil(value->number * GAME_FPS);
+		if (frames > SHRT_MAX) return PANGEA_SCRIPT_BAD_ARGUMENT;
+		if (!strcmp(key, "shieldSeconds")) gShieldTimer = (short)frames;
+		else if (!strcmp(key, "speedSeconds")) gSpeedyTimer = (short)frames;
+		else gEnemyFreezeTimer = (short)frames;
+	}
+	return PANGEA_SCRIPT_OK;
+}
+
+static PangeaScriptStatus CompleteScriptArea(int playerNum, bool success)
+{
+	if (playerNum != 0 || !gMyNodePtr) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!success) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	gFinishedArea = true;
+	return PANGEA_SCRIPT_OK;
+}
+
+static const PangeaScriptGameplayOps kGameplayOps = {
+	.getInput = GetScriptInput, .sampleTile = SampleScriptTile, .overlapBox = OverlapScriptBox,
+	.collisionCategories = kCollisionCategories,
+	.collisionCategoryCount = sizeof(kCollisionCategories) / sizeof(kCollisionCategories[0]),
+	.getState = GetScriptState, .setState = SetScriptState,
+	.stateFields = kStateFields, .stateFieldCount = sizeof(kStateFields) / sizeof(kStateFields[0]),
+	.complete = CompleteScriptArea,
+	.operationMask = (1u << PANGEA_SCRIPT_OP_FIRE) | (1u << PANGEA_SCRIPT_OP_TRANSFORM)
+		| (1u << PANGEA_SCRIPT_OP_RESPAWN) | (1u << PANGEA_SCRIPT_OP_MOUNT) | (1u << PANGEA_SCRIPT_OP_DISMOUNT),
+	.runOperation = MikeScript_RunOperation, .getRelations = MikeScript_GetRelations,
+};
 
 static PangeaScriptStatus SetScriptPlayerHealth(int playerNum, float health)
 {
@@ -1351,11 +1587,15 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 	outPlayer->hasDeathState = true;
 	for (int weaponIndex = 0; weaponIndex < outPlayer->weaponCount; weaponIndex++)
 		outPlayer->weapons[weaponIndex] = (PangeaScriptPlayerInventoryEntry){gMyWeapons[weaponIndex].type, gMyWeapons[weaponIndex].life};
+	outPlayer->hasKeyState = true;
+	for (int key = 0; key < 6; key++)
+		if (gMyKeys[key]) outPlayer->keys[outPlayer->keyCount++] = key;
 	return true;
 }
 
 void MikeScript_Init(void)
 {
+	ScriptPresentation_Configure();
 	const PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "MightyMike-Android",
@@ -1372,6 +1612,8 @@ void MikeScript_Init(void)
 		.setPlayerInvulnerable = SetScriptPlayerInvulnerable,
 		.setPlayerPosition = SetScriptPlayerPosition,
 		.setPlayerVelocity = SetScriptPlayerVelocity,
+		.setPlayerKey = SetScriptPlayerKey,
+		.gameplay = &kGameplayOps,
 		.capabilities = PANGEA_SCRIPT_MIGHTY_MIKE_CAPABILITIES,
 	};
 
@@ -1419,6 +1661,8 @@ static void CallAreaHook(PangeaScriptHook hook, int sceneNum, int areaNum, const
 
 void MikeScript_OnAreaLoad(int sceneNum, int areaNum)
 {
+	gScriptAreaTime = 0.0f;
+	gScriptInput = (PangeaScriptInputSnapshot){0};
 	CallAreaHook(PANGEA_SCRIPT_HOOK_LEVEL_LOAD, sceneNum, areaNum, "onAreaLoad");
 }
 
@@ -1429,12 +1673,15 @@ void MikeScript_OnAreaStart(int sceneNum, int areaNum)
 
 void MikeScript_OnAreaFrame(int sceneNum, int areaNum, unsigned int frameNum, float deltaSeconds)
 {
+	gScriptAreaTime += deltaSeconds;
+	SampleScriptInput();
+	MikeScript_UpdateEffects(deltaSeconds);
 	const PangeaScriptFrameContext context =
 	{
 		.levelNum = GetAreaLevelNum(sceneNum, areaNum),
 		.frameNum = frameNum,
 		.deltaSeconds = deltaSeconds,
-		.levelTimeSeconds = 0.0f,
+		.levelTimeSeconds = gScriptAreaTime,
 		.mode = "local",
 		.networked = false,
 		.sceneName = MikeScript_SceneName(sceneNum),

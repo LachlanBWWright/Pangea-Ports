@@ -344,6 +344,7 @@ static Boolean DoTrig_PowerUp(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 #ifdef PANGEA_ENABLE_SCRIPTING
 	if (!NanosaurScript_OnPickupCollected(theNode, whoNode, theNode->Kind, (float) theNode->PowerUpQuan, "nanosaur.powerup"))
 		return(false);
+	if (PangeaScript_RulesAreScriptControlled()) return false;
 #endif
 	theNode->TerrainItemPtr = nil;							// it aint never comin' back
 
@@ -469,6 +470,7 @@ static Boolean DoTrig_Crystal(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 	#ifdef PANGEA_ENABLE_SCRIPTING
 	if (!NanosaurScript_OnPickupCollected(theNode, whoNode, theNode->Kind, 1.0f, "nanosaur.crystal"))
 		return(false);
+	if (PangeaScript_RulesAreScriptControlled()) return false;
 	#endif
 	PlayEffect(EFFECT_CRYSTAL);
 	theNode->TerrainItemPtr = nil;							// it aint never comin' back

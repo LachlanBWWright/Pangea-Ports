@@ -357,6 +357,16 @@ ObjNode		*thisNodePtr;
 	{
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScriptObjectHandle frameHandle = {
+			thisNodePtr->ScriptObjectID, (uint32_t)thisNodePtr->ScriptObjectGeneration};
+		if (thisNodePtr->ScriptDeleteRequested)
+		{
+			DeleteObject(thisNodePtr);
+			thisNodePtr = gNextNode;
+			continue;
+		}
+#endif
 			
 	
 		KeepOldCollisionBoxes(thisNodePtr);					// keep old box
@@ -364,25 +374,43 @@ ObjNode		*thisNodePtr;
 			
 				/* UPDATE ANIMATION */
 				
-		if (thisNodePtr->StatusBits & STATUS_BIT_ANIM)
+		if ((thisNodePtr->StatusBits & STATUS_BIT_ANIM)
+#ifdef PANGEA_ENABLE_SCRIPTING
+			&& (!thisNodePtr->ScriptActiveStateInitialized || thisNodePtr->ScriptActive)
+#endif
+		)
 			UpdateSkeletonAnimation(thisNodePtr);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!BugdomScript_ObjectStillAlive(thisNodePtr, frameHandle))
+		{
+			thisNodePtr = gNextNode;
+			continue;
+		}
+#endif
 
 					/* NEXT TRY TO MOVE IT */
 
-		if (thisNodePtr->MoveCall != nil)
+		if (thisNodePtr->MoveCall != nil
+#ifdef PANGEA_ENABLE_SCRIPTING
+			&& BugdomScript_ShouldRunNativeMovement(thisNodePtr)
+#endif
+		)
 		{
 			thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+		if (BugdomScript_ObjectStillAlive(thisNodePtr, frameHandle) && thisNodePtr->ScriptObjectID != 0)
 			BugdomScript_RunObjectFrame(thisNodePtr);
 #endif
 		thisNodePtr = gNextNode;							// next node
 	}
 	while (thisNodePtr != nil);
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_SyncRide();
+#endif
 
 
 			/* CALL SOUND MAINTENANCE HERE FOR CONVENIENCE */
@@ -548,11 +576,13 @@ void DeleteObject(ObjNode	*theNode)
 		return;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+	BugdomScript_ClearRelationships(theNode);
 	if (theNode->ScriptObjectID != 0)
 	{
 		BugdomScript_OnObjectDeleted(theNode);
 		BugdomScript_UnregisterObject(theNode);
 	}
+	BugdomScript_ClearRelationships(theNode);
 #endif
 
 	GAME_ASSERT_MESSAGE(							// see if already deleted

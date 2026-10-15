@@ -367,6 +367,10 @@ ObjNode		*thisNodePtr;
 
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScriptObjectHandle frameHandle = {thisNodePtr->ScriptObjectID,
+			(uint32_t)thisNodePtr->ScriptObjectGeneration};
+#endif
 
 
 		if (gGamePaused && !(thisNodePtr->StatusBits & STATUS_BIT_MOVEINPAUSE))
@@ -375,7 +379,11 @@ ObjNode		*thisNodePtr;
 
 				/* UPDATE ANIMATION */
 
-		UpdateSkeletonAnimation(thisNodePtr);
+		if (!thisNodePtr->ScriptActiveStateInitialized || thisNodePtr->ScriptActive)
+			UpdateSkeletonAnimation(thisNodePtr);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!Bugdom2Script_ObjectStillAlive(thisNodePtr, frameHandle)) goto next;
+#endif
 
 
 					/* NEXT TRY TO MOVE IT */
@@ -384,12 +392,17 @@ ObjNode		*thisNodePtr;
 			&& (!(thisNodePtr->StatusBits & STATUS_BIT_NOMOVE))
 			&& (thisNodePtr->MoveCall != nil))
 		{
-			KeepOldCollisionBoxes(thisNodePtr);				// keep old boxes & other stuff
-			thisNodePtr->MoveCall(thisNodePtr);				// call object's move routine
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (Bugdom2Script_ShouldRunNativeMovement(thisNodePtr))
+#endif
+			{
+				KeepOldCollisionBoxes(thisNodePtr);
+				thisNodePtr->MoveCall(thisNodePtr);
+			}
 		}
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-		if (thisNodePtr->CType != INVALID_NODE_FLAG && thisNodePtr->ScriptObjectID != 0)
+		if (Bugdom2Script_ObjectStillAlive(thisNodePtr, frameHandle) && thisNodePtr->ScriptObjectID != 0)
 			Bugdom2Script_RunObjectFrame(thisNodePtr);
 #endif
 
@@ -1229,6 +1242,7 @@ void DeleteObject(ObjNode	*theNode)
 		return;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_ClearPlayerRelationships(theNode);
 	if (theNode->ScriptObjectID != 0)
 	{
 		Bugdom2Script_OnObjectDeleted(theNode);

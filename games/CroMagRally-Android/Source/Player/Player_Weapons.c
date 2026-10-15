@@ -46,6 +46,8 @@ static void ExplodeTorpedo(ObjNode *theBullet, const OGLPoint3D *where);
 static void MoveFreezeWeapon(ObjNode *theNode);
 static void MoveLandMine(ObjNode *theNode);
 static void DropLandMine(short playerNum);
+static bool gImmediatePowerupThrow;
+
 
 
 /****************************/
@@ -81,6 +83,14 @@ static void DropLandMine(short playerNum);
 #define	FreezeBombTimer		SpecialF[1]
 
 static const OGLPoint3D	gGunNozzelOff = {0,0,0};
+
+static void GetPowerupMuzzle(ObjNode* head, OGLPoint3D* coordinate)
+{
+	if (gImmediatePowerupThrow)
+		FindCoordOnJoint(head, 5, &gGunNozzelOff, coordinate);
+	else
+		FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, coordinate);
+}
 
 #define	MineArmingTimer		SpecialF[0]
 
@@ -178,6 +188,41 @@ short		powType;
 
 
 /******************** ACTIVATE NITRO POW *******************/
+
+Boolean PlayerFirePowerup(short playerNum, Boolean forwardThrow)
+{
+	if (playerNum < 0 || playerNum >= gNumTotalPlayers) return false;
+	PlayerInfoType* player = &gPlayerInfo[playerNum];
+	if (!player->objNode || !player->onThisMachine || player->isEliminated ||
+		player->powQuantity <= 0 || player->powTypeBeingThrown != POW_TYPE_NONE)
+		return false;
+	bool handThrown = player->powType == POW_TYPE_BONE || player->powType == POW_TYPE_OIL ||
+		player->powType == POW_TYPE_FREEZE || player->powType == POW_TYPE_BIRDBOMB;
+	if (handThrown && (!player->headObj || !player->headObj->Skeleton ||
+		!player->headObj->Skeleton->skeletonDefinition || player->headObj->Skeleton->skeletonDefinition->NumBones <= 5)) return false;
+	OGLPoint3D savedCoord = gCoord;
+	OGLVector3D savedDelta = gDelta;
+	gCoord = player->objNode->Coord;
+	gDelta = player->objNode->Delta;
+	gImmediatePowerupThrow = true;
+	switch (player->powType)
+	{
+		case POW_TYPE_BONE: ThrowBone(playerNum, forwardThrow); DecCurrentPOWQuantity(playerNum); break;
+		case POW_TYPE_OIL: ThrowOil(playerNum, forwardThrow); DecCurrentPOWQuantity(playerNum); break;
+		case POW_TYPE_BIRDBOMB: ThrowBirdBomb(playerNum, forwardThrow); DecCurrentPOWQuantity(playerNum); break;
+		case POW_TYPE_FREEZE: ThrowFreeze(playerNum, forwardThrow); DecCurrentPOWQuantity(playerNum); break;
+		case POW_TYPE_ROMANCANDLE: PlayerLaunchRomanCandle(playerNum); break;
+		case POW_TYPE_BOTTLEROCKET: PlayerLaunchBottleRocket(playerNum, forwardThrow); break;
+		case POW_TYPE_TORPEDO: PlayerLaunchTorpedo(playerNum); break;
+		case POW_TYPE_NITRO: ActivateNitroPOW(playerNum); break;
+		case POW_TYPE_MINE: DropLandMine(playerNum); break;
+		default: gCoord = savedCoord; gDelta = savedDelta; gImmediatePowerupThrow = false; return false;
+	}
+	gCoord = savedCoord;
+	gDelta = savedDelta;
+	gImmediatePowerupThrow = false;
+	return true;
+}
 
 void ActivateNitroPOW(short playerNum)
 {
@@ -314,7 +359,7 @@ ObjNode						*newObj,*head,*car;
 		.moveCall	= MoveBoneWeapon,
 		.scale		= 1,
 	};
-	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
+	GetPowerupMuzzle(head, &def.coord);
 	newObj = MakeNewDisplayGroupObject(&def);
 	RegisterProjectileEffect(newObj, "cromag.boneProjectile");
 	if (newObj == nil)
@@ -396,7 +441,7 @@ ObjNode						*newObj,*head,*car;
 		.moveCall	= MoveFreezeWeapon,
 		.scale		= 1
 	};
-	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
+	GetPowerupMuzzle(head, &def.coord);
 	newObj = MakeNewDisplayGroupObject(&def);
 	RegisterProjectileEffect(newObj, "cromag.freezeProjectile");
 	if (newObj == nil)
@@ -568,7 +613,7 @@ ObjNode						*newObj,*head,*car;
 		.moveCall 	= MoveOilBullet,
 		.scale		= 1
 	};
-	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
+	GetPowerupMuzzle(head, &def.coord);
 
 	newObj = MakeNewDisplayGroupObject(&def);
 	RegisterProjectileEffect(newObj, "cromag.oilProjectile");
@@ -750,12 +795,11 @@ short		p,bestP;
 		.rot		= car->Rot.y + (throwForward? 0: PI),
 		.scale		= 1,
 	};
-	FindCoordOnJointAtFlagEvent(head, 5, &gGunNozzelOff, &def.coord);
+	GetPowerupMuzzle(head, &def.coord);
 
 	newObj = MakeNewSkeletonObject(&def);
 	RegisterProjectileEffect(newObj, "cromag.birdBomb");
-	if (newObj == nil)
-		DoFatalAlert("ThrowBirdBomb: MakeNewSkeletonObject failed!");
+	if (newObj == nil) return;
 
 	newObj->Skeleton->AnimSpeed = 2.0f;
 	newObj->Delta.y = car->Delta.y + 600.0f;

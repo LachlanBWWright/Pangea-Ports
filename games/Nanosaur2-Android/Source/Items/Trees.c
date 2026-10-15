@@ -239,7 +239,7 @@ static Boolean DoTrig_Canopy(ObjNode *grass, ObjNode *player)
 			if (gPlayerInfo[p].invincibilityTimer > 0.0f)
 				return(false);
 
-			PlayerLoseHealth(p, .2, PLAYER_DEATH_TYPE_DEATHDIVE, &player->Coord, true);
+			PlayerLoseHealthFromObject(p, grass, .2, PLAYER_DEATH_TYPE_DEATHDIVE, &player->Coord, true);
 			PlayEffect3D(EFFECT_BODYHIT, &player->Coord);
 			PlayRumbleEffect(EFFECT_BODYHIT, p);
 			gPlayerInfo[p].invincibilityTimer = .6;
@@ -906,9 +906,9 @@ short   p = player->PlayerNum;
 	if (!gGamePrefs.kiddieMode)							// don't hurt in kiddie mode
 	{
 		if (MyRandomLong() & 1)
-			PlayerLoseHealth(p, tree->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
+			PlayerLoseHealthFromObject(p, tree, tree->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, nil, true);
 		else
-			PlayerLoseHealth(p, tree->Damage, PLAYER_DEATH_TYPE_EXPLODE, nil, true);
+			PlayerLoseHealthFromObject(p, tree, tree->Damage, PLAYER_DEATH_TYPE_EXPLODE, nil, true);
 	}
 
 	gPlayerInfo[p].invincibilityTimer = .5f;

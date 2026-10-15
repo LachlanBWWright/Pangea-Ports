@@ -355,8 +355,8 @@ static void  MoveKingAnt_Death(ObjNode *theNode)
 
 	
 	theNode->DeathTimer -= gFramesPerSecondFrac;
-	if (theNode->DeathTimer < 0.0f)		
-		gAreaCompleted = true;
+	if (theNode->DeathTimer < 0.0f)
+		(void) BugdomScript_CompleteNativeObjective();
 
 
 				/* UPDATE */

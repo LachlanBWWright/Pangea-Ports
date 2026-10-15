@@ -55,7 +55,17 @@ short		gShipSoundChannelNum;
 
 void TurnMeIntoFrog(void)
 {
+	if (!TryTurnMeIntoFrog())
+		DoFatalAlert("Couldnt init Frog!");
+}
+
+Boolean TryTurnMeIntoFrog(void)
+{
 	ObjNode *poof;
+	if (!gMyNodePtr || gFrogFlag || gSpaceShipFlag) return false;
+	ObjNode* frog = MakeNewShape(GroupNum_MeFrog, ObjType_MeFrog, 2,
+		gMyNodePtr->X.Int, gMyNodePtr->Y.Int, gMyNodePtr->Z, MoveMeFrog, PLAYFIELD_RELATIVE);
+	if (!frog) return false;
 
 				/* HIDE REAL ME */
 
@@ -70,11 +80,7 @@ void TurnMeIntoFrog(void)
 
 			/* MAKE FROG OBJECT */
 
-	gMyNodePtr = MakeNewShape(GroupNum_MeFrog,ObjType_MeFrog,2,
-					gRealMePtr->X.Int,gRealMePtr->Y.Int,gRealMePtr->Z,MoveMeFrog,
-					PLAYFIELD_RELATIVE);
-	if (gMyNodePtr == nil)
-		DoFatalAlert("Couldnt init Frog!");
+	gMyNodePtr = frog;
 
 	gMyNodePtr->TopOff = gRealMePtr->TopOff;		// set box
 	gMyNodePtr->BottomOff = gRealMePtr->BottomOff;
@@ -103,6 +109,7 @@ void TurnMeIntoFrog(void)
 	if (poof)
 		MikeScript_RegisterObject(poof, "mightymike.frogPoof", "child-object");
 	#endif
+	return true;
 }
 
 
@@ -115,6 +122,9 @@ void DisposeFrog(void)
 {
 	if (gFrogFlag)
 	{
+		gRealMePtr->X = gMyNodePtr->X;
+		gRealMePtr->Y = gMyNodePtr->Y;
+		gRealMePtr->Z = gMyNodePtr->Z;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 		MikeScript_UnregisterPlayerObject(gMyNodePtr);
@@ -307,6 +317,9 @@ void DisposeSpaceShip(void)
 {
 	if (gSpaceShipFlag)
 	{
+		gRealMePtr->X = gMyNodePtr->X;
+		gRealMePtr->Y = gMyNodePtr->Y;
+		gRealMePtr->Z = gMyNodePtr->Z;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 		MikeScript_UnregisterPlayerObject(gMyNodePtr);

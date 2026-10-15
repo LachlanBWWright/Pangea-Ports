@@ -92,6 +92,11 @@ void	InitBullets(void);
 Boolean	AddWeaponPowerup(ObjectEntryType *);
 void	GetAWeapon(short);
 void	CheckFireWeapon(void);
+Boolean MikeWeapon_AttackRequested(Boolean edge);
+Boolean MikeWeapon_Fire(void);
+#ifdef PANGEA_ENABLE_SCRIPTING
+Boolean MikeWeapon_FireFromScript(void);
+#endif
 void	SelectNextWeapon(int delta);
 void	RemoveCurrentWeaponFromInventory(void);
 void	WeaponHitEnemy(ObjNode *);

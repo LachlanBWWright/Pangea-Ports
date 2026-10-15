@@ -3,6 +3,7 @@
 /***************************/
 
 #include "game.h"
+#include "../Scripting/ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -97,6 +98,13 @@ long		c;
 
 	if (SeeIfCrossedLineMarker(player, &c))
 	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!Nanosaur2Script_UsesNativeRules())
+		{
+			Nanosaur2Script_OnCheckpointReached(p, c);
+			return;
+		}
+#endif
 
 				/* USE CENTERPOINT OF THIS FOR REINCARNATION */
 
@@ -235,6 +243,7 @@ no_lap:;
 			/* SEE HOW FAR TO THE NEXT CHECKPOINT */
 			/**************************************/
 
+	if (!Nanosaur2Script_UsesNativeRules()) return;
 	newCheckpoint = gPlayerInfo[p].raceCheckpointNum;
 
 				/* GET NEXT CKP # */
@@ -301,6 +310,7 @@ no_lap:;
 void CalcPlayerPlaces(void)
 {
 short	p,place,i;
+	if (!Nanosaur2Script_UsesNativeRules()) return;
 
 	if (gVSMode != VS_MODE_RACE)
 	{
@@ -368,6 +378,7 @@ next:
 static void PlayerCompletedRace(short playerNum)
 {
 short	i;
+	if (!Nanosaur2Script_UsesNativeRules()) return;
 
 	if (gPlayerInfo[playerNum].raceComplete)
 	{

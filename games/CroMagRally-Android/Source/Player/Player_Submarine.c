@@ -11,9 +11,7 @@
 
 #include "game.h"
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-#include "ScriptBindings.h"
-#endif
+#include "../Scripting/ScriptBindings.h"
 #include <SDL3/SDL_scancode.h>
 
 /****************************/
@@ -264,7 +262,7 @@ OGLVector3D		aimVec;
 
 			/* APPLY THRUST TO SUBMARINE */
 
-	if (gNoCarControls || gTrackCompleted || (gPlayerInfo[playerNum].submarineImmobilized > 0.0f))
+	if ((gNoCarControls && CroMagScript_NativeRulesEnabled()) || gTrackCompleted || (gPlayerInfo[playerNum].submarineImmobilized > 0.0f))
 	{
 		ApplyFrictionToDeltas(SUBMARINE_FRICTION * fps, &gDelta);
 		gPlayerInfo[playerNum].currentRPM = CalcVectorLength(&gDelta);
@@ -743,7 +741,7 @@ uint16_t			playerNum = theNode->PlayerNum;
 float			fps = gFramesPerSecondFrac;
 
 
-	if (gNoCarControls || gTrackCompleted || (gPlayerInfo[playerNum].submarineImmobilized > 0.0f))
+	if ((gNoCarControls && CroMagScript_NativeRulesEnabled()) || gTrackCompleted || (gPlayerInfo[playerNum].submarineImmobilized > 0.0f))
 		return;
 
 			/*****************/

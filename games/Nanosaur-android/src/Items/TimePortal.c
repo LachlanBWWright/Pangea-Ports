@@ -220,7 +220,11 @@ float	y;
 	if (theNode->Kind == PORTAL_TYPE_EXIT)
 	{
 		theNode->SpecialF[1] += fps;
-		if (theNode->SpecialF[1] > 5)
+		if (theNode->SpecialF[1] > 5
+#ifdef PANGEA_ENABLE_SCRIPTING
+			&& !PangeaScript_RulesAreScriptControlled()
+#endif
+			)
 		{
 			gGameOverFlag = gWonGameFlag = true;
 		}

@@ -72,6 +72,7 @@ bool AreAnyNewKeysPressed(void);
 
 bool GetNewNeedState(int needID);
 bool GetNeedState(int needID);
+bool GetReleasedNeedState(int needID);
 
 SDL_Gamepad* TryOpenGamepad(bool showMessageOnFailure);
 void OnJoystickRemoved(SDL_JoystickID which);

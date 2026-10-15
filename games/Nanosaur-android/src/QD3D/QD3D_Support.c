@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include "profiling.h"
 
 #ifdef __EMSCRIPTEN__
@@ -424,6 +425,13 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(QD3DSetu
 		Render_FlushQueue();
 		Render_Exit2D();
 	}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Render_Enter2D_Full640x480();
+	ScriptPresentation_Draw();
+	Render_FlushQueue();
+	Render_Exit2D();
+#endif
 
 	if (gGamePrefs.force4x3)
 	{

@@ -11,8 +11,10 @@
 
 #include "game.h"
 #include "profiling.h"
+#include "ScriptRules.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
+#include "ScriptBespoke.h"
 #endif
 
 /****************************/
@@ -92,6 +94,16 @@ static float	gDuelKeySequenceDelay, gDuelKeySequenceTimeLimit;
 int		gDuelReflex;
 Boolean	gPlayerToWinDuel;
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+int BillyScript_GetDuelStage(void) { return gDuelStage; }
+float BillyScript_GetDuelDelay(void) { return gDuelKeySequenceDelay; }
+float BillyScript_GetDuelTimeLimit(void) { return gDuelKeySequenceTimeLimit; }
+void BillyScript_SetDuelDelay(float value) { gDuelKeySequenceDelay = value; }
+void BillyScript_SetDuelTimeLimit(float value) { gDuelKeySequenceTimeLimit = value; }
+bool BillyScript_GetDuelOutcome(void) { return gPlayerToWinDuel; }
+void BillyScript_SetDuelOutcome(bool success) { gPlayerToWinDuel = success; }
+#endif
+
 
 static	Byte		gDuelDifficulty = 0;
 static 	Byte		gNumDuelers[MAX_DUEL_DIFFICULTY] = {1,2,3,3,3,3};
@@ -164,6 +176,9 @@ void PlayDuel(Byte difficulty)
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_Duel();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScript_UpdateAttachments();
+#endif
 		KeepTerrainAlive();
 
 		OGL_DrawScene(DefaultDrawCallback);
@@ -171,7 +186,7 @@ void PlayDuel(Byte difficulty)
 
 				/* MISC STUFF */
 
-		if (IsCheatKeyComboDown())										// cheat to bail out
+		if (BillyScript_NativeRulesAllowed() && IsCheatKeyComboDown())										// cheat to bail out
 		{
 			gPlayerToWinDuel = true;
 			gPlayerIsDead = false;
@@ -526,7 +541,7 @@ void MovePlayer_Duel(ObjNode *player)
 
 	GetObjectInfo(player);
 
-	switch(gDuelStage)
+	if (BillyScript_NativeRulesAllowed()) switch(gDuelStage)
 	{
 		case	DUEL_STAGE_WALKON:
 				MovePlayer_Duel_WalkOn(player);
@@ -798,6 +813,26 @@ do_right_gun:
 
 }
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool BillyScript_FireDuel(int side)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (GetBillyAreaMode() != BILLY_AREA_MODE_DUEL || !gGameViewInfoPtr || !player
+		|| gPlayerIsDead || gLevelCompleted || side < 0 || side > 2 || !player->Skeleton
+		|| !player->ChainNode || !player->ChainNode->ChainNode) return false;
+	int animation = player->Skeleton->AnimNum;
+	if (animation != PLAYER_ANIM_DRAWSHOOT && animation != PLAYER_ANIM_DRAWSHOOT2
+		&& animation != PLAYER_ANIM_DRAWSHOOT3 && animation != PLAYER_ANIM_DRAWSHOOT4) return false;
+	if (animation == PLAYER_ANIM_DRAWSHOOT && side != 0) return false;
+	if (animation == PLAYER_ANIM_DRAWSHOOT4 && side == 1) return false;
+	int target = side == 0 ? 0 : side == 1 ? 2 : 1;
+	if (!gDuelers[target] || gDuelers[target]->CType == INVALID_NODE_FLAG
+		|| !gDuelers[target]->Skeleton || gDuelers[target]->ScriptDeleteRequested) return false;
+	FirePlayerDuelGuns(player, side);
+	return true;
+}
+#endif
+
 
 /********************* FIRE ENEMY DUEL GUN **************************/
 
@@ -957,6 +992,30 @@ int			anim;
 		dot = OGLVector3D_Dot(&toImpact, &bulletAim);					// calc angle between
 		if (dot < 0.0f)													// see if on other side of the target pt now
 		{
+			enemy = (ObjNode *)theNode->TargetObj;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			Boolean destroyTarget = false;
+			float damage = 1.0f;
+			Boolean applyDamage = BillyScript_OnWeaponHit(theNode, enemy, damage, &damage, &destroyTarget);
+			if (!enemy || enemy->CType == INVALID_NODE_FLAG || !applyDamage || damage <= 0.0f)
+			{
+				DeleteObject(theNode);
+				return;
+			}
+			if (destroyTarget)
+			{
+				DeleteEnemy(enemy);
+				DeleteObject(theNode);
+				return;
+			}
+			PangeaScriptObjectHandle targetHandle = {enemy->ScriptObjectID, enemy->ScriptObjectGeneration};
+			if (PangeaScript_ObjectIsScriptControlled(targetHandle))
+			{
+				enemy->Health = fmaxf(0.0f, enemy->Health - damage);
+				DeleteObject(theNode);
+				return;
+			}
+#endif
 					/* DO ENTRY WOUND */
 					
 			splatVec.x = -gDelta.x;
@@ -975,24 +1034,6 @@ int			anim;
 			DoBulletImpact(&theNode->TargetCoord, &splatVec, 1.0);
 		
 		
-			enemy = (ObjNode *)theNode->TargetObj;				// who are we shooting?
-			Boolean applyDamage = true;
-			Boolean destroyTarget = false;
-			float damage = 1.0f;
-			#ifdef PANGEA_ENABLE_SCRIPTING
-			applyDamage = BillyScript_OnWeaponHit(theNode, enemy, damage, &damage, &destroyTarget);
-			#endif
-			if (!applyDamage)
-			{
-				DeleteObject(theNode);
-				return;
-			}
-			if (destroyTarget)
-			{
-				DeleteEnemy(enemy);
-				DeleteObject(theNode);
-				return;
-			}
 			
 			
 					/* WHICH DEATH ANIM TO DO */
@@ -1145,6 +1186,7 @@ Byte	key;
 float	fps = gFramesPerSecondFrac;
 
 			/* SEE IF DEACTIVATE @ END OF FACEOFF */
+	if (!BillyScript_NativeRulesAllowed()) return;
 			
 	if (gDoneFaceOff || (gDuelReflex == MAX_REFLEX_DOTS))				// see if done all the dots or firing now
 	{

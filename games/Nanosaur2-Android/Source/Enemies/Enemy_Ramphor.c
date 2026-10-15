@@ -399,7 +399,7 @@ short	playerNum = player->PlayerNum;
 					/* NO SHIELD, SO HURT PLAYER */
 		else
 		if (!gGamePrefs.kiddieMode)							// don't hurt in kiddie mode
-			PlayerLoseHealth(playerNum, enemy->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, &gCoord, true);
+			PlayerLoseHealthFromObject(playerNum, enemy, enemy->Damage, PLAYER_DEATH_TYPE_DEATHDIVE, &gCoord, true);
 
 
 		gPlayerInfo[playerNum].invincibilityTimer = 1.0f;

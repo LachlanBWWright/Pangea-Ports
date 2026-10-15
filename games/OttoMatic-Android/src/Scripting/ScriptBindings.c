@@ -1,6 +1,7 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "game.h"
+#include "pangea_presentation_game.h"
 #include "ScriptBindings.h"
 
 #include "splineitems.h"
@@ -857,12 +858,34 @@ static bool OttoObjectGetPosition(void* nativeObject, PangeaScriptVector3* outPo
 static bool OttoObjectSetPosition(void* nativeObject, const PangeaScriptVector3* position)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
-	if (!node || !position)
+	if (!node || !position || node->CType == INVALID_NODE_FLAG ||
+		!isfinite(position->x) || !isfinite(position->y) || !isfinite(position->z) ||
+		node->NumCollisionBoxes > MAX_COLLISION_BOXES)
 		return false;
+	OGLVector3D offset = {position->x - node->Coord.x, position->y - node->Coord.y,
+		position->z - node->Coord.z};
+	for (int i = 0; i < node->NumCollisionBoxes; i++)
+	{
+		const CollisionBoxType* box = &node->CollisionBoxes[i];
+		if (!isfinite(box->left + offset.x) || !isfinite(box->right + offset.x) ||
+			!isfinite(box->bottom + offset.y) || !isfinite(box->top + offset.y) ||
+			!isfinite(box->back + offset.z) || !isfinite(box->front + offset.z)) return false;
+	}
+	for (int i = 0; i < node->NumCollisionBoxes; i++)
+	{
+		CollisionBoxType* box = &node->CollisionBoxes[i];
+		box->left += offset.x;
+		box->right += offset.x;
+		box->bottom += offset.y;
+		box->top += offset.y;
+		box->back += offset.z;
+		box->front += offset.z;
+	}
 
 	node->Coord.x = position->x;
 	node->Coord.y = position->y;
 	node->Coord.z = position->z;
+	if (node == gPlayerInfo.objNode) gPlayerInfo.coord = node->Coord;
 
 	if (node == gCurrentScriptObject && gCurrentScriptObjectUsesGlobals)
 	{
@@ -949,8 +972,14 @@ static bool OttoObjectSetScale(void* nativeObject, float scale)
 static bool OttoObjectSetCollisionEnabled(void* nativeObject, bool enabled)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
-	if (!node) return false;
-	if (enabled && (!node->ScriptActiveStateInitialized || node->ScriptActive)) node->StatusBits &= ~STATUS_BIT_NOCOLLISION;
+	if (!node || node->CType == INVALID_NODE_FLAG) return false;
+	if (node->ScriptActiveStateInitialized && !node->ScriptActive)
+	{
+		if (enabled) node->ScriptSuspendedStatusBits &= ~STATUS_BIT_NOCOLLISION;
+		else node->ScriptSuspendedStatusBits |= STATUS_BIT_NOCOLLISION;
+		return true;
+	}
+	if (enabled) node->StatusBits &= ~STATUS_BIT_NOCOLLISION;
 	else node->StatusBits |= STATUS_BIT_NOCOLLISION;
 	return true;
 }
@@ -978,7 +1007,7 @@ static bool OttoObjectGetHealth(void* nativeObject, float* outHealth)
 	ObjNode* node = (ObjNode*) nativeObject;
 	if (!node || !outHealth)
 		return false;
-	*outHealth = node->Health;
+	*outHealth = node == gPlayerInfo.objNode ? gPlayerInfo.health : node->Health;
 	return true;
 }
 
@@ -991,15 +1020,40 @@ static bool OttoObjectGetDamage(void* nativeObject, float* outDamage)
 	return true;
 }
 
+static bool OttoObjectSetHealth(void* nativeObject, float health)
+{
+	ObjNode* node = nativeObject;
+	if (!node || node->CType == INVALID_NODE_FLAG || !isfinite(health) || health < 0.0f) return false;
+	if (node == gPlayerInfo.objNode) gPlayerInfo.health = health;
+	node->Health = health;
+	return true;
+}
+
+static bool OttoObjectSetDamage(void* nativeObject, float damage)
+{
+	ObjNode* node = nativeObject;
+	if (!node || node->CType == INVALID_NODE_FLAG || !isfinite(damage) || damage < 0.0f) return false;
+	node->Damage = damage;
+	return true;
+}
+
 static bool OttoObjectSetActive(void* nativeObject, bool active)
 {
 	ObjNode* node = (ObjNode*) nativeObject;
 	if (!node) return false;
-	if (!node->ScriptDefinitionID[0]) return true;
+	if (node->CType == INVALID_NODE_FLAG) return false;
+	Boolean wasActive = !node->ScriptActiveStateInitialized || node->ScriptActive;
+	if (wasActive == active) return true;
 	node->ScriptActiveStateInitialized = true;
 	node->ScriptActive = active;
-	if (active) node->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else node->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	uint32_t suspendedBits = STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	if (active)
+		node->StatusBits = (node->StatusBits & ~suspendedBits) | node->ScriptSuspendedStatusBits;
+	else
+	{
+		node->ScriptSuspendedStatusBits = node->StatusBits & suspendedBits;
+		node->StatusBits |= suspendedBits;
+	}
 	return true;
 }
 
@@ -1085,9 +1139,46 @@ static bool OttoObjectDelete(void* nativeObject)
 	return true;
 }
 
+static bool OttoObjectGetBounds(void* nativeObject, PangeaScriptBounds* output)
+{
+	ObjNode* node = nativeObject;
+	if (!node || !output || node->CType == INVALID_NODE_FLAG ||
+		node->NumCollisionBoxes == 0 || node->NumCollisionBoxes > MAX_COLLISION_BOXES) return false;
+	PangeaScriptBounds bounds = {{INFINITY, INFINITY, INFINITY}, {-INFINITY, -INFINITY, -INFINITY}};
+	for (int i = 0; i < node->NumCollisionBoxes; i++)
+	{
+		const CollisionBoxType* box = &node->CollisionBoxes[i];
+		if (!isfinite(box->left) || !isfinite(box->right) || !isfinite(box->bottom) ||
+			!isfinite(box->top) || !isfinite(box->back) || !isfinite(box->front) ||
+			box->left > box->right || box->bottom > box->top || box->back > box->front) return false;
+		bounds.min.x = fminf(bounds.min.x, box->left);
+		bounds.min.y = fminf(bounds.min.y, box->bottom);
+		bounds.min.z = fminf(bounds.min.z, box->back);
+		bounds.max.x = fmaxf(bounds.max.x, box->right);
+		bounds.max.y = fmaxf(bounds.max.y, box->top);
+		bounds.max.z = fmaxf(bounds.max.z, box->front);
+	}
+	*output = bounds;
+	return true;
+}
+
+static bool OttoObjectGetJointPosition(void* nativeObject, int joint, PangeaScriptVector3* output)
+{
+	ObjNode* node = nativeObject;
+	if (!node || !output || !node->Skeleton || !node->Skeleton->skeletonDefinition ||
+		joint < 0 || joint >= node->Skeleton->skeletonDefinition->NumBones) return false;
+	OGLPoint3D origin = {0};
+	OGLPoint3D position;
+	FindCoordOnJoint(node, joint, &origin, &position);
+	*output = (PangeaScriptVector3){position.x, position.y, position.z};
+	return true;
+}
+
 static const PangeaScriptObjectOps kOttoObjectNodeOps =
 {
 	.getPosition = OttoObjectGetPosition,
+	.getBounds = OttoObjectGetBounds,
+	.getJointPosition = OttoObjectGetJointPosition,
 	.getVelocity = OttoObjectGetVelocity,
 	.getRotation = OttoObjectGetRotation,
 	.getScale = OttoObjectGetScale,
@@ -1106,6 +1197,8 @@ static const PangeaScriptObjectOps kOttoObjectNodeOps =
 	.setAnimationNamed = OttoObjectSetAnimationNamed,
 	.setCollisionEnabled = OttoObjectSetCollisionEnabled,
 	.setActive = OttoObjectSetActive,
+	.setHealth = OttoObjectSetHealth,
+	.setDamage = OttoObjectSetDamage,
 	.deleteObject = OttoObjectDelete,
 };
 
@@ -1190,7 +1283,8 @@ static bool GetScriptPlayer(int playerNum, PangeaScriptPlayerSnapshot* outPlayer
 	outPlayer->hasLevelCompletionState = true;
 	outPlayer->heightOffGround = gPlayerInfo.distToFloor;
 	outPlayer->hasTerrainHeightState = true;
-	outPlayer->invulnerabilityTimeRemaining = gPlayerInfo.objNode->InvincibleTimer;
+	outPlayer->invulnerable = gPlayerInfo.invincibilityTimer > 0.0f;
+	outPlayer->invulnerabilityTimeRemaining = fmaxf(0.0f, gPlayerInfo.invincibilityTimer);
 	outPlayer->hasInvulnerabilityTimerState = true;
 	outPlayer->knockedDown = gPlayerInfo.knockDownTimer > 0.0f;
 	outPlayer->knockdownTimeRemaining = gPlayerInfo.knockDownTimer;
@@ -1262,6 +1356,19 @@ static PangeaScriptStatus SetScriptPlayerWeaponQuantity(int playerNum, int weapo
 	int emptySlot = -1;
 	if (playerNum != 0 || weaponType < 0 || weaponType >= NUM_WEAPON_TYPES || quantity < 0 || quantity > 99 || !gPlayerInfo.objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (quantity == 0 && weaponType == WEAPON_TYPE_FIST)
+		return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (quantity == 0 && gPlayerInfo.currentWeaponType == weaponType)
+	{
+		bool switched = false;
+		for (int slot = 0; slot < MAX_INVENTORY_SLOTS && !switched; slot++)
+		{
+			const WeaponInventoryType* item = &gPlayerInfo.weaponInventory[slot];
+			if (item->type != weaponType && item->type >= 0 && item->quantity > 0)
+				switched = SelectPlayerWeapon(item->type);
+		}
+		if (!switched) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	}
 	for (int slot = 0; slot < MAX_INVENTORY_SLOTS; slot++)
 	{
 		if (gPlayerInfo.weaponInventory[slot].type == weaponType)
@@ -1290,9 +1397,7 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 {
 	if (playerNum != 0 || !position || !gPlayerInfo.objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gPlayerInfo.coord = (OGLPoint3D){position->x, position->y, position->z};
-	gPlayerInfo.objNode->Coord = gPlayerInfo.coord;
-	return PANGEA_SCRIPT_OK;
+	return OttoObjectSetPosition(gPlayerInfo.objNode, position) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_BAD_ARGUMENT;
 }
 
 static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScriptVector3* velocity)
@@ -1302,8 +1407,118 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 	return OttoObjectSetVelocity(gPlayerInfo.objNode, velocity) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_RUNTIME_ERROR;
 }
 
+static PangeaScriptInputSnapshot gScriptInput;
+
+static void SampleScriptInput(void)
+{
+	static const struct { const char* name; int need; } actions[] =
+	{
+		{"forward", kNeed_Forward}, {"backward", kNeed_Backward},
+		{"left", kNeed_TurnLeft}, {"right", kNeed_TurnRight},
+		{"jump", kNeed_Jump}, {"fire", kNeed_Shoot},
+		{"interact", kNeed_PunchPickup}, {"previousWeapon", kNeed_PrevWeapon},
+		{"nextWeapon", kNeed_NextWeapon}, {"cameraMode", kNeed_CameraMode},
+		{"cameraLeft", kNeed_CameraLeft}, {"cameraRight", kNeed_CameraRight},
+	};
+	gScriptInput.actionCount = sizeof(actions) / sizeof(actions[0]);
+	for (int i = 0; i < gScriptInput.actionCount; i++)
+	{
+		bool held = GetNeedState(actions[i].need);
+		bool wasHeld = gScriptInput.actions[i].held;
+		gScriptInput.actions[i].name = actions[i].name;
+		gScriptInput.actions[i].held = held;
+		gScriptInput.actions[i].pressed = GetNewNeedState(actions[i].need);
+		gScriptInput.actions[i].released = wasHeld && !held;
+	}
+	gScriptInput.moveX = gPlayerInfo.analogControlX;
+	gScriptInput.moveY = gPlayerInfo.analogControlZ;
+}
+
+static bool GetScriptInput(int playerNum, PangeaScriptInputSnapshot* input)
+{
+	if (playerNum != 0 || !input) return false;
+	*input = gScriptInput;
+	return true;
+}
+
+static bool SampleScriptTerrain(float x, float z, PangeaScriptTerrainSample* sample)
+{
+	if (!sample || !isfinite(x) || !isfinite(z) || !gMapYCoords ||
+		x < 0 || z < 0 || x >= gTerrainUnitWidth || z >= gTerrainUnitDepth) return false;
+	OGLVector3D savedNormal = gRecentTerrainNormal;
+	*sample = (PangeaScriptTerrainSample){0};
+	sample->height = GetTerrainY(x, z);
+	sample->normal = (PangeaScriptVector3){gRecentTerrainNormal.x, gRecentTerrainNormal.y, gRecentTerrainNormal.z};
+	gRecentTerrainNormal = savedNormal;
+	sample->surfaceType = GetTileAttribsAtRowCol((int)(z / TERRAIN_POLYGON_SIZE), (int)(x / TERRAIN_POLYGON_SIZE));
+	sample->hasWater = GetWaterY(x, z, &sample->waterHeight);
+	return true;
+}
+
+static bool ScriptOverlapBox(const PangeaScriptBounds* bounds, unsigned mask,
+	PangeaScriptObjectHandle* results, int capacity, int* count)
+{
+	if (!bounds || !results || !count || capacity < 1 ||
+		!isfinite(bounds->min.x) || !isfinite(bounds->min.y) || !isfinite(bounds->min.z) ||
+		!isfinite(bounds->max.x) || !isfinite(bounds->max.y) || !isfinite(bounds->max.z) ||
+		bounds->min.x > bounds->max.x || bounds->min.y > bounds->max.y || bounds->min.z > bounds->max.z) return false;
+	*count = 0;
+	for (ObjNode* node = gFirstNodePtr; node && *count < capacity; node = node->NextNode)
+	{
+		if (node->CType == INVALID_NODE_FLAG || !(node->CType & mask) ||
+			(node->StatusBits & STATUS_BIT_NOCOLLISION)) continue;
+		PangeaScriptBounds collider;
+		if (!OttoObjectGetBounds(node, &collider)) continue;
+		if (!DoSimpleBoxCollisionAgainstObject(bounds->max.y, bounds->min.y, bounds->min.x,
+			bounds->max.x, bounds->max.z, bounds->min.z, node)) continue;
+		PangeaScriptObjectHandle handle = {node->ScriptObjectID, node->ScriptObjectGeneration};
+		if (!PangeaScript_ObjectExists(handle))
+		{
+			node->ScriptObjectID = 0;
+			node->ScriptObjectGeneration = 0;
+			OttoScript_RegisterObjectNode(node, "ottomatic.contact", PANGEA_SCRIPT_CAPABILITY_FULL, NULL, 0);
+			handle = (PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration};
+		}
+		if (!PangeaScript_ObjectExists(handle)) return false;
+		results[(*count)++] = handle;
+	}
+	return true;
+}
+
+static const PangeaScriptCollisionCategory kOttoCollisionCategories[] =
+{
+	{"solid", CTYPE_MISC}, {"enemy", CTYPE_ENEMY}, {"player", CTYPE_PLAYER},
+	{"trigger", CTYPE_TRIGGER | CTYPE_TRIGGER2}, {"projectile", CTYPE_WEAPON},
+	{"platform", CTYPE_MPLATFORM},
+};
+
+#include "ScriptGameplayState.inc"
+#include "ScriptNativeActions.inc"
+
+static const PangeaScriptGameplayOps kOttoGameplayOps =
+{
+	.getInput = GetScriptInput,
+	.sampleTerrain = SampleScriptTerrain,
+	.overlapBox = ScriptOverlapBox,
+	.collisionCategories = kOttoCollisionCategories,
+	.collisionCategoryCount = sizeof(kOttoCollisionCategories) / sizeof(kOttoCollisionCategories[0]),
+	.getState = GetOttoGameplayState,
+	.setState = SetOttoGameplayState,
+	.stateFields = kOttoStateFields,
+	.stateFieldCount = sizeof(kOttoStateFields) / sizeof(kOttoStateFields[0]),
+	.complete = CompleteOttoGameplay,
+	.operationMask = (1u << PANGEA_SCRIPT_OP_CARRY) | (1u << PANGEA_SCRIPT_OP_DROP) |
+		(1u << PANGEA_SCRIPT_OP_MOUNT) | (1u << PANGEA_SCRIPT_OP_DISMOUNT) |
+		(1u << PANGEA_SCRIPT_OP_FIRE) | (1u << PANGEA_SCRIPT_OP_RESPAWN) |
+		(1u << PANGEA_SCRIPT_OP_CAPTURE) | (1u << PANGEA_SCRIPT_OP_DELIVER) |
+		(1u << PANGEA_SCRIPT_OP_RESET_CARRIED),
+	.runOperation = RunOttoNativeOperation,
+	.getRelations = GetOttoNativeRelations,
+};
+
 void OttoScript_Init(void)
 {
+	ScriptPresentation_Configure();
 	const PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "OttoMatic-Android",
@@ -1312,6 +1527,7 @@ void OttoScript_Init(void)
 		.spawnScripted = SpawnScriptedObject,
 		.getPlayerCount = GetScriptPlayerCount,
 		.getPlayer = GetScriptPlayer,
+		.gameplay = &kOttoGameplayOps,
 		.setPlayerHealth = SetScriptPlayerHealth,
 		.setPlayerLives = SetScriptPlayerLives,
 		.setPlayerScore = SetScriptPlayerScore,
@@ -1329,6 +1545,7 @@ void OttoScript_Init(void)
 	gCurrentFrameContext = (PangeaScriptFrameContext){0};
 	gCurrentScriptObject = NULL;
 	gCurrentScriptObjectUsesGlobals = false;
+	gScriptInput = (PangeaScriptInputSnapshot){0};
 
 	status = PangeaScript_RegisterNativeItems(kNativeItems, (int)(sizeof(kNativeItems) / sizeof(kNativeItems[0])));
 	LogScriptStatus("native item registration", status);
@@ -1450,6 +1667,8 @@ void OttoScript_OnCheckpointReached(int checkpointNum)
 
 void OttoScript_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds)
 {
+	PollOttoNativeDelegation(deltaSeconds);
+	SampleScriptInput();
 	const PangeaScriptFrameContext context =
 	{
 		.levelNum = levelNum,
@@ -1474,6 +1693,7 @@ void OttoScript_OnLevelComplete(int levelNum)
 
 void OttoScript_OnLevelUnload(int levelNum)
 {
+	gOttoDelegatedPlayer = (PangeaScriptObjectHandle){0};
 	CallLevelHook(PANGEA_SCRIPT_HOOK_LEVEL_UNLOAD, levelNum, "onLevelUnload");
 	(void) PangeaScript_ApplyObjectLifecycleToAll(&gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	OttoScript_ReleaseCustomAssets();
@@ -1776,6 +1996,8 @@ void OttoScript_UnregisterObjectNode(ObjNode* theNode)
 
 void OttoScript_OnObjectDeleted(ObjNode* theNode)
 {
+	OttoScript_ClearNativeRelationships(theNode);
+	OttoScript_ClearNativeCar(theNode);
 	if (theNode && theNode->ScriptDefinitionID[0] && theNode->ScriptObjectID > 0)
 	{
 		PangeaScriptObjectHandle handle = {theNode->ScriptObjectID, theNode->ScriptObjectGeneration};
@@ -1787,6 +2009,12 @@ void OttoScript_OnObjectDeleted(ObjNode* theNode)
 		else if (PangeaScript_ObjectExists(handle) && !theNode->ScriptStreamOutSent)
 			(void) PangeaScript_ApplyObjectLifecycle(handle, &gCurrentFrameContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 	}
+}
+
+bool OttoScript_UsesControllerOverride(ObjNode* node)
+{
+	return node && !OttoScript_IsNativeDelegated(node) && node->CType != INVALID_NODE_FLAG && !node->ScriptDefinitionID[0] &&
+		PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration});
 }
 
 void OttoScript_RunObjectFrame(ObjNode* theNode, Boolean usesGlobals)
@@ -1904,6 +2132,14 @@ void OttoScript_RegisterHuman(ObjNode* human)
 	const char* const* tags = GetHumanTags(human->HumanType, &tagCount);
 	const char* objectType = tagCount > 1 ? tags[1] : NULL;
 	OttoScript_RegisterObjectNode(human, objectType, PANGEA_SCRIPT_CAPABILITY_FULL, tags, tagCount);
+}
+
+void OttoScript_OnHumanRescued(ObjNode* human)
+{
+	if (!human) return;
+	PangeaScriptObjectHandle handle = {human->ScriptObjectID, human->ScriptObjectGeneration};
+	if (PangeaScript_ObjectExists(handle))
+		LogScriptStatus("rescued", PangeaScript_CallObjectEvent(handle, &gCurrentFrameContext, "rescued"));
 }
 
 void OttoScript_RegisterPlayerObject(ObjNode* player)
@@ -2119,6 +2355,9 @@ void OttoScript_OnDamageApplied(float damage, int cause)
 
 void OttoScript_OnDeath(int eventValue)
 {
+	gOttoDelegatedPlayer = (PangeaScriptObjectHandle){0};
+	OttoScript_ClearNativeCar(gPlayerInfo.objNode);
+	if (gTargetPickup) (void)OttoScript_DropNativePickup();
 	PangeaScriptPlayerEventContext context;
 	ObjNode* player = gPlayerInfo.objNode;
 

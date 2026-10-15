@@ -1354,7 +1354,11 @@ static void MovePlayerRobot_Charging(ObjNode *theNode)
 
 	if (gPlayerInfo.superNovaStatic)						// if this obj exists then we're still charging
 	{
-		if (!GetNeedState(kNeed_Shoot))
+		if (
+#ifdef PANGEA_ENABLE_SCRIPTING
+			OttoScript_IsNativeDelegated(theNode) ? gPlayerInfo.superNovaCharge >= 1.0f :
+#endif
+			!GetNeedState(kNeed_Shoot))
 		{
 			DischargeSuperNova();							// attempt to discharge it
 		}
@@ -3421,6 +3425,59 @@ ObjNode		*magMonster;
 }
 
 
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+void OttoScript_UpdateNativeCarryPose(ObjNode* player)
+{
+	if (player != gPlayerInfo.objNode || !player || !player->Skeleton || player->Type != SKELETON_TYPE_OTTO) return;
+	ObjNode* car = OttoScript_GetNativeCar();
+	if (car)
+	{
+		player->Coord = car->Coord;
+		player->Coord.y += 90.0f;
+		player->Rot.y = car->Rot.y;
+		gPlayerInfo.coord = player->Coord;
+		UpdateObjectTransforms(player);
+	}
+	if (gPlayerInfo.leftHandObj && gPlayerInfo.rightHandObj) UpdateRobotHands(player);
+	if (!gTargetPickup || !player->IsHoldingPickup || gTargetPickup->POWType != POW_TYPE_MAGNET) return;
+	static const OGLPoint3D offset = {0, 0, 10};
+	OGLPoint3D right, left;
+	FindCoordOnJoint(player, PLAYER_JOINT_RIGHTHAND, &offset, &right);
+	FindCoordOnJoint(player, PLAYER_JOINT_LEFTHAND, &offset, &left);
+	gTargetPickup->MoveCall = nil;
+	gTargetPickup->CType = 0;
+	gTargetPickup->Coord = (OGLPoint3D){(right.x + left.x) * 0.5f, (right.y + left.y) * 0.5f,
+		(right.z + left.z) * 0.5f};
+	gTargetPickup->Rot.y = player->Rot.y;
+	gTargetPickup->Rot.x = -PI / 2;
+	UpdateObjectTransforms(gTargetPickup);
+	UpdateShadow(gTargetPickup);
+}
+
+bool OttoScript_DropNativePickup(void)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!player || !player->Skeleton || !gTargetPickup) return false;
+	if (gTargetPickup->POWType == POW_TYPE_MAGNET && player->IsHoldingPickup)
+	{
+		int id = gTargetPickup->MagnetMonsterID;
+		if (id < 0 || id >= MAX_MAGNET_MONSTERS || !gMagnetMonsterList[id]) return false;
+		OGLVector3D savedDelta = gDelta;
+		gDelta = player->Delta;
+		EndMagnetSkiing(player, false);
+		gDelta = savedDelta;
+	}
+	else
+	{
+		OttoScript_RestoreNativePickup(gTargetPickup);
+		gTargetPickup = NULL;
+		SetPlayerStandAnim(player, 4);
+	}
+	player->IsHoldingPickup = false;
+	return true;
+}
+#endif
 
 /******************** SHOULD APPLY SLOPES **************************/
 

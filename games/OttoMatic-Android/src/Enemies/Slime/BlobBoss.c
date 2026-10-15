@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -1074,8 +1075,7 @@ float	delay;
 			DeleteObject(gCasing);
 			gCasing = nil;
 
-			gLevelCompleted = true;							// we've won the level!
-			gLevelCompletedCoolDownTimer = 4;				// set delay so we can see it blow up
+			OttoScript_CompleteNativeLevel(4);
 		}
 
 				/* SET EXPLOSION DELAY ON EACH SEGMENT */

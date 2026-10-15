@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include "profiling.h"
 #ifdef __EMSCRIPTEN__
 #include <GLES2/gl2.h>
@@ -277,6 +278,7 @@ void QD3D_DrawScene(QD3DSetupOutputType *setupInfo, void (*drawRoutine)(const QD
 
 			StartProfilePhase(PROFILE_PHASE_UI);
 			Render_Enter2D_Full640x480();
+			ScriptPresentation_Draw();
 			if (gIsInGame)
 				SubmitInfobarOverlay();			// draw 2D elements on top
 			if (gGammaFadeFactor < 1.0f)

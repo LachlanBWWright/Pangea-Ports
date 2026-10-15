@@ -135,10 +135,13 @@ register ObjNode	*newNodePtr,*scanNodePtr,*reNodePtr;
 	NodeStackFront++;
 
 	long nodeNumBackup = newNodePtr->NodeNum;	// back up node number before zeroing out record
+	uint32_t allocationGeneration = newNodePtr->AllocationGeneration + 1;
+	if (allocationGeneration == 0) allocationGeneration = 1;
 
 	SDL_memset(newNodePtr, 0, sizeof(ObjNode));	// set all fields to 0
 
 	newNodePtr->NodeNum = nodeNumBackup;		// restore node number
+	newNodePtr->AllocationGeneration = allocationGeneration;
 
 		newNodePtr->MoveCall = moveCall;		// save move routine
 		newNodePtr->Genre = genre;
@@ -206,6 +209,7 @@ out:
 void MoveObjects(void)
 {
 static ObjNode*	nodesToMove[MAX_OBJECTS];
+static uint32_t generationsToMove[MAX_OBJECTS];
 int numNodesToMove = 0;
 
 	if (FirstNodePtr == nil)								// see if there are any objects
@@ -224,6 +228,7 @@ int numNodesToMove = 0;
 			continue;
 
 		nodesToMove[numNodesToMove] = node;
+		generationsToMove[numNodesToMove] = node->AllocationGeneration;
 		numNodesToMove++;
 	}
 
@@ -233,10 +238,10 @@ int numNodesToMove = 0;
 	{
 		ObjNode* node = nodesToMove[i];
 
-		if (node->CType == INVALID_NODE_FLAG)		// node was deleted by another node's move routine
+		if (node->CType == INVALID_NODE_FLAG || node->AllocationGeneration != generationsToMove[i])
 			continue;
 
-		if (node->MoveFlag && node->MoveCall != nil)
+		if (node->MoveFlag)
 		{
 			gThisNodePtr = node;					// set current object node
 
@@ -248,16 +253,21 @@ int numNodesToMove = 0;
 			gThisNodePtr->OldTopSide = gThisNodePtr->TopSide;
 			gThisNodePtr->OldBottomSide = gThisNodePtr->BottomSide;
 
-			node->MoveCall();						// call object's move routine
+			Boolean runNative = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			runNative = !PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){node->ScriptObjectID, node->ScriptObjectGeneration});
+#endif
+			if (runNative && node->MoveCall != nil)
+				node->MoveCall();
 
-			if (node->CType == INVALID_NODE_FLAG)	// move routine may have caused object to kill itself
+			if (node->CType == INVALID_NODE_FLAG || node->AllocationGeneration != generationsToMove[i])
 				continue;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 			if (node->ScriptObjectID != 0)
 				MikeScript_RunObjectFrame(node);
 
-			if (node->CType == INVALID_NODE_FLAG)
+			if (node->CType == INVALID_NODE_FLAG || node->AllocationGeneration != generationsToMove[i])
 				continue;
 #endif
 		}

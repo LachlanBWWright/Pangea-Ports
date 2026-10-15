@@ -423,6 +423,13 @@ ObjNode	*theNode;
 		theNode = gSplineObjectList[i];
 		if (theNode)
 		{
+#ifdef PANGEA_ENABLE_SCRIPTING
+			if (theNode->ScriptActiveStateInitialized && !theNode->ScriptActive)
+			{
+				if (theNode->ScriptDeleteRequested) DeleteObject(theNode);
+				continue;
+			}
+#endif
 					/* UPDATE SKELETON ANIMATION */
 
 			if (theNode->Skeleton)
@@ -433,7 +440,10 @@ ObjNode	*theNode;
 			if (theNode->SplineMoveCall)
 			{
 				KeepOldCollisionBoxes(theNode);					// keep old boxes & other stuff
-				theNode->SplineMoveCall(theNode);				// call object's spline move routine
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){theNode->ScriptObjectID, theNode->ScriptObjectGeneration}))
+#endif
+					theNode->SplineMoveCall(theNode);
 			}
 
 				/* UPDATE SKELETON'S MESH */

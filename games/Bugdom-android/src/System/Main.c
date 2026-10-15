@@ -412,6 +412,9 @@ static void PlayArea(void)
 {
 float killDelay = KILL_DELAY;						// time to wait after I'm dead before fading out
 float fps;
+#ifdef PANGEA_ENABLE_SCRIPTING
+float scriptLevelTime = 0.0f;
+#endif
 
 	gIsInGame = true;
 	gScriptFrameNum = 0;
@@ -444,11 +447,15 @@ float fps;
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 #ifdef PANGEA_ENABLE_SCRIPTING
-		BugdomScript_OnFrame(gRealLevel, gScriptFrameNum++, gFramesPerSecondFrac, 0.0f);
+		BugdomScript_OnFrame(gRealLevel, gScriptFrameNum++, gFramesPerSecondFrac, scriptLevelTime);
+		scriptLevelTime += gFramesPerSecondFrac;
 #endif
 				/* SPECIFIC MAINTENANCE */
 
-		CheckPlayerMorph();				
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (BugdomScript_NativeRulesEnabled() && gPlayerObj && BugdomScript_ShouldRunNativeMovement(gPlayerObj))
+#endif
+			CheckPlayerMorph();
 		UpdateLiquidAnimation();
 		UpdateHoneyTubeTextureAnimation();
 		UpdateRootSwings();
@@ -458,6 +465,9 @@ float fps;
 				
 		MoveObjects();
 		MoveSplineObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScript_UpdateAttachments();
+#endif
 		QD3D_MoveShards();
 		MoveParticleGroups();
 		UpdateCamera();
@@ -501,7 +511,7 @@ float fps;
 			
 			/* SEE IF GOT KILLED */
 				
-		if (gPlayerGotKilledFlag)				// if got killed, then hang around for a few seconds before resetting player
+		if (gPlayerGotKilledFlag && BugdomScript_NativeRulesEnabled())
 		{
 			killDelay -= fps;					
 			if (killDelay < 0.0f)				// see if time to reset player
@@ -783,6 +793,8 @@ static void DoDeathReset(void)
 
 static void CheckForCheats(void)
 {
+	if (!BugdomScript_NativeRulesEnabled())
+		return;
 #if !(_DEBUG)	// in debug builds, expose cheats without needing command/control key
 	if (GetKeyState_SDL(SDL_SCANCODE_GRAVE))	// must hold down the help key
 #endif

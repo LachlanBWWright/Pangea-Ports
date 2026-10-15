@@ -468,6 +468,9 @@ void MoveEverything(void)
 {
 	MoveObjects();
 	MoveSplineObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	PangeaScript_UpdateAttachments();
+#endif
 	UpdateCamera();								// update camera
 
 	/* LEVEL SPECIFIC UPDATES */

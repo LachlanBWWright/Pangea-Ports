@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -241,6 +242,7 @@ int		i;
 				Boolean destroyTarget = false;
 #ifdef PANGEA_ENABLE_SCRIPTING
 				applyDamage = BillyScript_OnWeaponHit(hitObj, theEnemy, damage, &damage, &destroyTarget);
+				if (theEnemy->CType == INVALID_NODE_FLAG) return true;
 				if (destroyTarget)
 				{
 					DeleteEnemy(theEnemy);
@@ -271,8 +273,15 @@ int		i;
 	{
 		if (ParticleHitObject(theEnemy, PARTICLE_FLAGS_HURTENEMY))
 		{
-		
-			if (theEnemy->HurtCallback(theEnemy, .3))			// handle hit (returns true if was deleted)
+			float damage = .3f;
+			Boolean applyDamage = true;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			Boolean destroyTarget = false;
+			applyDamage = BillyScript_OnWeaponHit(NULL, theEnemy, damage, &damage, &destroyTarget);
+			if (theEnemy->CType == INVALID_NODE_FLAG) return true;
+			if (destroyTarget) { DeleteEnemy(theEnemy); return true; }
+#endif
+			if (applyDamage && theEnemy->HurtCallback(theEnemy, damage))			// handle hit (returns true if was deleted)
 				return(true);
 		}
 	}
@@ -508,12 +517,17 @@ OGLVector3D	impactNormal;
 	{
 				/* THERE WAS AN IMPACT */
 				
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!BillyScript_DispatchBulletHit(bullet, target, &impactCoord))
+			MakePuff(&impactCoord, 10.0, PARTICLE_SObjType_GreySmoke, GL_SRC_ALPHA, GL_ONE, 1.0);
+#else
 		if (target->HitByBulletCallback)
 		{
 			target->HitByBulletCallback(bullet, target, &impactCoord);
 		}
 		else
 			MakePuff(&impactCoord, 10.0, PARTICLE_SObjType_GreySmoke, GL_SRC_ALPHA, GL_ONE, 1.0);			
+#endif
 									
 		DeleteObject(bullet);
 		return;
@@ -543,9 +557,11 @@ OGLVector3D	impactNormal;
 
 void DecEnemiesAtStopPoint(void)
 {
-	gScore += POINTS_SHOOTOUTENEMY;
+	if (gStopPointNum < 0 || gStopPointNum >= 20 || gNumEnemiesThisStopPoint[gStopPointNum] == 0) return;
+	if (BillyScript_NativeRulesAllowed()) gScore += POINTS_SHOOTOUTENEMY;
 
 	gNumEnemiesThisStopPoint[gStopPointNum]--;
+	if (!BillyScript_NativeRulesAllowed()) return;
 	if (gNumEnemiesThisStopPoint[gStopPointNum] <= 0)
 	{
 			/* SEE IF THAT'S THE END OF THE SWAMP */

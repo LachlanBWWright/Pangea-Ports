@@ -28,6 +28,7 @@
 #include "input.h"
 #include "externs.h"
 #include <math.h>
+#include "ScriptRulePolicy.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -312,7 +313,7 @@ static	void(*myMoveTable[])(void) =
 					MoveMe_Hurt					// water hurt right
 				};
 
-	if (gSpeedyTimer)									// see if speedy shoes
+	if (MikeScript_NativeRulesEnabled() && gSpeedyTimer)									// see if speedy shoes
 	{
 		if (--gSpeedyTimer == 0)
 		{
@@ -324,7 +325,7 @@ static	void(*myMoveTable[])(void) =
 		}
 	}
 
-	if (gEnemyFreezeTimer)								// update enemy freeze timer
+	if (MikeScript_NativeRulesEnabled() && gEnemyFreezeTimer)								// update enemy freeze timer
 		gEnemyFreezeTimer--;
 
 	if (gTeleportingFlag)								// lock me while teleporting
@@ -1227,9 +1228,14 @@ void MeHitBonusObject(ObjNode *targetNode)
 		pickupID = "mightymike.key";
 	else if ((targetNode->Type == ObjType_Coin) && (targetNode->SpriteGroupNum == GroupNum_Coin))
 		pickupID = "mightymike.coin";
+	else if ((targetNode->Type == ObjType_Bunny) && (targetNode->SpriteGroupNum == GroupNum_Bunny))
+		pickupID = "mightymike.bunny";
+	else if (LevelMetadataScene("area.character", gSceneNum) == SCENE_BARGAIN && targetNode->Type == ObjType_SpaceShip && !gSpaceShipFlag)
+		pickupID = "mightymike.spaceShip";
 	if (pickupID && !MikeScript_OnPickupCollected(targetNode, gMyNodePtr, targetNode->Type, 1.0f, pickupID))
 		return;
 	#endif
+	if (!MikeScript_NativeRulesEnabled()) return;
 
 						/* SEE IF HIT WEAPON POWERUP */
 

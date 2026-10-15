@@ -792,7 +792,7 @@ static void KillTick(ObjNode *enemy)
 				DoDialogMessage(DIALOG_MESSAGE_GOTTICKS, 1, 8.0, nil);
 			else																	// all ticks and fleas dead, so level done
 			{
-				StartLevelCompletion(4.0);
+				StartAutomaticLevelCompletion(4.0);
 				DoDialogMessage(DIALOG_MESSAGE_HAPPYDOG, 1, 3.0, nil);
 			}
 		}

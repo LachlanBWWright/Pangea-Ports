@@ -9,9 +9,7 @@
 
 #include "game.h"
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-#include "ScriptBindings.h"
-#endif
+#include "../Scripting/ScriptBindings.h"
 
 
 /****************************/
@@ -41,6 +39,7 @@ short				gWorstHumanPlace;
 
 void NextLap(short p)
 {
+	if (!CroMagScript_NativeRulesEnabled()) return;
 	gPlayerInfo[p].lapNum++;
 
 #ifdef PANGEA_ENABLE_SCRIPTING
@@ -67,6 +66,7 @@ float	intersectX, intersectZ;
 short	oldCheckpoint,newCheckpoint,nextCheckpoint;
 float	x1,z1,x2,z2,rot;
 OGLVector2D	checkToCheck,aim,deltaVec;
+	if (!CroMagScript_NativeRulesEnabled()) return;
 
 
 	/* SEE IF NEED TO DO THIS */
@@ -188,6 +188,9 @@ if (PangeaNet_IsHostAuthoritativeRemotePlayer(p))
 						goto no_lap;
 				}
 				gPlayerInfo[p].lapNum++;												// yep, we lapped because all the checkpoints were tagged
+#ifdef PANGEA_ENABLE_SCRIPTING
+				CroMagScript_OnLapComplete(p, gPlayerInfo[p].lapNum);
+#endif
 
 					/* SEE IF COMPLETED THE RACE */
 
@@ -281,6 +284,7 @@ no_lap:;
 void CalcPlayerPlaces(void)
 {
 short	p,place,i;
+	if (!CroMagScript_NativeRulesEnabled()) return;
 
 		/* SEE IF NEED TO DO THIS */
 

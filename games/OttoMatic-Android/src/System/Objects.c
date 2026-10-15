@@ -397,14 +397,43 @@ ObjNode		*thisNodePtr;
 		gCurrentNode = thisNodePtr;							// set current object node
 		gNextNode	 = thisNodePtr->NextNode;				// get next node now (cuz current node might get deleted)
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (thisNodePtr->ScriptDeleteRequested)
+		{
+			DeleteObject(thisNodePtr);
+			goto next;
+		}
+#endif
 
 		if (gGamePaused && !(thisNodePtr->StatusBits & STATUS_BIT_MOVEINPAUSE))
+			goto next;
+		if (thisNodePtr->ScriptActiveStateInitialized && !thisNodePtr->ScriptActive)
 			goto next;
 
 
 				/* UPDATE ANIMATION */
 
 		UpdateSkeletonAnimation(thisNodePtr);
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+		if (!(thisNodePtr->StatusBits & STATUS_BIT_ONSPLINE) && OttoScript_UsesControllerOverride(thisNodePtr))
+		{
+			KeepOldCollisionBoxes(thisNodePtr);
+			OttoScript_RunObjectFrame(thisNodePtr, false);
+			if (thisNodePtr->ScriptDeleteRequested)
+			{
+				DeleteObject(thisNodePtr);
+				goto next;
+			}
+			if (thisNodePtr->CType != INVALID_NODE_FLAG)
+			{
+				UpdateObjectTransforms(thisNodePtr);
+				OttoScript_UpdateNativeCarryPose(thisNodePtr);
+				OttoScript_ApplyObjectVisualOffset(thisNodePtr);
+			}
+			goto next;
+		}
+#endif
 
 
 					/* NEXT TRY TO MOVE IT */

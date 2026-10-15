@@ -830,7 +830,7 @@ OGLMatrix4x4	rm;
 							part->Rot.z -= gFramesPerSecondFrac * part->Speed2D;	// spin prop
 							rubber->Rot.z = part->Rot.z;
 
-							StartLevelCompletion(5.0f);							// we just won!
+							StartAutomaticLevelCompletion(5.0f);
 							theNode->CType |= CTYPE_LOOKAT;
 
 

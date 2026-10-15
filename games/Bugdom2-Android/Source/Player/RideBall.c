@@ -21,6 +21,7 @@
 
 static void MoveRideBall(ObjNode *theNode);
 static Boolean DoTrig_RideBall(ObjNode *door, ObjNode *who, Byte sideBits);
+static Boolean MountRideBall(ObjNode *ball, ObjNode *who, Byte sideBits);
 static void MoveRideBall(ObjNode *theNode);
 
 
@@ -275,6 +276,12 @@ jump_off:
 
 static Boolean DoTrig_RideBall(ObjNode *ball, ObjNode *who, Byte sideBits)
 {
+	if (!AllowNativeGameplayRules()) return true;
+	return MountRideBall(ball, who, sideBits);
+}
+
+static Boolean MountRideBall(ObjNode *ball, ObjNode *who, Byte sideBits)
+{
 			/* ONLY IF LANDED ON TOP OF BALL */
 
 	if (sideBits & SIDE_BITS_BOTTOM)
@@ -316,10 +323,24 @@ Boolean Bugdom2Script_SetPlayerForm(Boolean wantBall)
 	{
 		if (ball->What != WHAT_RIDEBALL) continue;
 		if (CalcQuickDistance(ball->Coord.x, ball->Coord.z, gPlayerInfo.coord.x, gPlayerInfo.coord.z) > 300.0f) continue;
-		return DoTrig_RideBall(ball, gPlayerInfo.objNode, SIDE_BITS_BOTTOM) && gPlayerInfo.ridingBall == ball;
+		return MountRideBall(ball, gPlayerInfo.objNode, SIDE_BITS_BOTTOM) && gPlayerInfo.ridingBall == ball;
 	}
 	return false;
 }
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+Boolean Bugdom2Script_MountBall(ObjNode* ball)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!player || !player->Skeleton || IsTunnelLevel() || gPlayerIsDead ||
+		!ball || ball->CType == INVALID_NODE_FLAG || ball->What != WHAT_RIDEBALL ||
+		gPlayerInfo.heldObject || gCurrentCarryingMoth || gPlayerInfo.ridingBall || Bugdom2Script_GetMountedPlane())
+		return false;
+	if (OGLPoint3D_Distance(&player->Coord, &ball->Coord) > 300.0f) return false;
+	MountRideBall(ball, player, SIDE_BITS_BOTTOM);
+	return gPlayerInfo.ridingBall == ball;
+}
+#endif
 
 
 #pragma mark -

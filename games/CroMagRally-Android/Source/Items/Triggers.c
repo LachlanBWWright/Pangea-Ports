@@ -11,10 +11,9 @@
 
 #include "game.h"
 #include "pickup_sync.h"
+#include <limits.h>
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-#include "ScriptBindings.h"
-#endif
+#include "../Scripting/ScriptBindings.h"
 
 /*******************/
 /*   PROTOTYPES    */
@@ -586,6 +585,10 @@ short	playerNum;
 	(void) sideBits;
 
 	playerNum = whoNode->PlayerNum;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!CroMagScript_OnPickupCollected(theNode, whoNode, theNode->Kind, 1.0f, "cromag.stickyTiresPow"))
+		return false;
+#endif
 
 
 			/* ANNOUNCE IT */
@@ -687,6 +690,10 @@ short	playerNum;
 	(void) sideBits;
 
 	playerNum = whoNode->PlayerNum;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!CroMagScript_OnPickupCollected(theNode, whoNode, theNode->Kind, 1.0f, "cromag.suspensionPow"))
+		return false;
+#endif
 
 			/* ANNOUNCE IT */
 
@@ -787,6 +794,10 @@ short	playerNum;
 	(void) sideBits;
 
 	playerNum = whoNode->PlayerNum;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!CroMagScript_OnPickupCollected(theNode, whoNode, theNode->Kind, 1.0f, "cromag.invisibilityPow"))
+		return false;
+#endif
 
 
 			/* ANNOUNCE IT */
@@ -1352,8 +1363,22 @@ OGLMatrix4x4	m1,m2;
 // OUTPUT: True = want to handle trigger as a solid object
 //
 
+Boolean PlayerCaptureFlag(ObjNode* car, ObjNode* flag)
+{
+	if (!car || !flag || gIsNetworkClient || gGameMode != GAME_MODE_CAPTUREFLAG ||
+		flag->Group != MODEL_GROUP_GLOBAL || flag->Kind != TRIGTYPE_TEAMTORCH ||
+		flag->Mode != 0 || car->CapturedFlag)
+		return false;
+	flag->CType = 0;
+	flag->Mode = 1;
+	flag->PlayerNum = car->PlayerNum;
+	car->CapturedFlag = (Ptr)flag;
+	return true;
+}
+
 static Boolean DoTrig_TeamTorch(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
 {
+	if (!CroMagScript_NativeRulesEnabled()) return false;
 	(void) sideBits;
 
 	if (gIsNetworkClient)
@@ -1362,11 +1387,7 @@ static Boolean DoTrig_TeamTorch(ObjNode *theNode, ObjNode *whoNode, Byte sideBit
 	if (whoNode->CapturedFlag)					// see if player already has a flag
 		return(true);
 
-	theNode->CType = 0;							// its not a trigger while being carried
-	theNode->Mode = 1;							// set carried mode
-	theNode->PlayerNum = whoNode->PlayerNum;	// remember which player is carrying it
-
-	whoNode->CapturedFlag = (Ptr)theNode;		// player remembers the flag
+	PlayerCaptureFlag(whoNode, theNode);
 
 
 	return(false);
@@ -1452,23 +1473,22 @@ ObjNode	*newObj;
 // OUTPUT: True = want to handle trigger as a solid object
 //
 
-static Boolean DoTrig_TeamBase(ObjNode *theNode, ObjNode *whoNode, Byte sideBits)
+Boolean PlayerDeliverFlag(ObjNode* whoNode, ObjNode* theNode)
 {
 ObjNode	*theTorch;
 short	teamNum;
-
-	(void) sideBits;
-
-	if (gIsNetworkClient)
-		return(true);
+	if (!whoNode || !theNode || gIsNetworkClient || gGameMode != GAME_MODE_CAPTUREFLAG ||
+		theNode->Kind != TRIGTYPE_TEAMBASE || theNode->Group != MODEL_GROUP_GLOBAL)
+		return false;
 
 	theTorch = (ObjNode *)whoNode->CapturedFlag;				// get torch object that player is carrying
 	if (theTorch == nil)										// bail if none
-		return(true);
+		return(false);
 
 	teamNum = theTorch->TorchTeam;								// get team # that this torch belongs to
+	if (teamNum < 0 || teamNum > 1 || gCapturedFlagCount[teamNum] >= SHRT_MAX) return false;
 	if (teamNum != theNode->TorchTeam)							// if this color torch doesnt belong on this base then bail
-		return(true);
+		return(false);
 
 
 		/* DROP THE TORCH AT THE BASE */
@@ -1511,6 +1531,26 @@ short	teamNum;
 
 
 	return(true);
+}
+
+static Boolean DoTrig_TeamBase(ObjNode* base, ObjNode* car, Byte sideBits)
+{
+	(void)sideBits;
+	if (CroMagScript_NativeRulesEnabled()) PlayerDeliverFlag(car, base);
+	return true;
+}
+
+Boolean PlayerResetCarriedFlag(ObjNode* car)
+{
+	if (!car || !car->CapturedFlag || gIsNetworkClient) return false;
+	ObjNode* flag = (ObjNode*)car->CapturedFlag;
+	car->CapturedFlag = nil;
+	flag->Mode = 0;
+	flag->CType = CTYPE_TRIGGER;
+	flag->Coord = flag->InitCoord;
+	flag->Delta = (OGLVector3D){0};
+	UpdateObjectTransforms(flag);
+	return true;
 }
 
 

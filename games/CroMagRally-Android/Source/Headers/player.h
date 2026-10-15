@@ -314,6 +314,7 @@ ObjNode *InitPlayer_Submarine(int playerNum, OGLPoint3D *where, float rotY);
 		/* WEAPON */
 
 void CheckPOWControls(ObjNode *theNode);
+Boolean PlayerFirePowerup(short playerNum, Boolean forwardThrow);
 void ThrowBone(short playerNum, Boolean throwForward);
 void ThrowOil(short playerNum, Boolean throwForward);
 void ActivateNitroPOW(short playerNum);

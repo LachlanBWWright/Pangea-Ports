@@ -212,6 +212,7 @@ void PlayerGotHit(ObjNode *byWhat, float altDamage, int hitAnim)
 {
 ObjNode	*player = gPlayerInfo.objNode;
 int	deathType = PLAYER_DEATH_TYPE_FALLOVER;
+	float damage = byWhat ? byWhat->Damage : altDamage;
 
 	if (gPlayerInfo.invincibilityTimer > 0.0f)							// cant get hit if invincible
 		return;
@@ -226,8 +227,15 @@ int	deathType = PLAYER_DEATH_TYPE_FALLOVER;
 
 	if (LevelMetadataCaseFor("level.player", gLevelNum) == LEVEL_NUM_BALSA)									// special for balsa level
 	{
-		HurtPlayerOnBalsaPlane();
 		deathType = PLAYER_DEATH_TYPE_BALSA;
+	}
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!Bugdom2Script_OnDamage(byWhat, damage, deathType, &damage))
+		return;
+#endif
+	if (deathType == PLAYER_DEATH_TYPE_BALSA)
+	{
+		HurtPlayerOnBalsaPlane();
 		goto dodamage;
 	}
 
@@ -261,10 +269,7 @@ int	deathType = PLAYER_DEATH_TYPE_FALLOVER;
 			/* INFLICT DAMAGE */
 
 dodamage:
-	if (byWhat == nil)
-		PlayerLoseHealth(altDamage, deathType);
-	else
-		PlayerLoseHealth(byWhat->Damage, deathType);
+	PlayerApplyDamage(damage, deathType);
 
 	PlayRumbleEffect(EFFECT_SMACK);
 }
@@ -278,17 +283,24 @@ dodamage:
 
 Boolean PlayerLoseHealth(float damage, Byte deathType)
 {
-Boolean	killed = false;
-
-	if (gPlayerInfo.health < 0.0f)				// see if already dead
-		return(true);
-
+	if (gPlayerInfo.health < 0.0f)
+		return true;
 	#ifdef PANGEA_ENABLE_SCRIPTING
 	if (!Bugdom2Script_OnDamage(nil, damage, deathType, &damage))
 		return false;
 	#endif
+	return PlayerApplyDamage(damage, deathType);
+}
+
+Boolean PlayerApplyDamage(float damage, Byte deathType)
+{
+	Boolean killed = false;
+	if (gPlayerInfo.health < 0.0f)
+		return true;
 
 	gPlayerInfo.health -= damage;
+	if (gPlayerInfo.objNode)
+		gPlayerInfo.objNode->Health = gPlayerInfo.health > 0 ? gPlayerInfo.health : 0;
 
 	#ifdef PANGEA_ENABLE_SCRIPTING
 	Bugdom2Script_OnDamageApplied(damage, deathType);
@@ -338,6 +350,11 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 			/* KILL US NOW */
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_ReleasePlayerCarry();
+	if (deathType != PLAYER_DEATH_TYPE_BALSA && Bugdom2Script_GetMountedPlane())
+		Bugdom2Script_DismountPlane();
+#endif
 	EndGliding(player);						// make sure the wings are gone
 
 	gPlayerIsDead = true;
@@ -425,6 +442,15 @@ void HidePlayer(ObjNode *player)
 void ResetPlayerAtBestCheckpoint(void)
 {
 ObjNode	*player = gPlayerInfo.objNode;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_ReleasePlayerCarry();
+#endif
+	int area = LevelMetadataCaseFor("level.bugdom2Area", gLevelNum);
+	if (area == LEVEL_NUM_PLUMBING || area == LEVEL_NUM_GUTTER)
+	{
+		ResetPlayerInTunnel();
+		return;
+	}
 
 
 			/***************************************************/

@@ -1,7 +1,10 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "game.h"
+#include "pangea_presentation_game.h"
 #include "ScriptBindings.h"
+#include "ScriptEggs.h"
+#include "ScriptGeometry.h"
 
 #include "structs.h"
 #include "splineitems.h"
@@ -19,6 +22,12 @@
 
 static void LogScriptStatus(const char* action, PangeaScriptStatus status);
 static PangeaScriptFrameContext gScriptFrameContext;
+#ifdef __EMSCRIPTEN__
+extern int PangeaNet_IsEnabled(void);
+#else
+static int PangeaNet_IsEnabled(void) { return 0; }
+#endif
+extern const PangeaScriptGameplayOps kNanosaur2ScriptGameplay;
 extern bool Nanosaur2Script_LoadCustomBG3D(FSSpec* spec, int group);
 extern bool Nanosaur2Script_LoadCustomSkeleton(Byte type, FSSpec* skeletonSpec, FSSpec* modelSpec);
 static int GetScriptSkeletonFrame(const SkeletonObjDataType* skeleton);
@@ -240,12 +249,9 @@ static bool Nanosaur2Script_GetObjectPosition(void* nativeObject, PangeaScriptVe
 static bool Nanosaur2Script_SetObjectPosition(void* nativeObject, const PangeaScriptVector3* position)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !position || obj->CType == INVALID_NODE_FLAG)
-		return false;
-
-	obj->Coord.x = position->x;
-	obj->Coord.y = position->y;
-	obj->Coord.z = position->z;
+	if (!Nanosaur2Script_MoveGeometry(obj, position)) return false;
+	for (int player = 0; player < gNumPlayers; player++)
+		if (gPlayerInfo[player].objNode == obj) gPlayerInfo[player].coord = obj->Coord;
 	return true;
 }
 
@@ -261,7 +267,8 @@ static bool Nanosaur2Script_GetObjectVelocity(void* nativeObject, PangeaScriptVe
 static bool Nanosaur2Script_SetObjectVelocity(void* nativeObject, const PangeaScriptVector3* velocity)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !velocity || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || !velocity || obj->CType == INVALID_NODE_FLAG ||
+		!isfinite(velocity->x) || !isfinite(velocity->y) || !isfinite(velocity->z))
 		return false;
 
 	obj->Delta.x = velocity->x;
@@ -282,7 +289,8 @@ static bool Nanosaur2Script_GetObjectRotation(void* nativeObject, PangeaScriptVe
 static bool Nanosaur2Script_SetObjectRotation(void* nativeObject, const PangeaScriptVector3* rotation)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !rotation || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || !rotation || obj->CType == INVALID_NODE_FLAG ||
+		!isfinite(rotation->x) || !isfinite(rotation->y) || !isfinite(rotation->z))
 		return false;
 	obj->Rot = (OGLVector3D){rotation->x, rotation->y, rotation->z};
 	UpdateObjectTransforms(obj);
@@ -300,18 +308,19 @@ static bool Nanosaur2Script_GetObjectScale(void* nativeObject, float* outScale)
 
 static bool Nanosaur2Script_SetObjectScale(void* nativeObject, float scale)
 {
-	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG || scale <= 0.0f)
-		return false;
-	obj->Scale = (OGLVector3D){scale, scale, scale};
-	UpdateObjectTransforms(obj);
-	return true;
+	return Nanosaur2Script_ScaleGeometry(nativeObject, scale);
 }
 
 static bool Nanosaur2Script_SetObjectCollisionEnabled(void* nativeObject, bool enabled)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
+	if (obj->ScriptActiveStateInitialized && !obj->ScriptActive)
+	{
+		if (enabled) obj->ScriptInactiveStatusBits &= ~STATUS_BIT_NOCOLLISION;
+		else obj->ScriptInactiveStatusBits |= STATUS_BIT_NOCOLLISION;
+		return true;
+	}
 	if (enabled && (!obj->ScriptActiveStateInitialized || obj->ScriptActive)) obj->StatusBits &= ~STATUS_BIT_NOCOLLISION;
 	else obj->StatusBits |= STATUS_BIT_NOCOLLISION;
 	return true;
@@ -340,6 +349,8 @@ static bool Nanosaur2Script_GetObjectHealth(void* nativeObject, float* outHealth
 	if (!obj || !outHealth || obj->CType == INVALID_NODE_FLAG)
 		return false;
 	*outHealth = obj->Health;
+	for (int player = 0; player < gNumPlayers; player++)
+		if (gPlayerInfo[player].objNode == obj) *outHealth = gPlayerInfo[player].health;
 	return true;
 }
 
@@ -352,15 +363,42 @@ static bool Nanosaur2Script_GetObjectDamage(void* nativeObject, float* outDamage
 	return true;
 }
 
+static bool Nanosaur2Script_SetObjectHealth(void* nativeObject, float health)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(health) || health < 0)
+		return false;
+	for (int player = 0; player < gNumPlayers; player++)
+	{
+		if (gPlayerInfo[player].objNode != obj) continue;
+		if (health > 1.0f) return false;
+		gPlayerInfo[player].health = health;
+	}
+	obj->Health = health;
+	return true;
+}
+
+static bool Nanosaur2Script_SetObjectDamage(void* nativeObject, float damage)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(damage) || damage < 0)
+		return false;
+	obj->Damage = damage;
+	return true;
+}
+
 static bool Nanosaur2Script_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (!obj->ScriptDefinitionID[0]) return true;
+	bool wasActive = !obj->ScriptActiveStateInitialized || obj->ScriptActive;
+	if (wasActive == active) return true;
+	uint32_t mask = STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	if (!active) obj->ScriptInactiveStatusBits = obj->StatusBits & mask;
 	obj->ScriptActiveStateInitialized = true;
 	obj->ScriptActive = active;
-	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	if (active) obj->StatusBits = (obj->StatusBits & ~mask) | obj->ScriptInactiveStatusBits;
+	else obj->StatusBits |= mask;
 	return true;
 }
 
@@ -448,9 +486,23 @@ static bool Nanosaur2Script_DeleteObject(void* nativeObject)
 	return true;
 }
 
+static bool Nanosaur2Script_GetJointPosition(void* nativeObject, int joint, PangeaScriptVector3* output)
+{
+	ObjNode* object = nativeObject;
+	if (!object || !output || object->CType == INVALID_NODE_FLAG || !object->Skeleton ||
+		!object->Skeleton->skeletonDefinition || joint < 0 || joint >= object->Skeleton->skeletonDefinition->NumBones)
+		return false;
+	OGLPoint3D origin = {0}, position;
+	FindCoordOnJoint(object, joint, &origin, &position);
+	*output = (PangeaScriptVector3){position.x, position.y, position.z};
+	return true;
+}
+
 static const PangeaScriptObjectOps kNanosaur2PlayerObjectOps =
 {
 	.getPosition = Nanosaur2Script_GetObjectPosition,
+	.getBounds = Nanosaur2Script_ReadBounds,
+	.getJointPosition = Nanosaur2Script_GetJointPosition,
 	.getVelocity = Nanosaur2Script_GetObjectVelocity,
 	.getRotation = Nanosaur2Script_GetObjectRotation,
 	.getScale = Nanosaur2Script_GetObjectScale,
@@ -460,6 +512,8 @@ static const PangeaScriptObjectOps kNanosaur2PlayerObjectOps =
 	.getActive = Nanosaur2Script_GetObjectActive,
 	.getHealth = Nanosaur2Script_GetObjectHealth,
 	.getDamage = Nanosaur2Script_GetObjectDamage,
+	.setHealth = Nanosaur2Script_SetObjectHealth,
+	.setDamage = Nanosaur2Script_SetObjectDamage,
 	.setPosition = Nanosaur2Script_SetObjectPosition,
 	.setVelocity = Nanosaur2Script_SetObjectVelocity,
 	.setRotation = Nanosaur2Script_SetObjectRotation,
@@ -616,15 +670,15 @@ Boolean Nanosaur2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int 
 	PangeaScriptObjectHandle playerHandle;
 	int playerNum;
 	if (!pickup || pickup->ScriptObjectID <= 0 || pickup->ScriptObjectGeneration <= 0)
-		return true;
+		return !PangeaScript_RulesAreScriptControlled();
 	if (!player || player->ScriptObjectID <= 0 || player->ScriptObjectGeneration <= 0)
-		return true;
+		return !PangeaScript_RulesAreScriptControlled();
 	pickupHandle = (PangeaScriptObjectHandle){pickup->ScriptObjectID, (uint32_t) pickup->ScriptObjectGeneration};
 	playerHandle = (PangeaScriptObjectHandle){player->ScriptObjectID, (uint32_t) player->ScriptObjectGeneration};
 	if (!PangeaScript_ObjectExists(pickupHandle))
-		return true;
+		return !PangeaScript_RulesAreScriptControlled();
 	if (!PangeaScript_ObjectExists(playerHandle))
-		return true;
+		return !PangeaScript_RulesAreScriptControlled();
 	playerNum = player->PlayerNum;
 	context = (PangeaScriptPickupContext)
 	{
@@ -640,7 +694,7 @@ Boolean Nanosaur2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int 
 	status = PangeaScript_CallPickupHook(&context, &result);
 	LogScriptStatus("onPickupCollected", status);
 	if (status != PANGEA_SCRIPT_OK)
-		return true;
+		return !PangeaScript_RulesAreScriptControlled();
 	if (isfinite(result.healthDelta) && result.healthDelta != 0.0f)
 	{
 		gPlayerInfo[playerNum].health += result.healthDelta;
@@ -649,7 +703,7 @@ Boolean Nanosaur2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int 
 		else if (gPlayerInfo[playerNum].health > 1.0f)
 			gPlayerInfo[playerNum].health = 1.0f;
 	}
-	return result.hasConsumePickup ? result.consumePickup : true;
+	return !PangeaScript_RulesAreScriptControlled() && (result.hasConsumePickup ? result.consumePickup : true);
 }
 
 Boolean Nanosaur2Script_OnWeaponHit(ObjNode* weapon, ObjNode* target, float damage, float* outDamage, Boolean* outDestroyTarget)
@@ -1045,9 +1099,6 @@ void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj)
 	status = PangeaScript_CallObjectFrame(handle, &gScriptFrameContext, &result);
 	if (!PangeaScript_ObjectExists(handle))
 	{
-		obj->ScriptObjectID = 0;
-		obj->ScriptObjectGeneration = 0;
-		obj->ScriptVisualOffset = (OGLVector3D){0};
 		PangeaScript_ClearLastError();
 		return;
 	}
@@ -1077,7 +1128,10 @@ void Nanosaur2Script_ApplyObjectScripting(ObjNode* obj)
 
 void Nanosaur2Script_RunObjectFrame(ObjNode* obj)
 {
+	PangeaScriptObjectHandle frameHandle = {obj->ScriptObjectID, obj->ScriptObjectGeneration};
 	Nanosaur2Script_ApplyObjectScripting(obj);
+	void* nativeObject = NULL;
+	if (!PangeaScript_GetObjectNativeObject(frameHandle, &nativeObject) || nativeObject != obj) return;
 	if (obj->CType == INVALID_NODE_FLAG)
 		return;
 	if (obj->ScriptDeleteRequested)
@@ -1092,6 +1146,9 @@ void Nanosaur2Script_RunObjectFrame(ObjNode* obj)
 		DeleteObject(obj);
 		return;
 	}
+	PangeaScriptObjectHandle handle = {obj->ScriptObjectID, obj->ScriptObjectGeneration};
+	if ((!obj->ScriptActiveStateInitialized || obj->ScriptActive) && PangeaScript_ObjectIsScriptControlled(handle))
+		Nanosaur2Script_AlignCarriedEgg(obj);
 	if (obj->Skeleton && obj->Skeleton->AnimHasStopped && !obj->ScriptAnimationCompletionSent)
 	{
 		PangeaScriptObjectHandle handle = {(int)obj->ScriptObjectID, obj->ScriptObjectGeneration};
@@ -1502,10 +1559,8 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 {
 	if (playerNum < 0 || playerNum >= gNumPlayers || !position || !gPlayerInfo[playerNum].objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gPlayerInfo[playerNum].coord = (OGLPoint3D){position->x, position->y, position->z};
-	gPlayerInfo[playerNum].objNode->Coord = gPlayerInfo[playerNum].coord;
-	UpdateObjectTransforms(gPlayerInfo[playerNum].objNode);
-	return PANGEA_SCRIPT_OK;
+	return Nanosaur2Script_SetObjectPosition(gPlayerInfo[playerNum].objNode, position)
+		? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_BAD_ARGUMENT;
 }
 
 static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScriptVector3* velocity)
@@ -1517,6 +1572,7 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 
 void Nanosaur2Script_Init(void)
 {
+	ScriptPresentation_Configure();
 	const PangeaScriptGameInfo gameInfo =
 	{
 		.gameId = "Nanosaur2-Android",
@@ -1533,10 +1589,12 @@ void Nanosaur2Script_Init(void)
 		.setPlayerPosition = SetScriptPlayerPosition,
 		.setPlayerVelocity = SetScriptPlayerVelocity,
 		.capabilities = PANGEA_SCRIPT_NANOSAUR2_CAPABILITIES,
+		.gameplay = &kNanosaur2ScriptGameplay,
 	};
 
 	PangeaScriptStatus status = PangeaScript_Init(&gameInfo);
 	LogScriptStatus("init", status);
+	PangeaScript_SetNetworkedMode(PangeaNet_IsEnabled() != 0);
 
 	status = PangeaScript_RegisterNativeItems(kNativeItems, (int)(sizeof(kNativeItems) / sizeof(kNativeItems[0])));
 	LogScriptStatus("native item registration", status);
@@ -1557,6 +1615,7 @@ void Nanosaur2Script_Shutdown(void)
 
 void Nanosaur2Script_LoadLevelConfig(int levelNum)
 {
+	PangeaScript_SetNetworkedMode(PangeaNet_IsEnabled() != 0);
 	PangeaScriptStatus status = PangeaScript_LoadLevelConfig(levelNum);
 	LogScriptStatus("level config load", status);
 }
@@ -1605,7 +1664,7 @@ static void CallLevelHook(PangeaScriptHook hook, int levelNum, const char* actio
 		.levelNum = levelNum,
 		.levelName = Nanosaur2Script_LevelName(levelNum),
 		.mode = mode,
-		.networked = gNumPlayers > 1,
+		.networked = PangeaNet_IsEnabled() != 0,
 	};
 
 	PangeaScriptStatus status = PangeaScript_CallLevelHook(hook, &context);
@@ -1630,6 +1689,7 @@ void Nanosaur2Script_OnCheckpointReset(void)
 
 void Nanosaur2Script_OnFrame(int levelNum, unsigned int frameNum, float deltaSeconds, float levelTimeSeconds)
 {
+	PangeaScript_SetNetworkedMode(PangeaNet_IsEnabled() != 0);
 	const char* mode = Nanosaur2Script_ModeName(levelNum);
 	const PangeaScriptFrameContext context =
 	{
@@ -1639,7 +1699,7 @@ void Nanosaur2Script_OnFrame(int levelNum, unsigned int frameNum, float deltaSec
 		.deltaSeconds = deltaSeconds,
 		.levelTimeSeconds = levelTimeSeconds,
 		.mode = mode,
-		.networked = gNumPlayers > 1,
+		.networked = PangeaNet_IsEnabled() != 0,
 	};
 	Nanosaur2Script_CacheFrameContext(&context);
 	PangeaScript_ExpireTriggerContacts(&context);
@@ -1682,7 +1742,7 @@ Boolean Nanosaur2Script_OnTerrainItem(TerrainItemEntryType* itemPtr, int levelNu
 		.levelNum = levelNum,
 		.itemType = originalType,
 		.remappedItemType = remappedType,
-		.networked = gNumPlayers > 1,
+		.networked = PangeaNet_IsEnabled() != 0,
 		.mode = mode,
 		.x = x,
 		.z = z,
@@ -1716,7 +1776,7 @@ Boolean Nanosaur2Script_OnSplineItem(SplineItemType* itemPtr, int levelNum, int 
 		.splineNum = splineNum,
 		.placement = itemPtr->placement,
 		.mode = mode,
-		.networked = gNumPlayers > 1,
+		.networked = PangeaNet_IsEnabled() != 0,
 		.params = params,
 		.paramCount = (int)(sizeof(params) / sizeof(params[0])),
 		.handled = false,

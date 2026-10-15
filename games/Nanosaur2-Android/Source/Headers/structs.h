@@ -357,6 +357,7 @@ struct ObjNode
 	Boolean ScriptAnimationCompletionSent;
 	Boolean ScriptActiveStateInitialized;
 	Boolean ScriptActive;
+	uint32_t ScriptInactiveStatusBits;
 
 			/* 3D CALCULATION STUFF */
 

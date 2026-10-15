@@ -924,6 +924,17 @@ void TextMesh_DrawExtents(ObjNode* textNode)
 	OGL_PopState();
 }
 
+bool Atlas_MeasureString(int groupNum, const char* text, uint32_t flags, float* width, float* height)
+{
+	if (groupNum < 0 || groupNum >= MAX_ATLASES || !gAtlases[groupNum] || !text || !width || !height)
+		return false;
+	TextMetrics metrics;
+	ComputeMetrics(gAtlases[groupNum], text, flags, &metrics);
+	*width = metrics.bbWidth;
+	*height = metrics.bbHeight;
+	return true;
+}
+
 void Atlas_ImmediateDraw(int groupNum, const char* text, uint32_t flags)
 {
 	GAME_ASSERT((size_t)groupNum < (size_t)MAX_ATLASES);

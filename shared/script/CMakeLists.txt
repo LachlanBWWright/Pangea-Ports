@@ -24,6 +24,10 @@ add_library(PangeaScript STATIC
 	pangea_script.c
 	pangea_script_config.c
 	pangea_script_backend_lua.c
+	pangea_geometry.c
+	pangea_presentation.c
+	pangea_dialogue.c
+	pangea_presentation_lua.c
 )
 
 target_include_directories(PangeaScript PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -51,6 +55,31 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
 		target_compile_options(PangeaGameScriptSampleTests PRIVATE -Wall -Wextra -Werror)
 	endif()
 	add_test(NAME PangeaScriptLuaTests COMMAND PangeaScriptLuaTests)
+	add_executable(PangeaPresentationTests ../../tests/test_pangea_presentation.c)
+	target_link_libraries(PangeaPresentationTests PRIVATE PangeaScript)
+	target_compile_options(PangeaPresentationTests PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Werror>)
+	add_test(NAME PangeaPresentationTests COMMAND PangeaPresentationTests)
+	set_tests_properties(PangeaPresentationTests PROPERTIES TIMEOUT 15)
+	add_executable(PangeaRuntimeReliabilityTests ../../tests/test_runtime_reliability.c)
+	target_link_libraries(PangeaRuntimeReliabilityTests PRIVATE PangeaScript)
+	target_compile_options(PangeaRuntimeReliabilityTests PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Werror>)
+	add_test(NAME PangeaRuntimeReliabilityTests COMMAND PangeaRuntimeReliabilityTests)
+	set_tests_properties(PangeaRuntimeReliabilityTests PROPERTIES TIMEOUT 15)
+	add_executable(PangeaGameplayServiceTests ../../tests/test_gameplay_services.c)
+	target_link_libraries(PangeaGameplayServiceTests PRIVATE PangeaScript)
+	target_compile_options(PangeaGameplayServiceTests PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Werror>)
+	add_test(NAME PangeaGameplayServiceTests COMMAND PangeaGameplayServiceTests)
+	set_tests_properties(PangeaGameplayServiceTests PROPERTIES TIMEOUT 15)
+	add_executable(PangeaBespokeOperationTests ../../tests/test_bespoke_operations.c)
+	target_link_libraries(PangeaBespokeOperationTests PRIVATE PangeaScript)
+	target_compile_options(PangeaBespokeOperationTests PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Werror>)
+	add_test(NAME PangeaBespokeOperationTests COMMAND PangeaBespokeOperationTests)
+	set_tests_properties(PangeaBespokeOperationTests PROPERTIES TIMEOUT 15)
+	add_executable(PangeaGeometryQueryTests ../../tests/test_geometry_queries.c)
+	target_link_libraries(PangeaGeometryQueryTests PRIVATE PangeaScript)
+	target_compile_options(PangeaGeometryQueryTests PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Werror>)
+	add_test(NAME PangeaGeometryQueryTests COMMAND PangeaGeometryQueryTests)
+	set_tests_properties(PangeaGeometryQueryTests PROPERTIES TIMEOUT 15)
 	add_test(NAME OttoMaticScriptSamples COMMAND PangeaGameScriptSampleTests ottomatic)
 	add_test(NAME BugdomScriptSamples COMMAND PangeaGameScriptSampleTests bugdom)
 	add_test(NAME Bugdom2ScriptSamples COMMAND PangeaGameScriptSampleTests bugdom2)

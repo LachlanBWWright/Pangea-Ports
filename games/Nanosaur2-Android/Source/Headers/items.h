@@ -37,6 +37,7 @@ enum
 
 Boolean AddEgg(TerrainItemEntryType *itemPtr, float  x, float z);
 void DropEgg_NoWormhole(short playerNum);
+void ClearEggObjectReferences(ObjNode* object);
 void FindAllEggItems(void);
 
 extern	Byte	gNumEggsToSave[NUM_EGG_TYPES];

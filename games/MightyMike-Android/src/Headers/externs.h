@@ -129,6 +129,8 @@ extern	short					gMyBlinkieTimer;
 extern	short					gSpeedyTimer;
 extern	Boolean					gFrogFlag;
 extern	Boolean					gSpaceShipFlag;
+extern ObjNode* gRealMePtr;
+extern long gFrogTimer, gSpaceShipTimer;
 
 #pragma mark - ObjectManager
 

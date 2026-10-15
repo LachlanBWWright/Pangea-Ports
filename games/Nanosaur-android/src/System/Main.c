@@ -314,6 +314,9 @@ FSSpec	spec;
 #endif
 			CalcPlayerKeyControls();
 		MoveObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScript_UpdateAttachments();
+#endif
 		QD3D_MoveShards();
 
 				/* SPECIFIC MAINTENANCE */
@@ -381,7 +384,11 @@ FSSpec	spec;
 			
 			/* SEE IF GOT KILLED */
 				
-		if (gPlayerGotKilledFlag)				// if got killed, then hang around for a few seconds before resetting player
+		if (gPlayerGotKilledFlag
+#ifdef PANGEA_ENABLE_SCRIPTING
+			&& !PangeaScript_RulesAreScriptControlled()
+#endif
+			)
 		{
 			killDelay -= fps;					
 			if (killDelay < 0.0f)				// see if time to reset player
@@ -527,6 +534,9 @@ void EmscriptenGameFrameImpl(void* arg)
 #endif
 	CalcPlayerKeyControls();
 	MoveObjects();
+#ifdef PANGEA_ENABLE_SCRIPTING
+	PangeaScript_UpdateAttachments();
+#endif
 	QD3D_MoveShards();
 
 	UpdateLavaTextureAnimation();
@@ -596,7 +606,11 @@ void EmscriptenGameFrameImpl(void* arg)
 
 		/* SEE IF GOT KILLED */
 
-	if (gPlayerGotKilledFlag)
+	if (gPlayerGotKilledFlag
+#ifdef PANGEA_ENABLE_SCRIPTING
+		&& !PangeaScript_RulesAreScriptControlled()
+#endif
+		)
 	{
 		sEmscriptenKillDelay -= fps;
 		if (sEmscriptenKillDelay < 0.0f)

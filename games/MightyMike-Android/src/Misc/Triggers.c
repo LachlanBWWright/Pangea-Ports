@@ -69,8 +69,7 @@ static	Boolean	(*gTriggerTable[])(void) = {
 #ifdef PANGEA_ENABLE_SCRIPTING
 static Boolean DoTrig_Scripted(void)
 {
-	MikeScript_OnCustomTrigger(gTriggerNode, gTriggerSides);
-	return true;
+	return MikeScript_OnCustomTrigger(gTriggerNode, gTriggerSides);
 }
 #endif
 

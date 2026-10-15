@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -285,6 +286,55 @@ float	dist = 10000000.0f;
 }
 
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool OttoScript_EnterNativeSaucer(ObjNode* saucer)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!saucer || saucer != gPlayerSaucer || saucer->MoveCall != MoveIceSaucer_UnderIce ||
+		!gIceCracked || !saucer->ChainNode || !player || !player->Skeleton || gPlayerIsDead ||
+		player->Type != SKELETON_TYPE_OTTO || gPlayerEnterSaucer || gTargetPickup ||
+		gPlayerInfo.fuel < 1.0f) return false;
+	saucer->ChainNode->Mode = HATCH_MODE_OPEN;
+	saucer->ChainNode->Coord.y = saucer->Coord.y + 250.0f;
+	saucer->ChainNode->Delta.y = 0.0f;
+	MorphToSkeletonAnim(player->Skeleton, PLAYER_ANIM_FALL, 4);
+	player->MoveCall = MovePlayerIntoSaucer;
+	gPlayerInfo.invincibilityTimer = 20.0f;
+	gPlayerEnterSaucer = true;
+	gFreezeCameraFromXZ = gFreezeCameraFromY = true;
+	return true;
+}
+
+bool OttoScript_ExitNativeSaucer(void)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	ObjNode* saucer = gPlayerSaucer;
+	if (!gPlayerEnterSaucer || !player || !player->Skeleton || !saucer || !saucer->ChainNode ||
+		gPlayerIsDead || gLevelCompleted) return false;
+	StopAChannel(&saucer->EffectChannel);
+	saucer->MoveCall = MoveIceSaucer_UnderIce;
+	saucer->Delta = (OGLVector3D){0};
+	saucer->DeltaRot = (OGLVector3D){0};
+	saucer->ChainNode->Mode = HATCH_MODE_OPEN;
+	player->MoveCall = MovePlayer_Robot;
+	player->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE);
+	player->CType = CTYPE_PLAYER;
+	if (gPlayerInfo.leftHandObj) gPlayerInfo.leftHandObj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE);
+	if (gPlayerInfo.rightHandObj) gPlayerInfo.rightHandObj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE);
+	player->Coord = saucer->Coord;
+	player->Coord.x += 300.0f;
+	player->Coord.y = GetTerrainY(player->Coord.x, player->Coord.z) - player->BBox.min.y;
+	player->Delta = (OGLVector3D){0};
+	gPlayerInfo.coord = player->Coord;
+	gPlayerInfo.invincibilityTimer = 0.0f;
+	gPlayerEnterSaucer = false;
+	gFreezeCameraFromXZ = gFreezeCameraFromY = false;
+	SetPlayerStandAnim(player, 4);
+	UpdateObjectTransforms(player);
+	return true;
+}
+#endif
+
 /********************* MOVE PLAYER INTO SAUCER ************************/
 
 static void MovePlayerIntoSaucer(ObjNode *player)
@@ -349,8 +399,7 @@ float fps = gFramesPerSecondFrac;
 	{
 		if (gCoord.y > (GetTerrainY(gCoord.x, gCoord.z) + 6000.0f))
 		{
-			gLevelCompleted = true;
-			gLevelCompletedCoolDownTimer = 0;
+			OttoScript_CompleteNativeLevel(0);
 		}
 	}
 

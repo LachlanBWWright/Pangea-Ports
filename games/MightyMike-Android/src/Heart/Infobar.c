@@ -9,6 +9,7 @@
 /* EXTERNALS   */
 /***************/
 #include "myglobals.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include "objecttypes.h"
 #include "window.h"
 #include "infobar.h"
@@ -184,6 +185,7 @@ void GiveMeHealth(void)
 
 void UpdateInfoBar(void)
 {
+	ScriptPresentation_Draw();
 	if (gUpdateScore)
 		ShowScore();
 	if (gUpdateCoins)

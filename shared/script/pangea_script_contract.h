@@ -6,6 +6,7 @@
  */
 
 #define PANGEA_SCRIPT_OTTO_MATIC_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onLevelLoad") \
@@ -29,6 +30,7 @@
 	X("onLoad")
 
 #define PANGEA_SCRIPT_BUGDOM_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onLevelLoad") \
@@ -53,6 +55,7 @@
 	X("onLoad")
 
 #define PANGEA_SCRIPT_BUGDOM2_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onLevelLoad") \
@@ -77,6 +80,7 @@
 	X("onLoad")
 
 #define PANGEA_SCRIPT_NANOSAUR_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onLevelLoad") \
@@ -96,6 +100,7 @@
 	X("onDeath")
 
 #define PANGEA_SCRIPT_NANOSAUR2_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onLevelLoad") \
@@ -122,6 +127,7 @@
 	X("onLoad")
 
 #define PANGEA_SCRIPT_CRO_MAG_RALLY_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onRaceLoad") \
@@ -142,6 +148,7 @@
 	X("onDeath")
 
 #define PANGEA_SCRIPT_BILLY_FRONTIER_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onAreaLoad") \
@@ -157,11 +164,13 @@
 	X("onDamage") \
 	X("onDamageApplied") \
 	X("onPlayerSpawn") \
+	X("onWeaponHit") \
 	X("onDeath") \
 	X("onSave") \
 	X("onLoad")
 
 #define PANGEA_SCRIPT_MIGHTY_MIKE_HOOK_LIST(X) \
+	X("onDialogueResult") \
 	X("onGameStart") \
 	X("onGameShutdown") \
 	X("onAreaLoad") \
@@ -199,6 +208,31 @@
 #define PANGEA_SCRIPT_MIGHTY_MIKE_CAPABILITIES { false, false, true, true, true, true, true, true, true, false }
 
 #define PANGEA_SCRIPT_COMMAND_DESCRIPTOR_LIST(X) \
+	X("pangea.player.carry", "player-carry", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.drop", "player-drop", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.handover", "player-handover", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.mount", "player-mount", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.dismount", "player-dismount", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.fire", "player-fire", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.reload", "player-reload", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.transform", "player-transform", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.respawn", "player-respawn", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.capture", "player-capture", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.deliver", "player-deliver", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.resetCarried", "player-resetCarried", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.releaseBuddy", "player-releaseBuddy", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.grab", "player-grab", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.interact", "player-interact", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.commandBuddy", "player-commandBuddy", "disabled-network", "callback", "integer player index; advertised native action; live target and valid operation options") \
+	X("pangea.player.setState", "player-state", "disabled-network", "callback", "integer player index; advertised writable field; matching scalar type and domain") \
+	X("pangea.level.complete", "level-completion", "disabled-network", "callback", "integer player index; boolean success outcome; adapter completion support") \
+	X("pangea.level.setRulesControlled", "level-rule-ownership", "disabled-network", "callback", "boolean state") \
+	X("pangea.object.attach", "object-attachment", "disabled-network", "callback", "generation-checked child and parent; acyclic relationship; valid joint and finite offset") \
+	X("pangea.object.detach", "object-detachment", "disabled-network", "callback", "generation-checked handle") \
+	X("pangea.object.moveKinematic", "object-kinematic", "disabled-network", "callback", "generation-checked script-controlled handle; finite Vector3 delta; supported collision category and native bounds") \
+	X("pangea.object.setScriptControlled", "object-setScriptControlled", "disabled-network", "callback", "generation-checked handle; boolean controller ownership") \
+	X("pangea.object.setHealth", "object-setHealth", "disabled-network", "callback", "generation-checked handle; finite nonnegative health") \
+	X("pangea.object.setDamage", "object-setDamage", "disabled-network", "callback", "generation-checked handle; finite nonnegative damage") \
 	X("pangea.player.setHealth", "player-health", "disabled-network", "callback", "integer player index; finite health in range 0..1; adapter health mutation support") \
 	X("pangea.player.setLives", "player-lives", "disabled-network", "callback", "integer player index; non-negative integer lives count; adapter lives mutation support") \
 	X("pangea.player.setScore", "player-score", "disabled-network", "callback", "integer player index; non-negative integer score in range 0..UINT32_MAX; adapter score mutation support") \

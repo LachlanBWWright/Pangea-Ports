@@ -36,3 +36,6 @@ void GameMain(void);
 void MoveEverything(void);
 void InitDefaultPrefs(void);
 void StartLevelCompletion(float coolDownTimer);
+Boolean AllowNativeGameplayRules(void);
+Boolean RunExplicitGameplayInteraction(ObjNode* target, ObjNode* player);
+void StartAutomaticLevelCompletion(float coolDownTimer);

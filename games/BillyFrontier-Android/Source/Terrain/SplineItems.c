@@ -419,6 +419,9 @@ ObjNode	*theNode;
 			if (theNode->SplineMoveCall)
 			{
 				KeepOldCollisionBoxes(theNode);					// keep old boxes & other stuff
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (BillyScript_CanRunNativeBehavior(theNode))
+#endif
 				theNode->SplineMoveCall(theNode);				// call object's spline move routine
 			}
 		}

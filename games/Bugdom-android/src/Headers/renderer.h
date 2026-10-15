@@ -59,6 +59,7 @@ enum
 	kDrawOrder_Ripples,
 	kDrawOrder_GlowyParticles,
 	kDrawOrder_UI,
+	kDrawOrder_ScriptPresentation,
 	kDrawOrder_FadeOverlay,
 	kDrawOrder_DebugUI,
 };

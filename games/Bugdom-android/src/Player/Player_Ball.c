@@ -234,7 +234,8 @@ static void MovePlayer_Ball(ObjNode *theNode)
 			
 	if (theNode->InvincibleTimer > 0.0f)
 	{
-		theNode->InvincibleTimer -= gFramesPerSecondFrac;
+		if (BugdomScript_NativeRulesEnabled())
+			theNode->InvincibleTimer -= gFramesPerSecondFrac;
 		if (theNode->InvincibleTimer < 0.0f)
 			theNode->InvincibleTimer = 0;
 	}
@@ -344,7 +345,8 @@ float	dx, dy;
 			gDelta.x *= 100.0f;
 			PlayEffect3D(EFFECT_SPEEDBOOST, &gCoord);
 			StartNitroTrail();			
-			gBallTimer -= .05f;						// lose a bit more ball time
+			if (BugdomScript_NativeRulesEnabled())
+				gBallTimer -= .05f;
 		}
 	}
 

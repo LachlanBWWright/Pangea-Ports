@@ -11,6 +11,7 @@
 
 
 #include "game.h"
+#include "../Scripting/ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -28,6 +29,7 @@ static void EggWasRetrieved(ObjNode *egg);
 static void MoveNest(ObjNode *nest);
 static void PlayerPickedUpEgg(ObjNode *egg, short playerNum);
 static void ResetEggToNest(ObjNode *egg);
+static void CommitEggPickup(ObjNode *egg, short playerNum);
 #ifdef __EMSCRIPTEN__
 static int Egg_FindIndex(ObjNode *egg);
 #endif
@@ -73,6 +75,8 @@ short					eggColor;
 
 			/* INIT EGG COUNTS */
 
+	gNumEggs = 0;
+	memset(gEggObjs, 0, sizeof(gEggObjs));
 	for (i = 0; i < NUM_EGG_TYPES; i++)
 	{
 		gNumEggsToSave[i] = 0;
@@ -340,7 +344,7 @@ ObjNode *nest;
 			/* SEE IF NEED TO RESET IT BACK TO ITS NEST */
 			/********************************************/
 
-	if (egg->CanResetEgg)									// has the egg been picked up before?
+	if (Nanosaur2Script_UsesNativeRules() && egg->CanResetEgg)
 	{
 		egg->ResetEggDelay -= fps;
 		if (egg->ResetEggDelay <= 0.0f)						// is it ok to try resetting now?
@@ -375,7 +379,7 @@ force_reset:
 		/********************************/
 
 	egg->DelayUntilCanPickup -= fps;
-	if (egg->DelayUntilCanPickup <= 0.0f)									// only allow pickup if timer is ready
+	if (Nanosaur2Script_UsesNativeRules() && egg->DelayUntilCanPickup <= 0.0f)
 	{
 		for (i = 0; i < gNumPlayers; i++)
 		{
@@ -434,8 +438,6 @@ ObjNode *nest;
 
 static void PlayerPickedUpEgg(ObjNode *egg, short playerNum)
 {
-ObjNode *nest;
-
 #if __EMSCRIPTEN__
 	if (PangeaNet_IsEnabled() && !PangeaNet_IsHost())
 		return;
@@ -445,6 +447,120 @@ ObjNode *nest;
 	if (!Nanosaur2Script_OnPickupCollected(egg, gPlayerInfo[playerNum].objNode, egg->Kind, 1.0f, "nanosaur2.egg"))
 		return;
 #endif
+	CommitEggPickup(egg, playerNum);
+}
+
+
+void ClearEggObjectReferences(ObjNode* object)
+{
+	for (int i = 0; i < gNumPlayers; i++)
+	{
+		if (gPlayerInfo[i].objNode == object && gPlayerInfo[i].carriedObj)
+			DropEgg_NoWormhole(i);
+		if (gPlayerInfo[i].carriedObj == object) gPlayerInfo[i].carriedObj = nil;
+	}
+	for (int i = 0; i < gNumEggs; i++)
+		if (gEggObjs[i] == object) gEggObjs[i] = nil;
+	if (object->What == WHAT_EGG)
+	{
+		ObjNode* nest = object->ChainHead;
+		if (nest && nest->CType != INVALID_NODE_FLAG && nest->ChainNode == object)
+		{
+			nest->ChainNode = nil;
+			nest->NestHasEgg = false;
+		}
+		object->ChainHead = nil;
+	}
+}
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+void Nanosaur2Script_AlignCarriedEgg(ObjNode* egg)
+{
+	if (!egg || egg->CType == INVALID_NODE_FLAG || egg->MoveCall != MoveEgg_Carried) return;
+	int player = egg->PlayerNum;
+	if (player < 0 || player >= gNumPlayers || gPlayerInfo[player].carriedObj != egg ||
+		!gPlayerInfo[player].objNode || gPlayerInfo[player].objNode->CType == INVALID_NODE_FLAG) return;
+	UpdateCarriedObject(gPlayerInfo[player].objNode, egg);
+}
+
+static Boolean IsAvailableEgg(ObjNode* egg)
+{
+	if (!egg || egg->CType == INVALID_NODE_FLAG || egg->What != WHAT_EGG || egg->MoveCall != MoveEgg_NotCarried ||
+		!egg->ChainHead || egg->ChainHead->CType == INVALID_NODE_FLAG ||
+		egg->ChainHead->ChainNode != egg || egg->Kind < 0 || egg->Kind >= NUM_EGG_TYPES) return false;
+	return true;
+}
+
+Boolean Nanosaur2Script_CarryEgg(short player, ObjNode* egg)
+{
+	if (player < 0 || player >= gNumPlayers || !gPlayerInfo[player].objNode ||
+		gPlayerIsDead[player] || gPlayerInfo[player].carriedObj || !IsAvailableEgg(egg)) return false;
+	for (int i = 0; i < gNumPlayers; i++) if (gPlayerInfo[i].carriedObj == egg) return false;
+	CommitEggPickup(egg, player);
+	return true;
+}
+
+Boolean Nanosaur2Script_ResetCarriedEgg(short player)
+{
+	if (player < 0 || player >= gNumPlayers || !gPlayerInfo[player].objNode) return false;
+	ObjNode* egg = gPlayerInfo[player].carriedObj;
+	if (!egg || egg->CType == INVALID_NODE_FLAG || egg->MoveCall != MoveEgg_Carried ||
+		!egg->ChainHead || egg->ChainHead->CType == INVALID_NODE_FLAG) return false;
+	DropEgg_NoWormhole(player);
+	egg->Coord = egg->OldCoord = egg->InitCoord;
+	egg->Delta = (OGLVector3D){0, 0, 0};
+	egg->ChainHead->NestHasEgg = true;
+	egg->CanResetEgg = false;
+	egg->DelayUntilCanPickup = 0;
+	UpdateObjectTransforms(egg);
+	CalcObjectBoxFromNode(egg);
+	return true;
+}
+
+Boolean Nanosaur2Script_DeliverEgg(short player, ObjNode* destination)
+{
+	if (player < 0 || player >= gNumPlayers || !gPlayerInfo[player].objNode) return false;
+	ObjNode* egg = gPlayerInfo[player].carriedObj;
+	if (!egg || egg->CType == INVALID_NODE_FLAG || egg->MoveCall != MoveEgg_Carried ||
+		!egg->ChainHead || egg->ChainHead->CType == INVALID_NODE_FLAG ||
+		egg->Kind < 0 || egg->Kind >= NUM_EGG_TYPES || gNumEggsSaved[egg->Kind] == 255) return false;
+	ObjNode* wormhole = FindClosestEggWormholeInRange(egg->Kind, &egg->Coord);
+	if (!wormhole || (destination && destination != wormhole)) return false;
+	ObjNode* nest = egg->ChainHead;
+	if (!nest->TerrainItemPtr) return false;
+	nest->ChainNode = nil;
+	nest->TerrainItemPtr->flags |= ITEM_FLAGS_USER1;
+	egg->ChainHead = nil;
+	gPlayerInfo[player].carriedObj = nil;
+	EggWasRetrieved(egg);
+	return true;
+}
+
+Boolean Nanosaur2Script_HandoverEgg(short player, short receiver)
+{
+	if (player < 0 || player >= gNumPlayers || receiver < 0 || receiver >= gNumPlayers || player == receiver ||
+		!gPlayerInfo[player].objNode || !gPlayerInfo[receiver].objNode || gPlayerIsDead[receiver] ||
+		gPlayerInfo[receiver].carriedObj) return false;
+	ObjNode* egg = gPlayerInfo[player].carriedObj;
+	if (!egg || egg->CType == INVALID_NODE_FLAG || egg->MoveCall != MoveEgg_Carried) return false;
+	gPlayerInfo[player].carriedObj = nil;
+	gPlayerInfo[receiver].carriedObj = egg;
+	egg->PlayerNum = receiver;
+	UpdateCarriedObject(gPlayerInfo[receiver].objNode, egg);
+	return true;
+}
+
+ObjNode* Nanosaur2Script_GetEggNest(ObjNode* egg)
+{
+	if (!egg || egg->CType == INVALID_NODE_FLAG || egg->What != WHAT_EGG ||
+		!egg->ChainHead || egg->ChainHead->CType == INVALID_NODE_FLAG) return nil;
+	return egg->ChainHead;
+}
+#endif
+
+static void CommitEggPickup(ObjNode *egg, short playerNum)
+{
+ObjNode *nest;
 
 			/* LET NEST KNOW THE EGG IS GONE */
 
@@ -460,7 +576,7 @@ ObjNode *nest;
 	egg->CanResetEgg 				= true;								// we can now reset it when needed
 	egg->ResetEggDelay 				= 15.0f;
 	
-	PlayEffect_Parms3D(EFFECT_GRABEGG, &gCoord, NORMAL_CHANNEL_RATE, .6);
+	PlayEffect_Parms3D(EFFECT_GRABEGG, &egg->Coord, NORMAL_CHANNEL_RATE, .6);
 	PlayRumbleEffect(EFFECT_GRABEGG, playerNum);
 
 #if __EMSCRIPTEN__
@@ -501,6 +617,7 @@ ObjNode			*wormhole;
 
 
 	wormhole = FindClosestEggWormholeInRange(egg->Kind, &egg->Coord);	// find closest in-range wormhole
+	if (!Nanosaur2Script_UsesNativeRules()) return;
 #if __EMSCRIPTEN__
 	if (wormhole && !(PangeaNet_IsEnabled() && !PangeaNet_IsHost()))
 #else
@@ -580,6 +697,7 @@ ObjNode		*wormhole = (ObjNode *)egg->Wormhole;
 OGLVector3D	v2;
 OGLPoint3D	jointCoord;
 float		dist, dist2;
+	if (!Nanosaur2Script_UsesNativeRules()) return;
 
 
 	GetObjectInfo(egg);
@@ -699,7 +817,7 @@ Boolean	gotAllEggs = true;
 		/* SEE IF WE GOT ALL THE EGGS WE NEED */
 		/**************************************/
 
-	switch(gVSMode)
+	if (Nanosaur2Script_UsesNativeRules()) switch(gVSMode)
 	{
 				/* HANDLE REGULAR ADVENTURE MODE */
 

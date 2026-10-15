@@ -152,6 +152,9 @@ void CheckWeaponChangeControls(ObjNode* theNode)
 
 void CheckPOWControls(ObjNode *theNode)
 {
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (OttoScript_IsNativeDelegated(theNode)) return;
+#endif
 		/* SEE IF SHOOT GUN */
 
 	if (GetNewNeedState(kNeed_Shoot))					// see if user pressed the key
@@ -273,6 +276,60 @@ OGLMatrix4x4	m;
 
 #pragma mark -
 
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+#include "../Scripting/ScriptPickupState.inc"
+
+void OttoScript_CancelNativeWeapon(void)
+{
+	ObjNode* charge = gPlayerInfo.superNovaStatic;
+	gPlayerInfo.superNovaStatic = NULL;
+	gPlayerInfo.superNovaCharge = 0.0f;
+	if (charge) DeleteObject(charge);
+	if (gPlayerInfo.objNode && gPlayerInfo.objNode->Skeleton) SetPlayerStandAnim(gPlayerInfo.objNode, 4);
+}
+
+bool OttoScript_FireNativeWeapon(void)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	int weapon = gPlayerInfo.currentWeaponType;
+	if (!player || gPlayerIsDead || !player->Skeleton || player->Type != SKELETON_TYPE_OTTO ||
+		weapon < 0 || weapon >= NUM_WEAPON_TYPES || gTargetPickup ||
+		(player->StatusBits & (STATUS_BIT_HIDDEN | STATUS_BIT_NOMOVE))) return false;
+	if (weapon != WEAPON_TYPE_FIST && FindWeaponInventoryIndex(weapon) == NO_INVENTORY_HERE) return false;
+	if (gWeaponIsGun[weapon] && !gPlayerInfo.holdingGun) return false;
+	if (weapon == WEAPON_TYPE_SUPERNOVA && !(player->StatusBits & STATUS_BIT_ONGROUND)) return false;
+	OGLPoint3D savedCoord = gCoord;
+	OGLVector3D savedDelta = gDelta;
+	gCoord = player->Coord;
+	gDelta = player->Delta;
+	ShootWeapon(player);
+	gCoord = savedCoord;
+	gDelta = savedDelta;
+	return true;
+}
+
+bool OttoScript_CarryNativePickup(ObjNode* pickup)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!pickup || !(pickup->CType & CTYPE_POWERUP) || !player || !player->Skeleton ||
+		player->Type != SKELETON_TYPE_OTTO || gPlayerIsDead || gTargetPickup ||
+		(pickup->StatusBits & STATUS_BIT_HIDDEN) || pickup->POWType < 0 || pickup->POWType >= NUM_POW_TYPES)
+		return false;
+	if (pickup->POWType == POW_TYPE_MAGNET && (pickup->MagnetMonsterID < 0 ||
+		pickup->MagnetMonsterID >= MAX_MAGNET_MONSTERS || !gMagnetMonsterList[pickup->MagnetMonsterID])) return false;
+	int anim = PLAYER_ANIM_PICKUPDEPOSIT;
+	if (pickup->POWType == POW_TYPE_MAGNET) anim = PLAYER_ANIM_PICKUPANDHOLDMAGNET;
+	else if (pickup->POWType == POW_TYPE_STUNPULSE || pickup->POWType == POW_TYPE_FREEZE ||
+		pickup->POWType == POW_TYPE_FLAME || pickup->POWType == POW_TYPE_FLARE)
+		anim = gPlayerInfo.holdingGun ? PLAYER_ANIM_PICKUPDEPOSIT : PLAYER_ANIM_PICKUPANDHOLDGUN;
+	SaveScriptPickup(pickup);
+	gTargetPickup = pickup;
+	player->IsHoldingPickup = false;
+	MorphToSkeletonAnim(player->Skeleton, anim, 8);
+	return true;
+}
+#endif
 
 /******************* FIND WEAPON INVENTORY INDEX **************************/
 
@@ -510,6 +567,22 @@ float fps = gFramesPerSecondFrac;
 //
 // INPUT:	i = starting index in inventory to scan
 //
+
+Boolean SelectPlayerWeapon(short weaponType)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!player || !player->Skeleton || weaponType < 0 || weaponType >= NUM_WEAPON_TYPES)
+		return false;
+	short slot = FindWeaponInventoryIndex(weaponType);
+	if (slot < 0 || gPlayerInfo.weaponInventory[slot].quantity <= 0)
+		return false;
+	if (gPlayerInfo.currentWeaponType == weaponType)
+		return true;
+	if (player->Skeleton->AnimNum == PLAYER_ANIM_CHANGEWEAPON && player->ChangeWeapon)
+		return false;
+	ChangeWeapons(slot, 1, true);
+	return gPlayerInfo.currentWeaponType == weaponType;
+}
 
 static void ChangeWeapons(int startIndex, int delta, bool tryStartSlotFirst)
 {
@@ -941,6 +1014,8 @@ static Boolean OttoScript_ApplyWeaponHit(ObjNode *weapon, ObjNode *target)
 	Boolean applyDamage = true;
 #ifdef PANGEA_ENABLE_SCRIPTING
 	applyDamage = OttoScript_OnWeaponHit(weapon, target, damage, &damage, &destroyTarget);
+	if (target->CType == INVALID_NODE_FLAG || weapon->CType == INVALID_NODE_FLAG)
+		return true;
 	if (destroyTarget)
 	{
 		DeleteObject(target);
@@ -949,6 +1024,15 @@ static Boolean OttoScript_ApplyWeaponHit(ObjNode *weapon, ObjNode *target)
 #endif
 	if (!applyDamage)
 		return false;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){target->ScriptObjectID, target->ScriptObjectGeneration}))
+		return true;
+#endif
+	if (!target->HitByWeaponHandler[weapon->Kind])
+	{
+		// Custom targets receive the hook without borrowing a native enemy handler.
+		return true;
+	}
 	weapon->Damage = damage;
 	Boolean handlerConsumedWeapon = (target->HitByWeaponHandler[weapon->Kind])(weapon, target, &gCoord, &gDelta);
 	if (weapon->CType != INVALID_NODE_FLAG)
@@ -989,7 +1073,12 @@ CollisionBoxType	*baseBoxList = theNode->CollisionBoxes;
 			hitObj = gCollisionList[i].objectPtr;							// get hit ObjNode
 			if (hitObj)
 			{
-				if (hitObj->HitByWeaponHandler[weaponType])					// see if there is a handler for this weapon
+				Boolean hasHandler = hitObj->HitByWeaponHandler[weaponType] != nil;
+#ifdef PANGEA_ENABLE_SCRIPTING
+				hasHandler = hasHandler || (hitObj->ScriptObjectID > 0 &&
+					PangeaScript_ObjectExists((PangeaScriptObjectHandle){hitObj->ScriptObjectID, hitObj->ScriptObjectGeneration}));
+#endif
+				if (hasHandler)
 				{
 					if (OttoScript_ApplyWeaponHit(theNode, hitObj))
 						goto explode_weapon;

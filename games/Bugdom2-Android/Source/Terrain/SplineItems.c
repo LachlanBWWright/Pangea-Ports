@@ -433,6 +433,10 @@ ObjNode	*theNode;
 		{
 			if (theNode->SplineMoveCall)
 			{
+#ifdef PANGEA_ENABLE_SCRIPTING
+				if (!Bugdom2Script_ShouldRunNativeMovement(theNode))
+					continue;
+#endif
 				KeepOldCollisionBoxes(theNode);					// keep old boxes & other stuff
 				theNode->SplineMoveCall(theNode);				// call object's spline move routine
 			}

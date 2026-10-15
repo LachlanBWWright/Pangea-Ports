@@ -19,6 +19,7 @@
 /****************************/
 
 static void CreateDialogMessage(int messNum, int priority, float duration, OGLPoint3D *fromWhere);
+static void PlayDialogVoice(int messNum, OGLPoint3D *fromWhere);
 
 
 /****************************/
@@ -166,6 +167,7 @@ static const int gMessageSound[MAX_DIALOG_MESSAGES] =
 /*********************/
 
 static float	gDialogAlpha;
+static bool gScriptDialogActive;
 static	int		gDialogMode;
 static	float	gMessageReplayVoiceDelay[MAX_DIALOG_MESSAGES];
 
@@ -187,6 +189,7 @@ static	OGLPoint3D	gNextMessageWhere;
 
 void InitDialogManager(void)
 {
+	gScriptDialogActive = false;
 	gCurrentDialogKey		= STR_NULL;
 	gDialogAlpha			= 0;
 	gNextMessageNum = gCurrentDialogMessageNum = -1;
@@ -205,6 +208,23 @@ void InitDialogManager(void)
 
 void DoDialogMessage(int messNum, int priority, float duration, OGLPoint3D *fromWhere)
 {
+	if (gScriptDialogActive)
+	{
+		if (messNum == gCurrentDialogMessageNum)
+		{
+			gMessageDuration = duration;
+			return;
+		}
+		if (gNextMessageNum != -1 && priority > gNextMessagePriority)
+			return;
+		gNextMessageNum = messNum;
+		gNextMessagePriority = priority;
+		gNextMessageDuration = duration;
+		gNextMessageWhere = fromWhere ? *fromWhere : (OGLPoint3D) {0, 0, 0};
+		if (gCurrentDialogKey != STR_NULL && priority < gCurrentDialogMessagePriority)
+			gDialogMode = DIALOG_MODE_DISAPPEAR;
+		return;
+	}
 	if (messNum == gCurrentDialogMessageNum)						// if same message, then just reset timer
 	{
 		if (gDialogMode == DIALOG_MODE_DISAPPEAR)					// if was disappearing, then reverse
@@ -244,7 +264,6 @@ void DoDialogMessage(int messNum, int priority, float duration, OGLPoint3D *from
 
 static void CreateDialogMessage(int messNum, int priority, float duration, OGLPoint3D *fromWhere)
 {
-int		effect;
 
 	gCurrentDialogIconGroup = gMessageIcon[messNum][0];								// get sprite group
 	gCurrentDialogIconFrame = gMessageIcon[messNum][1];								// get sprite frame
@@ -257,7 +276,12 @@ int		effect;
 
 	gNextMessageNum = -1;										// no message waiting
 
-			/* PLAY AUDIO */
+	PlayDialogVoice(messNum, fromWhere);
+}
+
+static void PlayDialogVoice(int messNum, OGLPoint3D *fromWhere)
+{
+	int effect;
 
 	if (gMessageReplayVoiceDelay[messNum] == 0.0f)				// see if there's still a delay
 	{
@@ -285,10 +309,40 @@ int		effect;
 	}
 }
 
+bool BeginScriptDialog(void)
+{
+	gScriptDialogActive = true;
+	if (gDialogSoundChannel != -1)
+	{
+		bool interrupted = IsEffectChannelPlaying(gDialogSoundChannel)
+			&& StopAChannelIfEffectNum(&gDialogSoundChannel, gDialogSoundEffect);
+		gDialogSoundChannel = -1;
+		if (interrupted && gCurrentDialogMessageNum >= 0)
+			gMessageReplayVoiceDelay[gCurrentDialogMessageNum] = 0;
+	}
+	return true;
+}
+
+void EndScriptDialog(void)
+{
+	if (!gScriptDialogActive)
+		return;
+	gScriptDialogActive = false;
+	if (gCurrentDialogKey != STR_NULL)
+	{
+		// Restart interrupted native speech without losing the pending quest message.
+		if (gDialogMode != DIALOG_MODE_DISAPPEAR)
+			PlayDialogVoice(gCurrentDialogMessageNum, &gDialogSoundWhere);
+		return;
+	}
+	if (gNextMessageNum != -1)
+		CreateDialogMessage(gNextMessageNum, gNextMessagePriority, gNextMessageDuration, &gNextMessageWhere);
+}
+
 /************************ UPDATE DIALOG MESSAGE ********************/
 void UpdateDialogMessage(void)
 {
-	if (gGamePaused)
+	if (gGamePaused || gScriptDialogActive)
 		return;
 
 			/* UPDATE ANY CURRENT VOICE */
@@ -364,6 +418,8 @@ void UpdateDialogMessage(void)
 
 void DrawDialogMessage(float x, float y)
 {
+	if (gScriptDialogActive)
+		return;
 	// Only update fade if game not paused
 	if (!gGamePaused)
 		UpdateDialogMessage();

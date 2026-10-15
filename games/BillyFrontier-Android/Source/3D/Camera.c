@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -416,7 +417,7 @@ float	dist;
 	from = gPlayerInfo.camera.cameraLocation;								// set from/to to existing values
 	to = gPlayerInfo.camera.pointOfInterest;
 				
-	if (gDoneFaceOff)
+	if (!BillyScript_NativeRulesAllowed() || gDoneFaceOff)
 		goto update;
 
 

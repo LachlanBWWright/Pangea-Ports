@@ -1,6 +1,7 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 
 #include "game.h"
+#include "pangea_presentation_game.h"
 #include "ScriptBindings.h"
 
 #include "splineitems.h"
@@ -234,18 +235,6 @@ static bool Bugdom2Script_GetObjectPosition(void* nativeObject, PangeaScriptVect
 	return true;
 }
 
-static bool Bugdom2Script_SetObjectPosition(void* nativeObject, const PangeaScriptVector3* position)
-{
-	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || !position || obj->CType == INVALID_NODE_FLAG)
-		return false;
-
-	obj->Coord.x = position->x;
-	obj->Coord.y = position->y;
-	obj->Coord.z = position->z;
-	return true;
-}
-
 static bool Bugdom2Script_GetObjectVelocity(void* nativeObject, PangeaScriptVector3* outVelocity)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
@@ -349,16 +338,51 @@ static bool Bugdom2Script_GetObjectDamage(void* nativeObject, float* outDamage)
 	return true;
 }
 
+static bool Bugdom2Script_SetObjectHealth(void* nativeObject, float health)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(health) || health < 0)
+		return false;
+	if (obj == gPlayerInfo.objNode)
+	{
+		if (health > 1.0f) return false;
+		gPlayerInfo.health = health;
+	}
+	obj->Health = health;
+	return true;
+}
+
+static bool Bugdom2Script_SetObjectDamage(void* nativeObject, float damage)
+{
+	ObjNode* obj = nativeObject;
+	if (!obj || obj->CType == INVALID_NODE_FLAG || !isfinite(damage) || damage < 0)
+		return false;
+	obj->Damage = damage;
+	return true;
+}
+
 static bool Bugdom2Script_SetObjectActive(void* nativeObject, bool active)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
 	if (!obj || obj->CType == INVALID_NODE_FLAG) return false;
-	if (!obj->ScriptDefinitionID[0]) return true;
+	if (obj->ScriptActiveStateInitialized && obj->ScriptActive == active) return true;
+	if (!active)
+		obj->ScriptInactiveStatusBits = obj->StatusBits & (STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
+	else if (obj->ScriptActiveStateInitialized)
+		obj->StatusBits = (obj->StatusBits & ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION)) | obj->ScriptInactiveStatusBits;
 	obj->ScriptActiveStateInitialized = true;
 	obj->ScriptActive = active;
-	if (active) obj->StatusBits &= ~(STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION);
-	else obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
+	if (!active) obj->StatusBits |= STATUS_BIT_HIDDEN | STATUS_BIT_NOCOLLISION;
 	return true;
+}
+
+Boolean Bugdom2Script_ShouldRunNativeMovement(ObjNode* obj)
+{
+	if (!obj || (obj->ScriptActiveStateInitialized && !obj->ScriptActive))
+		return false;
+	if (Bugdom2Script_MountUsesScriptController(obj)) return false;
+	PangeaScriptObjectHandle handle = {obj->ScriptObjectID, (uint32_t)obj->ScriptObjectGeneration};
+	return !PangeaScript_ObjectIsScriptControlled(handle);
 }
 
 static int ResolveNamedAnimation(const ObjNode* obj, const char* animation)
@@ -423,7 +447,7 @@ static bool Bugdom2Script_SetObjectAnimationNamed(void* nativeObject, const char
 static bool Bugdom2Script_DeleteObject(void* nativeObject)
 {
 	ObjNode* obj = (ObjNode*) nativeObject;
-	if (!obj || obj->CType == INVALID_NODE_FLAG)
+	if (!obj || obj->CType == INVALID_NODE_FLAG || obj == gPlayerInfo.objNode)
 		return false;
 
 	if (obj->ScriptDefinitionID[0])
@@ -447,6 +471,8 @@ static bool Bugdom2Script_DeleteObject(void* nativeObject)
 
 static const PangeaScriptObjectOps kBugdom2PlayerObjectOps =
 {
+	.getBounds = Bugdom2Script_GetObjectBounds,
+	.getJointPosition = Bugdom2Script_GetJointPosition,
 	.getPosition = Bugdom2Script_GetObjectPosition,
 	.getVelocity = Bugdom2Script_GetObjectVelocity,
 	.getRotation = Bugdom2Script_GetObjectRotation,
@@ -457,6 +483,8 @@ static const PangeaScriptObjectOps kBugdom2PlayerObjectOps =
 	.getActive = Bugdom2Script_GetObjectActive,
 	.getHealth = Bugdom2Script_GetObjectHealth,
 	.getDamage = Bugdom2Script_GetObjectDamage,
+	.setHealth = Bugdom2Script_SetObjectHealth,
+	.setDamage = Bugdom2Script_SetObjectDamage,
 	.getCollisionEnabled = Bugdom2Script_GetObjectCollisionEnabled,
 	.setPosition = Bugdom2Script_SetObjectPosition,
 	.setVelocity = Bugdom2Script_SetObjectVelocity,
@@ -672,9 +700,9 @@ Boolean Bugdom2Script_OnPickupCollected(ObjNode* pickup, ObjNode* player, int pi
 	return result.hasConsumePickup ? result.consumePickup : true;
 }
 
-void Bugdom2Script_OnMouseRescued(ObjNode* mouse, ObjNode* player, Boolean drowning)
+Boolean Bugdom2Script_OnMouseRescued(ObjNode* mouse, ObjNode* player, Boolean drowning)
 {
-	Bugdom2Script_OnPickupCollected(mouse, player, drowning ? 1 : 0, 1.0f, "bugdom2.mouse");
+	return Bugdom2Script_OnPickupCollected(mouse, player, drowning ? 1 : 0, 1.0f, "bugdom2.mouse");
 }
 
 void Bugdom2Script_OnObjectiveComplete(int playerNum, int outcome)
@@ -889,9 +917,13 @@ void Bugdom2Script_ApplyObjectScripting(ObjNode* obj)
 
 void Bugdom2Script_RunObjectFrame(ObjNode* obj)
 {
+	PangeaScriptObjectHandle frameHandle = {obj->ScriptObjectID, (uint32_t)obj->ScriptObjectGeneration};
 	Bugdom2Script_ApplyObjectScripting(obj);
-	if (obj->CType == INVALID_NODE_FLAG)
+	if (!Bugdom2Script_ObjectStillAlive(obj, frameHandle))
 		return;
+	if (obj == gPlayerInfo.objNode &&
+		!Bugdom2Script_ShouldRunNativeMovement(obj))
+		Bugdom2Script_UpdatePlayerRelationships(obj);
 	if (obj->ScriptDeleteRequested)
 	{
 		if ((obj->TerrainItemPtr || obj->SplineItemPtr) && !obj->ScriptStreamOutSent)
@@ -1546,10 +1578,8 @@ static PangeaScriptStatus SetScriptPlayerPosition(int playerNum, const PangeaScr
 {
 	if (playerNum != 0 || !position || !gPlayerInfo.objNode)
 		return PANGEA_SCRIPT_BAD_ARGUMENT;
-	gPlayerInfo.coord = (OGLPoint3D){position->x, position->y, position->z};
-	gPlayerInfo.objNode->Coord = gPlayerInfo.coord;
-	UpdateObjectTransforms(gPlayerInfo.objNode);
-	return PANGEA_SCRIPT_OK;
+	return Bugdom2Script_SetObjectPosition(gPlayerInfo.objNode, position)
+		? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_BAD_ARGUMENT;
 }
 
 static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScriptVector3* velocity)
@@ -1561,8 +1591,10 @@ static PangeaScriptStatus SetScriptPlayerVelocity(int playerNum, const PangeaScr
 
 void Bugdom2Script_Init(void)
 {
+	ScriptPresentation_Configure();
 	const PangeaScriptGameInfo gameInfo =
 	{
+		.gameplay = &kBugdom2GameplayOps,
 		.gameId = "Bugdom2-Android",
 		.gameName = "Bugdom 2",
 		.spawnNative = Bugdom2Script_SpawnNativeCallback,

@@ -10,6 +10,7 @@
 /***************/
 
 #include "game.h"
+extern float gGameLevelTimer;
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -30,7 +31,6 @@ static void MoveTunnelSpray(ObjNode *spray);
 static void DoTunnelObjectCollision_Sewer(ObjNode *player);
 static void DoTunnelObjectCollision_Gutter(ObjNode *player);
 static void PlayerGotHitInTunnel(ObjNode *player);
-static void ResetPlayerInTunnel(void);
 static void PlayerFallsOffEdgeOfTunnel(ObjNode *player, Boolean isLeft);
 
 
@@ -385,6 +385,10 @@ void PlayArea_Tunnel(void)
 				/* MOVE OBJECTS */
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
+#ifdef PANGEA_ENABLE_SCRIPTING
+		Bugdom2Script_ProcessCheckpointResetProbe();
+		Bugdom2Script_OnFrame(gLevelNum, gGameFrameNum, gFramesPerSecondFrac, gGameLevelTimer);
+#endif
 		MoveEverything();
 		EndProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 
@@ -409,6 +413,7 @@ void PlayArea_Tunnel(void)
 		CalcFramesPerSecond();
 
 		gGameFrameNum++;
+		gGameLevelTimer += gFramesPerSecondFrac;
 		EndProfilePhase(PROFILE_PHASE_SWAP_BUFFERS);
 
 
@@ -586,6 +591,8 @@ ObjNode	*newObj;
 	newObj = MakeNewSkeletonObject(&gNewObjectDefinition);
 
 	gPlayerInfo.objNode 	= newObj;
+	gPlayerInfo.coord = newObj->Coord;
+	newObj->Health = gPlayerInfo.health;
 
 
 				/* SET COLLISION INFO */
@@ -597,13 +604,16 @@ ObjNode	*newObj;
 
 
 	gPreviousSprayCoord = newObj->Coord;							// set spray to start coord
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_RegisterPlayerObject(newObj);
+#endif
 
 }
 
 
 /******************* RESET PLAYER IN TUNNEL ***********************/
 
-static void ResetPlayerInTunnel(void)
+void ResetPlayerInTunnel(void)
 {
 ObjNode	*player = gPlayerInfo.objNode;
 
@@ -619,6 +629,9 @@ ObjNode	*player = gPlayerInfo.objNode;
 	}
 
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnCheckpointReset();
+#endif
 	player->MoveCall = MovePlayer_Tunnel;
 	player->Rot.z = 0;
 	player->Rot.x = 0;
@@ -633,6 +646,12 @@ ObjNode	*player = gPlayerInfo.objNode;
 	gPlayerInfo.tunnelSpeed = 0;
 	gPlayerInfo.tunnelAngle = 0;
 	gPlayerInfo.tunnelDeltaRot = 0;
+	CalcTunnelCoordFromIndex(gPlayerTunnelIndex, &player->Coord);
+	gPlayerInfo.coord = player->Coord;
+	UpdateObjectTransforms(player);
+#ifdef PANGEA_ENABLE_SCRIPTING
+	Bugdom2Script_OnPlayerRespawn(player);
+#endif
 
 	MakeFadeEvent(true, 1);
 
@@ -722,7 +741,7 @@ int		anim;
 	if ((gPlayerTunnelIndex > (gNumTunnelSplinePoints * .95f)) &&		// see if crossed ending point
 		(oldIndex <=  (gNumTunnelSplinePoints * .95f)))
 	{
-		StartLevelCompletion(0);
+		StartAutomaticLevelCompletion(0);
 	}
 
 	if (gPlayerTunnelIndex >= gNumTunnelSplinePoints)			// make sure we don't go over
@@ -1460,13 +1479,18 @@ next:
 
 static void PlayerGotHitInTunnel(ObjNode *player)
 {
+	float damage = .2f;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!Bugdom2Script_OnDamage(nil, damage, PLAYER_DEATH_TYPE_TUNNEL, &damage))
+		return;
+#endif
 	gPlayerInfo.tunnelSpeed *= .4f;
 
 	gPlayerInfo.invincibilityTimer = 2.5;
 
 	MorphToSkeletonAnim(player->Skeleton, PLAYER_TUNNEL_ANIM_GOTHIT, 10);
 
-	PlayerLoseHealth(.2, PLAYER_DEATH_TYPE_TUNNEL);
+	PlayerApplyDamage(damage, PLAYER_DEATH_TYPE_TUNNEL);
 
 	PlayRumbleEffect(EFFECT_SMACK);
 }

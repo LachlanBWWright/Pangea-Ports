@@ -260,7 +260,7 @@ Boolean				killed = false;
 				}
 				
 						/* BALL IS SWIMMING */
-				else
+				else if (BugdomScript_NativeRulesEnabled())
 				{
 					InitPlayer_Bug(gPlayerObj, &gCoord, 0, PLAYER_ANIM_SWIM);
 				}

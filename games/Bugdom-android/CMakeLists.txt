@@ -294,6 +294,28 @@ if(PANGEA_ENABLE_SCRIPTING)
 	target_link_libraries(${GAME_TARGET} PRIVATE PangeaScript)
 endif()
 
+option(PANGEA_BUILD_GAMEPLAY_TESTS "Build native scripting adapter tests" OFF)
+if(PANGEA_BUILD_GAMEPLAY_TESTS AND PANGEA_ENABLE_SCRIPTING AND NOT EMSCRIPTEN)
+	enable_testing()
+	add_executable(BugdomScriptGameplayTests
+		tests/test_script_gameplay.c tests/test_script_bespoke.c
+		src/Scripting/ScriptGameplay.c src/Scripting/ScriptGameplayState.c
+		src/Scripting/ScriptObjectControl.c src/Scripting/ScriptObjectFrame.c
+		src/Scripting/ScriptBespoke.c src/Scripting/ScriptRelationships.c
+		src/Scripting/ScriptRidePlacement.c)
+	target_compile_definitions(BugdomScriptGameplayTests PRIVATE PANGEA_ENABLE_SCRIPTING=1)
+	target_include_directories(BugdomScriptGameplayTests PRIVATE
+		${GAME_SRCDIR}/Headers ${GAME_SRCDIR}/Scripting
+		${CMAKE_SOURCE_DIR}/../../shared/script
+		${CMAKE_SOURCE_DIR}/../../shared/metadata
+		${CMAKE_SOURCE_DIR}/../../shared/render)
+	target_link_libraries(BugdomScriptGameplayTests PRIVATE Pomme)
+	if(NOT APPLE AND NOT WIN32)
+		target_link_libraries(BugdomScriptGameplayTests PRIVATE m)
+	endif()
+	add_test(NAME BugdomScriptGameplayTests COMMAND BugdomScriptGameplayTests)
+endif()
+
 # Add required frameworks for KillMacMouseAcceleration
 if(APPLE)
 	target_link_libraries(${GAME_TARGET} PRIVATE "-framework Foundation" "-framework IOKit")

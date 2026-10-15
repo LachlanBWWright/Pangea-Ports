@@ -1980,13 +1980,14 @@ int	markerNum;
 
 	if (!SeeIfCrossedLineMarker(player, &markerNum))
 		return;
+	if (!AllowNativeGameplayRules()) return;
 
 	switch(LevelMetadataCaseFor("level.completion", gLevelNum))
 	{
 				/* HANDLE LINE MARKERS FOR GARDEN */
 
 		case	LEVEL_NUM_GNOMEGARDEN:
-				StartLevelCompletion(1.0);
+				StartAutomaticLevelCompletion(1.0);
 				break;
 
 				/* HANDLE LINE MARKERS FOR SIDEWALK */
@@ -2014,13 +2015,13 @@ int	markerNum;
 				/* PLAYROOM */
 
 		case	LEVEL_NUM_PLAYROOM:
-				StartLevelCompletion(1.0);
+				StartAutomaticLevelCompletion(1.0);
 				break;
 
 				/* CLOSET */
 
 		case	LEVEL_NUM_CLOSET:
-				StartLevelCompletion(1.0);
+				StartAutomaticLevelCompletion(1.0);
 				break;
 	}
 }

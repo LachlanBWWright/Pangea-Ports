@@ -1,4 +1,5 @@
 #include "pangea_script.h"
+#include "pangea_presentation.h"
 #include "pangea_script_contract.h"
 #include "pangea_script_backend.h"
 
@@ -41,6 +42,12 @@ typedef struct RegisteredObject
 	bool active;
 	bool enabled;
 	bool destroying;
+	bool scriptControlled;
+	bool attached;
+	bool attachmentOriginalControl;
+	PangeaScriptObjectHandle attachmentParent;
+	int attachmentJoint;
+	PangeaScriptVector3 attachmentOffset;
 	uint32_t generation;
 	void* nativeObject;
 	const PangeaScriptObjectOps* ops;
@@ -97,6 +104,7 @@ static int gHooksCalledCount;
 static int gConsecutiveHookFailures;
 static bool gScriptsDisabled;
 static bool gNetworkedMode;
+static bool gRulesScriptControlled;
 static PangeaScriptFrameContext gCurrentCallbackFrame;
 static bool gHasCurrentCallbackFrame;
 static PangeaScriptFrameContext gLastFrameContext;
@@ -1044,6 +1052,7 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 		effectiveGameInfo.savePersistent = default_save_persistent;
 
 	(void)PangeaScript_ApplyObjectLifecycleToAll(&shutdownFrame, PANGEA_SCRIPT_OBJECT_DESTROY);
+	gRulesScriptControlled=false;
 	gGameInfo = effectiveGameInfo;
 	gRuntimeFingerprint = compute_runtime_fingerprint(gGameInfo.gameId, NULL, 0);
 	if (gBackend)
@@ -1073,6 +1082,7 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 	gScriptsDisabled = false;
 	gNetworkedMode = false;
 	gCurrentCallbackFrame = (PangeaScriptFrameContext){0};
+	gRulesScriptControlled = false;
 	gHasCurrentCallbackFrame = false;
 	gLastFrameContext = (PangeaScriptFrameContext){0};
 	gHasLastFrameContext = false;
@@ -1091,9 +1101,12 @@ PangeaScriptStatus PangeaScript_Init(const PangeaScriptGameInfo* gameInfo)
 
 void PangeaScript_Shutdown(void)
 {
+	gRulesScriptControlled=false;
+	PangeaPresentation_Reset();
 	PangeaScriptFrameContext shutdownFrame = {0};
 	(void)PangeaScript_ApplyObjectLifecycleToAll(&shutdownFrame, PANGEA_SCRIPT_OBJECT_DESTROY);
 	gInitialized = false;
+	gRulesScriptControlled=false;
 	gScriptLoaded = false;
 	gItemRemapCount = 0;
 	memset(gNativeItems, 0, sizeof(gNativeItems));
@@ -1194,33 +1207,34 @@ PangeaScriptStatus PangeaScript_Reload(void)
 	char* script = read_text_file(scriptPath, &scriptSize);
 	if (!script)
 	{
-		gScriptLoaded = false;
 		set_error(PANGEA_SCRIPT_FILE_NOT_FOUND, "Script file not found");
 		return PANGEA_SCRIPT_FILE_NOT_FOUND;
 	}
 
-	gScriptLoaded = scriptSize > 0;
-	if (!gScriptLoaded)
+	if (scriptSize<=0)
 	{
 		free(script);
 		set_error(PANGEA_SCRIPT_PARSE_ERROR, "Script file is empty");
 		return PANGEA_SCRIPT_PARSE_ERROR;
 	}
-	gRuntimeFingerprint = compute_runtime_fingerprint(gGameInfo.gameId, (const unsigned char*)script, (size_t)scriptSize);
+	const uint32_t candidateFingerprint=compute_runtime_fingerprint(gGameInfo.gameId,(const unsigned char*)script,(size_t)scriptSize);
 
 	if (gBackend)
 	{
 		char backendError[PANGEA_SCRIPT_ERROR_CAPACITY];
 		backendError[0] = '\0';
-		PangeaScriptStatus status = PangeaScriptBackend_Load(gBackend, script, backendError, (int)sizeof(backendError));
+		PangeaScriptStatus status = gScriptLoaded
+			? PangeaScriptBackend_Reload(gBackend,script,backendError,(int)sizeof(backendError))
+			: PangeaScriptBackend_Load(gBackend,script,backendError,(int)sizeof(backendError));
 		free(script);
 		if (status != PANGEA_SCRIPT_OK)
 		{
-			gScriptLoaded = false;
 			set_backend_error(status, backendError);
 			return status;
 		}
 
+		gScriptLoaded=true;
+		gRuntimeFingerprint=candidateFingerprint;
 		gConsecutiveHookFailures = 0;
 		gScriptsDisabled = false;
 		gLastError[0] = '\0';
@@ -1542,12 +1556,14 @@ PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const Pange
 	}
 	if (hook == PANGEA_SCRIPT_HOOK_LEVEL_LOAD)
 	{
+		PangeaPresentation_Reset();
 		PangeaScriptFrameContext lifecycleContext = {
 			.levelNum = context ? context->levelNum : 0,
 		};
 		if (gBackend && gScriptLoaded && !gScriptsDisabled && !gNetworkedMode)
 			(void) PangeaScript_ApplyObjectLifecycleToAll(&lifecycleContext, PANGEA_SCRIPT_OBJECT_DESTROY);
 		reset_objects();
+		gRulesScriptControlled=false;
 	}
 	status = reject_networked_execution();
 	if (status != PANGEA_SCRIPT_OK)
@@ -1605,6 +1621,7 @@ PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const Pange
 				status = cleanupStatus;
 		}
 		reset_objects();
+		PangeaPresentation_Reset();
 	}
 	if (lifecycleEvent)
 		PangeaScript_RecordLifecycleEvent(lifecycleEvent, (PangeaScriptObjectHandle){0}, status);
@@ -1614,7 +1631,7 @@ PangeaScriptStatus PangeaScript_CallLevelHook(PangeaScriptHook hook, const Pange
 PangeaScriptStatus PangeaScript_CallNativeSaveHook(int levelNum, int saveSlot, bool loading)
 {
 	char slotName[32];
-	PangeaScriptLevelContext context;
+	PangeaScriptLevelContext context = {0};
 	snprintf(slotName, sizeof(slotName), "slot-%d", saveSlot);
 	context.levelNum = levelNum;
 	context.levelName = slotName;
@@ -3101,11 +3118,274 @@ bool PangeaScript_SetObjectActive(PangeaScriptObjectHandle handle, bool active)
 	return finish_object_command("pangea.object.setActive", handle, true, PANGEA_SCRIPT_RUNTIME_ERROR, "");
 }
 
+bool PangeaScript_ObjectIsScriptControlled(PangeaScriptObjectHandle handle)
+{
+	RegisteredObject* object=resolve_registered_object(handle);
+	return object && object->scriptControlled;
+}
+
+bool PangeaScript_SetObjectScriptControlled(PangeaScriptObjectHandle handle, bool controlled)
+{
+	const char* command="pangea.object.setScriptControlled";
+	if (reject_networked_execution()!=PANGEA_SCRIPT_OK) return false;
+	RegisteredObject* object=resolve_registered_object(handle);
+	if (!object) return finish_object_command(command,handle,false,PANGEA_SCRIPT_BAD_ARGUMENT,"Object handle is unknown or stale");
+	if (object->capabilityLevel<PANGEA_SCRIPT_CAPABILITY_FULL)
+		return finish_object_command(command,handle,false,PANGEA_SCRIPT_RUNTIME_ERROR,"Object lacks controller ownership capability");
+	if (object->attached && !controlled) return finish_object_command(command,handle,false,PANGEA_SCRIPT_RUNTIME_ERROR,"Detach the object before restoring native control");
+	object->scriptControlled=controlled;
+	return finish_object_command(command,handle,true,PANGEA_SCRIPT_RUNTIME_ERROR,"");
+}
+
+static bool set_object_combat_value(PangeaScriptObjectHandle handle, float value, bool health)
+{
+	const char* command=health ? "pangea.object.setHealth" : "pangea.object.setDamage";
+	if (reject_networked_execution()!=PANGEA_SCRIPT_OK) return false;
+	RegisteredObject* object=resolve_object(handle);
+	if (!object || !isfinite(value) || value<0)
+		return finish_object_command(command,handle,false,PANGEA_SCRIPT_BAD_ARGUMENT,"A live object and finite nonnegative value are required");
+	if (object->capabilityLevel<PANGEA_SCRIPT_CAPABILITY_FULL || !object->ops)
+		return finish_object_command(command,handle,false,PANGEA_SCRIPT_RUNTIME_ERROR,"Object lacks combat mutation capability");
+	bool (*setter)(void*,float)=health ? object->ops->setHealth : object->ops->setDamage;
+	if (!setter) return finish_object_command(command,handle,false,PANGEA_SCRIPT_INCOMPATIBLE_ITEM,"Object does not support this combat field");
+	return finish_object_command(command,handle,setter(object->nativeObject,value),PANGEA_SCRIPT_RUNTIME_ERROR,"Native object rejected combat mutation");
+}
+
+bool PangeaScript_SetObjectHealth(PangeaScriptObjectHandle handle, float health) { return set_object_combat_value(handle,health,true); }
+bool PangeaScript_SetObjectDamage(PangeaScriptObjectHandle handle, float damage) { return set_object_combat_value(handle,damage,false); }
+
+bool PangeaScript_GetInput(int playerNum, PangeaScriptInputSnapshot* output)
+{
+	if (!output || playerNum<0 || !gGameInfo.gameplay || !gGameInfo.gameplay->getInput) return false;
+	*output=(PangeaScriptInputSnapshot){0};
+	if (!gGameInfo.gameplay->getInput(playerNum,output) || output->actionCount<0 || output->actionCount>PANGEA_SCRIPT_INPUT_ACTIONS) return false;
+	if (!isfinite(output->moveX) || !isfinite(output->moveY) || !isfinite(output->lookX) || !isfinite(output->lookY)) return false;
+	if (output->hasAim && !is_finite_vector(&output->aim)) return false;
+	for (int i=0; i<output->actionCount; i++)
+	{
+		if (!output->actions[i].name || !output->actions[i].name[0] || strlen(output->actions[i].name)>63) return false;
+		for (int j=0; j<i; j++) if (!strcmp(output->actions[i].name,output->actions[j].name)) return false;
+	}
+	return true;
+}
+
+bool PangeaScript_SampleTerrain(float x, float z, PangeaScriptTerrainSample* output)
+{
+	if (!output || !isfinite(x) || !isfinite(z) || !gGameInfo.gameplay || !gGameInfo.gameplay->sampleTerrain) return false;
+	*output=(PangeaScriptTerrainSample){0};
+	return gGameInfo.gameplay->sampleTerrain(x,z,output) && isfinite(output->height) && is_finite_vector(&output->normal) &&
+		(!output->hasWater || isfinite(output->waterHeight));
+}
+
+bool PangeaScript_SampleTile(float x, float y, PangeaScriptTileSample* output)
+{
+	if (!output || !isfinite(x) || !isfinite(y) || !gGameInfo.gameplay || !gGameInfo.gameplay->sampleTile) return false;
+	*output=(PangeaScriptTileSample){0};
+	return gGameInfo.gameplay->sampleTile(x,y,output);
+}
+
+const PangeaScriptGameplayOps* PangeaScript_GetGameplayOps(void) { return gGameInfo.gameplay; }
+
+#include "pangea_player_operations.inc"
+
+bool PangeaScript_OverlapBox(const PangeaScriptBounds* bounds, const char* category, PangeaScriptObjectHandle* results, int capacity, int* count)
+{
+	const PangeaScriptGameplayOps* ops=gGameInfo.gameplay;
+	if (!bounds || !category || !results || !count || capacity<1 || capacity>64 || !ops || !ops->overlapBox) return false;
+	*count=0;
+	if (!is_finite_vector(&bounds->min) || !is_finite_vector(&bounds->max) || bounds->min.x>bounds->max.x || bounds->min.y>bounds->max.y || bounds->min.z>bounds->max.z) return false;
+	unsigned int mask=0;
+	for (int i=0; ops->collisionCategories && i<ops->collisionCategoryCount; i++)
+		if (ops->collisionCategories[i].name && !strcmp(category,ops->collisionCategories[i].name)) mask=ops->collisionCategories[i].mask;
+	if (!mask || !ops->overlapBox(bounds,mask,results,capacity,count) || *count<0 || *count>capacity) return false;
+	for (int i=0; i<*count; i++) if (!PangeaScript_ObjectExists(results[i])) return false;
+	return true;
+}
+
+static const PangeaScriptStateField* find_state_field(const char* key)
+{
+	const PangeaScriptGameplayOps* ops=gGameInfo.gameplay;
+	if (!key || !ops || !ops->stateFields) return NULL;
+	for (int i=0; i<ops->stateFieldCount; i++) if (ops->stateFields[i].key && !strcmp(key,ops->stateFields[i].key)) return &ops->stateFields[i];
+	return NULL;
+}
+
+bool PangeaScript_GetState(int playerNum, const char* key, PangeaScriptStateValue* output)
+{
+	const PangeaScriptStateField* field=find_state_field(key);
+	if (!field || playerNum<0 || !output || !gGameInfo.gameplay->getState) return false;
+	*output=(PangeaScriptStateValue){.type=field->type};
+	if (!gGameInfo.gameplay->getState(playerNum,key,output) || output->type!=field->type) return false;
+	return output->type==PANGEA_SCRIPT_STATE_BOOLEAN || (output->type==PANGEA_SCRIPT_STATE_NUMBER && isfinite(output->number));
+}
+
+PangeaScriptStatus PangeaScript_SetState(int playerNum, const char* key, const PangeaScriptStateValue* value)
+{
+	PangeaScriptStatus status=reject_networked_execution();
+	const PangeaScriptStateField* field=find_state_field(key);
+	if (status==PANGEA_SCRIPT_OK && (!field || !field->writable || !gGameInfo.gameplay->setState)) status=PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (status==PANGEA_SCRIPT_OK && (!value || playerNum<0 || value->type!=field->type)) status=PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (status==PANGEA_SCRIPT_OK && value->type==PANGEA_SCRIPT_STATE_NUMBER &&
+		(!isfinite(value->number) || value->number<field->min || value->number>field->max)) status=PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (status==PANGEA_SCRIPT_OK) status=gGameInfo.gameplay->setState(playerNum,key,value);
+	record_command("pangea.player.setState",(PangeaScriptObjectHandle){0},status);
+	set_error(status,status==PANGEA_SCRIPT_OK ? "" : "Gameplay state is unavailable, read-only, or outside its valid domain");
+	return status;
+}
+
+PangeaScriptStatus PangeaScript_Complete(int playerNum, bool success)
+{
+	PangeaScriptStatus status=reject_networked_execution();
+	if (status==PANGEA_SCRIPT_OK && playerNum<0) status=PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (status==PANGEA_SCRIPT_OK && (!gGameInfo.gameplay || !gGameInfo.gameplay->complete)) status=PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	if (status==PANGEA_SCRIPT_OK) status=gGameInfo.gameplay->complete(playerNum,success);
+	record_command("pangea.level.complete",(PangeaScriptObjectHandle){0},status);
+	set_error(status,status==PANGEA_SCRIPT_OK ? "" : "Requested completion outcome is unsupported in this game mode");
+	return status;
+}
+
+bool PangeaScript_RulesAreScriptControlled(void) { return gRulesScriptControlled; }
+
+PangeaScriptStatus PangeaScript_SetRulesScriptControlled(bool controlled)
+{
+	PangeaScriptStatus status=reject_networked_execution();
+	if (status==PANGEA_SCRIPT_OK && !gInitialized) status=PANGEA_SCRIPT_NOT_ENABLED;
+	if (status==PANGEA_SCRIPT_OK) gRulesScriptControlled=controlled;
+	record_command("pangea.level.setRulesControlled",(PangeaScriptObjectHandle){0},status);
+	if (status==PANGEA_SCRIPT_OK) set_error(status,"");
+	else if (status==PANGEA_SCRIPT_NOT_ENABLED) set_error(status,"Scripting host is not initialized");
+	return status;
+}
+
+bool PangeaScript_GetJointPosition(PangeaScriptObjectHandle handle, int joint, PangeaScriptVector3* output)
+{
+	RegisteredObject* object=resolve_object(handle);
+	return object && joint>=0 && output && object->ops && object->ops->getJointPosition &&
+		object->ops->getJointPosition(object->nativeObject,joint,output) && is_finite_vector(output);
+}
+
+bool PangeaScript_AttachObject(PangeaScriptObjectHandle child, PangeaScriptObjectHandle parent, int joint, const PangeaScriptVector3* offset)
+{
+	const char* command="pangea.object.attach";
+	if (reject_networked_execution()!=PANGEA_SCRIPT_OK) return false;
+	RegisteredObject* object=resolve_registered_object(child);
+	RegisteredObject* parentObject=resolve_object(parent);
+	if (!object || !parentObject || same_object_handle(child,parent) || joint< -1 || !is_finite_vector(offset))
+		return finish_object_command(command,child,false,PANGEA_SCRIPT_BAD_ARGUMENT,"Attachment requires live distinct handles, a valid joint and finite offset");
+	if (object->capabilityLevel<PANGEA_SCRIPT_CAPABILITY_FULL || !object->ops || !object->ops->setPosition)
+		return finish_object_command(command,child,false,PANGEA_SCRIPT_INCOMPATIBLE_ITEM,"Child does not support attachment position ownership");
+	PangeaScriptVector3 position;
+	bool positioned=joint>=0 ? PangeaScript_GetJointPosition(parent,joint,&position) : PangeaScript_GetObjectPosition(parent,&position);
+	if (!positioned)
+		return finish_object_command(command,child,false,PANGEA_SCRIPT_INCOMPATIBLE_ITEM,"Parent joint is unavailable");
+	position.x+=offset->x; position.y+=offset->y; position.z+=offset->z;
+	if (!is_finite_vector(&position)) return finish_object_command(command,child,false,PANGEA_SCRIPT_BAD_ARGUMENT,"Attachment coordinates exceed the supported range");
+	for (int i=0; parentObject; i++)
+	{
+		if (i>=63) return finish_object_command(command,child,false,PANGEA_SCRIPT_BAD_ARGUMENT,"Attachment chains are limited to 64 objects");
+		if (parentObject->attached && same_object_handle(parentObject->attachmentParent,child)) return finish_object_command(command,child,false,PANGEA_SCRIPT_BAD_ARGUMENT,"Attachments cannot form a cycle");
+		parentObject=parentObject->attached ? resolve_registered_object(parentObject->attachmentParent) : NULL;
+	}
+	if (!object->attached) object->attachmentOriginalControl=object->scriptControlled;
+	object->attached=true; object->scriptControlled=true;
+	object->attachmentParent=parent; object->attachmentJoint=joint; object->attachmentOffset=*offset;
+	return finish_object_command(command,child,true,PANGEA_SCRIPT_RUNTIME_ERROR,"");
+}
+
+bool PangeaScript_DetachObject(PangeaScriptObjectHandle handle)
+{
+	if (reject_networked_execution()!=PANGEA_SCRIPT_OK) return false;
+	RegisteredObject* object=resolve_registered_object(handle);
+	if (!object) return finish_object_command("pangea.object.detach",handle,false,PANGEA_SCRIPT_BAD_ARGUMENT,"Object handle is unknown or stale");
+	if (object->attached) object->scriptControlled=object->attachmentOriginalControl;
+	object->attached=false;
+	object->attachmentParent=(PangeaScriptObjectHandle){0};
+	return finish_object_command("pangea.object.detach",handle,true,PANGEA_SCRIPT_RUNTIME_ERROR,"");
+}
+
+static bool sync_attachment(RegisteredObject* object, int depth)
+{
+	if (!object->attached || !object->enabled) return true;
+	RegisteredObject* parent=resolve_object(object->attachmentParent);
+	if (!parent || depth>=64)
+	{
+		object->attached=false; object->scriptControlled=object->attachmentOriginalControl; return false;
+	}
+	if (!sync_attachment(parent,depth+1)) return false;
+	PangeaScriptVector3 position;
+	bool positioned=object->attachmentJoint<0 ? PangeaScript_GetObjectPosition(object->attachmentParent,&position) :
+		PangeaScript_GetJointPosition(object->attachmentParent,object->attachmentJoint,&position);
+	if (!positioned)
+	{
+		object->attached=false; object->scriptControlled=object->attachmentOriginalControl; return false;
+	}
+	position.x+=object->attachmentOffset.x; position.y+=object->attachmentOffset.y; position.z+=object->attachmentOffset.z;
+	if (is_finite_vector(&position) && object->ops->setPosition(object->nativeObject,&position)) return true;
+	object->attached=false; object->scriptControlled=object->attachmentOriginalControl; return false;
+}
+
+bool PangeaScript_GetObjectBounds(PangeaScriptObjectHandle handle, PangeaScriptBounds* output)
+{
+	RegisteredObject* object=resolve_object(handle);
+	if (!object || !output || !object->ops || !object->ops->getBounds || object->capabilityLevel<PANGEA_SCRIPT_CAPABILITY_READ_ONLY) return false;
+	return object->ops->getBounds(object->nativeObject,output) && is_finite_vector(&output->min) && is_finite_vector(&output->max) &&
+		output->min.x<=output->max.x && output->min.y<=output->max.y && output->min.z<=output->max.z;
+}
+
+static PangeaScriptStatus plan_kinematic_move(PangeaScriptObjectHandle handle, const PangeaScriptVector3* delta, const char* category, PangeaScriptKinematicResult* output)
+{
+	RegisteredObject* object=resolve_object(handle); PangeaScriptBounds bounds;
+	if (!object || !output || !category || !is_finite_vector(delta)) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	if (!object->scriptControlled || object->attached || object->capabilityLevel<PANGEA_SCRIPT_CAPABILITY_FULL || !object->ops || !object->ops->setPosition) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	*output=(PangeaScriptKinematicResult){0};
+	if (!PangeaScript_GetObjectBounds(handle,&bounds) || !PangeaScript_GetObjectPosition(handle,&output->position)) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+	PangeaScriptVector3 remaining=*delta;
+	for (int pass=0; pass<3; pass++)
+	{
+		PangeaScriptCollisionHit hit;
+		if (!PangeaScript_SweepBox(&bounds,&remaining,category,handle,&hit)) return PANGEA_SCRIPT_INCOMPATIBLE_ITEM;
+		float fraction=hit.object.id ? hit.fraction : 1;
+		float length=sqrtf(remaining.x*remaining.x+remaining.y*remaining.y+remaining.z*remaining.z);
+		if (!isfinite(length)) return PANGEA_SCRIPT_BAD_ARGUMENT;
+		float travel=hit.object.id && length>0 ? fmaxf(0,fraction-.001f/length) : fraction;
+		PangeaScriptVector3 moved={remaining.x*travel,remaining.y*travel,remaining.z*travel};
+		output->position.x+=moved.x; output->position.y+=moved.y; output->position.z+=moved.z;
+		bounds.min.x+=moved.x; bounds.min.y+=moved.y; bounds.min.z+=moved.z;
+		bounds.max.x+=moved.x; bounds.max.y+=moved.y; bounds.max.z+=moved.z;
+		if (!hit.object.id) break;
+		output->contacts[output->contactCount++]=hit;
+		remaining.x*=1-fraction; remaining.y*=1-fraction; remaining.z*=1-fraction;
+		float inward=remaining.x*hit.normal.x+remaining.y*hit.normal.y+remaining.z*hit.normal.z;
+		if (inward>=0) break;
+		remaining.x-=inward*hit.normal.x; remaining.y-=inward*hit.normal.y; remaining.z-=inward*hit.normal.z;
+	}
+	if (!is_finite_vector(&output->position)) return PANGEA_SCRIPT_BAD_ARGUMENT;
+	return object->ops->setPosition(object->nativeObject,&output->position) ? PANGEA_SCRIPT_OK : PANGEA_SCRIPT_RUNTIME_ERROR;
+}
+
+PangeaScriptStatus PangeaScript_MoveKinematic(PangeaScriptObjectHandle handle, const PangeaScriptVector3* delta, const char* category, PangeaScriptKinematicResult* output)
+{
+	PangeaScriptStatus status=reject_networked_execution();
+	if (status==PANGEA_SCRIPT_OK) status=plan_kinematic_move(handle,delta,category,output);
+	record_command("pangea.object.moveKinematic",handle,status);
+	set_error(status,status==PANGEA_SCRIPT_OK ? "" : "Kinematic movement requires script ownership, valid bounds and a complete collision query");
+	return status;
+}
+
+void PangeaScript_UpdateAttachments(void)
+{
+	for (int i=0; i<PANGEA_SCRIPT_MAX_OBJECTS; i++)
+		if (gRegisteredObjects[i].active && gRegisteredObjects[i].attached) (void)sync_attachment(&gRegisteredObjects[i],0);
+}
+
 bool PangeaScript_DeleteObject(PangeaScriptObjectHandle handle)
 {
 	RegisteredObject* object = resolve_object(handle);
 	if (!object)
 		return finish_object_command("pangea.object.delete", handle, false, PANGEA_SCRIPT_BAD_ARGUMENT, "Object handle is unknown or stale");
+	const char* category=PangeaScript_GetObjectCategory(handle);
+	if (category && !strcmp(category,"player"))
+		return finish_object_command("pangea.object.delete",handle,false,PANGEA_SCRIPT_INCOMPATIBLE_ITEM,"Native player bodies require a game-specific despawn operation");
 	if (!object->ops || !object->ops->deleteObject)
 		return finish_object_command("pangea.object.delete", handle, false, PANGEA_SCRIPT_RUNTIME_ERROR, "Object does not support deletion commands");
 

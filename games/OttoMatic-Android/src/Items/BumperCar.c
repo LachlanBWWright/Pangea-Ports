@@ -299,6 +299,48 @@ int	a,i;
 
 
 
+#ifdef PANGEA_ENABLE_SCRIPTING
+bool OttoScript_MountNativeCar(ObjNode* car)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!car || car->MoveCall != PlayerMoveBumperCar || !player || !player->Skeleton ||
+		player->Type != SKELETON_TYPE_OTTO || gPlayerIsDead || gPlayerCar || gTargetPickup ||
+		car->AreaNum < 0 || car->AreaNum >= MAX_AREAS || gBumperCarGateBlown[car->AreaNum]) return false;
+	OGLPoint3D savedCoord = gCoord;
+	DoTrig_BumperCar(car, player, 0);
+	player->Coord = gCoord;
+	player->OldCoord = player->Coord;
+	player->Delta = car->Delta;
+	gPlayerInfo.coord = player->Coord;
+	UpdateObjectTransforms(player);
+	gCoord = savedCoord;
+	return true;
+}
+
+bool OttoScript_DismountNativeCar(void)
+{
+	ObjNode* player = gPlayerInfo.objNode;
+	if (!gPlayerCar || !player || !player->Skeleton || gPlayerIsDead) return false;
+	MorphToSkeletonAnim(player->Skeleton, PLAYER_ANIM_JUMP, 5.0f);
+	gDoJumpJetAtApex = false;
+	player->Delta.y = 2000.0f;
+	player->Coord.y = gPlayerCar->Coord.y + 130.0f;
+	gPlayerInfo.coord = player->Coord;
+	StopBumperCars();
+	return true;
+}
+
+ObjNode* OttoScript_GetNativeCar(void) { return gPlayerCar; }
+
+void OttoScript_ClearNativeCar(ObjNode* node)
+{
+	if (node == gPlayerCar || node == gPlayerInfo.objNode) StopBumperCars();
+	for (int area = 0; area < MAX_AREAS; area++)
+		for (int car = 0; car < MAX_CARS; car++)
+			if (gCarList[area][car] == node) gCarList[area][car] = NULL;
+}
+#endif
+
 /******************** MOVE ENEMY BUMPER CAR *****************/
 
 static void MoveEnemyBumperCar(ObjNode *theNode)

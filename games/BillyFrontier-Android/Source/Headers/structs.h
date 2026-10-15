@@ -334,6 +334,8 @@ struct ObjNode
 	uint32_t		ScriptActiveCType;
 	uint32_t		ScriptActiveCBits;
 	Boolean			ScriptActiveStateInitialized;
+	Boolean			ScriptInactive;
+	Boolean			ScriptActiveWasHidden;
 	
 	float			Health;				// health 0..1
 	float			Damage;				// damage

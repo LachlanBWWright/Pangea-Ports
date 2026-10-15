@@ -345,6 +345,16 @@ ObjNode	*theNode;
 		theNode = gSplineObjectList[i];
 		if (theNode)
 		{
+			if (gGamePaused && !(theNode->StatusBits & STATUS_BIT_MOVEINPAUSE)) continue;
+			if (theNode->StatusBits & STATUS_BIT_NOMOVE) continue;
+#ifdef PANGEA_ENABLE_SCRIPTING
+			PangeaScriptObjectHandle handle = {theNode->ScriptObjectID, (uint32_t)theNode->ScriptObjectGeneration};
+			if (PangeaScript_ObjectIsScriptControlled(handle))
+			{
+				CroMagScript_RunObjectFrame(theNode);
+				continue;
+			}
+#endif
 			if (theNode->SplineMoveCall)
 				theNode->SplineMoveCall(theNode);				// call object's spline move routine
 		}

@@ -90,6 +90,9 @@ ObjNode	*newObj;
 	newObj->WhoHasPickUp = nil;					// noone is holding this yet
 	newObj->EggIsInPortal = false;				// egg isn't in portal
 	newObj->Kind = itemPtr->parm[0];			// remember species of egg
+	newObj->SpecialF[0] = newObj->Coord.x;
+	newObj->SpecialF[1] = newObj->Coord.y;
+	newObj->SpecialF[2] = newObj->Coord.z;
 	
 
 
@@ -110,8 +113,6 @@ ObjNode	*newObj;
 
 static void MoveEgg(ObjNode *theNode)
 {
-short	species;
-
 	DefaultMovePickupObject(theNode);			// handle it as a pickup
 
 
@@ -120,19 +121,33 @@ short	species;
 	
 	if (DoSimplePointCollision(&gCoord,CTYPE_PORTAL))
 	{
-		ObjNode	*whoHasMe;
-
 #ifdef PANGEA_ENABLE_SCRIPTING
 		if (!NanosaurScript_OnPickupCollected(theNode, (ObjNode *)theNode->WhoHasPickUp, theNode->Kind, 1.0f, "nanosaur.egg"))
 			return;
+		if (PangeaScript_RulesAreScriptControlled()) return;
 #endif
 		
+		DeliverEgg(theNode, nil);
+	}
+}
+
+Boolean DeliverEgg(ObjNode *theNode, ObjNode *portal)
+{
+	short species;
+	ObjNode *whoHasMe;
+	if (!theNode || theNode->Genre != DISPLAY_GROUP_GENRE || theNode->Group != LEVEL0_MGroupNum_Egg
+		|| theNode->Type < LEVEL0_MObjType_Egg1 || theNode->Type > LEVEL0_MObjType_Egg5
+		|| theNode->EggIsInPortal || theNode->Kind < 0 || theNode->Kind >= NUM_EGG_SPECIES) return false;
+	if (portal && (portal->Genre != EVENT_GENRE || portal->Kind != PORTAL_TYPE_EGG || !(portal->CType & CTYPE_PORTAL))) return false;
+
 		/* EGG HAS BEEN RECOVERED */
 
 		whoHasMe = (ObjNode *)theNode->WhoHasPickUp;			// who has this?
 		DropItem(whoHasMe);							// if I'm carrying it, get rid of it
+		if (portal) theNode->Coord = portal->Coord;
 		species = theNode->Kind;					// get species type
-		gRecoveredEggs[species]++;					// inc counter
+		if (gRecoveredEggs[species] < 32767)
+			gRecoveredEggs[species]++;
 		if (gRecoveredEggs[species] == 1)			// see if 1st of this species
 		{
 			gInfobarUpdateBits |= UPDATE_EGGS;		// update infobar
@@ -155,8 +170,8 @@ short	species;
 		
 		PlayEffect(EFFECT_PORTAL);
 		
-		UpdateObjectTransforms(theNode);		
-	}
+		UpdateObjectTransforms(theNode);
+	return true;
 }
 
 
@@ -430,6 +445,12 @@ static const TQ3Point3D	inPoint = {0,0,0};
 		return;
 
 	itemObj = theNode->CarriedObj;									// get item's obj
+	if (!itemObj || itemObj->CType == INVALID_NODE_FLAG)
+	{
+		theNode->StatusBits &= ~STATUS_BIT_ISCARRYING;
+		theNode->CarriedObj = nil;
+		return;
+	}
 	itemObj->WhoHasPickUp = nil;									// let item know it's not being carried
 	theNode->StatusBits &= ~STATUS_BIT_ISCARRYING;					// clear carrying flag
 	theNode->CarriedObj = nil;										// clear carried obj ptr
@@ -445,18 +466,56 @@ static const TQ3Point3D	inPoint = {0,0,0};
 	Q3Point3D_Transform(&inPoint, &itemObj->BaseTransformMatrix, &itemObj->Coord);
 }
 
+Boolean CarryEgg(ObjNode *holder, ObjNode *egg)
+{
+	if (!holder || !holder->Skeleton || !egg || egg->Genre != DISPLAY_GROUP_GENRE
+		|| egg->Group != LEVEL0_MGroupNum_Egg || egg->Type < LEVEL0_MObjType_Egg1
+		|| egg->Type > LEVEL0_MObjType_Egg5 || egg->EggIsInPortal
+		|| egg->WhoHasPickUp || !(egg->CType & CTYPE_PICKUP)
+		|| (holder->StatusBits & STATUS_BIT_ISCARRYING)) return false;
+	holder->StatusBits |= STATUS_BIT_ISCARRYING;
+	holder->CarriedObj = egg;
+	egg->WhoHasPickUp = holder;
+	egg->HoldingLimb = MYGUY_LIMB_HEAD;
+	egg->OldCBits = egg->CBits;
+	egg->OldCType = egg->CType;
+	egg->CBits = egg->CType = 0;
+	egg->StatusBits |= STATUS_BIT_DONTCULL;
+	return true;
+}
+
+Boolean UpdateCarriedEgg(ObjNode* egg)
+{
+	if (!egg || egg->Genre != DISPLAY_GROUP_GENRE || egg->Group != LEVEL0_MGroupNum_Egg
+		|| egg->Type < LEVEL0_MObjType_Egg1 || egg->Type > LEVEL0_MObjType_Egg5
+		|| !egg->WhoHasPickUp) return false;
+	DefaultMovePickupObject(egg);
+	return true;
+}
+
+void ReleasePickupRelationships(ObjNode *object)
+{
+	DropItem(object);
+	if (object->Genre == DISPLAY_GROUP_GENRE && object->Group == LEVEL0_MGroupNum_Egg
+		&& object->Type >= LEVEL0_MObjType_Egg1 && object->Type <= LEVEL0_MObjType_Egg5
+		&& object->WhoHasPickUp) DropItem((ObjNode *)object->WhoHasPickUp);
+}
+
 
 /********************* SEE IF ALL EGG SPECIES RECOVERED ***********************/
 
 static Boolean SeeIfAllEggSpeciesRecovered(void)
 {
 int	i,n;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (PangeaScript_RulesAreScriptControlled()) return false;
+#endif
 	
 			/* COUNT # SPECIES GOTTEN */
 			
 	n = 0;
 	for (i = 0; i < NUM_EGG_SPECIES; i++)
-		if (gRecoveredEggs[i] > 0)
+		if (gRecoveredEggs[i] >= gRequiredEggs[i])
 			n++;
 
 

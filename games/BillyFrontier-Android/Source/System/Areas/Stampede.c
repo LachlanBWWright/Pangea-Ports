@@ -11,6 +11,7 @@
 
 #include "game.h"
 #include "profiling.h"
+#include "ScriptRules.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -115,6 +116,9 @@ void PlayStampede(void)
 
 		StartProfilePhase(PROFILE_PHASE_GAME_LOGIC);
 		MoveEverything_Stampede();
+#ifdef PANGEA_ENABLE_SCRIPTING
+		PangeaScript_UpdateAttachments();
+#endif
 		KeepTerrainAlive();
 
 		OGL_DrawScene(DefaultDrawCallback);
@@ -663,7 +667,7 @@ int		markerNum;
 
 			/* SEE IF DONE */
 				
-	if (SeeIfCrossedLineMarker(&player->OldCoord, &gCoord, &markerNum))
+	if (BillyScript_NativeRulesAllowed() && SeeIfCrossedLineMarker(&player->OldCoord, &gCoord, &markerNum))
 	{
 		if (!gLevelCompleted)							// only win if we were the first to cross the line
 		{
@@ -797,6 +801,7 @@ Boolean		killed = false;
 
 static void BillyGotTrampled(ObjNode *player)
 {
+	if (!BillyScript_NativeRulesAllowed()) return;
 	if (player->Skeleton->AnimNum != PLAYER_ANIM_STAMPEDETRAMPLED)
 	{
 		KillPlayer(PLAYER_DEATH_TYPE_TRAMPLED);
@@ -923,7 +928,7 @@ int		markerNum;
 
 			/* DID KANGA WIN BEFORE US? */
 			
-	if (SeeIfCrossedLineMarker(&theNode->OldCoord, &theNode->Coord, &markerNum))
+	if (BillyScript_NativeRulesAllowed() && SeeIfCrossedLineMarker(&theNode->OldCoord, &theNode->Coord, &markerNum))
 	{
 		StartLevelCompletion(.1);
 	}			
@@ -1127,7 +1132,7 @@ int			markerNum;
 
 			/* DID KANGA WIN BEFORE US? */
 			
-	if (SeeIfCrossedLineMarker(&theNode->OldCoord, &theNode->Coord, &markerNum))
+	if (BillyScript_NativeRulesAllowed() && SeeIfCrossedLineMarker(&theNode->OldCoord, &theNode->Coord, &markerNum))
 	{
 		StartLevelCompletion(.1);
 	}			

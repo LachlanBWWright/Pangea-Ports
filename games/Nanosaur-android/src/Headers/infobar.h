@@ -6,6 +6,9 @@
 #define	NUM_EGG_SPECIES		5
 #define LEVEL_DURATION		(60*20)			// n seconds
 
+extern float gTimeRemaining;
+extern short gRequiredEggs[NUM_EGG_SPECIES];
+
 enum
 {
 	UPDATE_WEAPONICON = (1),

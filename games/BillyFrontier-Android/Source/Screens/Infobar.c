@@ -10,7 +10,9 @@
 /****************************/
 
 #include "game.h"
+#include "../../../../shared/script/pangea_presentation_game.h"
 #include "profiling.h"
+#include "ScriptRules.h"
 
 /****************************/
 /*    PROTOTYPES            */
@@ -192,6 +194,8 @@ void DrawInfobar(ObjNode* infobarObj)
 				break;
 				
 	}
+	SetInfobarSpriteState(0);
+	ScriptPresentation_Draw();
 	
 			
 			/***********/
@@ -651,7 +655,7 @@ static const OGLPoint2D	bulletCoords[6] =
 
 	if (gNeedToReloadNextAmmoClip)
 	{
-		if (GetNewNeedState(kNeed_Reload))					// user pressed the reload button?
+		if (BillyScript_NativeRulesAllowed() && GetNewNeedState(kNeed_Reload))					// user pressed the reload button?
 		{
 			gNeedToReloadNextAmmoClip = false;
 			PlayEffect(EFFECT_RELOAD);

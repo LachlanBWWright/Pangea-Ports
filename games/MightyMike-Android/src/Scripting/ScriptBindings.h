@@ -12,6 +12,7 @@ void MikeScript_LoadAreaConfig(int sceneNum, int areaNum);
 void MikeScript_OnAreaLoad(int sceneNum, int areaNum);
 void MikeScript_OnAreaStart(int sceneNum, int areaNum);
 void MikeScript_OnAreaFrame(int sceneNum, int areaNum, unsigned int frameNum, float deltaSeconds);
+void MikeScript_UpdateEffects(float deltaSeconds);
 void MikeScript_OnAreaComplete(int sceneNum, int areaNum);
 void MikeScript_OnAreaUnload(int sceneNum, int areaNum);
 // --- Live-object scripting extension ---
@@ -39,6 +40,6 @@ int MikeScript_SelectMapItemForReplacementJS(void);
 int MikeScript_GetSelectedMapItemFieldJS(int field);
 int MikeScript_ProbeSelectedMapReplacementJS(void);
 int MikeScript_ProbeSaveLoadJS(int saveSlot);
-void MikeScript_OnCustomTrigger(ObjNode* trigger, Byte sideBits);
+Boolean MikeScript_OnCustomTrigger(ObjNode* trigger, Byte sideBits);
 
 #endif

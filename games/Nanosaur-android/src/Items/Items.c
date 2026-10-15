@@ -679,6 +679,18 @@ ObjNode	*newObj;
 
 /********************* MOVE GAS VENT **********************/
 
+static Boolean AcceptGasVentFuel(ObjNode* vent)
+{
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!NanosaurScript_OnPickupCollected(vent, gPlayerObj, vent->Kind,
+		(MAX_FUEL_CAPACITY / 5.0f) * gFramesPerSecondFrac, "nanosaur.fuelVent")) return false;
+	if (PangeaScript_RulesAreScriptControlled()) return false;
+#else
+	(void)vent;
+#endif
+	return true;
+}
+
 static void MoveGasVent(ObjNode *theNode)
 {
 float	d;
@@ -711,7 +723,7 @@ float	d;
 			if (gMyCoord.z < theNode->CollisionBoxes->front)
 				if (gMyCoord.z > theNode->CollisionBoxes->back)
 					if (gMyCoord.y < theNode->CollisionBoxes->top)
-						if (gMyCoord.y > theNode->CollisionBoxes->bottom)
+						if (gMyCoord.y > theNode->CollisionBoxes->bottom && AcceptGasVentFuel(theNode))
 						{
 							gFuel += (MAX_FUEL_CAPACITY / 5.0f) * gFramesPerSecondFrac;
 							if (gFuel > MAX_FUEL_CAPACITY)

@@ -60,7 +60,10 @@ extern	void InitMyGuy(void);
 extern	void StartMyShield(ObjNode *theNode);
 extern	float gShieldTimer;
 extern	void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean overrideShield);
+enum { PLAYER_DAMAGE_UNKNOWN, PLAYER_DAMAGE_CONTACT, PLAYER_DAMAGE_PROJECTILE, PLAYER_DAMAGE_LAVA };
+void PlayerGotHurtFromSource(ObjNode* theNode, ObjNode* source, int cause, float damage, Boolean doHurtAnim, Boolean overrideShield);
 extern	void ResetPlayer(void);
+void AdvancePlayerExit(ObjNode* player);
 extern	int NanosaurScript_ProbeDeathJS(void);
 
 

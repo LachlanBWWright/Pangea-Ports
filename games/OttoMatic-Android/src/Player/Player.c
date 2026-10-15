@@ -11,6 +11,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
@@ -34,6 +35,7 @@ static void MoveRocketShip_Waiting2(ObjNode *rocket);
 static void ExplodePlayer(void);
 static void CheckIfPlayerSuckedIntoBlobWell(ObjNode *player, ObjNode *rocket);
 static void AlignRocketDoor(ObjNode *rocket);
+static Boolean ApplyPlayerHealthLoss(float damage, Byte deathType, Boolean intercepted);
 
 
 /****************************/
@@ -220,6 +222,15 @@ ObjNode	*player = gPlayerInfo.objNode;
 	if (player->Skeleton == nil)									// make sure there's a skeleton
 		DoFatalAlert("PlayerGotHit: no skeleton on player");
 
+	float damage = byWhat ? byWhat->Damage : altDamage;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!OttoScript_OnDamage(byWhat, damage, PLAYER_DEATH_TYPE_EXPLODE, &damage))
+		return false;
+	if (player->CType == INVALID_NODE_FLAG) return false;
+	if (PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){player->ScriptObjectID, player->ScriptObjectGeneration}))
+		return false;
+#endif
+
 
 			/* SPECIAL CASE IF WAS RIDING A BUBBLE */
 
@@ -257,12 +268,12 @@ ObjNode	*player = gPlayerInfo.objNode;
 		if (byWhat)
 		{
 			r = byWhat->Rot.y;
-			PlayerLoseHealth(byWhat->Damage, PLAYER_DEATH_TYPE_EXPLODE);
+			ApplyPlayerHealthLoss(damage, PLAYER_DEATH_TYPE_EXPLODE, true);
 		}
 		else
 		{
 			r = player->Rot.y;
-			PlayerLoseHealth(altDamage, PLAYER_DEATH_TYPE_EXPLODE);
+			ApplyPlayerHealthLoss(damage, PLAYER_DEATH_TYPE_EXPLODE, true);
 		}
 
 		player->Delta.x = -sin(r) * 1000.0f;
@@ -292,6 +303,11 @@ ObjNode	*player = gPlayerInfo.objNode;
 
 Boolean PlayerLoseHealth(float damage, Byte deathType)
 {
+	return ApplyPlayerHealthLoss(damage, deathType, false);
+}
+
+static Boolean ApplyPlayerHealthLoss(float damage, Byte deathType, Boolean intercepted)
+{
 Boolean	killed = false;
 
 #ifdef __EMSCRIPTEN__
@@ -304,8 +320,13 @@ Boolean	killed = false;
 		return(true);
 
 #ifdef PANGEA_ENABLE_SCRIPTING
-	if (!OttoScript_OnDamage(nil, damage, deathType, &damage))
+	if (!intercepted && !OttoScript_OnDamage(nil, damage, deathType, &damage))
 		return(false);
+	ObjNode* player = gPlayerInfo.objNode;
+	if (player && PangeaScript_ObjectIsScriptControlled((PangeaScriptObjectHandle){player->ScriptObjectID, player->ScriptObjectGeneration}))
+		return false;
+#else
+	(void) intercepted;
 #endif
 
 	gPlayerInfo.health -= damage;
@@ -1123,8 +1144,7 @@ float	y;
 	{
 		if (rocket->Kind == ROCKET_KIND_EXIT)			// see if that's the end of the level
 		{
-			gLevelCompleted = true;
-			gLevelCompletedCoolDownTimer = 0;
+			OttoScript_CompleteNativeLevel(0);
 		}
 		else
 		{
@@ -1618,7 +1638,7 @@ DeformationType		defData;
 
 			/* SEE IF PLAYER IN THAT ZONE */
 
-	if (IsPointInPoly2D(gPlayerInfo.coord.x - rocket->Coord.x,
+	if (OttoScript_UsesNativeRules() && IsPointInPoly2D(gPlayerInfo.coord.x - rocket->Coord.x,
 						gPlayerInfo.coord.z - rocket->Coord.z, 4, area))	// see if play in hot zone
 	{
 		player->CType = 0;
@@ -1631,8 +1651,7 @@ DeformationType		defData;
 
 			player->Delta.x = player->Delta.z = 0;					// stop player
 
-			gLevelCompleted = true;									// level is completed...
-			gLevelCompletedCoolDownTimer = 4.0;						// .. but do a cooldown to give time to see player sink
+			OttoScript_CompleteNativeLevel(4.0f);
 
 
 				/* MAKE DEFORMATION WELL */

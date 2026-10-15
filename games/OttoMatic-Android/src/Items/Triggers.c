@@ -10,6 +10,7 @@
 /****************************/
 
 #include "game.h"
+#include "ScriptRules.h"
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
@@ -838,6 +839,14 @@ static Boolean DoTrig_Checkpoint(ObjNode *theNode, ObjNode *whoNode, Byte sideBi
 {
 
 #pragma unused (whoNode, sideBits)
+
+	if (!OttoScript_UsesNativeRules())
+	{
+#ifdef PANGEA_ENABLE_SCRIPTING
+		OttoScript_OnCheckpointReached(theNode->CheckpointNum);
+#endif
+		return true;
+	}
 
 
 			/* DO THE USUAL CHECKPOINT STUFF */

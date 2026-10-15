@@ -32,6 +32,7 @@ int BugdomScript_GetKeyCount(void);
 bool BugdomScript_GetKey(int keyID);
 bool BugdomScript_SetKey(int keyID, bool enabled);
 void GetMoney(void);
+void BugdomScript_SetMoney(short amount);
 void UseMoney(void);
 Boolean DoWeHaveEnoughMoney(void);
 void LoseBallTime(float amount);

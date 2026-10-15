@@ -155,7 +155,11 @@ int16_t offset;
 				float hitDamage = weapon->WeaponPower;
 				Boolean destroyTarget = false;
 #ifdef PANGEA_ENABLE_SCRIPTING
-				if (!MikeScript_OnWeaponHit(weapon, gThisNodePtr, hitDamage, &hitDamage, &destroyTarget))
+				ObjNode* target = gThisNodePtr;
+				Boolean applyDamage = MikeScript_OnWeaponHit(weapon, target, hitDamage, &hitDamage, &destroyTarget);
+				if (target->CType == INVALID_NODE_FLAG || target->ScriptDeleteRequested)
+					return true;
+				if (!applyDamage)
 				{
 					if (weapon->CType != INVALID_NODE_FLAG)
 						WeaponHitEnemy(weapon);

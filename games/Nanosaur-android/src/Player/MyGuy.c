@@ -747,6 +747,10 @@ int	oldFuel;
 			/* LOSE FUEL */
 			
 	oldFuel = gFuel;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!PangeaScript_RulesAreScriptControlled())
+	{
+#endif
 	gFuel -= gFramesPerSecondFrac * FUEL_LOSS_RATE;	
 	if (gFuel <= 0.0f)
 	{
@@ -756,6 +760,9 @@ int	oldFuel;
 	}
 	if ((int)gFuel != oldFuel)								// only update infobar if changed by integer value 
 		gInfobarUpdateBits |= UPDATE_FUEL;
+#ifdef PANGEA_ENABLE_SCRIPTING
+	}
+#endif
 
 				/* COLLISION */
 				
@@ -807,7 +814,11 @@ TQ3Point3D	oldMyCoord;
 		gDelta.y += gFramesPerSecondFrac * 100;
 		gCoord.y += gDelta.y * gFramesPerSecondFrac;
 		theNode->ExitTimer += gFramesPerSecondFrac;				// change transparency value
-		if (theNode->ExitTimer > 5)
+		if (theNode->ExitTimer > 5
+#ifdef PANGEA_ENABLE_SCRIPTING
+			&& !PangeaScript_RulesAreScriptControlled()
+#endif
+			)
 		{
 			gGameOverFlag = true;
 			gWonGameFlag = true;
@@ -830,6 +841,13 @@ TQ3Point3D	oldMyCoord;
 
 
 /************************ UPDATE PLAYER ***************************/
+void AdvancePlayerExit(ObjNode* player)
+{
+	if (!player || !player->Skeleton || player != gPlayerObj || gPlayerGotKilledFlag) return;
+	GetObjectInfo(player);
+	MovePlayer_Exit(player);
+}
+
 
 static void UpdatePlayer(ObjNode *theNode)
 {
@@ -852,7 +870,11 @@ static void UpdatePlayer(ObjNode *theNode)
 	
 			/* CHECK FOR EASTER EGG */
 			
-	if (gMyCoord.y > 1500)						// while riding birdie does this
+	if (gMyCoord.y > 1500
+#ifdef PANGEA_ENABLE_SCRIPTING
+		&& !PangeaScript_RulesAreScriptControlled()
+#endif
+		)
 	{
 		GetCheatWeapons();
 		GetHealth(1);
@@ -918,7 +940,7 @@ UInt8		sides;
 			{
 				hitObj->Delta.x = hitObj->Delta.z = 0;
 				if (hitObj->CType & CTYPE_HURTIFTOUCH)			// see if enemy is deadly to touch
-					PlayerGotHurt(theNode,hitObj->Damage,true,false);
+					PlayerGotHurtFromSource(theNode, hitObj, PLAYER_DAMAGE_CONTACT, hitObj->Damage, true, false);
 			}
 			
 				/**********************/
@@ -928,7 +950,7 @@ UInt8		sides;
 			else
 			if (ctype & CTYPE_HURTME)
 			{
-				PlayerGotHurt(theNode,hitObj->Damage,true,false);
+				PlayerGotHurtFromSource(theNode, hitObj, PLAYER_DAMAGE_PROJECTILE, hitObj->Damage, true, false);
 				
 					/* SEE IF WAS DINO SPIT */
 					
@@ -956,7 +978,7 @@ UInt8		sides;
 		{
 			float	x,z;
 
-			PlayerGotHurt(theNode,.05,false,true);
+			PlayerGotHurtFromSource(theNode, nil, PLAYER_DAMAGE_LAVA, .05f, false, true);
 			gLavaSmokeCounter += gFramesPerSecondFrac;
 			if (gLavaSmokeCounter > .08f)
 			{
@@ -1010,6 +1032,11 @@ UInt32		ctype;
 
 void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean overrideShield)
 {
+	PlayerGotHurtFromSource(theNode, nil, PLAYER_DAMAGE_UNKNOWN, damage, doHurtAnim, overrideShield);
+}
+
+void PlayerGotHurtFromSource(ObjNode* theNode, ObjNode* source, int cause, float damage, Boolean doHurtAnim, Boolean overrideShield)
+{
 	if (damage == 0.0f)
 		return;
 		
@@ -1017,13 +1044,20 @@ void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean o
 		if (gMyShield)															// see if shielded
 			return;
 		
-	StopJetPack(theNode);													// make sure this is stopped when get hit
-
 	if (gPlayerGotKilledFlag)												// cant get hurt if already dead
 		return;
 		
 	if (theNode->InvincibleTimer > 0)										// cant be harmed if invincible
 		return;
+
+#ifdef PANGEA_ENABLE_SCRIPTING
+	if (!NanosaurScript_OnDamage(source, damage, cause, &damage) || damage <= 0.0f || theNode->CType == INVALID_NODE_FLAG)
+		return;
+#else
+	(void) source;
+	(void) cause;
+#endif
+	StopJetPack(theNode);
 
 	if (doHurtAnim)
 	{
@@ -1041,14 +1075,9 @@ void PlayerGotHurt(ObjNode *theNode, float damage, Boolean doHurtAnim, Boolean o
 	if (theNode->InvincibleTimer < INVINCIBILITY_DURATION_SHORT)
 		theNode->InvincibleTimer = INVINCIBILITY_DURATION_SHORT;	// make me invincible for a shorter while
 	
-	#ifdef PANGEA_ENABLE_SCRIPTING
-	if (!NanosaurScript_OnDamage(theNode, damage, 0, &damage))
-		return;
-	#endif
-	
 	gMyHealth -= damage;										// take damage
 	#ifdef PANGEA_ENABLE_SCRIPTING
-	NanosaurScript_OnDamageApplied(damage, 0);
+	NanosaurScript_OnDamageApplied(damage, cause);
 	#endif
 	gInfobarUpdateBits |= UPDATE_HEALTH;						// tell system to update this at end of frame
 	if (gMyHealth <= 0)											// see if was killed
@@ -1062,6 +1091,7 @@ static void KillPlayer(ObjNode *theNode)
 {
 	if (!gPlayerGotKilledFlag)
 	{
+		DropItem(theNode);
 		StopJetPack(theNode);
 		theNode->StatusBits &= ~STATUS_BIT_HIDDEN;				// un-hide me -- camera gets reset to third-person mode
 		MorphToSkeletonAnim(theNode->Skeleton,PLAYER_ANIM_DEATH,1.5);

@@ -13,6 +13,7 @@
 #ifdef PANGEA_ENABLE_SCRIPTING
 #include "ScriptBindings.h"
 #endif
+#include "ScriptRulePolicy.h"
 #include "window.h"
 #include "enemy.h"
 #include "object.h"
@@ -164,10 +165,6 @@ ObjNode		*newObj;
 	if (newObj == nil)
 		return(false);
 
-#ifdef PANGEA_ENABLE_SCRIPTING
-	MikeScript_RegisterObject(newObj, "mightymike.miscPowerup", "pickup");
-#endif
-
 	newObj->ItemIndex = itemPtr;					// remember where this came from
 
 	newObj->CType = CTYPE_BONUS;
@@ -279,6 +276,7 @@ short		i;
 
 void DecBunnyCount(void)
 {
+	if (!MikeScript_NativeRulesEnabled()) return;
 	if (--gNumBunnies <= 0)									// dec & see if that was the last bunny
 	{
 		gNumBunnies = 0;
@@ -667,6 +665,7 @@ void MoveShield(void)
 {
 	gThisNodePtr->X.Int = gMyNodePtr->X.Int;
 	gThisNodePtr->Y.Int = gMyNodePtr->Y.Int;
+	if (!MikeScript_NativeRulesEnabled()) return;
 
 	if (--gShieldTimer == 0)								// see if timeup
 		DeleteObject(gShieldNodePtr);
